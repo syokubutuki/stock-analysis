@@ -33,6 +33,10 @@ const EMDChart = dynamic(
   () => import("./components/analysis/EMDChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
 );
+const AnalyticSignalChart = dynamic(
+  () => import("./components/analysis/AnalyticSignalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const RecurrencePlot = dynamic(
   () => import("./components/analysis/RecurrencePlot"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -73,6 +77,46 @@ const VolatilityChart = dynamic(
   () => import("./components/analysis/VolatilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
 );
+const HilbertHuangChart = dynamic(
+  () => import("./components/analysis/HilbertHuangChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const GarchChart = dynamic(
+  () => import("./components/analysis/GarchChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RegimeChart = dynamic(
+  () => import("./components/analysis/RegimeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const CausalChart = dynamic(
+  () => import("./components/analysis/CausalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const FractalExtChart = dynamic(
+  () => import("./components/analysis/FractalExtChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const HVGChart = dynamic(
+  () => import("./components/analysis/HVGChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
+);
+const RecurrenceNetworkChart = dynamic(
+  () => import("./components/analysis/RecurrenceNetworkChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const TailRiskChart = dynamic(
+  () => import("./components/analysis/TailRiskChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const TDAChart = dynamic(
+  () => import("./components/analysis/TDAChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const KramersMoyalChart = dynamic(
+  () => import("./components/analysis/KramersMoyalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -95,18 +139,24 @@ type SectionKey =
   | "entropy"
   | "fractal"
   | "network"
-  | "calendar";
+  | "calendar"
+  | "regime"
+  | "causal"
+  | "tailrisk";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "basic", label: "基本分析", description: "差分系列・出来高・トレンド" },
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化" },
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF" },
-  { key: "volatility", label: "ボラティリティ", description: "EWMA・レジーム検出・クラスタリング" },
-  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD" },
-  { key: "nonlinear", label: "非線形動力学", description: "位相空間・Recurrence Plot・RQA・Lyapunov" },
+  { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・レバレッジ・ジャンプ" },
+  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT" },
+  { key: "nonlinear", label: "非線形動力学", description: "Recurrence Plot・Lyapunov・KM係数・TDA" },
   { key: "entropy", label: "情報理論", description: "エントロピー・マルチスケール・Fisher情報量" },
-  { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA" },
-  { key: "network", label: "ネットワーク", description: "Visibility Graph・Ordinal Pattern遷移" },
+  { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
+  { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
+  { key: "regime", label: "レジーム分析", description: "HMM・変化点検出・カルマンフィルタ" },
+  { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量" },
+  { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
 ];
 
@@ -244,7 +294,10 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "volatility" && (
-                <VolatilityChart prices={filteredPrices} />
+                <>
+                  <VolatilityChart prices={filteredPrices} />
+                  <GarchChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "frequency" && (
@@ -252,11 +305,17 @@ export default function AnalysisPage() {
                   <PowerSpectrum prices={filteredPrices} />
                   <WaveletChart prices={filteredPrices} />
                   <EMDChart prices={filteredPrices} />
+                  <AnalyticSignalChart prices={filteredPrices} />
+                  <HilbertHuangChart prices={filteredPrices} />
                 </>
               )}
 
               {activeSection === "nonlinear" && (
-                <RecurrencePlot prices={filteredPrices} />
+                <>
+                  <RecurrencePlot prices={filteredPrices} />
+                  <KramersMoyalChart prices={filteredPrices} />
+                  <TDAChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "entropy" && (
@@ -267,14 +326,31 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "fractal" && (
-                <DFAChart prices={filteredPrices} />
+                <>
+                  <DFAChart prices={filteredPrices} />
+                  <FractalExtChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "network" && (
                 <>
                   <VisibilityGraphChart prices={filteredPrices} />
+                  <HVGChart prices={filteredPrices} />
                   <OrdinalNetwork prices={filteredPrices} />
+                  <RecurrenceNetworkChart prices={filteredPrices} />
                 </>
+              )}
+
+              {activeSection === "regime" && (
+                <RegimeChart prices={filteredPrices} />
+              )}
+
+              {activeSection === "causal" && (
+                <CausalChart prices={filteredPrices} />
+              )}
+
+              {activeSection === "tailrisk" && (
+                <TailRiskChart prices={filteredPrices} />
               )}
 
               {activeSection === "calendar" && (
