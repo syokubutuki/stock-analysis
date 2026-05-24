@@ -8,27 +8,29 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { rsAnalysis, computeDCCA, correlationDimension } from "../../lib/fractal-ext";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function FractalExtChart({ prices }: Props) {
+export default function FractalExtChart({ prices, seriesMode }: Props) {
   const rsCanvasRef = useRef<HTMLCanvasElement>(null);
   const dccaCanvasRef = useRef<HTMLCanvasElement>(null);
   const corrDimCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
+  const { values: closes } = extractSeries(prices, seriesMode);
   const volumes = prices.map((p) => p.volume);
   const lr = logReturns(closes);
   const volReturns = logReturns(volumes.map((v) => v || 1));
 
-  const rs = useMemo(() => rsAnalysis(lr), [prices]);
-  const dcca = useMemo(() => computeDCCA(lr, volReturns), [prices]);
-  const corrDim = useMemo(() => correlationDimension(lr), [prices]);
+  const rs = useMemo(() => rsAnalysis(lr), [prices, seriesMode]);
+  const dcca = useMemo(() => computeDCCA(lr, volReturns), [prices, seriesMode]);
+  const corrDim = useMemo(() => correlationDimension(lr), [prices, seriesMode]);
 
   // R/S plot
   useEffect(() => {

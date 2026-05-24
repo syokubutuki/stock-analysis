@@ -2,23 +2,23 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeDFA, computeMFDFA } from "../../lib/fractal";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function DFAChart({ prices }: Props) {
+export default function DFAChart({ prices, seriesMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mfCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
-  const lr = logReturns(closes);
+  const { values: lr } = extractSeries(prices, seriesMode);
 
-  const dfa = useMemo(() => computeDFA(lr), [prices]);
-  const mfdfa = useMemo(() => computeMFDFA(lr), [prices]);
+  const dfa = useMemo(() => computeDFA(lr), [prices, seriesMode]);
+  const mfdfa = useMemo(() => computeMFDFA(lr), [prices, seriesMode]);
 
   // DFA log-logプロット
   useEffect(() => {

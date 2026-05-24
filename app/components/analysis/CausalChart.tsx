@@ -9,28 +9,30 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { mutualInformation, timeLaggedMI, transferEntropy, grangerTest } from "../../lib/causal";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function CausalChart({ prices }: Props) {
+export default function CausalChart({ prices, seriesMode }: Props) {
   const miRef = useRef<HTMLDivElement>(null);
   const miChartRef = useRef<IChartApi | null>(null);
   const flowCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
+  const { values: closes } = extractSeries(prices, seriesMode);
   const volumes = prices.map((p) => p.volume);
   const lr = logReturns(closes);
   const volReturns = logReturns(volumes.map((v) => v || 1));
 
-  const autoMI = useMemo(() => timeLaggedMI(lr, 30), [prices]);
-  const te = useMemo(() => transferEntropy(volReturns, lr, 1, 8), [prices]);
-  const granger = useMemo(() => grangerTest(volReturns, lr, 5), [prices]);
-  const miPriceVol = useMemo(() => mutualInformation(lr, volReturns.slice(0, lr.length)), [prices]);
+  const autoMI = useMemo(() => timeLaggedMI(lr, 30), [prices, seriesMode]);
+  const te = useMemo(() => transferEntropy(volReturns, lr, 1, 8), [prices, seriesMode]);
+  const granger = useMemo(() => grangerTest(volReturns, lr, 5), [prices, seriesMode]);
+  const miPriceVol = useMemo(() => mutualInformation(lr, volReturns.slice(0, lr.length)), [prices, seriesMode]);
 
   // Auto-MI chart (nonlinear ACF)
   useEffect(() => {

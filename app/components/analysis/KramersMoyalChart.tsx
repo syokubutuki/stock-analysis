@@ -2,21 +2,23 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { kramersMoyal } from "../../lib/kramers-moyal";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function KramersMoyalChart({ prices }: Props) {
+export default function KramersMoyalChart({ prices, seriesMode }: Props) {
   const driftCanvasRef = useRef<HTMLCanvasElement>(null);
   const potentialCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
+  const { values: closes } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
-  const km = useMemo(() => kramersMoyal(closes.slice(0, -1), lr, 20), [prices]);
+  const km = useMemo(() => kramersMoyal(closes.slice(0, -1), lr, 20), [prices, seriesMode]);
 
   // Drift + Diffusion plot
   useEffect(() => {

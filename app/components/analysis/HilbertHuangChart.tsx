@@ -8,30 +8,31 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeHHS, computeSTFT, rollingSpectralEntropy } from "../../lib/hilbert-huang-spectrum";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function HilbertHuangChart({ prices }: Props) {
+export default function HilbertHuangChart({ prices, seriesMode }: Props) {
   const hhsCanvasRef = useRef<HTMLCanvasElement>(null);
   const stftCanvasRef = useRef<HTMLCanvasElement>(null);
   const entropyRef = useRef<HTMLDivElement>(null);
   const entropyChartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
+  const { values: closes, times } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
   const lrTimes = times.slice(1);
 
-  const hhs = useMemo(() => computeHHS(lr, 35), [prices]);
-  const stft = useMemo(() => computeSTFT(lr, 64, 4), [prices]);
+  const hhs = useMemo(() => computeHHS(lr, 35), [prices, seriesMode]);
+  const stft = useMemo(() => computeSTFT(lr, 64, 4), [prices, seriesMode]);
   const specEntropy = useMemo(
     () => rollingSpectralEntropy(lr, Math.min(64, Math.floor(lr.length / 3))),
-    [prices]
+    [prices, seriesMode]
   );
 
   // HHS heatmap

@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { useAnalysisData } from "./hooks/useAnalysisData";
 import PeriodSelector from "./components/analysis/PeriodSelector";
+import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
+import { SeriesMode } from "./lib/series-mode";
 
 const DiffSeriesChart = dynamic(
   () => import("./components/analysis/DiffSeriesChart"),
@@ -164,6 +166,7 @@ export default function AnalysisPage() {
   const { data, filteredPrices, loading, error, fetchStock, period, setPeriod } =
     useAnalysisData();
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
+  const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
 
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -212,6 +215,7 @@ export default function AnalysisPage() {
                 {data.name}
               </span>
               <PeriodSelector current={period} onChange={setPeriod} />
+              <SeriesModeSelector current={seriesMode} onChange={setSeriesMode} />
             </>
           )}
         </div>
@@ -283,78 +287,78 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "transform" && (
-                <TransformCharts prices={filteredPrices} />
+                <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
               )}
 
               {activeSection === "distribution" && (
                 <>
-                  <ReturnDistribution prices={filteredPrices} />
-                  <ACFChart prices={filteredPrices} />
+                  <ReturnDistribution prices={filteredPrices} seriesMode={seriesMode} />
+                  <ACFChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "volatility" && (
                 <>
-                  <VolatilityChart prices={filteredPrices} />
-                  <GarchChart prices={filteredPrices} />
+                  <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <GarchChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "frequency" && (
                 <>
-                  <PowerSpectrum prices={filteredPrices} />
-                  <WaveletChart prices={filteredPrices} />
-                  <EMDChart prices={filteredPrices} />
-                  <AnalyticSignalChart prices={filteredPrices} />
-                  <HilbertHuangChart prices={filteredPrices} />
+                  <PowerSpectrum prices={filteredPrices} seriesMode={seriesMode} />
+                  <WaveletChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <EMDChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "nonlinear" && (
                 <>
-                  <RecurrencePlot prices={filteredPrices} />
-                  <KramersMoyalChart prices={filteredPrices} />
-                  <TDAChart prices={filteredPrices} />
+                  <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
+                  <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "entropy" && (
                 <>
-                  <EntropyDisplay prices={filteredPrices} />
-                  <MultiscaleEntropyChart prices={filteredPrices} />
+                  <EntropyDisplay prices={filteredPrices} seriesMode={seriesMode} />
+                  <MultiscaleEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "fractal" && (
                 <>
-                  <DFAChart prices={filteredPrices} />
-                  <FractalExtChart prices={filteredPrices} />
+                  <DFAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <FractalExtChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "network" && (
                 <>
-                  <VisibilityGraphChart prices={filteredPrices} />
-                  <HVGChart prices={filteredPrices} />
-                  <OrdinalNetwork prices={filteredPrices} />
-                  <RecurrenceNetworkChart prices={filteredPrices} />
+                  <VisibilityGraphChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <HVGChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <OrdinalNetwork prices={filteredPrices} seriesMode={seriesMode} />
+                  <RecurrenceNetworkChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "regime" && (
-                <RegimeChart prices={filteredPrices} />
+                <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
               )}
 
               {activeSection === "causal" && (
-                <CausalChart prices={filteredPrices} />
+                <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
               )}
 
               {activeSection === "tailrisk" && (
-                <TailRiskChart prices={filteredPrices} />
+                <TailRiskChart prices={filteredPrices} seriesMode={seriesMode} />
               )}
 
               {activeSection === "calendar" && (
-                <SpiralHeatmap prices={filteredPrices} />
+                <SpiralHeatmap prices={filteredPrices} seriesMode={seriesMode} />
               )}
             </div>
           </>

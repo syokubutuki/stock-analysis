@@ -9,29 +9,27 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitGarch, analyzeLeverage, detectJumps } from "../../lib/garch";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function GarchChart({ prices }: Props) {
+export default function GarchChart({ prices, seriesMode }: Props) {
   const volRef = useRef<HTMLDivElement>(null);
   const leverageCanvasRef = useRef<HTMLCanvasElement>(null);
   const jumpRef = useRef<HTMLDivElement>(null);
   const volChartRef = useRef<IChartApi | null>(null);
   const jumpChartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
 
-  const garch = useMemo(() => fitGarch(lr), [prices]);
-  const leverage = useMemo(() => analyzeLeverage(lr), [prices]);
-  const jumps = useMemo(() => detectJumps(lr), [prices]);
+  const garch = useMemo(() => fitGarch(lr), [prices, seriesMode]);
+  const leverage = useMemo(() => analyzeLeverage(lr), [prices, seriesMode]);
+  const jumps = useMemo(() => detectJumps(lr), [prices, seriesMode]);
 
   // GARCH conditional volatility chart
   useEffect(() => {

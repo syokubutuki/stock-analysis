@@ -7,21 +7,21 @@ import {
   type IChartApi,
   type Time,
 } from "lightweight-charts";
-import { logReturns } from "../../lib/transforms";
 import { powerSpectrum, estimateSpectralSlope } from "../../lib/frequency";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function PowerSpectrum({ prices }: Props) {
+export default function PowerSpectrum({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const lr = logReturns(closes);
+  const { values: lr } = extractSeries(prices, seriesMode);
   const spectrum = powerSpectrum(lr);
   const { slope } = estimateSpectralSlope(spectrum);
 

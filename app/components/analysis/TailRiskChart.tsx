@@ -2,26 +2,27 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { extremeValueAnalysis, higherOrderCumulants, tailDependence } from "../../lib/tail-risk";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function TailRiskChart({ prices }: Props) {
+export default function TailRiskChart({ prices, seriesMode }: Props) {
   const qqCanvasRef = useRef<HTMLCanvasElement>(null);
   const returnLevelCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
+  const { values: lr } = extractSeries(prices, seriesMode);
   const volumes = prices.map((p) => p.volume);
-  const lr = logReturns(closes);
   const volRet = logReturns(volumes.map((v) => v || 1));
 
-  const evt = useMemo(() => extremeValueAnalysis(lr, 0.9), [prices]);
-  const cumulants = useMemo(() => higherOrderCumulants(lr), [prices]);
-  const tailDep = useMemo(() => tailDependence(lr, volRet.slice(0, lr.length), 0.1), [prices]);
+  const evt = useMemo(() => extremeValueAnalysis(lr, 0.9), [prices, seriesMode]);
+  const cumulants = useMemo(() => higherOrderCumulants(lr), [prices, seriesMode]);
+  const tailDep = useMemo(() => tailDependence(lr, volRet.slice(0, lr.length), 0.1), [prices, seriesMode]);
 
   // GPD Q-Q plot
   useEffect(() => {

@@ -8,25 +8,25 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computePersistentHomology, fisherRaoDistance } from "../../lib/tda";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function TDAChart({ prices }: Props) {
+export default function TDAChart({ prices, seriesMode }: Props) {
   const diagramCanvasRef = useRef<HTMLCanvasElement>(null);
   const bettiCanvasRef = useRef<HTMLCanvasElement>(null);
   const frRef = useRef<HTMLDivElement>(null);
   const frChartRef = useRef<IChartApi | null>(null);
 
-  const lr = logReturns(prices.map((p) => p.close));
-  const times = prices.map((p) => p.time).slice(1);
+  const { values: lr, times } = extractSeries(prices, seriesMode);
 
-  const tda = useMemo(() => computePersistentHomology(lr), [prices]);
-  const fr = useMemo(() => fisherRaoDistance(lr, Math.min(60, Math.floor(lr.length / 4))), [prices]);
+  const tda = useMemo(() => computePersistentHomology(lr), [prices, seriesMode]);
+  const fr = useMemo(() => fisherRaoDistance(lr, Math.min(60, Math.floor(lr.length / 4))), [prices, seriesMode]);
 
   // Persistence diagram
   useEffect(() => {

@@ -2,23 +2,23 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { histogram, qqPlot, normalPDF, distributionStats } from "../../lib/distribution";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function ReturnDistribution({ prices }: Props) {
+export default function ReturnDistribution({ prices, seriesMode }: Props) {
   const histRef = useRef<HTMLCanvasElement>(null);
   const qqRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
-  const lr = logReturns(closes);
-  const stats = useMemo(() => distributionStats(lr), [prices]);
-  const hist = useMemo(() => histogram(lr, 50), [prices]);
-  const qq = useMemo(() => qqPlot(lr), [prices]);
+  const { values: lr } = extractSeries(prices, seriesMode);
+  const stats = useMemo(() => distributionStats(lr), [prices, seriesMode]);
+  const hist = useMemo(() => histogram(lr, 50), [prices, seriesMode]);
+  const qq = useMemo(() => qqPlot(lr), [prices, seriesMode]);
 
   // ヒストグラム + 正規分布PDF
   useEffect(() => {

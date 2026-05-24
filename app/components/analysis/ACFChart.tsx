@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries, SERIES_MODE_LABELS } from "../../lib/series-mode";
 import { acf, pacf, confidenceBound } from "../../lib/autocorrelation";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 function drawACF(
@@ -85,25 +86,25 @@ function drawACF(
   ctx.fillText("Lag", width / 2 - 10, height - 3);
 }
 
-export default function ACFChart({ prices }: Props) {
+export default function ACFChart({ prices, seriesMode }: Props) {
   const acfCanvasRef = useRef<HTMLCanvasElement>(null);
   const pacfCanvasRef = useRef<HTMLCanvasElement>(null);
   const acfSqCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
-  const lr = logReturns(closes);
-  const lrSq = lr.map((r) => r * r); // リターンの二乗
+  const { values: lr } = extractSeries(prices, seriesMode);
+  const lrSq = lr.map((r) => r * r);
 
-  const acfData = useMemo(() => acf(lr, 30), [prices]);
-  const pacfData = useMemo(() => pacf(lr, 30), [prices]);
-  const acfSqData = useMemo(() => acf(lrSq, 30), [prices]);
+  const acfData = useMemo(() => acf(lr, 30), [prices, seriesMode]);
+  const pacfData = useMemo(() => pacf(lr, 30), [prices, seriesMode]);
+  const acfSqData = useMemo(() => acf(lrSq, 30), [prices, seriesMode]);
   const bound = confidenceBound(lr.length);
 
+  const modeLabel = SERIES_MODE_LABELS[seriesMode];
   useEffect(() => {
-    if (acfCanvasRef.current) drawACF(acfCanvasRef.current, acfData, bound, "ACF (リターン)");
-    if (pacfCanvasRef.current) drawACF(pacfCanvasRef.current, pacfData, bound, "PACF (リターン)");
-    if (acfSqCanvasRef.current) drawACF(acfSqCanvasRef.current, acfSqData, bound, "ACF (リターン²)");
-  }, [prices, acfData, pacfData, acfSqData, bound]);
+    if (acfCanvasRef.current) drawACF(acfCanvasRef.current, acfData, bound, `ACF (${modeLabel})`);
+    if (pacfCanvasRef.current) drawACF(pacfCanvasRef.current, pacfData, bound, `PACF (${modeLabel})`);
+    if (acfSqCanvasRef.current) drawACF(acfSqCanvasRef.current, acfSqData, bound, `ACF (${modeLabel}²)`);
+  }, [prices, seriesMode, acfData, pacfData, acfSqData, bound, modeLabel]);
 
   // 有意なラグの検出
   const sigACF = acfData.filter((d) => d.lag > 0 && Math.abs(d.value) > bound);

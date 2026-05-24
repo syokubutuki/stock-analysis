@@ -8,12 +8,13 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { ewmaVolatility, detectVolRegimes, volClustering } from "../../lib/volatility";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 const REGIME_COLORS: Record<string, string> = {
@@ -28,24 +29,21 @@ const REGIME_LABELS: Record<string, string> = {
   high: "高ボラ",
 };
 
-export default function VolatilityChart({ prices }: Props) {
+export default function VolatilityChart({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
 
   const volData = useMemo(
     () => ewmaVolatility(lr, lrTimes, 0.94, 20),
-    [prices]
+    [prices, seriesMode]
   );
   const { regimes, thresholds } = useMemo(
     () => detectVolRegimes(volData),
     [volData]
   );
-  const clustering = useMemo(() => volClustering(lr), [prices]);
+  const clustering = useMemo(() => volClustering(lr), [prices, seriesMode]);
 
   // 年率換算
   const annualizeFactor = Math.sqrt(252);

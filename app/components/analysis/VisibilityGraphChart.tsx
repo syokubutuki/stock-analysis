@@ -8,27 +8,28 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeVisibilityGraph } from "../../lib/visibility-graph";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function VisibilityGraphChart({ prices }: Props) {
+export default function VisibilityGraphChart({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const degDistRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
+  const { values: closes, times } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
   const lrTimes = times.slice(1);
 
   const vg = useMemo(
     () => computeVisibilityGraph(lr, lrTimes, 50),
-    [prices]
+    [prices, seriesMode]
   );
 
   // 次数の時系列チャート

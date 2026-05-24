@@ -8,27 +8,28 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeAnalyticSignal, analyticSignalStats } from "../../lib/analytic-signal";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function AnalyticSignalChart({ prices }: Props) {
+export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
   const ampRef = useRef<HTMLDivElement>(null);
   const freqRef = useRef<HTMLDivElement>(null);
   const phaseCanvasRef = useRef<HTMLCanvasElement>(null);
   const ampChartRef = useRef<IChartApi | null>(null);
   const freqChartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
+  const { values: closes, times } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
   const lrTimes = times.slice(1);
 
-  const result = useMemo(() => computeAnalyticSignal(lr), [prices]);
+  const result = useMemo(() => computeAnalyticSignal(lr), [prices, seriesMode]);
   const stats = useMemo(() => analyticSignalStats(result), [result]);
 
   // 瞬時振幅チャート（対数リターン + エンベロープ）

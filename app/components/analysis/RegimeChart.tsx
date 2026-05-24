@@ -9,17 +9,18 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitHMM, detectChangePoints, kalmanFilter } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 const STATE_COLORS = ["#22c55e", "#eab308", "#ef4444"];
 
-export default function RegimeChart({ prices }: Props) {
+export default function RegimeChart({ prices, seriesMode }: Props) {
   const hmmRef = useRef<HTMLDivElement>(null);
   const cpRef = useRef<HTMLDivElement>(null);
   const kalmanRef = useRef<HTMLDivElement>(null);
@@ -28,14 +29,13 @@ export default function RegimeChart({ prices }: Props) {
   const cpChartRef = useRef<IChartApi | null>(null);
   const kalmanChartRef = useRef<IChartApi | null>(null);
 
+  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
   const closes = prices.map((p) => p.close);
   const times = prices.map((p) => p.time);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
 
-  const hmm = useMemo(() => fitHMM(lr, 3), [prices]);
-  const cp = useMemo(() => detectChangePoints(lr), [prices]);
-  const kalman = useMemo(() => kalmanFilter(closes), [prices]);
+  const hmm = useMemo(() => fitHMM(lr, 3), [prices, seriesMode]);
+  const cp = useMemo(() => detectChangePoints(lr), [prices, seriesMode]);
+  const kalman = useMemo(() => kalmanFilter(closes), [prices, seriesMode]);
 
   // HMM state probability chart
   useEffect(() => {

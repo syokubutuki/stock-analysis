@@ -9,6 +9,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import {
   logReturns,
   rankTransform,
@@ -18,6 +19,7 @@ import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 type TransformMode = "logReturn" | "rank" | "volNorm";
@@ -28,13 +30,12 @@ const MODE_LABELS: Record<TransformMode, string> = {
   volNorm: "ボラ正規化",
 };
 
-export default function TransformCharts({ prices }: Props) {
+export default function TransformCharts({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [mode, setMode] = useState<TransformMode>("logReturn");
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
+  const { values: closes, times } = extractSeries(prices, seriesMode);
 
   useEffect(() => {
     if (!containerRef.current || closes.length < 2) return;
@@ -103,7 +104,7 @@ export default function TransformCharts({ prices }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [prices, mode]);
+  }, [prices, mode, seriesMode]);
 
   // 統計情報
   const lr = logReturns(closes);

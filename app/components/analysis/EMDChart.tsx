@@ -8,30 +8,31 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeEMD, hilbertTransform } from "../../lib/emd";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 const IMF_COLORS = [
   "#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6",
 ];
 
-export default function EMDChart({ prices }: Props) {
+export default function EMDChart({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const residueRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const residueChartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
+  const { values: closes, times } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
   const lrTimes = times.slice(1);
 
-  const emdResult = useMemo(() => computeEMD(lr, 5), [prices]);
+  const emdResult = useMemo(() => computeEMD(lr, 5), [prices, seriesMode]);
 
   // 各IMFのヒルベルト変換情報
   const hilbertInfo = useMemo(() => {

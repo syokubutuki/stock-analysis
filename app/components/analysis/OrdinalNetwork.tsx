@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { buildOrdinalNetwork } from "../../lib/ordinal-network";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 // パターンの意味を日本語で
@@ -20,12 +22,12 @@ const PATTERN_LABELS: Record<string, string> = {
   "210": "連続下降",
 };
 
-export default function OrdinalNetwork({ prices }: Props) {
+export default function OrdinalNetwork({ prices, seriesMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
+  const { values: closes } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
-  const network = useMemo(() => buildOrdinalNetwork(lr, 3, 1), [prices]);
+  const network = useMemo(() => buildOrdinalNetwork(lr, 3, 1), [prices, seriesMode]);
 
   // ネットワーク描画
   useEffect(() => {

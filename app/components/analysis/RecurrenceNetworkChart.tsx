@@ -8,24 +8,24 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeRecurrenceNetwork } from "../../lib/recurrence-network";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function RecurrenceNetworkChart({ prices }: Props) {
+export default function RecurrenceNetworkChart({ prices, seriesMode }: Props) {
   const degreeRef = useRef<HTMLDivElement>(null);
   const clusterRef = useRef<HTMLDivElement>(null);
   const degreeChartRef = useRef<IChartApi | null>(null);
   const clusterChartRef = useRef<IChartApi | null>(null);
 
-  const lr = logReturns(prices.map((p) => p.close));
-  const times = prices.map((p) => p.time).slice(1);
+  const { values: lr, times } = extractSeries(prices, seriesMode);
 
-  const rn = useMemo(() => computeRecurrenceNetwork(lr), [prices]);
+  const rn = useMemo(() => computeRecurrenceNetwork(lr), [prices, seriesMode]);
 
   // Degree series
   useEffect(() => {

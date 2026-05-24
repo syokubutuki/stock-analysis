@@ -8,26 +8,27 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { multiscaleEntropy, fisherInformation } from "../../lib/multiscale-entropy";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function MultiscaleEntropyChart({ prices }: Props) {
+export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
   const mseCanvasRef = useRef<HTMLCanvasElement>(null);
   const fisherRef = useRef<HTMLDivElement>(null);
   const fisherChartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
+  const { values: closes, times } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
   const lrTimes = times.slice(1);
 
-  const mse = useMemo(() => multiscaleEntropy(lr, 20, 2), [prices]);
-  const fisher = useMemo(() => fisherInformation(lr, lrTimes, 60, 20), [prices]);
+  const mse = useMemo(() => multiscaleEntropy(lr, 20, 2), [prices, seriesMode]);
+  const fisher = useMemo(() => fisherInformation(lr, lrTimes, 60, 20), [prices, seriesMode]);
 
   // MSE曲線
   useEffect(() => {

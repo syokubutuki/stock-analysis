@@ -8,7 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import {
   shannonEntropy,
   permutationEntropy,
@@ -19,23 +19,21 @@ import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function EntropyDisplay({ prices }: Props) {
+export default function EntropyDisplay({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
 
-  const shannon = useMemo(() => shannonEntropy(lr), [prices]);
-  const permEnt = useMemo(() => permutationEntropy(lr, 3, 1), [prices]);
-  const sampEnt = useMemo(() => sampleEntropy(lr, 2), [prices]);
+  const shannon = useMemo(() => shannonEntropy(lr), [prices, seriesMode]);
+  const permEnt = useMemo(() => permutationEntropy(lr, 3, 1), [prices, seriesMode]);
+  const sampEnt = useMemo(() => sampleEntropy(lr, 2), [prices, seriesMode]);
   const rolling = useMemo(
     () => rollingEntropy(lr, lrTimes, 60),
-    [prices]
+    [prices, seriesMode]
   );
 
   useEffect(() => {

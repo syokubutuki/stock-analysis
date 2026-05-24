@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import {
   computeRecurrencePlot,
   estimateLyapunov,
@@ -12,21 +12,20 @@ import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
-export default function RecurrencePlot({ prices }: Props) {
+export default function RecurrencePlot({ prices, seriesMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
-  const times = prices.map((p) => p.time);
-  const lr = logReturns(closes);
+  const { values: lr, times: seriesTimes } = extractSeries(prices, seriesMode);
 
-  const rp = useMemo(() => computeRecurrencePlot(lr, 1, 3), [prices]);
-  const lyap = useMemo(() => estimateLyapunov(lr, 1, 3, 15), [prices]);
+  const rp = useMemo(() => computeRecurrencePlot(lr, 1, 3), [prices, seriesMode]);
+  const lyap = useMemo(() => estimateLyapunov(lr, 1, 3, 15), [prices, seriesMode]);
   const embedding = useMemo(
-    () => takensEmbedding(lr, times.slice(1), 1, 2),
-    [prices]
+    () => takensEmbedding(lr, seriesTimes, 1, 2),
+    [prices, seriesMode]
   );
 
   // Recurrence Plot描画

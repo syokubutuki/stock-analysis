@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  seriesMode: SeriesMode;
 }
 
 interface DayData {
@@ -27,12 +28,11 @@ function returnColor(val: number, maxAbs: number): string {
   return "#e5e7eb";
 }
 
-export default function SpiralHeatmap({ prices }: Props) {
+export default function SpiralHeatmap({ prices, seriesMode }: Props) {
   const calendarRef = useRef<HTMLCanvasElement>(null);
   const polarRef = useRef<HTMLCanvasElement>(null);
 
-  const closes = prices.map((p) => p.close);
-  const lr = logReturns(closes);
+  const { values: lr } = extractSeries(prices, seriesMode);
   const dayData: DayData[] = useMemo(() => {
     return lr.map((r, i) => {
       const dateStr = prices[i + 1].time;
@@ -44,7 +44,7 @@ export default function SpiralHeatmap({ prices }: Props) {
         returnVal: r,
       };
     });
-  }, [prices]);
+  }, [prices, seriesMode]);
 
   const maxAbs = useMemo(
     () => Math.max(...dayData.map((d) => Math.abs(d.returnVal)), 0.001),
