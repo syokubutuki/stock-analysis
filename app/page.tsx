@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useAnalysisData } from "./hooks/useAnalysisData";
 import PeriodSelector from "./components/analysis/PeriodSelector";
 import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
+import WatchlistPanel from "./components/WatchlistPanel";
 import { SeriesMode } from "./lib/series-mode";
 
 const DiffSeriesChart = dynamic(
@@ -171,6 +172,26 @@ const BenchmarkChart = dynamic(
   () => import("./components/analysis/BenchmarkChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const ADXChart = dynamic(
+  () => import("./components/analysis/ADXChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const StochasticsChart = dynamic(
+  () => import("./components/analysis/StochasticsChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const OBVVWAPChart = dynamic(
+  () => import("./components/analysis/OBVVWAPChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={430} /> }
+);
+const ATRChart = dynamic(
+  () => import("./components/analysis/ATRChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={430} /> }
+);
+const CopulaChart = dynamic(
+  () => import("./components/analysis/CopulaChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -203,12 +224,12 @@ type SectionKey =
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "basic", label: "基本分析", description: "ローソク足・一目均衡表・支持/抵抗線・フィボナッチ・ベンチマーク比較" },
-  { key: "technical", label: "テクニカル", description: "RSI・MACD・ボリンジャーバンド・シグナル検出" },
+  { key: "technical", label: "テクニカル", description: "RSI・MACD・BB・ADX・ストキャスティクス・OBV/VWAP" },
   { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
   { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率" },
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化" },
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF" },
-  { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・レバレッジ・ジャンプ" },
+  { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
   { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT" },
   { key: "nonlinear", label: "非線形動力学", description: "Recurrence Plot・Lyapunov・KM係数・TDA" },
   { key: "entropy", label: "情報理論", description: "エントロピー・マルチスケール・Fisher情報量" },
@@ -216,7 +237,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
   { key: "regime", label: "レジーム分析", description: "HMM・変化点検出・カルマンフィルタ" },
   { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量" },
-  { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性" },
+  { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
 ];
 
@@ -267,6 +288,11 @@ export default function AnalysisPage() {
               {loading ? "取得中..." : "分析開始"}
             </button>
           </form>
+          <WatchlistPanel
+            currentTicker={data?.ticker ?? null}
+            currentName={data?.name ?? null}
+            onSelect={(ticker) => fetchStock(ticker)}
+          />
           {data && (
             <>
               <span className="text-gray-600 text-sm font-medium">
@@ -350,7 +376,12 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "technical" && (
-                <TechnicalIndicators prices={filteredPrices} />
+                <>
+                  <TechnicalIndicators prices={filteredPrices} />
+                  <ADXChart prices={filteredPrices} />
+                  <StochasticsChart prices={filteredPrices} />
+                  <OBVVWAPChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "ohlc" && (
@@ -385,6 +416,7 @@ export default function AnalysisPage() {
                 <>
                   <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} />
                   <GarchChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ATRChart prices={filteredPrices} />
                 </>
               )}
 
@@ -438,7 +470,10 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "tailrisk" && (
-                <TailRiskChart prices={filteredPrices} seriesMode={seriesMode} />
+                <>
+                  <TailRiskChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <CopulaChart prices={filteredPrices} seriesMode={seriesMode} />
+                </>
               )}
 
               {activeSection === "calendar" && (
@@ -449,18 +484,100 @@ export default function AnalysisPage() {
         )}
 
         {!data && !loading && !error && (
-          <div className="text-center py-16 text-gray-400">
-            <p className="text-lg mb-4">銘柄コードを入力して分析開始</p>
-            <p className="text-sm mb-8">
-              日本株4桁コード (例: 9984 ソフトバンクG, 8306 三菱UFJ, 7203 トヨタ)
-            </p>
-            <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-left text-sm text-gray-500">
-              {SECTIONS.map(({ label, description }) => (
-                <div key={label} className="p-3 bg-white rounded-lg border border-gray-100">
-                  <div className="font-medium text-gray-700">{label}</div>
-                  <div>{description}</div>
-                </div>
-              ))}
+          <div className="py-8">
+            {/* Hero */}
+            <div className="text-center mb-10">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">株価構造分析ツール</h2>
+              <p className="text-gray-500 mb-4">
+                テクニカル指標からフラクタル解析まで、多角的に株式を分析できるWebアプリ
+              </p>
+              <p className="text-sm text-gray-400">
+                日本株4桁コード (例: 9984 ソフトバンクG, 8306 三菱UFJ, 7203 トヨタ)
+              </p>
+            </div>
+
+            {/* 分析の進め方 */}
+            <div className="max-w-3xl mx-auto mb-10">
+              <h3 className="text-sm font-bold text-gray-700 mb-3 text-center">分析の進め方</h3>
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-0 justify-center text-sm">
+                {[
+                  { step: "1", title: "基本分析", desc: "トレンド・移動平均線で全体像を把握" },
+                  { step: "2", title: "テクニカル", desc: "RSI・MACD等で売買タイミングを確認" },
+                  { step: "3", title: "リスク指標", desc: "ドローダウン・VaRでリスクを評価" },
+                  { step: "4", title: "発展分析", desc: "ボラティリティ・フラクタル等で深掘り" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    {i > 0 && <span className="hidden sm:block text-gray-300 mx-1">&rarr;</span>}
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 min-w-[180px]">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center">
+                        {item.step}
+                      </span>
+                      <div>
+                        <div className="font-medium text-gray-700">{item.title}</div>
+                        <div className="text-xs text-gray-400">{item.desc}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* セクション一覧 */}
+            <div className="max-w-4xl mx-auto">
+              <h3 className="text-sm font-bold text-gray-700 mb-3 text-center">利用できる分析機能</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                {SECTIONS.map(({ key, label, description }) => {
+                  const icons: Record<string, string> = {
+                    basic: "📊", technical: "📈", ohlc: "🕯️", risk: "🛡️",
+                    transform: "🔄", distribution: "📉", volatility: "⚡",
+                    frequency: "🌊", nonlinear: "🔀", entropy: "🧮",
+                    fractal: "🔬", network: "🕸️", regime: "🔁",
+                    causal: "🔗", tailrisk: "⚠️", calendar: "📅",
+                  };
+                  const levels: Record<string, { label: string; color: string }> = {
+                    basic: { label: "入門", color: "bg-green-100 text-green-700" },
+                    technical: { label: "入門", color: "bg-green-100 text-green-700" },
+                    ohlc: { label: "基本", color: "bg-blue-100 text-blue-700" },
+                    risk: { label: "基本", color: "bg-blue-100 text-blue-700" },
+                    transform: { label: "中級", color: "bg-yellow-100 text-yellow-700" },
+                    distribution: { label: "中級", color: "bg-yellow-100 text-yellow-700" },
+                    volatility: { label: "中級", color: "bg-yellow-100 text-yellow-700" },
+                    frequency: { label: "上級", color: "bg-orange-100 text-orange-700" },
+                    nonlinear: { label: "上級", color: "bg-orange-100 text-orange-700" },
+                    entropy: { label: "上級", color: "bg-orange-100 text-orange-700" },
+                    fractal: { label: "上級", color: "bg-orange-100 text-orange-700" },
+                    network: { label: "上級", color: "bg-orange-100 text-orange-700" },
+                    regime: { label: "専門", color: "bg-red-100 text-red-700" },
+                    causal: { label: "専門", color: "bg-red-100 text-red-700" },
+                    tailrisk: { label: "専門", color: "bg-red-100 text-red-700" },
+                    calendar: { label: "基本", color: "bg-blue-100 text-blue-700" },
+                  };
+                  const level = levels[key] || { label: "基本", color: "bg-blue-100 text-blue-700" };
+                  return (
+                    <div key={key} className="p-3 bg-white rounded-lg border border-gray-100 hover:border-blue-200 transition-colors">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span>{icons[key] || "📊"}</span>
+                        <span className="font-medium text-gray-700">{label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${level.color}`}>
+                          {level.label}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">{description}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ヒント */}
+            <div className="max-w-2xl mx-auto mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800">
+              <div className="font-medium mb-1">使い方のヒント</div>
+              <ul className="list-disc pl-4 space-y-1 text-xs text-blue-700">
+                <li>各分析パネルの下部にある「読み方」をクリックすると、指標の詳しい解説が表示されます</li>
+                <li>「入力系列」セレクターで終値以外（始値・日中リターン等）に切り替えて分析できます</li>
+                <li>期間セレクターで分析対象の期間を絞り込めます</li>
+                <li>入門 → 基本 → 中級 → 上級の順に進めると理解しやすくなります</li>
+              </ul>
             </div>
           </div>
         )}
