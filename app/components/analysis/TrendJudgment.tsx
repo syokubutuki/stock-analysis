@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   createChart,
+  CandlestickSeries,
   LineSeries,
   type IChartApi,
   type Time,
@@ -60,14 +61,24 @@ export default function TrendJudgment({ prices }: Props) {
     });
     chartRef.current = chart;
 
-    // 株価
-    const priceLine = chart.addSeries(LineSeries, {
-      color: "#333333",
-      lineWidth: 2,
+    // ローソク足
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#26a69a",
+      downColor: "#ef5350",
+      borderUpColor: "#26a69a",
+      borderDownColor: "#ef5350",
+      wickUpColor: "#26a69a",
+      wickDownColor: "#ef5350",
       title: "株価",
     });
-    priceLine.setData(
-      trendSeries.map((p) => ({ time: p.time as Time, value: p.close }))
+    candleSeries.setData(
+      prices.map((p) => ({
+        time: p.time as Time,
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+      }))
     );
 
     // SMA5

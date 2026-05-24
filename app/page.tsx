@@ -143,6 +143,18 @@ const IntradayRangeChart = dynamic(
   () => import("./components/analysis/IntradayRangeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const TechnicalIndicators = dynamic(
+  () => import("./components/analysis/TechnicalIndicators"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const DrawdownChart = dynamic(
+  () => import("./components/analysis/DrawdownChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RiskMetricsPanel = dynamic(
+  () => import("./components/analysis/RiskMetricsPanel"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -157,7 +169,9 @@ function ChartPlaceholder({ height }: { height: number }) {
 
 type SectionKey =
   | "basic"
+  | "technical"
   | "ohlc"
+  | "risk"
   | "transform"
   | "distribution"
   | "volatility"
@@ -172,8 +186,10 @@ type SectionKey =
   | "tailrisk";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
-  { key: "basic", label: "基本分析", description: "差分系列・出来高・トレンド・ギャップ" },
+  { key: "basic", label: "基本分析", description: "ローソク足・SMA・差分系列・出来高・ギャップ" },
+  { key: "technical", label: "テクニカル", description: "RSI・MACD・ボリンジャーバンド・シグナル検出" },
   { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
+  { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率" },
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化" },
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF" },
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・レバレッジ・ジャンプ" },
@@ -313,6 +329,10 @@ export default function AnalysisPage() {
                 </>
               )}
 
+              {activeSection === "technical" && (
+                <TechnicalIndicators prices={filteredPrices} />
+              )}
+
               {activeSection === "ohlc" && (
                 <>
                   <CandleStructureChart prices={filteredPrices} />
@@ -320,6 +340,13 @@ export default function AnalysisPage() {
                   <GapScatterChart prices={filteredPrices} />
                   <IntradayRangeChart prices={filteredPrices} />
                   <RangeVolatilityChart prices={filteredPrices} />
+                </>
+              )}
+
+              {activeSection === "risk" && (
+                <>
+                  <RiskMetricsPanel prices={filteredPrices} />
+                  <DrawdownChart prices={filteredPrices} />
                 </>
               )}
 
