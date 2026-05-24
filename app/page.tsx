@@ -155,6 +155,22 @@ const RiskMetricsPanel = dynamic(
   () => import("./components/analysis/RiskMetricsPanel"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const IchimokuChart = dynamic(
+  () => import("./components/analysis/IchimokuChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SupportResistanceChart = dynamic(
+  () => import("./components/analysis/SupportResistanceChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const FibonacciChart = dynamic(
+  () => import("./components/analysis/FibonacciChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const BenchmarkChart = dynamic(
+  () => import("./components/analysis/BenchmarkChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -186,7 +202,7 @@ type SectionKey =
   | "tailrisk";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
-  { key: "basic", label: "基本分析", description: "ローソク足・SMA・差分系列・出来高・ギャップ" },
+  { key: "basic", label: "基本分析", description: "ローソク足・一目均衡表・支持/抵抗線・フィボナッチ・ベンチマーク比較" },
   { key: "technical", label: "テクニカル", description: "RSI・MACD・ボリンジャーバンド・シグナル検出" },
   { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
   { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率" },
@@ -323,6 +339,10 @@ export default function AnalysisPage() {
               {activeSection === "basic" && (
                 <>
                   <TrendJudgment prices={filteredPrices} />
+                  <IchimokuChart prices={filteredPrices} />
+                  <SupportResistanceChart prices={filteredPrices} />
+                  <FibonacciChart prices={filteredPrices} />
+                  <BenchmarkChart prices={filteredPrices} />
                   <DiffSeriesChart prices={filteredPrices} />
                   <VolumeAnalysis prices={filteredPrices} />
                   <GapAnalysisChart prices={filteredPrices} />
