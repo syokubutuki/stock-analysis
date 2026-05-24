@@ -19,6 +19,10 @@ const TrendJudgment = dynamic(
   () => import("./components/analysis/TrendJudgment"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
 );
+const GapAnalysisChart = dynamic(
+  () => import("./components/analysis/GapAnalysisChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const TransformCharts = dynamic(
   () => import("./components/analysis/TransformCharts"),
   { ssr: false, loading: () => <ChartPlaceholder height={220} /> }
@@ -119,6 +123,26 @@ const KramersMoyalChart = dynamic(
   () => import("./components/analysis/KramersMoyalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const RangeVolatilityChart = dynamic(
+  () => import("./components/analysis/RangeVolatilityChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const CandleStructureChart = dynamic(
+  () => import("./components/analysis/CandleStructureChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const MFEMAEChart = dynamic(
+  () => import("./components/analysis/MFEMAEChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const GapScatterChart = dynamic(
+  () => import("./components/analysis/GapScatterChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const IntradayRangeChart = dynamic(
+  () => import("./components/analysis/IntradayRangeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -133,6 +157,7 @@ function ChartPlaceholder({ height }: { height: number }) {
 
 type SectionKey =
   | "basic"
+  | "ohlc"
   | "transform"
   | "distribution"
   | "volatility"
@@ -147,7 +172,8 @@ type SectionKey =
   | "tailrisk";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
-  { key: "basic", label: "基本分析", description: "差分系列・出来高・トレンド" },
+  { key: "basic", label: "基本分析", description: "差分系列・出来高・トレンド・ギャップ" },
+  { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化" },
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF" },
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・レバレッジ・ジャンプ" },
@@ -283,6 +309,17 @@ export default function AnalysisPage() {
                   <TrendJudgment prices={filteredPrices} />
                   <DiffSeriesChart prices={filteredPrices} />
                   <VolumeAnalysis prices={filteredPrices} />
+                  <GapAnalysisChart prices={filteredPrices} />
+                </>
+              )}
+
+              {activeSection === "ohlc" && (
+                <>
+                  <CandleStructureChart prices={filteredPrices} />
+                  <MFEMAEChart prices={filteredPrices} />
+                  <GapScatterChart prices={filteredPrices} />
+                  <IntradayRangeChart prices={filteredPrices} />
+                  <RangeVolatilityChart prices={filteredPrices} />
                 </>
               )}
 

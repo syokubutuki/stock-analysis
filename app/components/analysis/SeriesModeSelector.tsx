@@ -4,8 +4,11 @@ import { SeriesMode, SERIES_MODE_LABELS } from "../../lib/series-mode";
 
 const MODES: { key: SeriesMode; label: string }[] = [
   { key: "close", label: SERIES_MODE_LABELS.close },
+  { key: "open", label: SERIES_MODE_LABELS.open },
   { key: "diff", label: SERIES_MODE_LABELS.diff },
   { key: "logReturn", label: SERIES_MODE_LABELS.logReturn },
+  { key: "overnightReturn", label: SERIES_MODE_LABELS.overnightReturn },
+  { key: "intradayReturn", label: SERIES_MODE_LABELS.intradayReturn },
 ];
 
 interface Props {

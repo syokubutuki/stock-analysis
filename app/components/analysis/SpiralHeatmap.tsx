@@ -32,10 +32,24 @@ export default function SpiralHeatmap({ prices, seriesMode }: Props) {
   const calendarRef = useRef<HTMLCanvasElement>(null);
   const polarRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr } = extractSeries(prices, seriesMode);
+  const { values, times } = extractSeries(prices, seriesMode);
   const dayData: DayData[] = useMemo(() => {
-    return lr.map((r, i) => {
-      const dateStr = prices[i + 1].time;
+    // "close" モードでは生の終値が返るため、リターンを自前で計算する
+    if (seriesMode === "close") {
+      return values.slice(1).map((v, i) => {
+        const dateStr = times[i + 1];
+        const d = new Date(dateStr);
+        return {
+          date: dateStr,
+          dayOfWeek: d.getDay(),
+          month: d.getMonth(),
+          returnVal: values[i] !== 0 ? (v - values[i]) / values[i] : 0,
+        };
+      });
+    }
+    // diff / logReturn モードでは既にリターン系列
+    return values.map((r, i) => {
+      const dateStr = times[i];
       const d = new Date(dateStr);
       return {
         date: dateStr,
@@ -44,7 +58,7 @@ export default function SpiralHeatmap({ prices, seriesMode }: Props) {
         returnVal: r,
       };
     });
-  }, [prices, seriesMode]);
+  }, [values, times, seriesMode]);
 
   const maxAbs = useMemo(
     () => Math.max(...dayData.map((d) => Math.abs(d.returnVal)), 0.001),
