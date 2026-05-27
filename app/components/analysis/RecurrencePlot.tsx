@@ -30,45 +30,80 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
 
     const parent = canvas.parentElement;
     if (!parent) return;
-    const size = Math.min(parent.clientWidth, 450);
+    const totalSize = Math.min(parent.clientWidth, 450);
     const dpr = window.devicePixelRatio || 1;
 
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
+    canvas.width = totalSize * dpr;
+    canvas.height = totalSize * dpr;
+    canvas.style.width = `${totalSize}px`;
+    canvas.style.height = `${totalSize}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.scale(dpr, dpr);
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, totalSize, totalSize);
 
-    const cellSize = size / rp.n;
+    const margin = { l: 40, r: 10, t: 10, b: 32 };
+    const plotW = totalSize - margin.l - margin.r;
+    const plotH = totalSize - margin.t - margin.b;
+    const cellW = plotW / rp.n;
+    const cellH = plotH / rp.n;
 
+    // RP dots
     ctx.fillStyle = "#1e40af";
     for (let i = 0; i < rp.n; i++) {
       for (let j = 0; j < rp.n; j++) {
         if (rp.matrix[i * rp.n + j] === 1) {
           ctx.fillRect(
-            Math.floor(j * cellSize),
-            Math.floor(i * cellSize),
-            Math.max(1, Math.ceil(cellSize)),
-            Math.max(1, Math.ceil(cellSize))
+            margin.l + Math.floor(j * cellW),
+            margin.t + Math.floor(i * cellH),
+            Math.max(1, Math.ceil(cellW)),
+            Math.max(1, Math.ceil(cellH))
           );
         }
       }
     }
 
-    // 軸ラベル
+    // Ticks
+    ctx.fillStyle = "#9ca3af";
+    ctx.strokeStyle = "#d1d5db";
+    ctx.font = "9px monospace";
+    ctx.lineWidth = 0.5;
+    const tickCount = 5;
+    for (let i = 0; i <= tickCount; i++) {
+      const frac = i / tickCount;
+      const val = Math.round(frac * rp.n);
+
+      // X-axis
+      const xPx = margin.l + frac * plotW;
+      ctx.beginPath();
+      ctx.moveTo(xPx, margin.t + plotH);
+      ctx.lineTo(xPx, margin.t + plotH + 4);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillText(`${val}`, xPx, margin.t + plotH + 14);
+
+      // Y-axis
+      const yPx = margin.t + frac * plotH;
+      ctx.beginPath();
+      ctx.moveTo(margin.l - 4, yPx);
+      ctx.lineTo(margin.l, yPx);
+      ctx.stroke();
+      ctx.textAlign = "right";
+      ctx.fillText(`${val}`, margin.l - 6, yPx + 3);
+    }
+
+    // Axis labels
     ctx.fillStyle = "#6b7280";
     ctx.font = "10px sans-serif";
-    ctx.fillText("t \u2192", size / 2 - 6, size - 3);
+    ctx.textAlign = "center";
+    ctx.fillText("t", margin.l + plotW / 2, totalSize - 4);
     ctx.save();
-    ctx.translate(9, size / 2);
+    ctx.translate(10, margin.t + plotH / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("t \u2192", 0, 0);
+    ctx.fillText("t", 0, 0);
     ctx.restore();
   }, [rp]);
 
@@ -106,14 +141,23 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
     const maxY = Math.max(...data);
     const rangeY = maxY - minY || 1;
 
-    // Grid
+    // Grid + ticks
     ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 4; i++) {
-      const y = margin.t + (i / 4) * ph;
+    const yTicks = 5;
+    for (let i = 0; i <= yTicks; i++) {
+      const y = margin.t + (i / yTicks) * ph;
       ctx.beginPath();
       ctx.moveTo(margin.l, y);
       ctx.lineTo(margin.l + pw, y);
+      ctx.stroke();
+    }
+    const xTicks = 5;
+    for (let i = 0; i <= xTicks; i++) {
+      const x = margin.l + (i / xTicks) * pw;
+      ctx.beginPath();
+      ctx.moveTo(x, margin.t);
+      ctx.lineTo(x, margin.t + ph);
       ctx.stroke();
     }
 
@@ -152,18 +196,24 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
     ctx.fillStyle = "#6b7280";
     ctx.font = "9px monospace";
     ctx.textAlign = "right";
-    for (let i = 0; i <= 4; i++) {
-      const val = maxY - (i / 4) * rangeY;
-      ctx.fillText(val.toFixed(2), margin.l - 4, margin.t + (i / 4) * ph + 3);
+    for (let i = 0; i <= yTicks; i++) {
+      const val = maxY - (i / yTicks) * rangeY;
+      ctx.fillText(val.toFixed(2), margin.l - 4, margin.t + (i / yTicks) * ph + 3);
     }
-    ctx.textAlign = "left";
 
-    // X-axis
-    ctx.fillText("0", margin.l, h - 6);
-    ctx.fillText(`${n - 1}`, margin.l + pw - 12, h - 6);
+    // X-axis labels
+    ctx.textAlign = "center";
+    for (let i = 0; i <= xTicks; i++) {
+      const val = Math.round((i / xTicks) * (n - 1));
+      const x = margin.l + (i / xTicks) * pw;
+      ctx.fillText(`${val}`, x, h - 6);
+    }
+
+    // X-axis title
     ctx.fillStyle = "#9ca3af";
     ctx.font = "9px sans-serif";
-    ctx.fillText("step", margin.l + pw / 2 - 10, h - 4);
+    ctx.fillText("step", margin.l + pw / 2, h - 16);
+    ctx.textAlign = "left";
 
     // Title
     ctx.fillStyle = "#374151";

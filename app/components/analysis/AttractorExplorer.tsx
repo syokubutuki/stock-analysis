@@ -50,17 +50,18 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     [values, times, tau, dim]
   );
 
-  const normalized = useMemo(() => {
-    if (embedding.length === 0) return [];
+  const { points: normalized, ranges } = useMemo(() => {
+    if (embedding.length === 0) return { points: [], ranges: { xMin: 0, xMax: 0, yMin: 0, yMax: 0, zMin: 0, zMax: 0 } };
     const xs = embedding.map(p => p.x);
     const ys = embedding.map(p => p.y);
     const zs = dim === 3 ? embedding.map(p => p.z ?? 0) : embedding.map(() => 0);
-    const norm = (arr: number[]) => {
+    const stats = (arr: number[]) => {
       const mn = Math.min(...arr), mx = Math.max(...arr), r = mx - mn || 1;
-      return arr.map(v => ((v - mn) / r - 0.5) * 2);
+      return { mn, mx, r, norm: arr.map(v => ((v - mn) / r - 0.5) * 2) };
     };
-    const nx = norm(xs), ny = norm(ys), nz = norm(zs);
-    return nx.map((_, i) => ({ x: nx[i], y: ny[i], z: nz[i], time: embedding[i].time }));
+    const sx = stats(xs), sy = stats(ys), sz = stats(zs);
+    const pts = sx.norm.map((_, i) => ({ x: sx.norm[i], y: sy.norm[i], z: sz.norm[i], time: embedding[i].time }));
+    return { points: pts, ranges: { xMin: sx.mn, xMax: sx.mx, yMin: sy.mn, yMax: sy.mx, zMin: sz.mn, zMax: sz.mx } };
   }, [embedding, dim]);
 
   useEffect(() => {
@@ -180,7 +181,9 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
       ctx.fillText(dateStr, lx, ly);
     }
 
-    // --- Axes ---
+    // --- Axes & Ticks ---
+    const fmtTick = (v: number) => Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(3);
+
     if (dim === 3) {
       const ox = 36, oy = size - 36;
       const axes = [
@@ -204,19 +207,66 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
         ctx.fillText(ax.label, ex + 4, ey - 4);
       }
     } else {
+      // 2D: draw grid lines and tick values
+      const margin = 50;
+      const plot = (size - margin * 2) * zoomRef.current;
+      const cx = size / 2 + panRef.current.x;
+      const cy = size / 2 + panRef.current.y;
+      const tickCount = 5;
+
+      ctx.font = "9px monospace";
+      ctx.textAlign = "center";
+
+      for (let i = 0; i <= tickCount; i++) {
+        const t = (i / tickCount - 0.5) * 2; // -1 to 1
+        const xPx = cx + t * plot / 2;
+        const yPx = cy - t * plot / 2;
+        const xVal = ranges.xMin + (i / tickCount) * (ranges.xMax - ranges.xMin);
+        const yVal = ranges.yMin + (i / tickCount) * (ranges.yMax - ranges.yMin);
+
+        // X-axis ticks
+        if (xPx > 30 && xPx < size - 10) {
+          ctx.strokeStyle = "#e5e7eb";
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(xPx, 30);
+          ctx.lineTo(xPx, size - 30);
+          ctx.stroke();
+          ctx.fillStyle = "#9ca3af";
+          ctx.fillText(fmtTick(xVal), xPx, size - 16);
+        }
+        // Y-axis ticks
+        if (yPx > 10 && yPx < size - 30) {
+          ctx.strokeStyle = "#e5e7eb";
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(30, yPx);
+          ctx.lineTo(size - 10, yPx);
+          ctx.stroke();
+          ctx.fillStyle = "#9ca3af";
+          ctx.textAlign = "right";
+          ctx.fillText(fmtTick(yVal), 28, yPx + 3);
+          ctx.textAlign = "center";
+        }
+      }
+
+      // Axis labels
       ctx.fillStyle = "#6b7280";
       ctx.font = "10px sans-serif";
-      ctx.fillText("r(t) \u2192", size / 2 - 14, size - 6);
+      ctx.textAlign = "center";
+      ctx.fillText("r(t)", size / 2, size - 4);
       ctx.save();
-      ctx.translate(12, size / 2);
+      ctx.translate(10, size / 2);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillText(`r(t-${tau}) \u2192`, 0, 0);
+      ctx.fillText(`r(t-${tau})`, 0, 0);
       ctx.restore();
+      ctx.textAlign = "left";
     }
 
     // Info
     ctx.fillStyle = "#9ca3af";
     ctx.font = "10px monospace";
+    ctx.textAlign = "left";
     ctx.fillText(`n=${n}  dim=${dim}  \u03C4=${tau}  zoom=${zoomRef.current.toFixed(1)}x`, 6, 14);
   }, [normalized, dim, tau, playing, scrubValue, trailLen, projectPoint]);
 
