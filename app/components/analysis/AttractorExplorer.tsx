@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { takensEmbedding } from "../../lib/nonlinear";
@@ -12,9 +12,9 @@ interface Props {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Plotly = any;
+type PlotlyType = any;
 
-function loadPlotly(): Promise<Plotly> {
+function loadPlotly(): Promise<PlotlyType> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if ((window as any).__Plotly) return Promise.resolve((window as any).__Plotly);
   return new Promise((resolve, reject) => {
@@ -34,7 +34,7 @@ function loadPlotly(): Promise<Plotly> {
 
 export default function AttractorExplorer({ prices, seriesMode }: Props) {
   const plotRef = useRef<HTMLDivElement>(null);
-  const plotlyRef = useRef<Plotly>(null);
+  const plotlyRef = useRef<PlotlyType>(null);
   const [tau, setTau] = useState(1);
   const [dim, setDim] = useState<2 | 3>(3);
   const [loaded, setLoaded] = useState(false);
@@ -46,6 +46,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
   const cometPosRef = useRef(0);
   const [scrubValue, setScrubValue] = useState(0);
   const animRef = useRef<number>(0);
+  const plotCreatedRef = useRef(false);
 
   const { values, times } = extractSeries(prices, seriesMode);
 
@@ -54,128 +55,81 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     [values, times, tau, dim]
   );
 
-  // Data arrays for Plotly
   const plotData = useMemo(() => {
-    if (embedding.length === 0) return { x: [], y: [], z: [], times: [] as string[], colors: [] as number[] };
-    const x = embedding.map(p => p.x);
-    const y = embedding.map(p => p.y);
-    const z = dim === 3 ? embedding.map(p => p.z ?? 0) : [];
-    const colors = embedding.map((_, i) => i);
-    const t = embedding.map(p => p.time);
-    return { x, y, z, times: t, colors };
+    if (embedding.length === 0) return { x: [] as number[], y: [] as number[], z: [] as number[], times: [] as string[], colors: [] as number[] };
+    return {
+      x: embedding.map(p => p.x),
+      y: embedding.map(p => p.y),
+      z: dim === 3 ? embedding.map(p => p.z ?? 0) : [],
+      times: embedding.map(p => p.time),
+      colors: embedding.map((_, i) => i),
+    };
   }, [embedding, dim]);
 
   useEffect(() => { cometPosRef.current = 0; setScrubValue(0); }, [plotData.x.length, tau, dim]);
 
-  // Load Plotly and create initial plot
+  // Load Plotly
   useEffect(() => {
     loadPlotly().then(P => { plotlyRef.current = P; setLoaded(true); });
   }, []);
 
-  // Draw / update the Plotly chart
+  // Create plot (only when data/dim/tau changes, NOT on comet movement)
   useEffect(() => {
     const P = plotlyRef.current;
     const el = plotRef.current;
     if (!P || !el || plotData.x.length === 0) return;
 
-    const n = plotData.x.length;
-    const headIdx = Math.min(Math.floor(cometPosRef.current), n - 1);
-    const isAnimating = playing || scrubValue > 0;
+    const is3d = dim === 3;
+    const traceType = is3d ? "scatter3d" : "scatter";
 
-    const hovertemplate = dim === 3
+    const hovertemplate = is3d
       ? "x(t): %{x:.4f}<br>x(t-τ): %{y:.4f}<br>x(t-2τ): %{z:.4f}<br>%{text}<extra></extra>"
       : "x(t): %{x:.4f}<br>x(t-τ): %{y:.4f}<br>%{text}<extra></extra>";
 
-    const traces: Plotly[] = [];
-
-    // Main trajectory
-    const mainTrace: Plotly = {
-      x: plotData.x,
-      y: plotData.y,
+    // Trace 0: main trajectory (always visible)
+    const mainTrace: PlotlyType = {
+      x: plotData.x, y: plotData.y,
+      ...(is3d ? { z: plotData.z } : {}),
       text: plotData.times,
       hovertemplate,
+      type: traceType,
       mode: "lines+markers",
-      marker: {
-        size: 2.5,
-        color: plotData.colors,
-        colorscale: [[0, "#3b82f6"], [1, "#ef4444"]],
-        opacity: isAnimating ? 0.15 : 0.7,
-      },
-      line: {
-        width: isAnimating ? 0.5 : 1.5,
-        color: "rgba(100,140,200," + (isAnimating ? "0.15" : "0.4") + ")",
-      },
+      marker: { size: 2.5, color: plotData.colors, colorscale: [[0, "#3b82f6"], [1, "#ef4444"]], opacity: 0.7 },
+      line: { width: 1.5, color: "rgba(100,140,200,0.4)" },
     };
 
-    if (dim === 3) {
-      mainTrace.z = plotData.z;
-      mainTrace.type = "scatter3d";
-    } else {
-      mainTrace.type = "scatter";
-    }
-    traces.push(mainTrace);
+    // Trace 1: comet trail (initially empty)
+    const cometTrace: PlotlyType = {
+      x: [], y: [],
+      ...(is3d ? { z: [] } : {}),
+      text: [], hovertemplate,
+      type: traceType,
+      mode: "lines+markers",
+      marker: { size: [], color: [], colorscale: [[0, "rgba(100,160,255,0.2)"], [1, "#ffffff"]], line: { width: 0 } },
+      line: { width: 2.5, color: "rgba(120,180,255,0.6)" },
+      showlegend: false,
+    };
 
-    // Comet trail + head
-    if (isAnimating && headIdx >= 0) {
-      const tailStart = Math.max(0, headIdx - trailLen);
-      const trailX = plotData.x.slice(tailStart, headIdx + 1);
-      const trailY = plotData.y.slice(tailStart, headIdx + 1);
-      const trailT = plotData.times.slice(tailStart, headIdx + 1);
-      const trailColors = trailX.map((_, i) => i / trailX.length);
-      const trailSizes = trailX.map((_, i) => 2 + (i / trailX.length) * 6);
+    // Trace 2: head marker (initially empty)
+    const headTrace: PlotlyType = {
+      x: [], y: [],
+      ...(is3d ? { z: [] } : {}),
+      text: [], hovertemplate,
+      type: traceType,
+      mode: "markers+text",
+      textposition: "top right",
+      textfont: { size: 11, color: "#fff", family: "monospace" },
+      marker: { size: 12, color: "#ffffff", line: { width: 2, color: "#3b82f6" } },
+      showlegend: false,
+    };
 
-      const cometTrace: Plotly = {
-        x: trailX,
-        y: trailY,
-        text: trailT,
-        hovertemplate,
-        mode: "lines+markers",
-        marker: {
-          size: trailSizes,
-          color: trailColors,
-          colorscale: [[0, "rgba(100,160,255,0.2)"], [1, "#ffffff"]],
-          line: { width: 0 },
-        },
-        line: { width: 2.5, color: "rgba(120,180,255,0.6)" },
-        showlegend: false,
-      };
-
-      if (dim === 3) {
-        cometTrace.z = plotData.z.slice(tailStart, headIdx + 1);
-        cometTrace.type = "scatter3d";
-      } else {
-        cometTrace.type = "scatter";
-      }
-      traces.push(cometTrace);
-
-      // Head marker
-      const headTrace: Plotly = {
-        x: [plotData.x[headIdx]],
-        y: [plotData.y[headIdx]],
-        text: [plotData.times[headIdx]],
-        hovertemplate,
-        mode: "markers+text",
-        textposition: "top right",
-        textfont: { size: 11, color: "#fff", family: "monospace" },
-        marker: { size: 12, color: "#ffffff", line: { width: 2, color: "#3b82f6" } },
-        showlegend: false,
-      };
-      if (dim === 3) {
-        headTrace.z = [plotData.z[headIdx]];
-        headTrace.type = "scatter3d";
-      } else {
-        headTrace.type = "scatter";
-      }
-      traces.push(headTrace);
-    }
-
-    const layout: Plotly = {
+    const layout: PlotlyType = {
       margin: { l: 40, r: 20, t: 30, b: 40 },
       paper_bgcolor: "#0f172a",
       plot_bgcolor: "#0f172a",
       font: { color: "#94a3b8", size: 10 },
       showlegend: false,
-      ...(dim === 3 ? {
+      ...(is3d ? {
         scene: {
           xaxis: { title: "r(t)", gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8" },
           yaxis: { title: `r(t-${tau})`, gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8" },
@@ -192,15 +146,69 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
 
     const config = { responsive: true, displayModeBar: true, scrollZoom: true };
 
-    // Use react to avoid re-creating the plot when only the comet moves
-    if (el.children.length > 0 && (el as Plotly).data) {
-      P.react(el, traces, layout, config);
-    } else {
-      P.newPlot(el, traces, layout, config);
-    }
-  }, [loaded, plotData, dim, tau, playing, scrubValue, trailLen]);
+    P.newPlot(el, [mainTrace, cometTrace, headTrace], layout, config);
+    plotCreatedRef.current = true;
 
-  // Comet animation loop
+    return () => {
+      if (el) P.purge(el);
+      plotCreatedRef.current = false;
+    };
+  }, [loaded, plotData, dim, tau]);
+
+  // Update comet traces via restyle (no full redraw, preserves camera)
+  const updateComet = useCallback((headIdx: number) => {
+    const P = plotlyRef.current;
+    const el = plotRef.current;
+    if (!P || !el || !plotCreatedRef.current || plotData.x.length === 0) return;
+
+    const n = plotData.x.length;
+    const idx = Math.min(Math.max(0, headIdx), n - 1);
+    const is3d = dim === 3;
+
+    if (idx <= 0) {
+      // Hide comet traces
+      P.restyle(el, { x: [[]], y: [[]], ...(is3d ? { z: [[]] } : {}), text: [[]], "marker.size": [[]], "marker.color": [[]] }, [1]);
+      P.restyle(el, { x: [[]], y: [[]], ...(is3d ? { z: [[]] } : {}), text: [[]] }, [2]);
+      // Restore main trace opacity
+      P.restyle(el, { "marker.opacity": 0.7, "line.width": 1.5, "line.color": "rgba(100,140,200,0.4)" }, [0]);
+      return;
+    }
+
+    // Dim main trace
+    P.restyle(el, { "marker.opacity": 0.15, "line.width": 0.5, "line.color": "rgba(100,140,200,0.12)" }, [0]);
+
+    const tailStart = Math.max(0, idx - trailLen);
+    const trailX = plotData.x.slice(tailStart, idx + 1);
+    const trailY = plotData.y.slice(tailStart, idx + 1);
+    const trailZ = is3d ? plotData.z.slice(tailStart, idx + 1) : [];
+    const trailT = plotData.times.slice(tailStart, idx + 1);
+    const trailColors = trailX.map((_, i) => i / trailX.length);
+    const trailSizes = trailX.map((_, i) => 2 + (i / trailX.length) * 6);
+
+    // Update trail (trace 1)
+    P.restyle(el, {
+      x: [trailX], y: [trailY],
+      ...(is3d ? { z: [trailZ] } : {}),
+      text: [trailT],
+      "marker.size": [trailSizes],
+      "marker.color": [trailColors],
+    }, [1]);
+
+    // Update head (trace 2)
+    P.restyle(el, {
+      x: [[plotData.x[idx]]],
+      y: [[plotData.y[idx]]],
+      ...(is3d ? { z: [[plotData.z[idx]]] } : {}),
+      text: [[plotData.times[idx]]],
+    }, [2]);
+  }, [plotData, dim, trailLen]);
+
+  // React to scrubValue changes (from animation or manual scrub)
+  useEffect(() => {
+    updateComet(scrubValue);
+  }, [scrubValue, updateComet]);
+
+  // Animation loop — only updates ref + scrubValue, does NOT trigger full Plotly redraw
   useEffect(() => {
     if (!playing) return;
     let running = true;
@@ -208,7 +216,8 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
       if (!running) return;
       cometPosRef.current += speed;
       if (cometPosRef.current >= plotData.x.length) cometPosRef.current = 0;
-      setScrubValue(Math.floor(cometPosRef.current));
+      const newVal = Math.floor(cometPosRef.current);
+      setScrubValue(prev => prev === newVal ? prev : newVal);
       animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
@@ -219,6 +228,12 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     cometPosRef.current = val;
     setScrubValue(val);
     if (playing) setPlaying(false);
+  };
+
+  const handleReset = () => {
+    cometPosRef.current = 0;
+    setScrubValue(0);
+    setPlaying(false);
   };
 
   return (
@@ -258,7 +273,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
           }} className={`px-3 py-1.5 rounded text-xs font-medium ${playing ? "bg-amber-500 text-white" : "bg-blue-600 text-white"}`}>
             {playing ? "||  停止" : "\u25B6  再生"}
           </button>
-          <button onClick={() => { cometPosRef.current = 0; setScrubValue(0); setPlaying(false); }}
+          <button onClick={handleReset}
             className="px-3 py-1.5 rounded text-xs font-medium bg-gray-200 text-gray-600 hover:bg-gray-300">
             リセット
           </button>
