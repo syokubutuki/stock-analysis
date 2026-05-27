@@ -373,7 +373,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
           </button>
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] text-gray-400">速度 x{speed}</span>
-            <input type="range" min={0.5} max={8} step={0.5} value={speed}
+            <input type="range" min={0.1} max={8} step={0.1} value={speed}
               onChange={e => setSpeed(Number(e.target.value))} className="w-20 accent-blue-600" />
           </label>
           <label className="flex flex-col gap-0.5">
