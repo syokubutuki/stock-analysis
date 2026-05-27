@@ -48,6 +48,10 @@ const RecurrencePlot = dynamic(
   () => import("./components/analysis/RecurrencePlot"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const AttractorExplorer = dynamic(
+  () => import("./components/analysis/AttractorExplorer"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 const EntropyDisplay = dynamic(
   () => import("./components/analysis/EntropyDisplay"),
   { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
@@ -432,6 +436,7 @@ export default function AnalysisPage() {
 
               {activeSection === "nonlinear" && (
                 <>
+                  <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
                   <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
                   <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />
                   <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
