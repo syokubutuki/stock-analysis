@@ -251,8 +251,8 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
       const dx = x - d.lastX, dy = y - d.lastY;
       if (d.button === 0 && dim === 3) {
         // Left drag: rotate
-        angleRef.current.ry += dx * 0.008;
-        angleRef.current.rx += dy * 0.008;
+        angleRef.current.ry -= dx * 0.008;
+        angleRef.current.rx -= dy * 0.008;
       } else if (d.button === 2 || (d.button === 0 && dim === 2)) {
         // Right drag (3D) or left drag (2D): pan
         panRef.current.x += dx;
