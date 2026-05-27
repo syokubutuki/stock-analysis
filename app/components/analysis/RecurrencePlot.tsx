@@ -6,7 +6,6 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import {
   computeRecurrencePlot,
   estimateLyapunov,
-  takensEmbedding,
 } from "../../lib/nonlinear";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -15,18 +14,14 @@ interface Props {
   seriesMode: SeriesMode;
 }
 
-export default function RecurrencePlot({ prices, seriesMode }: Props) {
+export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const phaseRef = useRef<HTMLCanvasElement>(null);
+  const lyapCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr, times: seriesTimes } = extractSeries(prices, seriesMode);
+  const { values: lr } = extractSeries(prices, seriesMode);
 
   const rp = useMemo(() => computeRecurrencePlot(lr, 1, 3), [prices, seriesMode]);
-  const lyap = useMemo(() => estimateLyapunov(lr, 1, 3, 15), [prices, seriesMode]);
-  const embedding = useMemo(
-    () => takensEmbedding(lr, seriesTimes, 1, 2),
-    [prices, seriesMode]
-  );
+  const lyap = useMemo(() => estimateLyapunov(lr, 1, 3, 20), [prices, seriesMode]);
 
   // Recurrence Plot描画
   useEffect(() => {
@@ -35,7 +30,7 @@ export default function RecurrencePlot({ prices, seriesMode }: Props) {
 
     const parent = canvas.parentElement;
     if (!parent) return;
-    const size = Math.min(parent.clientWidth, 350);
+    const size = Math.min(parent.clientWidth, 450);
     const dpr = window.devicePixelRatio || 1;
 
     canvas.width = size * dpr;
@@ -65,78 +60,133 @@ export default function RecurrencePlot({ prices, seriesMode }: Props) {
         }
       }
     }
+
+    // 軸ラベル
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "10px sans-serif";
+    ctx.fillText("t \u2192", size / 2 - 6, size - 3);
+    ctx.save();
+    ctx.translate(9, size / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("t \u2192", 0, 0);
+    ctx.restore();
   }, [rp]);
 
-  // 位相空間プロット描画
+  // Lyapunov 発散曲線描画
   useEffect(() => {
-    const canvas = phaseRef.current;
-    if (!canvas || embedding.length === 0) return;
+    const canvas = lyapCanvasRef.current;
+    if (!canvas || lyap.divergence.length === 0) return;
 
     const parent = canvas.parentElement;
     if (!parent) return;
-    const size = Math.min(parent.clientWidth, 350);
+    const w = Math.min(parent.clientWidth, 450);
+    const h = 160;
     const dpr = window.devicePixelRatio || 1;
-
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = "#fafafa";
-    ctx.fillRect(0, 0, size, size);
+    const margin = { l: 50, r: 16, t: 12, b: 28 };
+    const pw = w - margin.l - margin.r;
+    const ph = h - margin.t - margin.b;
 
-    const xs = embedding.map((p) => p.x);
-    const ys = embedding.map((p) => p.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const rangeX = maxX - minX || 1;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+
+    const data = lyap.divergence;
+    const n = data.length;
+    if (n < 2) return;
+
+    const minY = Math.min(...data);
+    const maxY = Math.max(...data);
     const rangeY = maxY - minY || 1;
-    const margin = 20;
-    const plotSize = size - 2 * margin;
 
-    // 軌跡
-    ctx.strokeStyle = "rgba(59, 130, 246, 0.3)";
+    // Grid
+    ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      const y = margin.t + (i / 4) * ph;
+      ctx.beginPath();
+      ctx.moveTo(margin.l, y);
+      ctx.lineTo(margin.l + pw, y);
+      ctx.stroke();
+    }
+
+    // Data line
+    ctx.strokeStyle = lyap.exponent > 0.01 ? "#dc2626" : lyap.exponent < -0.01 ? "#16a34a" : "#d97706";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
     ctx.beginPath();
-    for (let i = 0; i < embedding.length; i++) {
-      const px = margin + ((embedding[i].x - minX) / rangeX) * plotSize;
-      const py = margin + ((embedding[i].y - minY) / rangeY) * plotSize;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+    for (let i = 0; i < n; i++) {
+      const x = margin.l + (i / (n - 1)) * pw;
+      const y = margin.t + (1 - (data[i] - minY) / rangeY) * ph;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
     ctx.stroke();
 
-    // 点
-    for (let i = 0; i < embedding.length; i++) {
-      const t = i / embedding.length;
-      const px = margin + ((embedding[i].x - minX) / rangeX) * plotSize;
-      const py = margin + ((embedding[i].y - minY) / rangeY) * plotSize;
-      ctx.fillStyle = `rgba(${Math.round(255 * t)}, ${Math.round(100 * (1 - t))}, ${Math.round(255 * (1 - t))}, 0.7)`;
+    // Linear fit line (slope = Lyapunov exponent)
+    if (n > 2) {
+      ctx.strokeStyle = "rgba(100,100,100,0.4)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      const y0 = data[0];
       ctx.beginPath();
-      ctx.arc(px, py, 2, 0, Math.PI * 2);
-      ctx.fill();
+      for (let i = 0; i < n; i++) {
+        const fitVal = y0 + lyap.exponent * i;
+        const x = margin.l + (i / (n - 1)) * pw;
+        const y = margin.t + (1 - (fitVal - minY) / rangeY) * ph;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
-    // 軸ラベル
-    ctx.fillStyle = "#666";
+    // Y-axis labels
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const val = maxY - (i / 4) * rangeY;
+      ctx.fillText(val.toFixed(2), margin.l - 4, margin.t + (i / 4) * ph + 3);
+    }
+    ctx.textAlign = "left";
+
+    // X-axis
+    ctx.fillText("0", margin.l, h - 6);
+    ctx.fillText(`${n - 1}`, margin.l + pw - 12, h - 6);
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "9px sans-serif";
+    ctx.fillText("step", margin.l + pw / 2 - 10, h - 4);
+
+    // Title
+    ctx.fillStyle = "#374151";
     ctx.font = "10px sans-serif";
-    ctx.fillText("r(t)", size / 2 - 10, size - 4);
-    ctx.save();
-    ctx.translate(10, size / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText("r(t-1)", 0, 0);
-    ctx.restore();
-  }, [embedding]);
+    ctx.fillText("ln|divergence|", margin.l + 2, margin.t + 10);
+  }, [lyap]);
+
+  // RQA判定
+  const rqaInterpretation = useMemo(() => {
+    const hints: string[] = [];
+    if (rp.recurrenceRate > 0.15) hints.push("再帰率が高い: パターンの反復が多い");
+    else if (rp.recurrenceRate < 0.03) hints.push("再帰率が低い: ほぼ非反復的な動き");
+    if (rp.determinism > 0.7) hints.push("決定性が高い: 予測可能な構造あり");
+    else if (rp.determinism < 0.3) hints.push("決定性が低い: ランダム性が支配的");
+    if (rp.laminarity > 0.5) hints.push("層流性が高い: レンジ相場の傾向");
+    if (rp.trappingTime > 5) hints.push("滞留時間が長い: 状態が固着しやすい");
+    if (rp.diagEntropy > 2) hints.push("対角線エントロピー高: 複雑な動力学");
+    return hints;
+  }, [rp]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <h3 className="font-bold text-gray-800 mb-3">非線形動力学</h3>
+      <h3 className="font-bold text-gray-800 mb-3">Recurrence Plot & Lyapunov指数</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Recurrence Plot */}
@@ -147,81 +197,115 @@ export default function RecurrencePlot({ prices, seriesMode }: Props) {
           <div className="flex justify-center">
             <canvas ref={canvasRef} className="rounded border border-gray-100" />
           </div>
-          <div className="mt-2 text-xs space-y-1">
-            <div>回帰率(RR): <span className="font-mono font-medium">{(rp.recurrenceRate * 100).toFixed(2)}%</span></div>
-            <div>決定性(DET): <span className="font-mono font-medium">{(rp.determinism * 100).toFixed(2)}%</span></div>
-            <div>層流性(LAM): <span className="font-mono font-medium">{(rp.laminarity * 100).toFixed(2)}%</span></div>
-            <div>滞留時間(TT): <span className="font-mono font-medium">{rp.trappingTime.toFixed(2)}</span></div>
-            <div>対角線ENTR: <span className="font-mono font-medium">{rp.diagEntropy.toFixed(3)}</span></div>
-            <div>最長対角線: <span className="font-mono font-medium">{rp.maxDiagLength}</span></div>
-            <div>最長垂直線: <span className="font-mono font-medium">{rp.maxVertLength}</span></div>
-          </div>
         </div>
 
-        {/* Phase Space */}
+        {/* RQA Metrics */}
         <div>
           <div className="text-sm font-medium text-gray-700 mb-2">
-            位相空間 (Takens埋め込み)
+            RQA メトリクス
           </div>
-          <div className="flex justify-center">
-            <canvas ref={phaseRef} className="rounded border border-gray-100" />
+          <div className="text-xs space-y-1.5">
+            <div className="flex justify-between border-b border-gray-100 pb-1">
+              <span>回帰率 (RR)</span>
+              <span className="font-mono font-medium">{(rp.recurrenceRate * 100).toFixed(2)}%</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-1">
+              <span>決定性 (DET)</span>
+              <span className="font-mono font-medium">{(rp.determinism * 100).toFixed(2)}%</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-1">
+              <span>層流性 (LAM)</span>
+              <span className="font-mono font-medium">{(rp.laminarity * 100).toFixed(2)}%</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-1">
+              <span>滞留時間 (TT)</span>
+              <span className="font-mono font-medium">{rp.trappingTime.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-1">
+              <span>対角線エントロピー</span>
+              <span className="font-mono font-medium">{rp.diagEntropy.toFixed(3)}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-1">
+              <span>最長対角線</span>
+              <span className="font-mono font-medium">{rp.maxDiagLength}</span>
+            </div>
+            <div className="flex justify-between pb-1">
+              <span>最長垂直線</span>
+              <span className="font-mono font-medium">{rp.maxVertLength}</span>
+            </div>
           </div>
-          <div className="mt-2 text-xs text-gray-500">
-            色: 赤(古い) → 青(新しい) / τ=1, dim=2
-          </div>
+
+          {/* Interpretation */}
+          {rqaInterpretation.length > 0 && (
+            <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-800 space-y-0.5">
+              {rqaInterpretation.map((h, i) => <div key={i}>{h}</div>)}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Lyapunov指数 */}
-      <div className="mt-4 p-3 bg-gray-50 rounded">
-        <div className="text-sm font-medium text-gray-700 mb-1">Lyapunov指数</div>
-        <div className="text-xs grid grid-cols-2 gap-2">
+      {/* Lyapunov指数 + 発散曲線 */}
+      <div className="mt-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Lyapunov指数</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div>
-            最大指数: <span className={`font-mono font-medium ${lyap.exponent > 0 ? "text-red-600" : "text-green-600"}`}>
-              {lyap.exponent.toFixed(4)}
-            </span>
+            <div className="flex justify-center">
+              <canvas ref={lyapCanvasRef} className="rounded border border-gray-100" />
+            </div>
+            <div className="mt-1 text-[10px] text-gray-400 text-center">
+              実線: 近傍軌道の対数発散 / 破線: 線形フィット(傾き = {"\u03BB"})
+            </div>
           </div>
-          <div className="text-gray-500">
-            {lyap.exponent > 0.01
-              ? "正 → カオス的挙動 (予測困難)"
-              : lyap.exponent < -0.01
-              ? "負 → 安定的 (予測可能)"
-              : "≈0 → 境界的"}
+          <div className="p-3 bg-gray-50 rounded">
+            <div className="text-xs space-y-2">
+              <div className="flex justify-between">
+                <span>最大Lyapunov指数 ({"\u03BB"})</span>
+                <span className={`font-mono font-bold ${lyap.exponent > 0.01 ? "text-red-600" : lyap.exponent < -0.01 ? "text-green-600" : "text-amber-600"}`}>
+                  {lyap.exponent.toFixed(4)}
+                </span>
+              </div>
+              <div className={`p-2 rounded text-xs ${
+                lyap.exponent > 0.01 ? "bg-red-50 text-red-700" :
+                lyap.exponent < -0.01 ? "bg-green-50 text-green-700" :
+                "bg-amber-50 text-amber-700"
+              }`}>
+                {lyap.exponent > 0.01
+                  ? "正: カオス的挙動。初期値鋭敏性により長期予測は困難。ポジションサイズの縮小・短期売買を推奨。"
+                  : lyap.exponent < -0.01
+                  ? "負: 安定的。軌道が収束しており、テクニカル分析の信頼性が比較的高い。"
+                  : "境界的(≈0)。周期的またはクリティカルな状態。レジーム転換の兆候の可能性。"}
+              </div>
+              <div className="text-[10px] text-gray-500 space-y-0.5">
+                <div>予測ホライズン ≈ 1/{"\u03BB"} = {lyap.exponent > 0.001 ? (1 / lyap.exponent).toFixed(1) + " ステップ" : "\u221E"}</div>
+                <div>DET={rp.determinism > 0.5 ? "高" : "低"} + {"\u03BB"}={lyap.exponent > 0.01 ? "正" : lyap.exponent < -0.01 ? "負" : "≈0"}
+                  {" → "}
+                  {rp.determinism > 0.5 && lyap.exponent <= 0.01 ? "予測しやすい局面" : "予測が難しい局面"}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <AnalysisGuide title="非線形動力学の読み方">
-        <p><span className="font-medium">位相空間(Takens埋め込み):</span> {"Takensの定理に基づき、1次元の時系列を多次元空間に再構成したものです。ここでは遅延座標 (r_t, r_{t-1}) の2次元プロットを表示しています。元の系の力学的構造(アトラクタ)を可視化できます。"}</p>
+      <AnalysisGuide title="Recurrence Plot & Lyapunov指数の読み方">
+        <p><span className="font-medium">Recurrence Plot(再帰プロット):</span> 位相空間(dim=3, τ=1)上で2時点の状態が近い場合に点を打つプロットです。</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">点が一様に分布:</span> ランダムな系列。予測可能な構造がない。</li>
-          <li><span className="font-medium">特定の形状(楕円、渦巻き等):</span> 決定論的な構造が存在。その構造を利用した予測が可能かもしれない。</li>
-          <li><span className="font-medium">色の推移:</span> 赤(過去)→青(現在)。アトラクタ上の軌道がどう変化したかが分かります。</li>
+          <li><span className="font-medium">対角線パターン:</span> 周期性(同じ軌道の繰り返し)。</li>
+          <li><span className="font-medium">対角線の断片:</span> 一時的な類似パターン。長いほど持続性が高い。</li>
+          <li><span className="font-medium">水平・垂直の線:</span> 状態の「滞留」(レンジ相場)。</li>
+          <li><span className="font-medium">白い領域:</span> 以前と異なる状態 = レジーム変化の可能性。</li>
         </ul>
-        <p><span className="font-medium">Recurrence Plot(再帰プロット):</span> 位相空間上で、異なる2時点のベクトルが近い(=似た状態にある)場合に点を打つプロットです。</p>
+        <p><span className="font-medium">RQAメトリクス:</span></p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">対角線上の直線パターン:</span> 系列に周期性がある(同じ軌道を繰り返している)。</li>
-          <li><span className="font-medium">対角線の断片(斜めの短い線分):</span> 類似した動きが一時的に繰り返されている。長いほど持続性が高い。</li>
-          <li><span className="font-medium">水平・垂直の線:</span> 系列がある状態に「滞留」している(レンジ相場)。</li>
-          <li><span className="font-medium">白い領域(点がない):</span> 以前とは全く異なる状態 = レジーム変化が起きた可能性。</li>
+          <li><span className="font-medium">回帰率(RR):</span> 再帰ペアの割合。高いほどパターンが反復されている。</li>
+          <li><span className="font-medium">決定性(DET):</span> 対角線に含まれる再帰点の割合。高いほど決定論的(予測可能)。</li>
+          <li><span className="font-medium">層流性(LAM):</span> 垂直線に含まれる再帰点の割合。高いほどレンジ相場傾向。</li>
+          <li><span className="font-medium">滞留時間(TT):</span> 垂直線の平均長。長いほど同じ状態に留まりやすい。</li>
+          <li><span className="font-medium">対角線エントロピー:</span> 対角線長のShannon Entropy。高いほど複雑な動力学。</li>
         </ul>
-        <p><span className="font-medium">RQA (Recurrence Quantification Analysis) メトリクス:</span></p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">回帰率(RR):</span> 全ペアのうち再帰している割合。高いほど系列のパターンが繰り返されている。</li>
-          <li><span className="font-medium">決定性(DET):</span> 長さ2以上の対角線に含まれる再帰点の割合。高いほど決定論的(=予測可能)。</li>
-          <li><span className="font-medium">層流性(LAM):</span> 長さ2以上の垂直線に含まれる再帰点の割合。高いほど系列が特定の状態に「滞留」しやすい(レンジ相場)。</li>
-          <li><span className="font-medium">滞留時間(TT):</span> 垂直線の平均長さ。長いほど同じ状態に長く留まる傾向がある。</li>
-          <li><span className="font-medium">対角線ENTR:</span> 対角線長の分布のShannon Entropy。高いほど対角線の長さが多様 = 複雑な動力学。</li>
-          <li><span className="font-medium">最長対角線:</span> 最も長い対角線構造の長さ。長いほど系列が長期間にわたって過去の軌道を繰り返している。</li>
-          <li><span className="font-medium">最長垂直線:</span> 最も長い滞留の長さ。長いほど強いレンジ相場が存在した。</li>
-        </ul>
-        <p><span className="font-medium">Lyapunov指数:</span> 位相空間上で近接した2つの軌道が時間とともにどれだけ離れるか(発散速度)を示す指標です。</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">{`正(λ > 0):`}</span> 初期条件への鋭敏な依存性 = カオス的。わずかな誤差が指数関数的に拡大するため、長期予測は本質的に困難。</li>
-          <li><span className="font-medium">{`ゼロ付近(λ ≈ 0):`}</span> 境界的。周期的またはクリティカルな状態。</li>
-          <li><span className="font-medium">{`負(λ < 0):`}</span> 軌道が収束。安定した固定点や周期軌道に向かっている = 予測がしやすい。</li>
-        </ul>
-        <p><span className="font-medium">トレードへの活用:</span> Lyapunov指数が負または0付近で決定性が高い期間は、テクニカル分析の信頼性が高まります。逆にLyapunov指数が大きく正で決定性が低い場合は、ポジションサイズを縮小し、リスク管理を強化すべきです。</p>
+        <p><span className="font-medium">Lyapunov指数:</span> 近傍軌道の発散速度。正ならカオス的(予測困難)、負なら安定(予測しやすい)。</p>
+        <p><span className="font-medium">発散曲線の見方:</span> 実線が右上がり(正の傾き)ならカオス、水平や右下がりなら安定。破線は線形フィットで、その傾きがLyapunov指数。</p>
+        <p><span className="font-medium">投資判断:</span> DETが高く{"\u03BB"}が負〜0の期間はテクニカル分析の信頼性が高い。{"\u03BB"}が大きく正の場合はリスク管理を強化。予測ホライズン(≈1/{"\u03BB"})を超える予測は本質的に困難。</p>
       </AnalysisGuide>
     </div>
   );
