@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { takensEmbedding } from "../../lib/nonlinear";
@@ -11,22 +11,33 @@ interface Props {
   seriesMode: SeriesMode;
 }
 
-interface Vec3 { x: number; y: number; z: number }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Plotly = any;
 
-function rotateY(p: Vec3, a: number): Vec3 {
-  const c = Math.cos(a), s = Math.sin(a);
-  return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
-}
-function rotateX(p: Vec3, a: number): Vec3 {
-  const c = Math.cos(a), s = Math.sin(a);
-  return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
+function loadPlotly(): Promise<Plotly> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((window as any).__Plotly) return Promise.resolve((window as any).__Plotly);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.plot.ly/plotly-2.35.2.min.js";
+    s.onload = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const P = (window as any).Plotly;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__Plotly = P;
+      resolve(P);
+    };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
 }
 
 export default function AttractorExplorer({ prices, seriesMode }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const plotRef = useRef<HTMLDivElement>(null);
+  const plotlyRef = useRef<Plotly>(null);
   const [tau, setTau] = useState(1);
   const [dim, setDim] = useState<2 | 3>(3);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
   // Comet state
   const [playing, setPlaying] = useState(false);
@@ -34,9 +45,6 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
   const [trailLen, setTrailLen] = useState(200);
   const cometPosRef = useRef(0);
   const [scrubValue, setScrubValue] = useState(0);
-
-  const dragRef = useRef({ dragging: false, lastX: 0, lastY: 0 });
-  const angleRef = useRef({ rx: 0.4, ry: 0.6 });
   const animRef = useRef<number>(0);
 
   const { values, times } = extractSeries(prices, seriesMode);
@@ -46,231 +54,166 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     [values, times, tau, dim]
   );
 
-  // Normalize to [-1, 1]
-  const normalized = useMemo(() => {
-    if (embedding.length === 0) return [];
-    const xs = embedding.map(p => p.x);
-    const ys = embedding.map(p => p.y);
-    const zs = dim === 3 ? embedding.map(p => p.z ?? 0) : embedding.map(() => 0);
-    const norm = (arr: number[]) => {
-      const mn = Math.min(...arr), mx = Math.max(...arr), r = mx - mn || 1;
-      return arr.map(v => ((v - mn) / r - 0.5) * 2);
-    };
-    const nx = norm(xs), ny = norm(ys), nz = norm(zs);
-    return nx.map((_, i) => ({ x: nx[i], y: ny[i], z: nz[i], time: embedding[i].time }));
+  // Data arrays for Plotly
+  const plotData = useMemo(() => {
+    if (embedding.length === 0) return { x: [], y: [], z: [], times: [] as string[], colors: [] as number[] };
+    const x = embedding.map(p => p.x);
+    const y = embedding.map(p => p.y);
+    const z = dim === 3 ? embedding.map(p => p.z ?? 0) : [];
+    const colors = embedding.map((_, i) => i);
+    const t = embedding.map(p => p.time);
+    return { x, y, z, times: t, colors };
   }, [embedding, dim]);
 
-  useEffect(() => { cometPosRef.current = 0; setScrubValue(0); }, [normalized.length, tau, dim]);
+  useEffect(() => { cometPosRef.current = 0; setScrubValue(0); }, [plotData.x.length, tau, dim]);
 
-  // Project all points (shared between draw calls)
-  const projectAll = useCallback((size: number) => {
-    const margin = 40;
-    const plot = size - margin * 2;
-    const rx = angleRef.current.rx, ry = angleRef.current.ry;
+  // Load Plotly and create initial plot
+  useEffect(() => {
+    loadPlotly().then(P => { plotlyRef.current = P; setLoaded(true); });
+  }, []);
 
-    return normalized.map((p, i) => {
-      let v: Vec3 = { x: p.x, y: p.y, z: p.z };
-      if (dim === 3) {
-        v = rotateX(v, rx);
-        v = rotateY(v, ry);
-      }
-      // Orthographic-ish projection: slight depth scaling for 3D
-      const depthScale = dim === 3 ? 1 / (1 + v.z * 0.15) : 1;
-      const sx = margin + (v.x * depthScale + 1) / 2 * plot;
-      const sy = margin + (-v.y * depthScale + 1) / 2 * plot; // flip y
-      return { sx, sy, depth: v.z, t: i / normalized.length, time: p.time };
-    });
-  }, [normalized, dim]);
+  // Draw / update the Plotly chart
+  useEffect(() => {
+    const P = plotlyRef.current;
+    const el = plotRef.current;
+    if (!P || !el || plotData.x.length === 0) return;
 
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || normalized.length === 0) return;
-    const parent = canvas.parentElement;
-    if (!parent) return;
-    const size = Math.min(parent.clientWidth - 16, 720);
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-
-    // Background
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, size, size);
-
-    const pts = projectAll(size);
-    const n = pts.length;
+    const n = plotData.x.length;
     const headIdx = Math.min(Math.floor(cometPosRef.current), n - 1);
     const isAnimating = playing || scrubValue > 0;
 
-    // --- Full trajectory line (always visible) ---
-    // Simple blue->red gradient via segments
-    const lineAlpha = isAnimating ? 0.25 : 0.7;
-    ctx.lineWidth = isAnimating ? 1 : 1.5;
-    ctx.lineJoin = "round";
-    for (let i = 1; i < n; i++) {
-      const t = i / n;
-      // blue(0) -> red(1)
-      const r = Math.round(60 + 195 * t);
-      const g = Math.round(130 * (1 - t * 0.7));
-      const b = Math.round(220 * (1 - t));
-      ctx.strokeStyle = `rgba(${r},${g},${b},${lineAlpha})`;
-      ctx.beginPath();
-      ctx.moveTo(pts[i - 1].sx, pts[i - 1].sy);
-      ctx.lineTo(pts[i].sx, pts[i].sy);
-      ctx.stroke();
-    }
+    const hovertemplate = dim === 3
+      ? "x(t): %{x:.4f}<br>x(t-τ): %{y:.4f}<br>x(t-2τ): %{z:.4f}<br>%{text}<extra></extra>"
+      : "x(t): %{x:.4f}<br>x(t-τ): %{y:.4f}<br>%{text}<extra></extra>";
 
-    // --- Comet overlay ---
+    const traces: Plotly[] = [];
+
+    // Main trajectory
+    const mainTrace: Plotly = {
+      x: plotData.x,
+      y: plotData.y,
+      text: plotData.times,
+      hovertemplate,
+      mode: "lines+markers",
+      marker: {
+        size: 2.5,
+        color: plotData.colors,
+        colorscale: [[0, "#3b82f6"], [1, "#ef4444"]],
+        opacity: isAnimating ? 0.15 : 0.7,
+      },
+      line: {
+        width: isAnimating ? 0.5 : 1.5,
+        color: "rgba(100,140,200," + (isAnimating ? "0.15" : "0.4") + ")",
+      },
+    };
+
+    if (dim === 3) {
+      mainTrace.z = plotData.z;
+      mainTrace.type = "scatter3d";
+    } else {
+      mainTrace.type = "scatter";
+    }
+    traces.push(mainTrace);
+
+    // Comet trail + head
     if (isAnimating && headIdx >= 0) {
       const tailStart = Math.max(0, headIdx - trailLen);
+      const trailX = plotData.x.slice(tailStart, headIdx + 1);
+      const trailY = plotData.y.slice(tailStart, headIdx + 1);
+      const trailT = plotData.times.slice(tailStart, headIdx + 1);
+      const trailColors = trailX.map((_, i) => i / trailX.length);
+      const trailSizes = trailX.map((_, i) => 2 + (i / trailX.length) * 6);
 
-      // Bright trail: thickening line that fades in
-      for (let i = tailStart + 1; i <= headIdx; i++) {
-        const progress = (i - tailStart) / (headIdx - tailStart || 1);
-        const t = i / n;
-        const r = Math.round(60 + 195 * t);
-        const g = Math.round(130 * (1 - t * 0.7));
-        const b = Math.round(220 * (1 - t));
-        ctx.strokeStyle = `rgba(${r},${g},${b},${0.2 + progress * 0.8})`;
-        ctx.lineWidth = 1 + progress * 3;
-        ctx.beginPath();
-        ctx.moveTo(pts[i - 1].sx, pts[i - 1].sy);
-        ctx.lineTo(pts[i].sx, pts[i].sy);
-        ctx.stroke();
+      const cometTrace: Plotly = {
+        x: trailX,
+        y: trailY,
+        text: trailT,
+        hovertemplate,
+        mode: "lines+markers",
+        marker: {
+          size: trailSizes,
+          color: trailColors,
+          colorscale: [[0, "rgba(100,160,255,0.2)"], [1, "#ffffff"]],
+          line: { width: 0 },
+        },
+        line: { width: 2.5, color: "rgba(120,180,255,0.6)" },
+        showlegend: false,
+      };
+
+      if (dim === 3) {
+        cometTrace.z = plotData.z.slice(tailStart, headIdx + 1);
+        cometTrace.type = "scatter3d";
+      } else {
+        cometTrace.type = "scatter";
       }
+      traces.push(cometTrace);
 
-      // Head glow
-      const h = pts[headIdx];
-      const ht = headIdx / n;
-      const hr = Math.round(60 + 195 * ht);
-      const hg = Math.round(130 * (1 - ht * 0.7));
-      const hb = Math.round(220 * (1 - ht));
-
-      // Soft glow
-      const grad = ctx.createRadialGradient(h.sx, h.sy, 0, h.sx, h.sy, 14);
-      grad.addColorStop(0, `rgba(${hr},${hg},${hb},0.5)`);
-      grad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(h.sx, h.sy, 14, 0, Math.PI * 2);
-      ctx.fill();
-
-      // White core
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.arc(h.sx, h.sy, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Date label
-      ctx.font = "bold 11px monospace";
-      const lx = Math.min(h.sx + 10, size - 82);
-      const ly = Math.max(h.sy - 8, 16);
-      const tw = ctx.measureText(h.time).width;
-      ctx.fillStyle = "rgba(15,23,42,0.85)";
-      ctx.fillRect(lx - 2, ly - 11, tw + 4, 14);
-      ctx.fillStyle = `rgb(${hr},${hg},${hb})`;
-      ctx.fillText(h.time, lx, ly);
+      // Head marker
+      const headTrace: Plotly = {
+        x: [plotData.x[headIdx]],
+        y: [plotData.y[headIdx]],
+        text: [plotData.times[headIdx]],
+        hovertemplate,
+        mode: "markers+text",
+        textposition: "top right",
+        textfont: { size: 11, color: "#fff", family: "monospace" },
+        marker: { size: 12, color: "#ffffff", line: { width: 2, color: "#3b82f6" } },
+        showlegend: false,
+      };
+      if (dim === 3) {
+        headTrace.z = [plotData.z[headIdx]];
+        headTrace.type = "scatter3d";
+      } else {
+        headTrace.type = "scatter";
+      }
+      traces.push(headTrace);
     }
 
-    // --- Axes ---
-    if (dim === 3) {
-      const rx = angleRef.current.rx, ry = angleRef.current.ry;
-      const axLen = 0.25;
-      const ox = 30, oy = size - 30;
-      const axes = [
-        { dx: axLen, dy: 0, dz: 0, label: "r(t)", color: "#f87171" },
-        { dx: 0, dy: axLen, dz: 0, label: `r(t-${tau})`, color: "#4ade80" },
-        { dx: 0, dy: 0, dz: axLen, label: `r(t-${2 * tau})`, color: "#60a5fa" },
-      ];
-      for (const ax of axes) {
-        let v: Vec3 = { x: ax.dx, y: ax.dy, z: ax.dz };
-        v = rotateX(v, rx);
-        v = rotateY(v, ry);
-        const ex = ox + v.x * 50, ey = oy - v.y * 50;
-        ctx.strokeStyle = ax.color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(ox, oy);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-        ctx.fillStyle = ax.color;
-        ctx.font = "10px monospace";
-        ctx.fillText(ax.label, ex + 3, ey - 3);
-      }
+    const layout: Plotly = {
+      margin: { l: 40, r: 20, t: 30, b: 40 },
+      paper_bgcolor: "#0f172a",
+      plot_bgcolor: "#0f172a",
+      font: { color: "#94a3b8", size: 10 },
+      showlegend: false,
+      ...(dim === 3 ? {
+        scene: {
+          xaxis: { title: "r(t)", gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8" },
+          yaxis: { title: `r(t-${tau})`, gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8" },
+          zaxis: { title: `r(t-${2 * tau})`, gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8" },
+          bgcolor: "#0f172a",
+          dragmode: "orbit",
+        },
+      } : {
+        xaxis: { title: "r(t)", gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8" },
+        yaxis: { title: `r(t-${tau})`, gridcolor: "#1e293b", zerolinecolor: "#334155", color: "#94a3b8", scaleanchor: "x" },
+        dragmode: "zoom",
+      }),
+    };
+
+    const config = { responsive: true, displayModeBar: true, scrollZoom: true };
+
+    // Use react to avoid re-creating the plot when only the comet moves
+    if (el.children.length > 0 && (el as Plotly).data) {
+      P.react(el, traces, layout, config);
     } else {
-      ctx.fillStyle = "#64748b";
-      ctx.font = "10px monospace";
-      ctx.fillText("r(t) \u2192", size / 2 - 14, size - 8);
-      ctx.save();
-      ctx.translate(10, size / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText(`r(t-${tau}) \u2192`, 0, 0);
-      ctx.restore();
+      P.newPlot(el, traces, layout, config);
     }
+  }, [loaded, plotData, dim, tau, playing, scrubValue, trailLen]);
 
-    // Info
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = "10px monospace";
-    ctx.fillText(`n=${n}  dim=${dim}  \u03C4=${tau}`, 8, 14);
-    if (dim === 3) ctx.fillText("drag to rotate", size - 96, 14);
-  }, [projectAll, normalized, dim, tau, playing, scrubValue, trailLen]);
-
-  // Render loop
+  // Comet animation loop
   useEffect(() => {
+    if (!playing) return;
     let running = true;
     const loop = () => {
       if (!running) return;
-      if (autoRotate && dim === 3 && !dragRef.current.dragging) {
-        angleRef.current.ry += 0.004;
-      }
-      if (playing && normalized.length > 0) {
-        cometPosRef.current += speed;
-        if (cometPosRef.current >= normalized.length) cometPosRef.current = 0;
-        setScrubValue(Math.floor(cometPosRef.current));
-      }
-      draw();
+      cometPosRef.current += speed;
+      if (cometPosRef.current >= plotData.x.length) cometPosRef.current = 0;
+      setScrubValue(Math.floor(cometPosRef.current));
       animRef.current = requestAnimationFrame(loop);
     };
-    loop();
+    animRef.current = requestAnimationFrame(loop);
     return () => { running = false; cancelAnimationFrame(animRef.current); };
-  }, [draw, autoRotate, dim, playing, speed, normalized.length]);
-
-  // Mouse / touch
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const onDown = (x: number, y: number) => { dragRef.current = { dragging: true, lastX: x, lastY: y }; };
-    const onMove = (x: number, y: number) => {
-      if (!dragRef.current.dragging) return;
-      angleRef.current.ry += (x - dragRef.current.lastX) * 0.008;
-      angleRef.current.rx += (y - dragRef.current.lastY) * 0.008;
-      dragRef.current.lastX = x;
-      dragRef.current.lastY = y;
-    };
-    const onUp = () => { dragRef.current.dragging = false; };
-    const md = (e: MouseEvent) => onDown(e.clientX, e.clientY);
-    const mm = (e: MouseEvent) => onMove(e.clientX, e.clientY);
-    const ts = (e: TouchEvent) => { if (e.touches.length === 1) { e.preventDefault(); onDown(e.touches[0].clientX, e.touches[0].clientY); } };
-    const tm = (e: TouchEvent) => { if (e.touches.length === 1) { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); } };
-    canvas.addEventListener("mousedown", md);
-    window.addEventListener("mousemove", mm);
-    window.addEventListener("mouseup", onUp);
-    canvas.addEventListener("touchstart", ts, { passive: false });
-    canvas.addEventListener("touchmove", tm, { passive: false });
-    canvas.addEventListener("touchend", onUp);
-    return () => {
-      canvas.removeEventListener("mousedown", md);
-      window.removeEventListener("mousemove", mm);
-      window.removeEventListener("mouseup", onUp);
-      canvas.removeEventListener("touchstart", ts);
-      canvas.removeEventListener("touchmove", tm);
-      canvas.removeEventListener("touchend", onUp);
-    };
-  }, []);
+  }, [playing, speed, plotData.x.length]);
 
   const handleScrub = (val: number) => {
     cometPosRef.current = val;
@@ -300,25 +243,17 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
             ))}
           </div>
         </label>
-        {dim === 3 && (
-          <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={autoRotate}
-              onChange={e => setAutoRotate(e.target.checked)} className="accent-blue-600" />
-            自動回転
-          </label>
-        )}
       </div>
 
-      {/* Canvas */}
-      <div className="flex justify-center">
-        <canvas ref={canvasRef} className="rounded border border-gray-700 cursor-grab active:cursor-grabbing" />
-      </div>
+      {/* Plotly chart */}
+      <div ref={plotRef} style={{ width: "100%", height: dim === 3 ? 600 : 500 }} />
+      {!loaded && <div className="text-center text-sm text-gray-400 py-8">3Dエンジン読み込み中...</div>}
 
       {/* Playback */}
       <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <button onClick={() => {
-            if (!playing && scrubValue >= normalized.length - 1) { cometPosRef.current = 0; setScrubValue(0); }
+            if (!playing && scrubValue >= plotData.x.length - 1) { cometPosRef.current = 0; setScrubValue(0); }
             setPlaying(!playing);
           }} className={`px-3 py-1.5 rounded text-xs font-medium ${playing ? "bg-amber-500 text-white" : "bg-blue-600 text-white"}`}>
             {playing ? "||  停止" : "\u25B6  再生"}
@@ -334,15 +269,15 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
           </label>
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] text-gray-400">尾長 {trailLen}</span>
-            <input type="range" min={10} max={150} step={5} value={trailLen}
+            <input type="range" min={10} max={300} step={10} value={trailLen}
               onChange={e => setTrailLen(Number(e.target.value))} className="w-20 accent-blue-600" />
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-400 w-20 shrink-0">{normalized[scrubValue]?.time ?? "---"}</span>
-          <input type="range" min={0} max={Math.max(0, normalized.length - 1)} value={scrubValue}
+          <span className="text-[10px] text-gray-400 w-20 shrink-0">{plotData.times[scrubValue] ?? "---"}</span>
+          <input type="range" min={0} max={Math.max(0, plotData.x.length - 1)} value={scrubValue}
             onChange={e => handleScrub(Number(e.target.value))} className="flex-1 accent-blue-600" />
-          <span className="text-[10px] text-gray-400 w-20 text-right shrink-0">{normalized[normalized.length - 1]?.time ?? "---"}</span>
+          <span className="text-[10px] text-gray-400 w-20 text-right shrink-0">{plotData.times[plotData.times.length - 1] ?? "---"}</span>
         </div>
       </div>
 
@@ -351,14 +286,16 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
         <span>過去</span>
         <div className="w-28 h-2 rounded" style={{ background: "linear-gradient(to right, #3b82f6, #ef4444)" }} />
         <span>現在</span>
+        <span className="ml-2 text-gray-400">| ドラッグ: 回転 / スクロール: 拡大縮小</span>
       </div>
 
       <AnalysisGuide title="アトラクタ探索の使い方">
         <p><span className="font-medium">目的:</span> Takensの埋め込み定理に基づき、1次元時系列から力学系のアトラクタを再構成して可視化します。</p>
+        <p><span className="font-medium">操作:</span> 3Dモードではドラッグで回転、スクロールで拡大縮小、右ドラッグで平行移動できます。</p>
         <p><span className="font-medium">パラメータ:</span></p>
         <ul className="list-disc pl-4 space-y-1">
           <li><span className="font-medium">{"遅延 \u03C4:"}</span> 遅延座標の時間間隔。小さすぎると対角線に潰れ、大きすぎると構造が崩れます。ACFの最初のゼロクロスや相互情報量の最初の極小が目安。</li>
-          <li><span className="font-medium">次元:</span> 2Dは平面断面、3Dは立体構造。3Dではドラッグで回転できます。</li>
+          <li><span className="font-medium">次元:</span> 2Dは平面断面、3Dは立体構造。</li>
         </ul>
         <p><span className="font-medium">再生:</span> 光点がアトラクタ上を時間順に移動します。スクラバーで任意の時点にジャンプ可能。</p>
         <p><span className="font-medium">読み取り方:</span></p>
