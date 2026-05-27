@@ -30,8 +30,8 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
 
   // Comet state
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(2);
-  const [trailLen, setTrailLen] = useState(50);
+  const [speed, setSpeed] = useState(0.5);
+  const [trailLen, setTrailLen] = useState(200);
   const cometPosRef = useRef(0);
   const [scrubValue, setScrubValue] = useState(0);
 
@@ -87,7 +87,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     if (!canvas || normalized.length === 0) return;
     const parent = canvas.parentElement;
     if (!parent) return;
-    const size = Math.min(parent.clientWidth - 16, 520);
+    const size = Math.min(parent.clientWidth - 16, 720);
     const dpr = window.devicePixelRatio || 1;
     canvas.width = size * dpr;
     canvas.height = size * dpr;
