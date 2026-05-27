@@ -196,6 +196,30 @@ const CopulaChart = dynamic(
   () => import("./components/analysis/CopulaChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const EmbeddingOptimizer = dynamic(
+  () => import("./components/analysis/EmbeddingOptimizer"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RollingRQAChart = dynamic(
+  () => import("./components/analysis/RollingRQAChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const LocalLyapunovChart = dynamic(
+  () => import("./components/analysis/LocalLyapunovChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SimplexPredictionChart = dynamic(
+  () => import("./components/analysis/SimplexPredictionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const RollingTDAChart = dynamic(
+  () => import("./components/analysis/RollingTDAChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const AttractorSignalDashboard = dynamic(
+  () => import("./components/analysis/AttractorSignalDashboard"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -235,7 +259,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF" },
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
   { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT" },
-  { key: "nonlinear", label: "非線形動力学", description: "Recurrence Plot・Lyapunov・KM係数・TDA" },
+  { key: "nonlinear", label: "非線形動力学", description: "アトラクタ・RQA・Lyapunov・位相空間予測・KM係数・TDA・投資シグナル" },
   { key: "entropy", label: "情報理論", description: "エントロピー・マルチスケール・Fisher情報量" },
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
@@ -436,10 +460,16 @@ export default function AnalysisPage() {
 
               {activeSection === "nonlinear" && (
                 <>
+                  <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} />
+                  <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} />
                   <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
+                  <RollingRQAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <LocalLyapunovChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <SimplexPredictionChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
                   <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />
                   <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <RollingTDAChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
