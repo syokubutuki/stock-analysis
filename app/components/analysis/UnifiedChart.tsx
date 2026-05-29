@@ -29,6 +29,7 @@ export default function UnifiedChart({ prices, period }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const savedRange = useRef<{ from: Time; to: Time } | null>(null);
+  const prevPricesRef = useRef<PricePoint[]>(prices);
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(DEFAULT_ENABLED)
   );
@@ -64,13 +65,11 @@ export default function UnifiedChart({ prices, period }: Props) {
   useEffect(() => {
     if (!containerRef.current || prices.length === 0) return;
 
-    if (chartRef.current) {
-      try {
-        savedRange.current = chartRef.current.timeScale().getVisibleRange() as { from: Time; to: Time } | null;
-      } catch {
-        // chart may already be disposed
-      }
-      chartRef.current.remove();
+    // Detect if prices changed (new stock loaded) vs series toggle
+    const pricesChanged = prevPricesRef.current !== prices;
+    prevPricesRef.current = prices;
+    if (pricesChanged) {
+      savedRange.current = null;
     }
 
     const chart = createChart(containerRef.current, {
@@ -94,6 +93,7 @@ export default function UnifiedChart({ prices, period }: Props) {
 
     // Track which scales we've added so we can configure them
     const usedScales = new Set<string>();
+    let seriesAdded = false;
 
     for (const def of enabledSeries) {
       try {
@@ -119,6 +119,7 @@ export default function UnifiedChart({ prices, period }: Props) {
             }))
           );
           usedScales.add(def.scaleId);
+          seriesAdded = true;
         } else if (def.type === "histogram") {
           const data = def.compute(prices);
           if (data.length === 0) continue;
@@ -137,6 +138,7 @@ export default function UnifiedChart({ prices, period }: Props) {
             }))
           );
           usedScales.add(def.scaleId);
+          seriesAdded = true;
         } else {
           // line
           const data = def.compute(prices);
@@ -156,6 +158,7 @@ export default function UnifiedChart({ prices, period }: Props) {
             }))
           );
           usedScales.add(def.scaleId);
+          seriesAdded = true;
         }
       } catch {
         // Skip series that fail to compute
@@ -169,26 +172,19 @@ export default function UnifiedChart({ prices, period }: Props) {
       });
     }
 
-    // Show left scale if any non-price series are active
-    const hasLeftScales = [...usedScales].some(
-      (s) => s !== "price" && s !== "volume"
-    );
-    if (hasLeftScales) {
-      // Find the first non-price, non-volume scale and display it on the left
-      // lightweight-charts auto-creates scales; we don't need to manually set left
-    }
-
-    // Restore saved range, or set initial range
-    if (savedRange.current) {
-      try {
-        chart.timeScale().setVisibleRange(savedRange.current);
-      } catch {
+    // Set visible range only if at least one series was added
+    if (seriesAdded) {
+      if (savedRange.current) {
+        try {
+          chart.timeScale().setVisibleRange(savedRange.current);
+        } catch {
+          chart.timeScale().fitContent();
+        }
+      } else if (period) {
+        setInitialVisibleRange(chart, prices, period);
+      } else {
         chart.timeScale().fitContent();
       }
-    } else if (period) {
-      setInitialVisibleRange(chart, prices, period);
-    } else {
-      chart.timeScale().fitContent();
     }
     setComputing(false);
 
@@ -200,6 +196,15 @@ export default function UnifiedChart({ prices, period }: Props) {
     window.addEventListener("resize", handleResize);
 
     return () => {
+      // Save visible range before destroying, using the local chart variable
+      if (seriesAdded) {
+        try {
+          const range = chart.timeScale().getVisibleRange();
+          if (range) savedRange.current = range as { from: Time; to: Time };
+        } catch {
+          // ignore
+        }
+      }
       window.removeEventListener("resize", handleResize);
       chart.remove();
       chartRef.current = null;
