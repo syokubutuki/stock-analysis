@@ -20,9 +20,12 @@ interface DayStats {
   date: string;
   dayOfWeek: number;
   month: number;
-  closeReturn: number;   // 前日比 (close-to-close)
-  intradayReturn: number; // 日中 (open→close)
-  overnightReturn: number; // 夜間 (prev close→open)
+  dayOfMonth: number;
+  weekOfMonth: number; // 1-5
+  tradingDayOfYear: number;
+  closeReturn: number;
+  intradayReturn: number;
+  overnightReturn: number;
 }
 
 function pct(v: number): string {
@@ -36,20 +39,121 @@ function colorClass(v: number): string {
   return v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500";
 }
 
+function mean(arr: number[]): number {
+  return arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+}
+function median(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+function std(arr: number[]): number {
+  if (arr.length < 2) return 0;
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
+}
+function winRate(arr: number[]): number {
+  return arr.length > 0 ? arr.filter((v) => v > 0).length / arr.length : 0;
+}
+
+// Two-tailed t-test: H0: mean = 0
+function tTestPValue(arr: number[]): number | null {
+  const n = arr.length;
+  if (n < 3) return null;
+  const m = mean(arr);
+  const se = std(arr) / Math.sqrt(n);
+  if (se === 0) return null;
+  const t = m / se;
+  // Approximate p-value using normal distribution for large n
+  // For small n, use approximation of Student's t CDF
+  const df = n - 1;
+  const x = df / (df + t * t);
+  // Regularized incomplete beta function approximation
+  const p = incompleteBeta(df / 2, 0.5, x);
+  return Math.min(p, 1);
+}
+
+// Simple approximation of regularized incomplete beta function
+function incompleteBeta(a: number, b: number, x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  // Use continued fraction for Ix(a,b)
+  const maxIter = 200;
+  const eps = 1e-10;
+  const lnBeta = lnGamma(a) + lnGamma(b) - lnGamma(a + b);
+  const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lnBeta) / a;
+  // Lentz's algorithm for continued fraction
+  let f = 1, c = 1, d = 1 - (a + b) * x / (a + 1);
+  if (Math.abs(d) < 1e-30) d = 1e-30;
+  d = 1 / d; f = d;
+  for (let i = 1; i <= maxIter; i++) {
+    const m = i;
+    let numerator = m * (b - m) * x / ((a + 2 * m - 1) * (a + 2 * m));
+    d = 1 + numerator * d; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d;
+    c = 1 + numerator / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    f *= d * c;
+    numerator = -(a + m) * (a + b + m) * x / ((a + 2 * m) * (a + 2 * m + 1));
+    d = 1 + numerator * d; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d;
+    c = 1 + numerator / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    const delta = d * c;
+    f *= delta;
+    if (Math.abs(delta - 1) < eps) break;
+  }
+  return front * f;
+}
+
+function lnGamma(z: number): number {
+  // Lanczos approximation
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+  ];
+  if (z < 0.5) {
+    return Math.log(Math.PI / Math.sin(Math.PI * z)) - lnGamma(1 - z);
+  }
+  z -= 1;
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  const t = z + g + 0.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+
+function pValueLabel(p: number | null): { text: string; cls: string } {
+  if (p === null) return { text: "-", cls: "text-gray-400" };
+  const star = p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "";
+  const cls = p < 0.05 ? "text-blue-600 font-medium" : "text-gray-500";
+  return { text: p.toFixed(3) + star, cls };
+}
+
 export default function SpiralHeatmap({ prices, period }: Props) {
-  const cumulCanvasRef = useRef<HTMLCanvasElement>(null);
+  const dowCumulRef = useRef<HTMLCanvasElement>(null);
+  const monthCumulRef = useRef<HTMLCanvasElement>(null);
+  const domBarRef = useRef<HTMLCanvasElement>(null);
+  const seasonRef = useRef<HTMLCanvasElement>(null);
 
   const days: DayStats[] = useMemo(() => {
     if (prices.length < 2) return [];
+    // Compute trading day of year per year
+    const yearCounters: Record<number, number> = {};
     return prices.slice(1).map((p, i) => {
       const prev = prices[i];
       const d = new Date(p.time);
       const prevClose = prev.close || 1;
       const open = p.open || prevClose;
+      const year = d.getFullYear();
+      yearCounters[year] = (yearCounters[year] || 0) + 1;
+      const dom = d.getDate();
+      const weekOfMonth = Math.ceil(dom / 7);
       return {
         date: p.time,
         dayOfWeek: d.getDay(),
         month: d.getMonth(),
+        dayOfMonth: dom,
+        weekOfMonth,
+        tradingDayOfYear: yearCounters[year],
         closeReturn: (p.close - prevClose) / prevClose,
         intradayReturn: (p.close - open) / open,
         overnightReturn: (open - prevClose) / prevClose,
@@ -72,20 +176,9 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return stats.map((s) => {
       const n = s.closeReturns.length;
       if (n === 0) return null;
-      const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-      const median = (arr: number[]) => {
-        const sorted = [...arr].sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-      };
-      const std = (arr: number[]) => {
-        const m = mean(arr);
-        return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
-      };
-      const winRate = (arr: number[]) => arr.filter((v) => v > 0).length / arr.length;
       return {
         n,
-        close: { mean: mean(s.closeReturns), median: median(s.closeReturns), std: std(s.closeReturns), winRate: winRate(s.closeReturns) },
+        close: { mean: mean(s.closeReturns), median: median(s.closeReturns), std: std(s.closeReturns), winRate: winRate(s.closeReturns), pValue: tTestPValue(s.closeReturns) },
         intraday: { mean: mean(s.intradayReturns), median: median(s.intradayReturns), std: std(s.intradayReturns), winRate: winRate(s.intradayReturns) },
         overnight: { mean: mean(s.overnightReturns), median: median(s.overnightReturns), std: std(s.overnightReturns), winRate: winRate(s.overnightReturns) },
       };
@@ -107,15 +200,9 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return stats.map((s) => {
       const n = s.closeReturns.length;
       if (n === 0) return null;
-      const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-      const std = (arr: number[]) => {
-        const m = mean(arr);
-        return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
-      };
-      const winRate = (arr: number[]) => arr.filter((v) => v > 0).length / arr.length;
       return {
         n,
-        close: { mean: mean(s.closeReturns), std: std(s.closeReturns), winRate: winRate(s.closeReturns) },
+        close: { mean: mean(s.closeReturns), std: std(s.closeReturns), winRate: winRate(s.closeReturns), pValue: tTestPValue(s.closeReturns) },
         intraday: { mean: mean(s.intradayReturns), std: std(s.intradayReturns), winRate: winRate(s.intradayReturns) },
         overnight: { mean: mean(s.overnightReturns), std: std(s.overnightReturns), winRate: winRate(s.overnightReturns) },
       };
@@ -124,7 +211,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
   // --- Weekday x Month cross stats ---
   const crossStats = useMemo(() => {
-    // [dow][month] => returns[]
     const grid: number[][][] = Array.from({ length: 7 }, () =>
       Array.from({ length: 12 }, () => [])
     );
@@ -134,8 +220,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return grid.map((months) =>
       months.map((returns) => {
         if (returns.length === 0) return null;
-        const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-        return { mean, n: returns.length };
+        return { mean: mean(returns), n: returns.length };
       })
     );
   }, [days]);
@@ -168,16 +253,93 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return { maxUp, maxDown, avgUp: avg(upStreaks), avgDown: avg(downStreaks), upCount: upStreaks.length, downCount: downStreaks.length };
   }, [days]);
 
-  // --- Cumulative return by weekday (canvas chart) ---
+  // --- Day-of-month stats ---
+  const domStats = useMemo(() => {
+    const buckets: number[][] = Array.from({ length: 31 }, () => []);
+    for (const d of days) {
+      buckets[d.dayOfMonth - 1].push(d.closeReturn);
+    }
+    return buckets.map((arr, i) => {
+      if (arr.length < 2) return null;
+      return { dom: i + 1, mean: mean(arr), n: arr.length };
+    });
+  }, [days]);
+
+  // --- Week-of-month stats ---
+  const womStats = useMemo(() => {
+    const buckets: number[][] = Array.from({ length: 5 }, () => []);
+    for (const d of days) {
+      const w = Math.min(d.weekOfMonth, 5) - 1;
+      buckets[w].push(d.closeReturn);
+    }
+    return buckets.map((arr, i) => {
+      if (arr.length < 2) return null;
+      return {
+        week: i + 1,
+        mean: mean(arr),
+        std: std(arr),
+        n: arr.length,
+        winRate: winRate(arr),
+        pValue: tTestPValue(arr),
+      };
+    });
+  }, [days]);
+
+  // --- Annual seasonality (average cumulative return by trading day of year) ---
+  const seasonality = useMemo(() => {
+    // Group returns by trading day of year, then compute average cumulative
+    const years = new Set(days.map((d) => new Date(d.date).getFullYear()));
+    const yearSeries: Record<number, number[]> = {};
+    for (const y of years) yearSeries[y] = [];
+    for (const d of days) {
+      const y = new Date(d.date).getFullYear();
+      yearSeries[y].push(d.closeReturn);
+    }
+    // Build cumulative for each year
+    const cumulByYear: Record<number, number[]> = {};
+    let maxLen = 0;
+    for (const y of years) {
+      const series = yearSeries[y];
+      const cumul: number[] = [];
+      let sum = 0;
+      for (const r of series) { sum += r; cumul.push(sum); }
+      cumulByYear[y] = cumul;
+      maxLen = Math.max(maxLen, cumul.length);
+    }
+    // Average across years at each trading day
+    const avgCumul: { day: number; avg: number }[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const vals: number[] = [];
+      for (const y of years) {
+        if (cumulByYear[y].length > i) vals.push(cumulByYear[y][i]);
+      }
+      if (vals.length > 0) avgCumul.push({ day: i + 1, avg: mean(vals) });
+    }
+    return avgCumul;
+  }, [days]);
+
+  // --- Previous day conditional probability ---
+  const conditionalStats = useMemo(() => {
+    if (days.length < 2) return null;
+    const afterUp: number[] = [];
+    const afterDown: number[] = [];
+    for (let i = 1; i < days.length; i++) {
+      if (days[i - 1].closeReturn > 0) afterUp.push(days[i].closeReturn);
+      else if (days[i - 1].closeReturn < 0) afterDown.push(days[i].closeReturn);
+    }
+    return {
+      afterUp: { n: afterUp.length, mean: mean(afterUp), winRate: winRate(afterUp), pValue: tTestPValue(afterUp) },
+      afterDown: { n: afterDown.length, mean: mean(afterDown), winRate: winRate(afterDown), pValue: tTestPValue(afterDown) },
+    };
+  }, [days]);
+
+  // --- Cumulative return by weekday ---
   const dowCumulative = useMemo(() => {
-    // For each trading day, build cumulative return series per weekday
     const series: Record<number, { idx: number; cumRet: number }[]> = {};
     const counters: Record<number, number> = {};
     const cumRet: Record<number, number> = {};
     for (const dow of DOW_TRADING) {
-      series[dow] = [];
-      counters[dow] = 0;
-      cumRet[dow] = 0;
+      series[dow] = []; counters[dow] = 0; cumRet[dow] = 0;
     }
     for (const d of days) {
       if (!(d.dayOfWeek in series)) continue;
@@ -188,15 +350,13 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return series;
   }, [days]);
 
-  // --- Monthly cumulative return (canvas chart) ---
+  // --- Monthly cumulative return ---
   const monthCumulative = useMemo(() => {
     const series: Record<number, { idx: number; cumRet: number }[]> = {};
     const counters: Record<number, number> = {};
     const cumRet: Record<number, number> = {};
     for (let m = 0; m < 12; m++) {
-      series[m] = [];
-      counters[m] = 0;
-      cumRet[m] = 0;
+      series[m] = []; counters[m] = 0; cumRet[m] = 0;
     }
     for (const d of days) {
       cumRet[d.month] += d.closeReturn;
@@ -212,8 +372,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     "#3b82f6","#6366f1","#8b5cf6","#a855f7","#ec4899","#f43f5e",
   ];
 
-  // Draw cumulative return charts
-  const drawCumulative = useCallback((
+  // Generic line chart drawer
+  const drawLineChart = useCallback((
     canvas: HTMLCanvasElement,
     seriesData: Record<number, { idx: number; cumRet: number }[]>,
     colors: string[],
@@ -236,7 +396,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     ctx.fillStyle = "#fafafa";
     ctx.fillRect(0, 0, width, height);
 
-    // Find global min/max
     let allMin = 0, allMax = 0, allMaxIdx = 0;
     for (const k of keys) {
       for (const pt of seriesData[k]) {
@@ -252,37 +411,22 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     const plotH = height - pad.top - pad.bottom;
     const range = allMax - allMin || 0.01;
 
-    // Zero line
     const zeroY = pad.top + plotH * (1 - (0 - allMin) / range);
-    ctx.strokeStyle = "#d1d5db";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, zeroY);
-    ctx.lineTo(width - pad.right, zeroY);
-    ctx.stroke();
+    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
 
-    // Y-axis labels
-    ctx.fillStyle = "#999";
-    ctx.font = "9px sans-serif";
-    ctx.textAlign = "right";
-    const yTicks = 5;
-    for (let i = 0; i <= yTicks; i++) {
-      const val = allMin + (range * i) / yTicks;
-      const y = pad.top + plotH * (1 - i / yTicks);
+    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    for (let i = 0; i <= 5; i++) {
+      const val = allMin + (range * i) / 5;
+      const y = pad.top + plotH * (1 - i / 5);
       ctx.fillText((val * 100).toFixed(1) + "%", pad.left - 5, y + 3);
-      ctx.strokeStyle = "#f0f0f0";
-      ctx.beginPath();
-      ctx.moveTo(pad.left, y);
-      ctx.lineTo(width - pad.right, y);
-      ctx.stroke();
+      ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
     }
 
-    // Draw series
     for (const k of keys) {
       const pts = seriesData[k];
       if (pts.length < 2) continue;
-      ctx.strokeStyle = colors[k];
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = colors[k]; ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < pts.length; i++) {
         const x = pad.left + (pts[i].idx / allMaxIdx) * plotW;
@@ -292,24 +436,153 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       ctx.stroke();
     }
 
-    // Legend
-    ctx.font = "9px sans-serif";
-    ctx.textAlign = "left";
+    ctx.font = "9px sans-serif"; ctx.textAlign = "left";
     let lx = pad.left;
     for (const k of keys) {
       if (!seriesData[k] || seriesData[k].length === 0) continue;
-      ctx.fillStyle = colors[k];
-      ctx.fillRect(lx, height - 12, 12, 3);
-      ctx.fillStyle = "#666";
-      ctx.fillText(labels[k], lx + 15, height - 7);
+      ctx.fillStyle = colors[k]; ctx.fillRect(lx, height - 12, 12, 3);
+      ctx.fillStyle = "#666"; ctx.fillText(labels[k], lx + 15, height - 7);
       lx += ctx.measureText(labels[k]).width + 25;
     }
   }, []);
 
+  // Bar chart drawer for day-of-month
+  const drawBarChart = useCallback((
+    canvas: HTMLCanvasElement,
+    data: ({ dom: number; mean: number; n: number } | null)[],
+  ) => {
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const width = parent.clientWidth;
+    const height = 180;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(0, 0, width, height);
+
+    const valid = data.filter((d) => d !== null) as { dom: number; mean: number; n: number }[];
+    if (valid.length === 0) return;
+
+    const pad = { top: 15, bottom: 25, left: 50, right: 10 };
+    const plotW = width - pad.left - pad.right;
+    const plotH = height - pad.top - pad.bottom;
+    const maxAbs = Math.max(...valid.map((d) => Math.abs(d.mean)), 0.001);
+
+    const zeroY = pad.top + plotH / 2;
+    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
+
+    // Y-axis
+    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    for (const v of [-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs]) {
+      const y = zeroY - (v / maxAbs) * (plotH / 2);
+      ctx.fillText((v * 100).toFixed(2) + "%", pad.left - 5, y + 3);
+      ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+    }
+
+    const barW = Math.max(2, plotW / 31 - 2);
+    for (const d of valid) {
+      const x = pad.left + ((d.dom - 1) / 30) * plotW;
+      const barH = (d.mean / maxAbs) * (plotH / 2);
+      ctx.fillStyle = d.mean > 0 ? "rgba(38, 166, 154, 0.7)" : "rgba(239, 83, 80, 0.7)";
+      ctx.fillRect(x, zeroY - Math.max(barH, 0), barW, Math.abs(barH));
+    }
+
+    // X-axis labels
+    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    for (let i = 1; i <= 31; i += 5) {
+      const x = pad.left + ((i - 1) / 30) * plotW + barW / 2;
+      ctx.fillText(String(i), x, height - 8);
+    }
+  }, []);
+
+  // Seasonality chart drawer
+  const drawSeasonality = useCallback((
+    canvas: HTMLCanvasElement,
+    data: { day: number; avg: number }[],
+  ) => {
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const width = parent.clientWidth;
+    const height = 200;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(0, 0, width, height);
+
+    if (data.length < 2) return;
+
+    const pad = { top: 15, bottom: 25, left: 50, right: 15 };
+    const plotW = width - pad.left - pad.right;
+    const plotH = height - pad.top - pad.bottom;
+    const maxDay = data[data.length - 1].day;
+    let minVal = Infinity, maxVal = -Infinity;
+    for (const pt of data) { minVal = Math.min(minVal, pt.avg); maxVal = Math.max(maxVal, pt.avg); }
+    const range = maxVal - minVal || 0.01;
+
+    // Zero line
+    if (minVal <= 0 && maxVal >= 0) {
+      const zeroY = pad.top + plotH * (1 - (0 - minVal) / range);
+      ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
+    }
+
+    // Y-axis
+    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    for (let i = 0; i <= 5; i++) {
+      const val = minVal + (range * i) / 5;
+      const y = pad.top + plotH * (1 - i / 5);
+      ctx.fillText((val * 100).toFixed(1) + "%", pad.left - 5, y + 3);
+      ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+    }
+
+    // Draw line
+    ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = pad.left + ((data[i].day - 1) / (maxDay - 1)) * plotW;
+      const y = pad.top + plotH * (1 - (data[i].avg - minVal) / range);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Month boundaries (approx ~21 trading days per month)
+    ctx.fillStyle = "#bbb"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    for (let m = 0; m < 12; m++) {
+      const dayApprox = Math.round(m * (maxDay / 12));
+      if (dayApprox === 0) continue;
+      const x = pad.left + (dayApprox / (maxDay - 1)) * plotW;
+      ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke();
+      ctx.fillText(MONTH_LABELS[m], x, height - 8);
+    }
+  }, []);
+
+  // Draw all canvases
   useEffect(() => {
-    if (!cumulCanvasRef.current || days.length === 0) return;
-    drawCumulative(cumulCanvasRef.current, dowCumulative, DOW_COLORS, DOW_LABELS, DOW_TRADING);
-  }, [days, dowCumulative, drawCumulative]);
+    if (days.length === 0) return;
+    if (dowCumulRef.current) drawLineChart(dowCumulRef.current, dowCumulative, DOW_COLORS, DOW_LABELS, DOW_TRADING);
+    if (monthCumulRef.current) {
+      const activeMonths = Array.from({ length: 12 }, (_, i) => i).filter((m) => monthCumulative[m].length > 0);
+      drawLineChart(monthCumulRef.current, monthCumulative, MONTH_COLORS, MONTH_LABELS, activeMonths);
+    }
+    if (domBarRef.current) drawBarChart(domBarRef.current, domStats);
+    if (seasonRef.current) drawSeasonality(seasonRef.current, seasonality);
+  }, [days, dowCumulative, monthCumulative, domStats, seasonality, drawLineChart, drawBarChart, drawSeasonality]);
 
   if (days.length === 0) {
     return (
@@ -339,12 +612,11 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             </thead>
             <tbody>
               <tr className="border-b border-gray-100">
-                <td className="py-1 px-2 text-gray-500">N (サンプル数)</td>
+                <td className="py-1 px-2 text-gray-500">N</td>
                 {DOW_TRADING.map((dow) => (
                   <td key={dow} className="py-1 px-2 text-center font-mono text-gray-600">{dowStats[dow]?.n ?? 0}</td>
                 ))}
               </tr>
-              {/* Close-to-close */}
               <tr className="border-b border-gray-100 bg-gray-50">
                 <td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>前日比 (Close-to-Close)</td>
               </tr>
@@ -376,7 +648,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                   return <td key={dow} className="py-1 px-2 text-center font-mono text-gray-600">{s ? pct2(s.close.winRate) : "-"}</td>;
                 })}
               </tr>
-              {/* Intraday */}
+              <tr className="border-b border-gray-100">
+                <td className="py-1 px-2 text-gray-400">p値</td>
+                {DOW_TRADING.map((dow) => {
+                  const s = dowStats[dow];
+                  const pv = s ? pValueLabel(s.close.pValue) : { text: "-", cls: "text-gray-400" };
+                  return <td key={dow} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>;
+                })}
+              </tr>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>日中 (Open→Close)</td>
               </tr>
@@ -401,7 +680,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                   return <td key={dow} className="py-1 px-2 text-center font-mono text-gray-600">{s ? pct2(s.intraday.winRate) : "-"}</td>;
                 })}
               </tr>
-              {/* Overnight */}
               <tr className="border-b border-gray-100 bg-gray-50">
                 <td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>夜間 (PrevClose→Open)</td>
               </tr>
@@ -470,6 +748,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                 ))}
               </tr>
               <tr className="border-b border-gray-100">
+                <td className="py-1 px-1.5 text-gray-500">p値</td>
+                {monthStats.map((s, m) => {
+                  if (!s) return null;
+                  const pv = pValueLabel(s.close.pValue);
+                  return <td key={m} className={`py-1 px-1.5 text-center font-mono ${pv.cls}`}>{pv.text}</td>;
+                })}
+              </tr>
+              <tr className="border-b border-gray-100">
                 <td className="py-1 px-1.5 text-gray-500">日中 平均</td>
                 {monthStats.map((s, m) => s && (
                   <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(s.intraday.mean)}`}>{pct2(s.intraday.mean)}</td>
@@ -480,6 +766,56 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                 {monthStats.map((s, m) => s && (
                   <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(s.overnight.mean)}`}>{pct2(s.overnight.mean)}</td>
                 ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Week-of-month stats */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">月内週番号別リターン (第1週〜第5週)</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="py-1 px-2 text-left text-gray-500 font-medium"></th>
+                {[1, 2, 3, 4, 5].map((w) => (
+                  <th key={w} className="py-1 px-2 text-center font-medium text-gray-700">第{w}週</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-100">
+                <td className="py-1 px-2 text-gray-500">N</td>
+                {womStats.map((s, i) => (
+                  <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{s?.n ?? 0}</td>
+                ))}
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-1 px-2 text-gray-500">平均</td>
+                {womStats.map((s, i) => (
+                  <td key={i} className={`py-1 px-2 text-center font-mono ${s ? colorClass(s.mean) : ""}`}>{s ? pct(s.mean) : "-"}</td>
+                ))}
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-1 px-2 text-gray-500">標準偏差</td>
+                {womStats.map((s, i) => (
+                  <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{s ? pct(s.std) : "-"}</td>
+                ))}
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-1 px-2 text-gray-500">勝率</td>
+                {womStats.map((s, i) => (
+                  <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{s ? pct2(s.winRate) : "-"}</td>
+                ))}
+              </tr>
+              <tr>
+                <td className="py-1 px-2 text-gray-500">p値</td>
+                {womStats.map((s, i) => {
+                  const pv = s ? pValueLabel(s.pValue) : { text: "-", cls: "text-gray-400" };
+                  return <td key={i} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>;
+                })}
               </tr>
             </tbody>
           </table>
@@ -522,11 +858,71 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       </div>
 
+      {/* Previous day conditional */}
+      {conditionalStats && (
+        <div>
+          <div className="text-xs text-gray-500 mb-1">前日騰落との関係</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="py-1 px-2 text-left text-gray-500 font-medium">条件</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">N</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">翌日平均</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">翌日勝率</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">p値</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-100">
+                  <td className="py-1 px-2 text-gray-600">前日上昇後</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-600">{conditionalStats.afterUp.n}</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(conditionalStats.afterUp.mean)}`}>{pct(conditionalStats.afterUp.mean)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(conditionalStats.afterUp.winRate)}</td>
+                  {(() => { const pv = pValueLabel(conditionalStats.afterUp.pValue); return <td className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; })()}
+                </tr>
+                <tr>
+                  <td className="py-1 px-2 text-gray-600">前日下落後</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-600">{conditionalStats.afterDown.n}</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(conditionalStats.afterDown.mean)}`}>{pct(conditionalStats.afterDown.mean)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(conditionalStats.afterDown.winRate)}</td>
+                  {(() => { const pv = pValueLabel(conditionalStats.afterDown.pValue); return <td className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; })()}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Day-of-month bar chart */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">月内日別 平均リターン (Turn of Month効果)</div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden">
+          <canvas ref={domBarRef} />
+        </div>
+      </div>
+
       {/* Cumulative return by weekday */}
       <div>
         <div className="text-xs text-gray-500 mb-1">曜日別 累積リターン</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden">
-          <canvas ref={cumulCanvasRef} />
+          <canvas ref={dowCumulRef} />
+        </div>
+      </div>
+
+      {/* Monthly cumulative return */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">月別 累積リターン</div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden">
+          <canvas ref={monthCumulRef} />
+        </div>
+      </div>
+
+      {/* Annual seasonality curve */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">年間シーズナリティ曲線 (年平均 累積リターン推移)</div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden">
+          <canvas ref={seasonRef} />
         </div>
       </div>
 
