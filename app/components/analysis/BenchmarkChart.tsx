@@ -63,6 +63,10 @@ export default function BenchmarkChart({ prices, period }: Props) {
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
+  // Date range for comparison period
+  const [rangeFrom, setRangeFrom] = useState<string>("");
+  const [rangeTo, setRangeTo] = useState<string>("");
+
   const fetchPrices = useCallback(async (ticker: string): Promise<{ prices: PricePoint[]; name: string } | null> => {
     const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`);
     const json = await res.json();
@@ -144,12 +148,34 @@ export default function BenchmarkChart({ prices, period }: Props) {
     setEntries((prev) => prev.filter((e) => e.ticker !== ticker));
   }, []);
 
+  // Filter prices by selected date range
+  const rangedPrices = useMemo(() => {
+    let filtered = prices;
+    if (rangeFrom) filtered = filtered.filter((p) => p.time >= rangeFrom);
+    if (rangeTo) filtered = filtered.filter((p) => p.time <= rangeTo);
+    return filtered;
+  }, [prices, rangeFrom, rangeTo]);
+
+  const filterByRange = useCallback(
+    (pts: PricePoint[]) => {
+      let filtered = pts;
+      if (rangeFrom) filtered = filtered.filter((p) => p.time >= rangeFrom);
+      if (rangeTo) filtered = filtered.filter((p) => p.time <= rangeTo);
+      return filtered;
+    },
+    [rangeFrom, rangeTo]
+  );
+
+  // Date range boundaries for the date inputs
+  const dateMin = useMemo(() => (prices.length > 0 ? prices[0].time : ""), [prices]);
+  const dateMax = useMemo(() => (prices.length > 0 ? prices[prices.length - 1].time : ""), [prices]);
+
   // Compute aligned data for all loaded entries
   const computed = useMemo((): ComputedEntry[] => {
     return entries
       .filter((e) => e.prices && e.prices.length > 0)
       .map((entry) => {
-        const aligned = alignSeries(prices, entry.prices!);
+        const aligned = alignSeries(rangedPrices, filterByRange(entry.prices!));
         return {
           entry,
           series: computeBenchmarkSeries(aligned.stock, aligned.bench),
@@ -157,7 +183,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
           rolling: rollingBeta(aligned.stock, aligned.bench, 60),
         };
       });
-  }, [prices, entries]);
+  }, [rangedPrices, entries, filterByRange]);
 
   // Performance chart
   useEffect(() => {
@@ -196,8 +222,9 @@ export default function BenchmarkChart({ prices, period }: Props) {
       );
     }
 
-    if (period) {
-      setInitialVisibleRange(chart, prices, period);
+    const hasCustomRange = rangeFrom || rangeTo;
+    if (!hasCustomRange && period) {
+      setInitialVisibleRange(chart, rangedPrices, period);
     } else {
       chart.timeScale().fitContent();
     }
@@ -211,7 +238,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
       chart.remove();
       perfApiRef.current = null;
     };
-  }, [computed, period, prices]);
+  }, [computed, period, rangedPrices, rangeFrom, rangeTo]);
 
   // Rolling beta/correlation chart
   useEffect(() => {
@@ -255,8 +282,9 @@ export default function BenchmarkChart({ prices, period }: Props) {
       );
     }
 
-    if (period) {
-      setInitialVisibleRange(chart, prices, period);
+    const hasCustomRange = rangeFrom || rangeTo;
+    if (!hasCustomRange && period) {
+      setInitialVisibleRange(chart, rangedPrices, period);
     } else {
       chart.timeScale().fitContent();
     }
@@ -270,7 +298,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
       chart.remove();
       betaApiRef.current = null;
     };
-  }, [computed, period, prices]);
+  }, [computed, period, rangedPrices, rangeFrom, rangeTo]);
 
   const pct = (v: number) => (v * 100).toFixed(2);
   const fmt = (v: number) => v.toFixed(3);
@@ -344,6 +372,41 @@ export default function BenchmarkChart({ prices, period }: Props) {
         <div className="text-xs text-red-500 mb-2">{addError}</div>
       )}
 
+      {/* Date range selector */}
+      <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
+        <span className="text-gray-500 font-medium">比較期間:</span>
+        <input
+          type="date"
+          value={rangeFrom}
+          min={dateMin}
+          max={rangeTo || dateMax}
+          onChange={(e) => setRangeFrom(e.target.value)}
+          className="px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-400"
+        />
+        <span className="text-gray-400">〜</span>
+        <input
+          type="date"
+          value={rangeTo}
+          min={rangeFrom || dateMin}
+          max={dateMax}
+          onChange={(e) => setRangeTo(e.target.value)}
+          className="px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-400"
+        />
+        {(rangeFrom || rangeTo) && (
+          <button
+            onClick={() => { setRangeFrom(""); setRangeTo(""); }}
+            className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors"
+          >
+            全期間に戻す
+          </button>
+        )}
+        {rangeFrom && rangeTo && (
+          <span className="text-gray-400">
+            ({rangedPrices.length}営業日)
+          </span>
+        )}
+      </div>
+
       {anyLoading && (
         <div className="text-sm text-gray-400 py-6 text-center">
           データ取得中...
@@ -410,7 +473,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
 
           {/* Performance chart */}
           <div className="mb-2 text-xs text-gray-500 font-medium">
-            相対パフォーマンス (基準日=100)
+            相対パフォーマンス (基準日=100){rangeFrom && <span className="ml-1 text-blue-500">({rangeFrom}〜{rangeTo || dateMax})</span>}
             <span className="ml-2 text-blue-500">-- 分析銘柄</span>
             {computed.map((c) => (
               <span key={c.entry.ticker} className="ml-2" style={{ color: c.entry.color }}>

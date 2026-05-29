@@ -160,18 +160,6 @@ const RiskMetricsPanel = dynamic(
   () => import("./components/analysis/RiskMetricsPanel"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
-const IchimokuChart = dynamic(
-  () => import("./components/analysis/IchimokuChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
-);
-const SupportResistanceChart = dynamic(
-  () => import("./components/analysis/SupportResistanceChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
-);
-const FibonacciChart = dynamic(
-  () => import("./components/analysis/FibonacciChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
-);
 const BenchmarkChart = dynamic(
   () => import("./components/analysis/BenchmarkChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -219,6 +207,10 @@ const RollingTDAChart = dynamic(
 const AttractorSignalDashboard = dynamic(
   () => import("./components/analysis/AttractorSignalDashboard"),
   { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const LyapunovSpectrumChart = dynamic(
+  () => import("./components/analysis/LyapunovSpectrumChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={600} /> }
 );
 
 function ChartPlaceholder({ height }: { height: number }) {
@@ -393,9 +385,6 @@ export default function AnalysisPage() {
               {activeSection === "basic" && (
                 <>
                   <UnifiedChart prices={allPrices} period={period} />
-                  <IchimokuChart prices={allPrices} period={period} />
-                  <SupportResistanceChart prices={allPrices} period={period} />
-                  <FibonacciChart prices={allPrices} period={period} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
@@ -465,6 +454,7 @@ export default function AnalysisPage() {
                   <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
                   <RollingRQAChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LocalLyapunovChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <LyapunovSpectrumChart prices={filteredPrices} seriesMode={seriesMode} />
                   <SimplexPredictionChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
                   <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />

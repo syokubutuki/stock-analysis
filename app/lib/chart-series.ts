@@ -1,7 +1,6 @@
 import { PricePoint } from "./types";
 import { computeTrendSeries } from "./trend-analysis";
 import { computeRSI, computeMACD, computeBollinger } from "./technical-indicators";
-import { computeIchimoku } from "./ichimoku";
 import { computeStochastics } from "./stochastics";
 import { computeADX } from "./adx";
 import { computeATR, computeKeltnerChannel } from "./atr";
@@ -73,7 +72,6 @@ export interface SeriesDef {
 export const GROUPS: SeriesGroup[] = [
   { id: "price", label: "価格" },
   { id: "sma", label: "移動平均" },
-  { id: "ichimoku", label: "一目均衡表" },
   { id: "band", label: "バンド" },
   { id: "volume", label: "出来高" },
   { id: "oscillator", label: "オシレーター" },
@@ -201,77 +199,6 @@ export const SERIES: SeriesDef[] = [
       computeTrendSeries(p)
         .filter((x) => x.sma75 !== null)
         .map((x) => tv(x.time, x.sma75!)),
-  },
-
-  // ====== 一目均衡表 ======
-  {
-    id: "ichi_tenkan",
-    label: "転換線",
-    group: "ichimoku",
-    color: "#3b82f6",
-    scaleId: "price",
-    type: "line",
-    compute: (p) => {
-      const { current } = computeIchimoku(p);
-      return current.filter((x) => x.tenkan !== null).map((x) => tv(x.time, x.tenkan!));
-    },
-  },
-  {
-    id: "ichi_kijun",
-    label: "基準線",
-    group: "ichimoku",
-    color: "#ef4444",
-    scaleId: "price",
-    type: "line",
-    compute: (p) => {
-      const { current } = computeIchimoku(p);
-      return current.filter((x) => x.kijun !== null).map((x) => tv(x.time, x.kijun!));
-    },
-  },
-  {
-    id: "ichi_senkouA",
-    label: "先行スパン1",
-    group: "ichimoku",
-    color: "rgba(34,197,94,0.5)",
-    scaleId: "price",
-    type: "line",
-    compute: (p) => {
-      const { current, leading } = computeIchimoku(p);
-      const data = current
-        .filter((x) => x.senkouA !== null)
-        .map((x) => tv(x.time, x.senkouA!));
-      for (const l of leading) data.push(tv(l.time, l.senkouA));
-      return data;
-    },
-  },
-  {
-    id: "ichi_senkouB",
-    label: "先行スパン2",
-    group: "ichimoku",
-    color: "rgba(239,68,68,0.5)",
-    scaleId: "price",
-    type: "line",
-    compute: (p) => {
-      const { current, leading } = computeIchimoku(p);
-      const data = current
-        .filter((x) => x.senkouB !== null)
-        .map((x) => tv(x.time, x.senkouB!));
-      for (const l of leading) data.push(tv(l.time, l.senkouB));
-      return data;
-    },
-  },
-  {
-    id: "ichi_chikou",
-    label: "遅行スパン",
-    group: "ichimoku",
-    color: "#a855f7",
-    scaleId: "price",
-    type: "line",
-    lineStyle: 2,
-    compute: (p) => {
-      const { current } = computeIchimoku(p);
-      return current.filter((x) => x.chikou !== null).map((x) => tv(x.time, x.chikou!));
-    },
   },
 
   // ====== バンド ======
