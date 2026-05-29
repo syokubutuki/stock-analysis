@@ -16,9 +16,9 @@ const VolumeAnalysis = dynamic(
   () => import("./components/analysis/VolumeAnalysis"),
   { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
 );
-const TrendJudgment = dynamic(
-  () => import("./components/analysis/TrendJudgment"),
-  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+const UnifiedChart = dynamic(
+  () => import("./components/analysis/UnifiedChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
 );
 const GapAnalysisChart = dynamic(
   () => import("./components/analysis/GapAnalysisChart"),
@@ -392,7 +392,7 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
-                  <TrendJudgment prices={filteredPrices} />
+                  <UnifiedChart prices={filteredPrices} />
                   <IchimokuChart prices={filteredPrices} />
                   <SupportResistanceChart prices={filteredPrices} />
                   <FibonacciChart prices={filteredPrices} />
