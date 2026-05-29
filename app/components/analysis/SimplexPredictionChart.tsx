@@ -185,13 +185,36 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
     const toX = (t: number) => m.left + (t / (maxTheta || 1)) * plotW;
     const toY = (s: number) => m.top + plotH - ((s - minSkill) / (maxSkill - minSkill || 1)) * plotH;
 
-    // Grid
+    // Grid + ticks
     ctx.strokeStyle = "#f0f0f0";
     ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 4; i++) {
-      const y = m.top + (plotH / 4) * i;
+    const yTicks = 4;
+    for (let i = 0; i <= yTicks; i++) {
+      const y = m.top + (plotH / yTicks) * i;
       ctx.beginPath(); ctx.moveTo(m.left, y); ctx.lineTo(m.left + plotW, y); ctx.stroke();
     }
+    const xTicks = 5;
+    for (let i = 0; i <= xTicks; i++) {
+      const x = m.left + (plotW / xTicks) * i;
+      ctx.beginPath(); ctx.moveTo(x, m.top); ctx.lineTo(x, m.top + plotH); ctx.stroke();
+    }
+
+    // Y-axis tick labels
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= yTicks; i++) {
+      const val = maxSkill - (i / yTicks) * (maxSkill - minSkill);
+      ctx.fillText(val.toFixed(2), m.left - 4, m.top + (plotH / yTicks) * i + 3);
+    }
+
+    // X-axis tick labels
+    ctx.textAlign = "center";
+    for (let i = 0; i <= xTicks; i++) {
+      const val = (i / xTicks) * maxTheta;
+      ctx.fillText(val.toFixed(1), m.left + (plotW / xTicks) * i, m.top + plotH + 12);
+    }
+    ctx.textAlign = "left";
 
     // Line
     ctx.strokeStyle = "#8b5cf6";
