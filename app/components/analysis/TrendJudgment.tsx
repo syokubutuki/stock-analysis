@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   createChart,
-  createSeriesMarkers,
   CandlestickSeries,
   LineSeries,
   type IChartApi,
@@ -11,7 +10,6 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { computeTrendSeries, judgeTrend, type TrendJudgment as TrendResult } from "../../lib/trend-analysis";
-import { detectEventMarkers, EventMarker } from "../../lib/event-markers";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -39,9 +37,6 @@ const DIRECTION_BG: Record<string, string> = {
 export default function TrendJudgment({ prices }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-
-  const [showMarkers, setShowMarkers] = useState(true);
-  const markers = useMemo(() => detectEventMarkers(prices), [prices]);
 
   const trend = judgeTrend(prices);
   const trendSeries = computeTrendSeries(prices);
@@ -74,7 +69,6 @@ export default function TrendJudgment({ prices }: Props) {
       borderDownColor: "#ef5350",
       wickUpColor: "#26a69a",
       wickDownColor: "#ef5350",
-      title: "株価",
     });
     candleSeries.setData(
       prices.map((p) => ({
@@ -86,30 +80,12 @@ export default function TrendJudgment({ prices }: Props) {
       }))
     );
 
-    if (showMarkers && markers.length > 0) {
-      createSeriesMarkers(
-        candleSeries,
-        markers.map((m) => ({
-          time: m.time as Time,
-          position: (m.type === "gapDown" || m.type === "bigDown" ? "belowBar" : "aboveBar") as "belowBar" | "aboveBar",
-          color: m.type === "gapUp" || m.type === "bigUp" ? "#22c55e"
-               : m.type === "gapDown" || m.type === "bigDown" ? "#ef4444"
-               : "#3b82f6",
-          shape: (m.type === "volumeSpike" ? "circle"
-               : m.type === "gapUp" || m.type === "bigUp" ? "arrowUp"
-               : "arrowDown") as "circle" | "arrowUp" | "arrowDown",
-          text: m.label,
-        }))
-      );
-    }
-
     // SMA5
     const sma5Data = trendSeries.filter((p) => p.sma5 !== null);
     if (sma5Data.length > 0) {
       const sma5Line = chart.addSeries(LineSeries, {
         color: "#f59e0b",
         lineWidth: 1,
-        title: "SMA5",
       });
       sma5Line.setData(
         sma5Data.map((p) => ({ time: p.time as Time, value: p.sma5! }))
@@ -122,7 +98,6 @@ export default function TrendJudgment({ prices }: Props) {
       const sma25Line = chart.addSeries(LineSeries, {
         color: "#3b82f6",
         lineWidth: 1,
-        title: "SMA25",
       });
       sma25Line.setData(
         sma25Data.map((p) => ({ time: p.time as Time, value: p.sma25! }))
@@ -135,7 +110,6 @@ export default function TrendJudgment({ prices }: Props) {
       const sma75Line = chart.addSeries(LineSeries, {
         color: "#a855f7",
         lineWidth: 1,
-        title: "SMA75",
       });
       sma75Line.setData(
         sma75Data.map((p) => ({ time: p.time as Time, value: p.sma75! }))
@@ -156,21 +130,11 @@ export default function TrendJudgment({ prices }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [prices, showMarkers, markers]);
+  }, [prices]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-gray-800">トレンド判断</h3>
-        <button
-          onClick={() => setShowMarkers((v) => !v)}
-          className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-            showMarkers ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          イベントマーカー
-        </button>
-      </div>
+      <h3 className="font-bold text-gray-800 mb-3">トレンド判断</h3>
 
       <div className={`rounded-lg border p-3 mb-3 ${DIRECTION_BG[trend.direction]}`}>
         <div className="flex items-center justify-between">
@@ -200,9 +164,6 @@ export default function TrendJudgment({ prices }: Props) {
 
       <div className="mt-2 flex gap-3 text-xs text-gray-500">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-0.5 bg-gray-700" /> 株価
-        </span>
-        <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-0.5 bg-amber-500" /> SMA5
         </span>
         <span className="flex items-center gap-1">
@@ -212,15 +173,6 @@ export default function TrendJudgment({ prices }: Props) {
           <span className="inline-block w-3 h-0.5 bg-purple-500" /> SMA75
         </span>
       </div>
-
-      {showMarkers && markers.length > 0 && (
-        <div className="mt-1 flex gap-3 text-xs text-gray-500 flex-wrap">
-          <span className="flex items-center gap-1"><span className="text-blue-500">●</span> 出来高急増</span>
-          <span className="flex items-center gap-1"><span className="text-green-500">▲</span> 窓開け↑/大幅上昇</span>
-          <span className="flex items-center gap-1"><span className="text-red-500">▼</span> 窓開け↓/大幅下落</span>
-          <span className="text-gray-400">({markers.length}件検出)</span>
-        </div>
-      )}
 
       <AnalysisGuide title="トレンド判断の読み方">
         <p><span className="font-medium">SMA(単純移動平均線):</span> 過去N日間の終値の平均。期間が短いほど直近の値動きに敏感に反応し、長いほど大きなトレンドを反映します。</p>

@@ -65,7 +65,7 @@ export default function IchimokuChart({ prices }: Props) {
     const tenkanData = current.filter((p) => p.tenkan !== null);
     if (tenkanData.length > 0) {
       const s = chart.addSeries(LineSeries, {
-        color: "#3b82f6", lineWidth: 1, title: "転換線(9)",
+        color: "#3b82f6", lineWidth: 1,
       });
       s.setData(tenkanData.map((p) => ({ time: p.time as Time, value: p.tenkan! })));
     }
@@ -74,7 +74,7 @@ export default function IchimokuChart({ prices }: Props) {
     const kijunData = current.filter((p) => p.kijun !== null);
     if (kijunData.length > 0) {
       const s = chart.addSeries(LineSeries, {
-        color: "#ef4444", lineWidth: 1, title: "基準線(26)",
+        color: "#ef4444", lineWidth: 1,
       });
       s.setData(kijunData.map((p) => ({ time: p.time as Time, value: p.kijun! })));
     }
@@ -83,7 +83,7 @@ export default function IchimokuChart({ prices }: Props) {
     const senkouAData = current.filter((p) => p.senkouA !== null);
     if (senkouAData.length > 0) {
       const s = chart.addSeries(LineSeries, {
-        color: "rgba(34, 197, 94, 0.5)", lineWidth: 1, title: "先行1",
+        color: "rgba(34, 197, 94, 0.5)", lineWidth: 1,
       });
       const data = senkouAData.map((p) => ({ time: p.time as Time, value: p.senkouA! }));
       // Add leading data
@@ -97,7 +97,7 @@ export default function IchimokuChart({ prices }: Props) {
     const senkouBData = current.filter((p) => p.senkouB !== null);
     if (senkouBData.length > 0) {
       const s = chart.addSeries(LineSeries, {
-        color: "rgba(239, 68, 68, 0.5)", lineWidth: 1, title: "先行2",
+        color: "rgba(239, 68, 68, 0.5)", lineWidth: 1,
       });
       const data = senkouBData.map((p) => ({ time: p.time as Time, value: p.senkouB! }));
       for (const l of leading) {
@@ -110,7 +110,7 @@ export default function IchimokuChart({ prices }: Props) {
     const chikouData = current.filter((p) => p.chikou !== null);
     if (chikouData.length > 0) {
       const s = chart.addSeries(LineSeries, {
-        color: "#a855f7", lineWidth: 1, lineStyle: 2, title: "遅行",
+        color: "#a855f7", lineWidth: 1, lineStyle: 2,
       });
       s.setData(chikouData.map((p) => ({ time: p.time as Time, value: p.chikou! })));
     }

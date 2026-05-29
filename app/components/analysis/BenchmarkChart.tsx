@@ -100,14 +100,14 @@ export default function BenchmarkChart({ prices }: Props) {
     perfApiRef.current = chart;
 
     const stockLine = chart.addSeries(LineSeries, {
-      color: "#3b82f6", lineWidth: 2, title: "銘柄",
+      color: "#3b82f6", lineWidth: 2,
     });
     stockLine.setData(
       series.map((s) => ({ time: s.time as Time, value: s.stockNorm }))
     );
 
     const benchLine = chart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1, title: BENCHMARKS[benchKey].label,
+      color: "#9ca3af", lineWidth: 1,
     });
     benchLine.setData(
       series.map((s) => ({ time: s.time as Time, value: s.benchNorm }))
@@ -142,14 +142,14 @@ export default function BenchmarkChart({ prices }: Props) {
     betaApiRef.current = chart;
 
     const betaLine = chart.addSeries(LineSeries, {
-      color: "#8b5cf6", lineWidth: 2, title: "β (60日)",
+      color: "#8b5cf6", lineWidth: 2,
     });
     betaLine.setData(
       rolling.map((r) => ({ time: r.time as Time, value: r.beta }))
     );
 
     const corrLine = chart.addSeries(LineSeries, {
-      color: "#f59e0b", lineWidth: 1, title: "相関 (60日)",
+      color: "#f59e0b", lineWidth: 1,
     });
     corrLine.setData(
       rolling.map((r) => ({ time: r.time as Time, value: r.correlation }))
@@ -157,7 +157,7 @@ export default function BenchmarkChart({ prices }: Props) {
 
     // β=1 reference line
     const refLine = chart.addSeries(LineSeries, {
-      color: "rgba(107, 114, 128, 0.3)", lineWidth: 1, lineStyle: 2, title: "",
+      color: "rgba(107, 114, 128, 0.3)", lineWidth: 1, lineStyle: 2,
     });
     refLine.setData(
       rolling.map((r) => ({ time: r.time as Time, value: 1 }))

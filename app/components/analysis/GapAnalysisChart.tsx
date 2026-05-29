@@ -46,7 +46,6 @@ export default function GapAnalysisChart({ prices }: Props) {
     gapApiRef.current = chart;
 
     const overnightSeries = chart.addSeries(HistogramSeries, {
-      title: "夜間リターン",
       priceScaleId: "right",
     });
     overnightSeries.setData(
@@ -92,7 +91,6 @@ export default function GapAnalysisChart({ prices }: Props) {
     const totalSeries = chart.addSeries(LineSeries, {
       color: "#6b7280",
       lineWidth: 2,
-      title: "全体",
     });
     totalSeries.setData(
       cumReturns.map((c) => ({
@@ -104,7 +102,6 @@ export default function GapAnalysisChart({ prices }: Props) {
     const overnightSeries = chart.addSeries(LineSeries, {
       color: "#3b82f6",
       lineWidth: 2,
-      title: "夜間累積",
     });
     overnightSeries.setData(
       cumReturns.map((c) => ({
@@ -116,7 +113,6 @@ export default function GapAnalysisChart({ prices }: Props) {
     const intradaySeries = chart.addSeries(LineSeries, {
       color: "#f59e0b",
       lineWidth: 2,
-      title: "日中累積",
     });
     intradaySeries.setData(
       cumReturns.map((c) => ({

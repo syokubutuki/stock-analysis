@@ -85,7 +85,6 @@ export default function DiffSeriesChart({ prices }: Props) {
       const colors = COLORS[lag];
       const series = chart.addSeries(HistogramSeries, {
         priceScaleId: `diff${lag}`,
-        title: `${lag}日差分`,
       });
 
       series.setData(

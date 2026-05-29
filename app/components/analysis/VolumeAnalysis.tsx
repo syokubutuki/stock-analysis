@@ -47,7 +47,6 @@ export default function VolumeAnalysis({ prices }: Props) {
     // 出来高ヒストグラム
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceScaleId: "right",
-      title: "出来高",
     });
     volumeSeries.setData(
       volumeBars.map((bar) => ({
@@ -68,7 +67,6 @@ export default function VolumeAnalysis({ prices }: Props) {
     const avgSeries = chart.addSeries(LineSeries, {
       color: "#ff9800",
       lineWidth: 1,
-      title: "20日平均",
       priceScaleId: "right",
     });
     avgSeries.setData(
