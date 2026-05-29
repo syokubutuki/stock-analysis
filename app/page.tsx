@@ -24,6 +24,10 @@ const GapAnalysisChart = dynamic(
   () => import("./components/analysis/GapAnalysisChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const CustomReturnChart = dynamic(
+  () => import("./components/analysis/CustomReturnChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
 const TransformCharts = dynamic(
   () => import("./components/analysis/TransformCharts"),
   { ssr: false, loading: () => <ChartPlaceholder height={220} /> }
@@ -389,6 +393,7 @@ export default function AnalysisPage() {
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
                   <GapAnalysisChart prices={allPrices} period={period} />
+                  <CustomReturnChart prices={allPrices} />
                 </>
               )}
 
