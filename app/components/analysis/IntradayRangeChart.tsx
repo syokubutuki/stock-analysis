@@ -15,12 +15,15 @@ import {
   computeRangeStats,
 } from "../../lib/intraday-range";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function IntradayRangeChart({ prices }: Props) {
+export default function IntradayRangeChart({ prices, period }: Props) {
   const histRef = useRef<HTMLDivElement>(null);
   const maRef = useRef<HTMLDivElement>(null);
   const histApiRef = useRef<IChartApi | null>(null);
@@ -60,7 +63,7 @@ export default function IntradayRangeChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (histRef.current)
         chart.applyOptions({ width: histRef.current.clientWidth });
@@ -71,7 +74,7 @@ export default function IntradayRangeChart({ prices }: Props) {
       chart.remove();
       histApiRef.current = null;
     };
-  }, [points, stats.medianRange]);
+  }, [points, stats.medianRange, prices, period]);
 
   // ローリングMA
   useEffect(() => {
@@ -100,7 +103,7 @@ export default function IntradayRangeChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (maRef.current)
         chart.applyOptions({ width: maRef.current.clientWidth });
@@ -111,7 +114,7 @@ export default function IntradayRangeChart({ prices }: Props) {
       chart.remove();
       maApiRef.current = null;
     };
-  }, [rolling20]);
+  }, [rolling20, prices, period]);
 
   const pct = (v: number) => (v * 100).toFixed(3);
 

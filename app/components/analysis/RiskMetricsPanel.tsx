@@ -10,12 +10,15 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeRiskMetrics, rollingRiskMetrics } from "../../lib/risk-metrics";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function RiskMetricsPanel({ prices }: Props) {
+export default function RiskMetricsPanel({ prices, period }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<IChartApi | null>(null);
 
@@ -67,7 +70,7 @@ export default function RiskMetricsPanel({ prices }: Props) {
       rolling.map((r) => ({ time: r.time as Time, value: 0 }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (chartRef.current)
         chart.applyOptions({ width: chartRef.current.clientWidth });
@@ -78,7 +81,7 @@ export default function RiskMetricsPanel({ prices }: Props) {
       chart.remove();
       apiRef.current = null;
     };
-  }, [rolling]);
+  }, [rolling, prices, period]);
 
   const pct = (v: number) => (v * 100).toFixed(2);
   const fmt = (v: number) => v.toFixed(2);

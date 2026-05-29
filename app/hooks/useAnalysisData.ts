@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { StockData, PricePoint } from "../lib/types";
 
-export type PeriodKey = "1m" | "3m" | "6m" | "1y" | "2y" | "3y";
+export type PeriodKey = "1m" | "3m" | "6m" | "1y" | "2y" | "3y" | "5y" | "10y";
 
 const PERIOD_DAYS: Record<PeriodKey, number> = {
   "1m": 21,
@@ -12,6 +12,8 @@ const PERIOD_DAYS: Record<PeriodKey, number> = {
   "1y": 252,
   "2y": 504,
   "3y": 756,
+  "5y": 1260,
+  "10y": 2520,
 };
 
 export function useAnalysisData() {
@@ -28,7 +30,7 @@ export function useAnalysisData() {
 
     try {
       const res = await fetch(
-        `/api/stock?ticker=${encodeURIComponent(ticker.trim())}&range=3y`
+        `/api/stock?ticker=${encodeURIComponent(ticker.trim())}&range=10y`
       );
       const json = await res.json();
       if (!res.ok) {
@@ -43,6 +45,10 @@ export function useAnalysisData() {
     }
   }, []);
 
+  const allPrices: PricePoint[] = useMemo(() => {
+    return data?.prices ?? [];
+  }, [data]);
+
   const filteredPrices: PricePoint[] = useMemo(() => {
     if (!data?.prices) return [];
     const maxDays = PERIOD_DAYS[period];
@@ -51,5 +57,5 @@ export function useAnalysisData() {
     return prices.slice(prices.length - maxDays);
   }, [data, period]);
 
-  return { data, filteredPrices, loading, error, fetchStock, period, setPeriod };
+  return { data, allPrices, filteredPrices, loading, error, fetchStock, period, setPeriod };
 }

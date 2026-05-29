@@ -17,14 +17,17 @@ import {
   type DiffStats,
 } from "../../lib/diff-series";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
 type DiffMode = "absolute" | "percent";
 
-export default function DiffSeriesChart({ prices }: Props) {
+export default function DiffSeriesChart({ prices, period }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<Map<string, ISeriesApi<"Histogram">>>(new Map());
@@ -99,7 +102,7 @@ export default function DiffSeriesChart({ prices }: Props) {
     });
 
     setStats(newStats);
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (containerRef.current) {

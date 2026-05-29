@@ -10,10 +10,13 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { computeADX, judgeADX } from "../../lib/adx";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
 const STRENGTH_COLORS: Record<string, string> = {
@@ -27,7 +30,7 @@ const TREND_COLORS: Record<string, string> = {
   "下降": "text-red-600",
 };
 
-export default function ADXChart({ prices }: Props) {
+export default function ADXChart({ prices, period }: Props) {
   const upperRef = useRef<HTMLDivElement>(null);
   const lowerRef = useRef<HTMLDivElement>(null);
   const upperApiRef = useRef<IChartApi | null>(null);
@@ -69,7 +72,7 @@ export default function ADXChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (upperRef.current)
@@ -81,7 +84,7 @@ export default function ADXChart({ prices }: Props) {
       chart.remove();
       upperApiRef.current = null;
     };
-  }, [prices]);
+  }, [prices, period]);
 
   // Lower chart: +DI, -DI, ADX
   useEffect(() => {
@@ -125,7 +128,7 @@ export default function ADXChart({ prices }: Props) {
       adxPoints.map((p) => ({ time: p.time as Time, value: p.adx }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (lowerRef.current)
@@ -137,7 +140,7 @@ export default function ADXChart({ prices }: Props) {
       chart.remove();
       lowerApiRef.current = null;
     };
-  }, [adxPoints]);
+  }, [adxPoints, prices, period]);
 
   const last = adxPoints.length > 0 ? adxPoints[adxPoints.length - 1] : null;
 

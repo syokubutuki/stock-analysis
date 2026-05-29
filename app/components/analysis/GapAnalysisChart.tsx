@@ -15,12 +15,15 @@ import {
   computeCumulativeReturns,
 } from "../../lib/gap-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function GapAnalysisChart({ prices }: Props) {
+export default function GapAnalysisChart({ prices, period }: Props) {
   const gapChartRef = useRef<HTMLDivElement>(null);
   const cumChartRef = useRef<HTMLDivElement>(null);
   const gapApiRef = useRef<IChartApi | null>(null);
@@ -59,7 +62,7 @@ export default function GapAnalysisChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (gapChartRef.current)
@@ -121,7 +124,7 @@ export default function GapAnalysisChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (cumChartRef.current)

@@ -17,14 +17,18 @@ import {
   type SeriesDef,
   type TimeValue,
 } from "../../lib/chart-series";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function UnifiedChart({ prices }: Props) {
+export default function UnifiedChart({ prices, period }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const savedRange = useRef<{ from: Time; to: Time } | null>(null);
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(DEFAULT_ENABLED)
   );
@@ -61,6 +65,11 @@ export default function UnifiedChart({ prices }: Props) {
     if (!containerRef.current || prices.length === 0) return;
 
     if (chartRef.current) {
+      try {
+        savedRange.current = chartRef.current.timeScale().getVisibleRange() as { from: Time; to: Time } | null;
+      } catch {
+        // chart may already be disposed
+      }
       chartRef.current.remove();
     }
 
@@ -169,7 +178,18 @@ export default function UnifiedChart({ prices }: Props) {
       // lightweight-charts auto-creates scales; we don't need to manually set left
     }
 
-    chart.timeScale().fitContent();
+    // Restore saved range, or set initial range
+    if (savedRange.current) {
+      try {
+        chart.timeScale().setVisibleRange(savedRange.current);
+      } catch {
+        chart.timeScale().fitContent();
+      }
+    } else if (period) {
+      setInitialVisibleRange(chart, prices, period);
+    } else {
+      chart.timeScale().fitContent();
+    }
     setComputing(false);
 
     const handleResize = () => {

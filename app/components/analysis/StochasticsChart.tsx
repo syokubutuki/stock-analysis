@@ -10,13 +10,16 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { computeStochastics, detectStochSignals } from "../../lib/stochastics";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function StochasticsChart({ prices }: Props) {
+export default function StochasticsChart({ prices, period }: Props) {
   const upperRef = useRef<HTMLDivElement>(null);
   const lowerRef = useRef<HTMLDivElement>(null);
   const upperApiRef = useRef<IChartApi | null>(null);
@@ -70,7 +73,7 @@ export default function StochasticsChart({ prices }: Props) {
         close: p.close,
       }))
     );
-    upperChart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(upperChart, prices, period); } else { upperChart.timeScale().fitContent(); }
 
     // Lower chart: stochastics
     const lowerChart = createChart(lowerRef.current, {
@@ -123,7 +126,7 @@ export default function StochasticsChart({ prices }: Props) {
         stochPoints.map((p) => ({ time: p.time as Time, value: 20 }))
       );
 
-      lowerChart.timeScale().fitContent();
+      if (period) { setInitialVisibleRange(lowerChart, prices, period); } else { lowerChart.timeScale().fitContent(); }
     }
 
     const handleResize = () => {
@@ -141,7 +144,7 @@ export default function StochasticsChart({ prices }: Props) {
       upperApiRef.current = null;
       lowerApiRef.current = null;
     };
-  }, [prices, stochPoints]);
+  }, [prices, stochPoints, period]);
 
   const last = stochPoints.length > 0 ? stochPoints[stochPoints.length - 1] : null;
 

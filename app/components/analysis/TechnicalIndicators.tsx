@@ -15,15 +15,18 @@ import {
   computeBollinger,
   detectSignals,
 } from "../../lib/technical-indicators";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
 type IndicatorTab = "rsi" | "macd" | "bollinger";
 
-export default function TechnicalIndicators({ prices }: Props) {
+export default function TechnicalIndicators({ prices, period }: Props) {
   const [tab, setTab] = useState<IndicatorTab>("rsi");
   const chartRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<IChartApi | null>(null);
@@ -154,7 +157,7 @@ export default function TechnicalIndicators({ prices }: Props) {
       );
     }
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (chartRef.current)
@@ -166,7 +169,7 @@ export default function TechnicalIndicators({ prices }: Props) {
       chart.remove();
       apiRef.current = null;
     };
-  }, [tab, rsi, macd, bollinger]);
+  }, [tab, rsi, macd, bollinger, prices, period]);
 
   // Current values
   const lastRSI = rsi.length > 0 ? rsi[rsi.length - 1].value : null;

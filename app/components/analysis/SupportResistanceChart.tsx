@@ -10,12 +10,15 @@ import {
 import { PricePoint } from "../../lib/types";
 import { detectSupportResistance } from "../../lib/support-resistance";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function SupportResistanceChart({ prices }: Props) {
+export default function SupportResistanceChart({ prices, period }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<IChartApi | null>(null);
 
@@ -65,7 +68,7 @@ export default function SupportResistanceChart({ prices }: Props) {
       });
     }
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (chartRef.current)
         chart.applyOptions({ width: chartRef.current.clientWidth });

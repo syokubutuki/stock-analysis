@@ -10,9 +10,12 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeFibonacci } from "../../lib/fibonacci";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
 const RETRACE_COLORS: Record<string, string> = {
@@ -25,7 +28,7 @@ const RETRACE_COLORS: Record<string, string> = {
   "100.0%": "#dc2626",
 };
 
-export default function FibonacciChart({ prices }: Props) {
+export default function FibonacciChart({ prices, period }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<IChartApi | null>(null);
 
@@ -76,7 +79,7 @@ export default function FibonacciChart({ prices }: Props) {
       });
     }
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (chartRef.current)
         chart.applyOptions({ width: chartRef.current.clientWidth });

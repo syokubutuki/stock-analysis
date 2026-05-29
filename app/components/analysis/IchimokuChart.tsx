@@ -11,9 +11,12 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeIchimoku, judgeIchimoku } from "../../lib/ichimoku";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
 const SIGNAL_COLORS: Record<string, string> = {
@@ -24,7 +27,7 @@ const SIGNAL_COLORS: Record<string, string> = {
   "中立": "bg-gray-50 border-gray-200 text-gray-700",
 };
 
-export default function IchimokuChart({ prices }: Props) {
+export default function IchimokuChart({ prices, period }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<IChartApi | null>(null);
 
@@ -115,7 +118,7 @@ export default function IchimokuChart({ prices }: Props) {
       s.setData(chikouData.map((p) => ({ time: p.time as Time, value: p.chikou! })));
     }
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (chartRef.current)
         chart.applyOptions({ width: chartRef.current.clientWidth });

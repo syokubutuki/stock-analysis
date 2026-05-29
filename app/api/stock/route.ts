@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const range = request.nextUrl.searchParams.get("range") || "1y";
-    const validRanges = ["1mo", "3mo", "6mo", "1y", "2y", "3y", "5y"];
+    const validRanges = ["1mo", "3mo", "6mo", "1y", "2y", "3y", "5y", "10y"];
     const safeRange = validRanges.includes(range) ? range : "1y";
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${safeRange}&interval=1d`;
     const res = await fetch(url, {

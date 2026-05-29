@@ -10,12 +10,15 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeMFEMAE, computeMFEMAEStats } from "../../lib/mfe-mae";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function MFEMAEChart({ prices }: Props) {
+export default function MFEMAEChart({ prices, period }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const scatterRef = useRef<HTMLCanvasElement>(null);
   const apiRef = useRef<IChartApi | null>(null);
@@ -67,7 +70,7 @@ export default function MFEMAEChart({ prices }: Props) {
       maData.map((d) => ({ time: d.time as Time, value: d.mae * 100 }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (chartRef.current)
         chart.applyOptions({ width: chartRef.current.clientWidth });
@@ -78,7 +81,7 @@ export default function MFEMAEChart({ prices }: Props) {
       chart.remove();
       apiRef.current = null;
     };
-  }, [points]);
+  }, [points, prices, period]);
 
   // 散布図 (Canvas)
   useEffect(() => {

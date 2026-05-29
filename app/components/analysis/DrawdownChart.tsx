@@ -15,12 +15,15 @@ import {
   computeDrawdownStats,
 } from "../../lib/drawdown";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function DrawdownChart({ prices }: Props) {
+export default function DrawdownChart({ prices, period }: Props) {
   const ddChartRef = useRef<HTMLDivElement>(null);
   const ddApiRef = useRef<IChartApi | null>(null);
   const uwChartRef = useRef<HTMLDivElement>(null);
@@ -65,7 +68,7 @@ export default function DrawdownChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (ddChartRef.current)
         chart.applyOptions({ width: ddChartRef.current.clientWidth });
@@ -76,7 +79,7 @@ export default function DrawdownChart({ prices }: Props) {
       chart.remove();
       ddApiRef.current = null;
     };
-  }, [ddSeries]);
+  }, [ddSeries, prices, period]);
 
   // Underwater equity chart (price vs peak)
   useEffect(() => {
@@ -112,7 +115,7 @@ export default function DrawdownChart({ prices }: Props) {
       ddSeries.map((d) => ({ time: d.time as Time, value: d.price }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (uwChartRef.current)
         chart.applyOptions({ width: uwChartRef.current.clientWidth });
@@ -123,7 +126,7 @@ export default function DrawdownChart({ prices }: Props) {
       chart.remove();
       uwApiRef.current = null;
     };
-  }, [ddSeries]);
+  }, [ddSeries, prices, period]);
 
   const pct = (v: number) => (v * 100).toFixed(2);
   const top5 = periods.slice(0, 5);

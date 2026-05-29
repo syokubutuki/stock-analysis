@@ -14,13 +14,16 @@ import {
   computeVWAP,
   detectOBVDivergence,
 } from "../../lib/obv-vwap";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function OBVVWAPChart({ prices }: Props) {
+export default function OBVVWAPChart({ prices, period }: Props) {
   const priceChartRef = useRef<HTMLDivElement>(null);
   const obvChartRef = useRef<HTMLDivElement>(null);
   const priceChartApi = useRef<IChartApi | null>(null);
@@ -77,7 +80,7 @@ export default function OBVVWAPChart({ prices }: Props) {
       vwapData.map((v) => ({ time: v.time as Time, value: v.vwap }))
     );
 
-    priceChart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(priceChart, prices, period); } else { priceChart.timeScale().fitContent(); }
 
     // --- OBV Chart ---
     const obvChart = createChart(obvChartRef.current, {
@@ -110,7 +113,7 @@ export default function OBVVWAPChart({ prices }: Props) {
       obvData.map((o) => ({ time: o.time as Time, value: o.obvMA }))
     );
 
-    obvChart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(obvChart, prices, period); } else { obvChart.timeScale().fitContent(); }
 
     // --- Resize handler ---
     const handleResize = () => {
@@ -136,7 +139,7 @@ export default function OBVVWAPChart({ prices }: Props) {
       priceChartApi.current = null;
       obvChartApi.current = null;
     };
-  }, [prices, obvData, vwapData]);
+  }, [prices, obvData, vwapData, period]);
 
   const obvVsMA =
     latestOBV && latestOBV.obv > latestOBV.obvMA

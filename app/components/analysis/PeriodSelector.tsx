@@ -9,6 +9,8 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: "1y", label: "1Y" },
   { key: "2y", label: "2Y" },
   { key: "3y", label: "3Y" },
+  { key: "5y", label: "5Y" },
+  { key: "10y", label: "10Y" },
 ];
 
 interface Props {

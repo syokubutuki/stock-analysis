@@ -15,12 +15,15 @@ import {
   rollingCandleStats,
 } from "../../lib/candle-structure";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function CandleStructureChart({ prices }: Props) {
+export default function CandleStructureChart({ prices, period }: Props) {
   const bodyChartRef = useRef<HTMLDivElement>(null);
   const posChartRef = useRef<HTMLDivElement>(null);
   const bodyApiRef = useRef<IChartApi | null>(null);
@@ -56,7 +59,7 @@ export default function CandleStructureChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (bodyChartRef.current)
         chart.applyOptions({ width: bodyChartRef.current.clientWidth });
@@ -67,7 +70,7 @@ export default function CandleStructureChart({ prices }: Props) {
       chart.remove();
       bodyApiRef.current = null;
     };
-  }, [metrics]);
+  }, [metrics, prices, period]);
 
   // 終値位置 (ローリング)
   useEffect(() => {
@@ -108,7 +111,7 @@ export default function CandleStructureChart({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
     const handleResize = () => {
       if (posChartRef.current)
         chart.applyOptions({ width: posChartRef.current.clientWidth });
@@ -119,7 +122,7 @@ export default function CandleStructureChart({ prices }: Props) {
       chart.remove();
       posApiRef.current = null;
     };
-  }, [rolling]);
+  }, [rolling, prices, period]);
 
   const pct = (v: number) => (v * 100).toFixed(1);
 

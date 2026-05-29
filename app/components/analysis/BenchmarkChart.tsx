@@ -13,107 +13,194 @@ import {
   computeBenchmarkSeries,
   computeBenchmarkStats,
   rollingBeta,
+  generateComparisonSummary,
+  type BenchmarkStats,
+  type RollingBetaPoint,
+  type BenchmarkPoint,
 } from "../../lib/benchmark";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-type BenchmarkKey = "nikkei" | "topix";
+const MAX_COMPARE = 10;
 
-const BENCHMARKS: Record<BenchmarkKey, { ticker: string; label: string }> = {
-  nikkei: { ticker: "^N225", label: "日経225" },
-  topix: { ticker: "^TPX", label: "TOPIX" },
-};
+const PALETTE = [
+  "#9ca3af", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444",
+  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
+];
 
-export default function BenchmarkChart({ prices }: Props) {
+interface CompareEntry {
+  ticker: string;
+  label: string;
+  color: string;
+  prices: PricePoint[] | null;
+  loading: boolean;
+  error: string | null;
+}
+
+interface ComputedEntry {
+  entry: CompareEntry;
+  series: BenchmarkPoint[];
+  stats: BenchmarkStats;
+  rolling: RollingBetaPoint[];
+}
+
+export default function BenchmarkChart({ prices, period }: Props) {
   const perfChartRef = useRef<HTMLDivElement>(null);
   const betaChartRef = useRef<HTMLDivElement>(null);
   const perfApiRef = useRef<IChartApi | null>(null);
   const betaApiRef = useRef<IChartApi | null>(null);
 
-  const [benchKey, setBenchKey] = useState<BenchmarkKey>("nikkei");
-  const [benchPrices, setBenchPrices] = useState<PricePoint[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<CompareEntry[]>([
+    { ticker: "^N225", label: "日経225", color: PALETTE[0], prices: null, loading: false, error: null },
+  ]);
+  const [inputTicker, setInputTicker] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
-  const fetchBenchmark = useCallback(async (key: BenchmarkKey) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/stock?ticker=${encodeURIComponent(BENCHMARKS[key].ticker)}&range=3y`
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "ベンチマーク取得失敗");
-        setBenchPrices(null);
-        return;
-      }
-      setBenchPrices(json.prices);
-    } catch {
-      setError("ネットワークエラー");
-      setBenchPrices(null);
-    } finally {
-      setLoading(false);
-    }
+  const fetchPrices = useCallback(async (ticker: string): Promise<{ prices: PricePoint[]; name: string } | null> => {
+    const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`);
+    const json = await res.json();
+    if (!res.ok) return null;
+    return { prices: json.prices, name: json.name || ticker };
   }, []);
 
+  // Fetch initial default entry
   useEffect(() => {
-    fetchBenchmark(benchKey);
-  }, [benchKey, fetchBenchmark]);
+    const init = async () => {
+      setEntries((prev) =>
+        prev.map((e) => (e.ticker === "^N225" ? { ...e, loading: true } : e))
+      );
+      const result = await fetchPrices("^N225");
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.ticker === "^N225"
+            ? {
+                ...e,
+                prices: result?.prices ?? null,
+                loading: false,
+                error: result ? null : "取得失敗",
+              }
+            : e
+        )
+      );
+    };
+    init();
+  }, [fetchPrices]);
 
-  const aligned = useMemo(() => {
-    if (!benchPrices) return null;
-    return alignSeries(prices, benchPrices);
-  }, [prices, benchPrices]);
+  const handleAdd = useCallback(async () => {
+    const raw = inputTicker.trim();
+    if (!raw) return;
+    if (entries.length >= MAX_COMPARE) {
+      setAddError(`最大${MAX_COMPARE}銘柄まで`);
+      return;
+    }
 
-  const series = useMemo(() => {
-    if (!aligned) return [];
-    return computeBenchmarkSeries(aligned.stock, aligned.bench);
-  }, [aligned]);
+    // Normalize: 4-digit numbers and special tickers
+    const normalizedTicker = /^\d{4}$/.test(raw) ? raw : raw.toUpperCase();
+    if (entries.some((e) => e.ticker === normalizedTicker || e.ticker === raw)) {
+      setAddError("既に追加済み");
+      return;
+    }
 
-  const stats = useMemo(() => {
-    if (!aligned) return null;
-    return computeBenchmarkStats(aligned.stock, aligned.bench);
-  }, [aligned]);
+    setAddLoading(true);
+    setAddError(null);
+    try {
+      const result = await fetchPrices(raw);
+      if (!result) {
+        setAddError("銘柄データを取得できません");
+        return;
+      }
+      const colorIndex = entries.length % PALETTE.length;
+      const label =
+        result.name && result.name !== raw
+          ? `${raw} ${result.name}`
+          : raw;
+      setEntries((prev) => [
+        ...prev,
+        {
+          ticker: normalizedTicker,
+          label,
+          color: PALETTE[colorIndex],
+          prices: result.prices,
+          loading: false,
+          error: null,
+        },
+      ]);
+      setInputTicker("");
+    } catch {
+      setAddError("ネットワークエラー");
+    } finally {
+      setAddLoading(false);
+    }
+  }, [inputTicker, entries, fetchPrices]);
 
-  const rolling = useMemo(() => {
-    if (!aligned) return [];
-    return rollingBeta(aligned.stock, aligned.bench, 60);
-  }, [aligned]);
+  const handleRemove = useCallback((ticker: string) => {
+    setEntries((prev) => prev.filter((e) => e.ticker !== ticker));
+  }, []);
+
+  // Compute aligned data for all loaded entries
+  const computed = useMemo((): ComputedEntry[] => {
+    return entries
+      .filter((e) => e.prices && e.prices.length > 0)
+      .map((entry) => {
+        const aligned = alignSeries(prices, entry.prices!);
+        return {
+          entry,
+          series: computeBenchmarkSeries(aligned.stock, aligned.bench),
+          stats: computeBenchmarkStats(aligned.stock, aligned.bench),
+          rolling: rollingBeta(aligned.stock, aligned.bench, 60),
+        };
+      });
+  }, [prices, entries]);
 
   // Performance chart
   useEffect(() => {
-    if (!perfChartRef.current || series.length < 2) return;
+    if (!perfChartRef.current || computed.length === 0) return;
     if (perfApiRef.current) perfApiRef.current.remove();
 
     const chart = createChart(perfChartRef.current, {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
       grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
       width: perfChartRef.current.clientWidth,
-      height: 220,
+      height: 240,
       rightPriceScale: { visible: true },
       timeScale: { timeVisible: false },
     });
     perfApiRef.current = chart;
 
-    const stockLine = chart.addSeries(LineSeries, {
-      color: "#3b82f6", lineWidth: 2,
-    });
-    stockLine.setData(
-      series.map((s) => ({ time: s.time as Time, value: s.stockNorm }))
-    );
+    // Stock line (always blue, thick)
+    if (computed.length > 0 && computed[0].series.length > 0) {
+      const stockLine = chart.addSeries(LineSeries, {
+        color: "#3b82f6",
+        lineWidth: 2,
+      });
+      stockLine.setData(
+        computed[0].series.map((s) => ({ time: s.time as Time, value: s.stockNorm }))
+      );
+    }
 
-    const benchLine = chart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1,
-    });
-    benchLine.setData(
-      series.map((s) => ({ time: s.time as Time, value: s.benchNorm }))
-    );
+    // Each compare entry
+    for (const c of computed) {
+      const line = chart.addSeries(LineSeries, {
+        color: c.entry.color,
+        lineWidth: 1,
+      });
+      line.setData(
+        c.series.map((s) => ({ time: s.time as Time, value: s.benchNorm }))
+      );
+    }
 
-    chart.timeScale().fitContent();
+    if (period) {
+      setInitialVisibleRange(chart, prices, period);
+    } else {
+      chart.timeScale().fitContent();
+    }
     const handleResize = () => {
       if (perfChartRef.current)
         chart.applyOptions({ width: perfChartRef.current.clientWidth });
@@ -124,12 +211,15 @@ export default function BenchmarkChart({ prices }: Props) {
       chart.remove();
       perfApiRef.current = null;
     };
-  }, [series, benchKey]);
+  }, [computed, period, prices]);
 
   // Rolling beta/correlation chart
   useEffect(() => {
-    if (!betaChartRef.current || rolling.length < 2) return;
+    if (!betaChartRef.current || computed.length === 0) return;
     if (betaApiRef.current) betaApiRef.current.remove();
+
+    const hasRolling = computed.some((c) => c.rolling.length > 1);
+    if (!hasRolling) return;
 
     const chart = createChart(betaChartRef.current, {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
@@ -141,29 +231,35 @@ export default function BenchmarkChart({ prices }: Props) {
     });
     betaApiRef.current = chart;
 
-    const betaLine = chart.addSeries(LineSeries, {
-      color: "#8b5cf6", lineWidth: 2,
-    });
-    betaLine.setData(
-      rolling.map((r) => ({ time: r.time as Time, value: r.beta }))
-    );
+    for (const c of computed) {
+      if (c.rolling.length < 2) continue;
+      const betaLine = chart.addSeries(LineSeries, {
+        color: c.entry.color,
+        lineWidth: 2,
+      });
+      betaLine.setData(
+        c.rolling.map((r) => ({ time: r.time as Time, value: r.beta }))
+      );
+    }
 
-    const corrLine = chart.addSeries(LineSeries, {
-      color: "#f59e0b", lineWidth: 1,
-    });
-    corrLine.setData(
-      rolling.map((r) => ({ time: r.time as Time, value: r.correlation }))
-    );
+    // Beta=1 reference
+    const anyRolling = computed.find((c) => c.rolling.length > 1);
+    if (anyRolling) {
+      const refLine = chart.addSeries(LineSeries, {
+        color: "rgba(107, 114, 128, 0.3)",
+        lineWidth: 1,
+        lineStyle: 2,
+      });
+      refLine.setData(
+        anyRolling.rolling.map((r) => ({ time: r.time as Time, value: 1 }))
+      );
+    }
 
-    // β=1 reference line
-    const refLine = chart.addSeries(LineSeries, {
-      color: "rgba(107, 114, 128, 0.3)", lineWidth: 1, lineStyle: 2,
-    });
-    refLine.setData(
-      rolling.map((r) => ({ time: r.time as Time, value: 1 }))
-    );
-
-    chart.timeScale().fitContent();
+    if (period) {
+      setInitialVisibleRange(chart, prices, period);
+    } else {
+      chart.timeScale().fitContent();
+    }
     const handleResize = () => {
       if (betaChartRef.current)
         chart.applyOptions({ width: betaChartRef.current.clientWidth });
@@ -174,113 +270,199 @@ export default function BenchmarkChart({ prices }: Props) {
       chart.remove();
       betaApiRef.current = null;
     };
-  }, [rolling]);
+  }, [computed, period, prices]);
 
   const pct = (v: number) => (v * 100).toFixed(2);
   const fmt = (v: number) => v.toFixed(3);
 
+  const anyLoading = entries.some((e) => e.loading);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h3 className="font-bold text-gray-800">ベンチマーク比較</h3>
-        <div className="flex gap-1">
-          {(Object.keys(BENCHMARKS) as BenchmarkKey[]).map((key) => (
+      <h3 className="font-bold text-gray-800 mb-3">ベンチマーク比較</h3>
+
+      {/* Tags */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        {entries.map((e) => (
+          <span
+            key={e.ticker}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border"
+            style={{
+              borderColor: e.color,
+              color: e.color,
+              backgroundColor: e.color + "10",
+            }}
+          >
+            <span
+              className="w-2 h-2 rounded-full inline-block"
+              style={{ backgroundColor: e.color }}
+            />
+            {e.label}
+            {e.loading && <span className="text-gray-400 ml-1">...</span>}
+            {e.error && <span className="text-red-400 ml-1">!</span>}
             <button
-              key={key}
-              onClick={() => setBenchKey(key)}
-              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-                benchKey === key
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              onClick={() => handleRemove(e.ticker)}
+              className="ml-0.5 hover:text-red-500 transition-colors"
+              title="削除"
             >
-              {BENCHMARKS[key].label}
+              x
             </button>
-          ))}
-        </div>
+          </span>
+        ))}
+
+        {/* Add input */}
+        {entries.length < MAX_COMPARE && (
+          <form
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              handleAdd();
+            }}
+            className="inline-flex items-center gap-1"
+          >
+            <input
+              type="text"
+              value={inputTicker}
+              onChange={(ev) => {
+                setInputTicker(ev.target.value);
+                setAddError(null);
+              }}
+              placeholder="銘柄コード"
+              className="w-24 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-400"
+              disabled={addLoading}
+            />
+            <button
+              type="submit"
+              disabled={addLoading || !inputTicker.trim()}
+              className="px-2 py-0.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+            >
+              {addLoading ? "..." : "+ 追加"}
+            </button>
+          </form>
+        )}
       </div>
+      {addError && (
+        <div className="text-xs text-red-500 mb-2">{addError}</div>
+      )}
 
-      {loading && (
-        <div className="text-sm text-gray-400 py-8 text-center">
-          ベンチマークデータ取得中...
+      {anyLoading && (
+        <div className="text-sm text-gray-400 py-6 text-center">
+          データ取得中...
         </div>
       )}
-      {error && (
-        <div className="text-sm text-red-500 py-4 text-center">{error}</div>
-      )}
 
-      {stats && !loading && (
+      {computed.length > 0 && !anyLoading && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3">
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">β (ベータ)</div>
-              <div className={`font-mono font-medium ${stats.beta > 1.2 ? "text-red-600" : stats.beta < 0.8 ? "text-blue-600" : ""}`}>
-                {fmt(stats.beta)}
-              </div>
-              <div className="text-gray-400">
-                {stats.beta > 1.2 ? "高ベータ(攻撃的)" : stats.beta < 0.8 ? "低ベータ(防御的)" : "中程度"}
-              </div>
-            </div>
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">α (年率)</div>
-              <div className={`font-mono font-medium ${stats.alpha >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pct(stats.alpha)}%
-              </div>
-              <div className="text-gray-400">ベンチマーク対比の超過収益</div>
-            </div>
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">相関係数</div>
-              <div className="font-mono font-medium">{fmt(stats.correlation)}</div>
-            </div>
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">情報レシオ</div>
-              <div className={`font-mono font-medium ${stats.informationRatio >= 0.5 ? "text-green-600" : ""}`}>
-                {fmt(stats.informationRatio)}
-              </div>
-              <div className="text-gray-400">TE: {pct(stats.trackingError)}%</div>
-            </div>
+          {/* Stats comparison table */}
+          <div className="overflow-x-auto mb-3">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1.5 px-2 text-gray-500 font-medium">比較先</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Beta</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Alpha(年率)</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">相関</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">IR</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">TE</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">銘柄</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">比較先</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">超過</th>
+                </tr>
+              </thead>
+              <tbody>
+                {computed.map((c) => (
+                  <tr key={c.entry.ticker} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-1.5 px-2 font-medium" style={{ color: c.entry.color }}>
+                      <span
+                        className="inline-block w-2 h-2 rounded-full mr-1"
+                        style={{ backgroundColor: c.entry.color }}
+                      />
+                      {c.entry.label}
+                    </td>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.beta > 1.2 ? "text-red-600" : c.stats.beta < 0.8 ? "text-blue-600" : ""}`}>
+                      {fmt(c.stats.beta)}
+                    </td>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.alpha >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {pct(c.stats.alpha)}%
+                    </td>
+                    <td className="text-right py-1.5 px-2 font-mono">
+                      {fmt(c.stats.correlation)}
+                    </td>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.informationRatio >= 0.5 ? "text-green-600" : c.stats.informationRatio <= -0.5 ? "text-red-600" : ""}`}>
+                      {fmt(c.stats.informationRatio)}
+                    </td>
+                    <td className="text-right py-1.5 px-2 font-mono text-gray-500">
+                      {pct(c.stats.trackingError)}%
+                    </td>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.stockReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {pct(c.stats.stockReturn)}%
+                    </td>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.benchReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {pct(c.stats.benchReturn)}%
+                    </td>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.excessReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {pct(c.stats.excessReturn)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-xs mb-3">
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">銘柄リターン</div>
-              <div className={`font-mono font-medium ${stats.stockReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pct(stats.stockReturn)}%
-              </div>
-            </div>
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">{BENCHMARKS[benchKey].label}リターン</div>
-              <div className={`font-mono font-medium ${stats.benchReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pct(stats.benchReturn)}%
-              </div>
-            </div>
-            <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-500">超過リターン</div>
-              <div className={`font-mono font-medium ${stats.excessReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pct(stats.excessReturn)}%
-              </div>
-            </div>
-          </div>
-
+          {/* Performance chart */}
           <div className="mb-2 text-xs text-gray-500 font-medium">
             相対パフォーマンス (基準日=100)
+            <span className="ml-2 text-blue-500">-- 分析銘柄</span>
+            {computed.map((c) => (
+              <span key={c.entry.ticker} className="ml-2" style={{ color: c.entry.color }}>
+                -- {c.entry.label}
+              </span>
+            ))}
           </div>
           <div ref={perfChartRef} className="w-full rounded border border-gray-100 mb-4" />
 
+          {/* Rolling beta chart */}
           <div className="mb-2 text-xs text-gray-500 font-medium">
-            <span className="text-purple-500">β</span> /{" "}
-            <span className="text-amber-500">相関</span> (60日ローリング)
+            ローリングBeta (60日)
+            {computed.map((c) => (
+              <span key={c.entry.ticker} className="ml-2" style={{ color: c.entry.color }}>
+                -- {c.entry.label}
+              </span>
+            ))}
           </div>
-          <div ref={betaChartRef} className="w-full rounded border border-gray-100" />
+          <div ref={betaChartRef} className="w-full rounded border border-gray-100 mb-4" />
+
+          {/* Auto summaries */}
+          <div className="space-y-1.5 mb-3">
+            {computed.map((c) => (
+              <div
+                key={c.entry.ticker}
+                className="text-xs p-2 rounded border-l-2"
+                style={{ borderColor: c.entry.color, backgroundColor: c.entry.color + "08" }}
+              >
+                <span className="font-medium" style={{ color: c.entry.color }}>
+                  vs {c.entry.label}:
+                </span>{" "}
+                <span className="text-gray-700">
+                  {generateComparisonSummary(c.entry.label, c.stats)}
+                </span>
+              </div>
+            ))}
+          </div>
         </>
       )}
 
+      {computed.length === 0 && !anyLoading && entries.length > 0 && entries.every(e => !e.loading && !e.prices) && (
+        <div className="text-sm text-gray-400 py-6 text-center">
+          比較データがありません
+        </div>
+      )}
+
       <AnalysisGuide title="ベンチマーク比較の読み方">
-        <p><span className="font-medium">β (ベータ):</span> 市場全体に対する感応度。β=1なら市場と同じ動き、β{">"}1なら市場以上に変動（攻撃的）、β{"<"}1なら市場より安定（防御的）。</p>
-        <p><span className="font-medium">α (アルファ):</span> ベンチマーク対比の超過リターン（年率）。正のαは市場を上回るパフォーマンス。CAPMにおける「市場では説明できないリターン」。</p>
-        <p><span className="font-medium">トラッキングエラー (TE):</span> 超過リターンの標準偏差（年率）。ベンチマークからのリターンの乖離度合い。</p>
-        <p><span className="font-medium">情報レシオ (IR):</span> α / TE。リスク調整済みの超過リターン。0.5以上で良好とされる。</p>
-        <p><span className="font-medium">ローリングβ:</span> 60日ごとのβの推移。βが安定していればリスク特性が一貫しており、変動が大きければ市場環境によってリスク特性が変わる銘柄。</p>
+        <p><span className="font-medium">Beta:</span> 比較先に対する感応度。1なら同じ動き、{">"}1なら比較先以上に変動（攻撃的）、{"<"}1なら比較先より安定（防御的）。</p>
+        <p><span className="font-medium">Alpha (年率):</span> 比較先対比の超過リターン。正のAlphaは比較先を上回るパフォーマンス。</p>
+        <p><span className="font-medium">TE (トラッキングエラー):</span> 超過リターンの標準偏差（年率）。比較先からの乖離度合い。</p>
+        <p><span className="font-medium">IR (情報レシオ):</span> Alpha / TE。リスク調整済み超過リターン。0.5以上で良好。</p>
+        <p><span className="font-medium">複数銘柄の比較:</span> 日経225以外にも任意の銘柄コードを追加して、分析対象との関係性を比較できます。相関が低い銘柄同士は分散投資効果が期待できます。</p>
       </AnalysisGuide>
     </div>
   );

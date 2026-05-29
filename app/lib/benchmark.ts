@@ -163,3 +163,38 @@ export function rollingBeta(
   }
   return result;
 }
+
+// Rule-based auto summary
+export function generateComparisonSummary(
+  label: string,
+  stats: BenchmarkStats
+): string {
+  const parts: string[] = [];
+
+  // Beta characterization
+  if (stats.beta > 1.5) parts.push(`${label}に対しβ=${stats.beta.toFixed(2)}と非常に高感応度 (市場の1.5倍以上変動するハイリスク銘柄)`);
+  else if (stats.beta > 1.2) parts.push(`${label}に対しβ=${stats.beta.toFixed(2)}と高め (市場以上に変動する攻撃的な銘柄)`);
+  else if (stats.beta > 0.8) parts.push(`${label}に対しβ=${stats.beta.toFixed(2)}で市場並みの感応度`);
+  else if (stats.beta > 0.5) parts.push(`${label}に対しβ=${stats.beta.toFixed(2)}と低め (市場より安定的な防御銘柄)`);
+  else parts.push(`${label}に対しβ=${stats.beta.toFixed(2)}と極めて低い (市場との連動が弱い)`);
+
+  // Correlation
+  if (stats.correlation > 0.8) parts.push(`相関${stats.correlation.toFixed(2)}で強い連動性あり`);
+  else if (stats.correlation > 0.5) parts.push(`相関${stats.correlation.toFixed(2)}で中程度の連動`);
+  else if (stats.correlation > 0.2) parts.push(`相関${stats.correlation.toFixed(2)}で連動性が低く分散投資効果が期待できる`);
+  else parts.push(`相関${stats.correlation.toFixed(2)}でほぼ無相関 (独自の値動き)`);
+
+  // Alpha
+  const alphaPct = (stats.alpha * 100).toFixed(1);
+  if (stats.alpha > 0.1) parts.push(`年率α=+${alphaPct}%と大幅に上回る超過収益`);
+  else if (stats.alpha > 0.03) parts.push(`年率α=+${alphaPct}%のプラス超過収益`);
+  else if (stats.alpha > -0.03) parts.push(`αはほぼゼロで${label}並みのリターン`);
+  else if (stats.alpha > -0.1) parts.push(`年率α=${alphaPct}%で${label}を下回る`);
+  else parts.push(`年率α=${alphaPct}%と大幅に劣後`);
+
+  // Information Ratio
+  if (stats.informationRatio > 0.5) parts.push(`IR=${stats.informationRatio.toFixed(2)}でリスク調整後も良好`);
+  else if (stats.informationRatio < -0.5) parts.push(`IR=${stats.informationRatio.toFixed(2)}でリスク対比のリターンが低い`);
+
+  return parts.join("。") + "。";
+}

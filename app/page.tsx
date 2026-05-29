@@ -270,7 +270,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
 ];
 
 export default function AnalysisPage() {
-  const { data, filteredPrices, loading, error, fetchStock, period, setPeriod } =
+  const { data, allPrices, filteredPrices, loading, error, fetchStock, period, setPeriod } =
     useAnalysisData();
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
@@ -392,40 +392,40 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
-                  <UnifiedChart prices={filteredPrices} />
-                  <IchimokuChart prices={filteredPrices} />
-                  <SupportResistanceChart prices={filteredPrices} />
-                  <FibonacciChart prices={filteredPrices} />
-                  <BenchmarkChart prices={filteredPrices} />
-                  <DiffSeriesChart prices={filteredPrices} />
-                  <VolumeAnalysis prices={filteredPrices} />
-                  <GapAnalysisChart prices={filteredPrices} />
+                  <UnifiedChart prices={allPrices} period={period} />
+                  <IchimokuChart prices={allPrices} period={period} />
+                  <SupportResistanceChart prices={allPrices} period={period} />
+                  <FibonacciChart prices={allPrices} period={period} />
+                  <BenchmarkChart prices={allPrices} period={period} />
+                  <DiffSeriesChart prices={allPrices} period={period} />
+                  <VolumeAnalysis prices={allPrices} period={period} />
+                  <GapAnalysisChart prices={allPrices} period={period} />
                 </>
               )}
 
               {activeSection === "technical" && (
                 <>
-                  <TechnicalIndicators prices={filteredPrices} />
-                  <ADXChart prices={filteredPrices} />
-                  <StochasticsChart prices={filteredPrices} />
-                  <OBVVWAPChart prices={filteredPrices} />
+                  <TechnicalIndicators prices={allPrices} period={period} />
+                  <ADXChart prices={allPrices} period={period} />
+                  <StochasticsChart prices={allPrices} period={period} />
+                  <OBVVWAPChart prices={allPrices} period={period} />
                 </>
               )}
 
               {activeSection === "ohlc" && (
                 <>
-                  <CandleStructureChart prices={filteredPrices} />
-                  <MFEMAEChart prices={filteredPrices} />
-                  <GapScatterChart prices={filteredPrices} />
-                  <IntradayRangeChart prices={filteredPrices} />
-                  <RangeVolatilityChart prices={filteredPrices} />
+                  <CandleStructureChart prices={allPrices} period={period} />
+                  <MFEMAEChart prices={allPrices} period={period} />
+                  <GapScatterChart prices={allPrices} period={period} />
+                  <IntradayRangeChart prices={allPrices} period={period} />
+                  <RangeVolatilityChart prices={allPrices} period={period} />
                 </>
               )}
 
               {activeSection === "risk" && (
                 <>
-                  <RiskMetricsPanel prices={filteredPrices} />
-                  <DrawdownChart prices={filteredPrices} />
+                  <RiskMetricsPanel prices={allPrices} period={period} />
+                  <DrawdownChart prices={allPrices} period={period} />
                 </>
               )}
 

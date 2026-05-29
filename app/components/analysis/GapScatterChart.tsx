@@ -4,9 +4,12 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeGapSeries, type GapPoint } from "../../lib/gap-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
 interface QuadrantStats {
@@ -50,7 +53,7 @@ function linearRegression(x: number[], y: number[]): { slope: number; intercept:
   return { slope, intercept, r2 };
 }
 
-export default function GapScatterChart({ prices }: Props) {
+export default function GapScatterChart({ prices, period }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const gaps = useMemo(() => computeGapSeries(prices), [prices]);

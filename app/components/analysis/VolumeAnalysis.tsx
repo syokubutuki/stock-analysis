@@ -11,12 +11,15 @@ import {
 import { PricePoint } from "../../lib/types";
 import { analyzeVolume, detectVolumeSurges, type VolumeSurge } from "../../lib/volume-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import { setInitialVisibleRange } from "../../lib/chart-visible-range";
+import type { PeriodKey } from "../../hooks/useAnalysisData";
 
 interface Props {
   prices: PricePoint[];
+  period?: PeriodKey;
 }
 
-export default function VolumeAnalysis({ prices }: Props) {
+export default function VolumeAnalysis({ prices, period }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -76,7 +79,7 @@ export default function VolumeAnalysis({ prices }: Props) {
       }))
     );
 
-    chart.timeScale().fitContent();
+    if (period) { setInitialVisibleRange(chart, prices, period); } else { chart.timeScale().fitContent(); }
 
     const handleResize = () => {
       if (containerRef.current) {
