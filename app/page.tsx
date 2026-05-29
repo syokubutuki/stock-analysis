@@ -512,7 +512,7 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "calendar" && (
-                <SpiralHeatmap prices={filteredPrices} seriesMode={seriesMode} />
+                <SpiralHeatmap prices={filteredPrices} period={period} />
               )}
             </div>
           </>
