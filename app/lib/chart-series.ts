@@ -36,6 +36,7 @@ import { fitHMM, kalmanFilter } from "./regime";
 export interface TimeValue {
   time: string;
   value: number;
+  color?: string; // per-point color override (used by histogram)
 }
 
 export interface TimeOHLC {
@@ -269,10 +270,13 @@ export const SERIES: SeriesDef[] = [
     color: "#9ca3af",
     scaleId: "volume",
     type: "histogram",
-    colorFn: upDown,
     compute: (p) => {
       const bars = analyzeVolume(p);
-      return bars.map((b) => tv(b.time, b.volume));
+      return bars.map((b) => ({
+        time: b.time,
+        value: b.volume,
+        color: b.type === "down" ? red : green,
+      }));
     },
   },
   {

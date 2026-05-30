@@ -24,6 +24,7 @@ export function analyzeVolume(
 
     const priceChange =
       i > 0 ? prices[i].close - prices[i - 1].close : 0;
+    const bodyDir = prices[i].close - prices[i].open;
 
     result.push({
       time: prices[i].time,
@@ -31,7 +32,7 @@ export function analyzeVolume(
       avgVolume,
       ratio: avgVolume > 0 ? prices[i].volume / avgVolume : 1,
       priceChange,
-      type: priceChange > 0 ? "up" : priceChange < 0 ? "down" : "flat",
+      type: bodyDir > 0 ? "up" : bodyDir < 0 ? "down" : "flat",
     });
   }
 

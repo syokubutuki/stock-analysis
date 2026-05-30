@@ -132,9 +132,8 @@ export default function UnifiedChart({ prices, period }: Props) {
             data.map((d) => ({
               time: d.time as Time,
               value: d.value,
-              color: def.colorFn
-                ? def.colorFn(d.value)
-                : def.color,
+              color: d.color
+                ?? (def.colorFn ? def.colorFn(d.value) : def.color),
             }))
           );
           usedScales.add(def.scaleId);

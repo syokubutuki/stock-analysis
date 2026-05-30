@@ -268,6 +268,10 @@ const RegimeTechnicalChart = dynamic(
   () => import("./components/analysis/RegimeTechnicalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const TradingViewWidget = dynamic(
+  () => import("./components/analysis/TradingViewWidget"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -441,6 +445,7 @@ export default function AnalysisPage() {
               {activeSection === "basic" && (
                 <>
                   <StructureScorecardChart prices={filteredPrices} />
+                  <TradingViewWidget ticker={data.ticker} />
                   <UnifiedChart prices={allPrices} period={period} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <DiffSeriesChart prices={allPrices} period={period} />
