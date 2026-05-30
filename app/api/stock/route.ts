@@ -137,15 +137,17 @@ export async function GET(request: NextRequest) {
 
     const prices = timestamps
       .map((ts: number, i: number) => {
-        const close = adjClose ? adjClose[i] : quote.close[i];
-        if (close == null) return null;
+        const rawClose = quote.close[i];
+        const close = adjClose ? adjClose[i] : rawClose;
+        if (close == null || rawClose == null) return null;
+        const adj = adjClose && rawClose !== 0 ? close / rawClose : 1;
         const date = new Date(ts * 1000);
         const time = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
         return {
           time,
-          open: quote.open[i] ?? close,
-          high: quote.high[i] ?? close,
-          low: quote.low[i] ?? close,
+          open: (quote.open[i] ?? rawClose) * adj,
+          high: (quote.high[i] ?? rawClose) * adj,
+          low: (quote.low[i] ?? rawClose) * adj,
           close,
           volume: quote.volume[i] || 0,
         };

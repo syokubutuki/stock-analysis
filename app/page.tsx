@@ -268,11 +268,70 @@ const RegimeTechnicalChart = dynamic(
   () => import("./components/analysis/RegimeTechnicalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
-const TradingViewWidget = dynamic(
-  () => import("./components/analysis/TradingViewWidget"),
+const VolumeReturnChart = dynamic(
+  () => import("./components/analysis/VolumeReturnChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={320} /> }
+);
+const VolumeLeadChart = dynamic(
+  () => import("./components/analysis/VolumeLeadChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={280} /> }
+);
+const VolumeWeightedTechChart = dynamic(
+  () => import("./components/analysis/VolumeWeightedTechChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
 );
-
+const IntradayPathChart = dynamic(
+  () => import("./components/analysis/IntradayPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const ClosePositionChart = dynamic(
+  () => import("./components/analysis/ClosePositionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={280} /> }
+);
+const TrueRangeDecompChart = dynamic(
+  () => import("./components/analysis/TrueRangeDecompChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const CandlestickPatternChart = dynamic(
+  () => import("./components/analysis/CandlestickPatternChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RegimeDistributionChart = dynamic(
+  () => import("./components/analysis/RegimeDistributionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={320} /> }
+);
+const RegimeTransitionChart = dynamic(
+  () => import("./components/analysis/RegimeTransitionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={440} /> }
+);
+const PredictionAccuracyChart = dynamic(
+  () => import("./components/analysis/PredictionAccuracyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const InfoRatioDashboard = dynamic(
+  () => import("./components/analysis/InfoRatioDashboard"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const SimpleBacktestChart = dynamic(
+  () => import("./components/analysis/SimpleBacktestChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const AlertSystemChart = dynamic(
+  () => import("./components/analysis/AlertSystemChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
+);
+const MultiTimeframeChart = dynamic(
+  () => import("./components/analysis/MultiTimeframeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
+);
+const MonteCarloChart = dynamic(
+  () => import("./components/analysis/MonteCarloChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const GarchVarChart = dynamic(
+  () => import("./components/analysis/GarchVarChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -444,16 +503,19 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
-                  <StructureScorecardChart prices={filteredPrices} />
-                  <TradingViewWidget ticker={data.ticker} />
+                  <AlertSystemChart prices={filteredPrices} />
                   <UnifiedChart prices={allPrices} period={period} />
+                  <StructureScorecardChart prices={filteredPrices} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
                   <VolumeProfileChart prices={filteredPrices} />
+                  <VolumeReturnChart prices={filteredPrices} />
+                  <VolumeLeadChart prices={filteredPrices} />
                   <GapAnalysisChart prices={allPrices} period={period} />
                   <CustomReturnChart prices={allPrices} />
                   <HoldingPeriodChart prices={filteredPrices} />
+                  <MultiTimeframeChart prices={filteredPrices} />
                 </>
               )}
 
@@ -463,12 +525,18 @@ export default function AnalysisPage() {
                   <ADXChart prices={allPrices} period={period} />
                   <StochasticsChart prices={allPrices} period={period} />
                   <OBVVWAPChart prices={allPrices} period={period} />
+                  <VolumeWeightedTechChart prices={filteredPrices} />
+                  <SimpleBacktestChart prices={filteredPrices} />
                 </>
               )}
 
               {activeSection === "ohlc" && (
                 <>
                   <CandleStructureChart prices={allPrices} period={period} />
+                  <CandlestickPatternChart prices={filteredPrices} />
+                  <IntradayPathChart prices={filteredPrices} />
+                  <ClosePositionChart prices={filteredPrices} />
+                  <TrueRangeDecompChart prices={filteredPrices} />
                   <MFEMAEChart prices={allPrices} period={period} />
                   <GapScatterChart prices={allPrices} period={period} />
                   <IntradayRangeChart prices={allPrices} period={period} />
@@ -480,6 +548,8 @@ export default function AnalysisPage() {
                 <>
                   <RiskMetricsPanel prices={allPrices} period={period} />
                   <DrawdownChart prices={allPrices} period={period} />
+                  <MonteCarloChart prices={filteredPrices} />
+                  <GarchVarChart prices={filteredPrices} />
                 </>
               )}
 
@@ -499,6 +569,8 @@ export default function AnalysisPage() {
                   <CrossCorrelogramChart prices={filteredPrices} />
                   <IndependenceTestsChart prices={filteredPrices} seriesMode={seriesMode} />
                   <DistributionSurfaceChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <PredictionAccuracyChart prices={filteredPrices} />
+                  <InfoRatioDashboard prices={filteredPrices} />
                 </>
               )}
 
@@ -564,6 +636,8 @@ export default function AnalysisPage() {
                 <>
                   <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RegimeTechnicalChart prices={filteredPrices} />
+                  <RegimeDistributionChart prices={filteredPrices} />
+                  <RegimeTransitionChart prices={filteredPrices} />
                 </>
               )}
 
