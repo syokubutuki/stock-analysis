@@ -80,7 +80,7 @@ export default function UnifiedChart({ prices, period }: Props) {
         horzLines: { color: "#f0f0f0" },
       },
       width: containerRef.current.clientWidth,
-      height: 700,
+      height: 600,
       rightPriceScale: { visible: true },
       leftPriceScale: { visible: false },
       timeScale: { timeVisible: false },
