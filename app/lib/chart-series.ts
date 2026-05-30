@@ -29,7 +29,7 @@ import {
   phaseSpaceDensity,
   rollingTDA,
 } from "./attractor-investment";
-import { fitHMM, kalmanFilter, kalmanFilter2State, adaptiveKalmanFilter } from "./regime";
+import { fitHMM, kalmanFilter, kalmanFilter2State, adaptiveKalmanFilter, kalmanFilter3State, kalmanSmoother } from "./regime";
 
 // ---- Types ----
 
@@ -1183,6 +1183,105 @@ export const SERIES: SeriesDef[] = [
       const c = p.map((x) => x.close);
       const r = adaptiveKalmanFilter(c);
       return r.lowerBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  // ====== 3状態カルマン ======
+  {
+    id: "kalman3_price",
+    label: "カルマン3状態",
+    group: "regime",
+    color: "#0d9488",
+    scaleId: "price",
+    type: "line",
+    lineWidth: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter3State(c);
+      return r.filteredPrice.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman3_velocity",
+    label: "3状態速度",
+    group: "regime",
+    color: "#14b8a6",
+    scaleId: "kalman_vel",
+    type: "histogram",
+    colorFn: upDown,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter3State(c);
+      return r.filteredVelocity.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman3_accel",
+    label: "加速度",
+    group: "regime",
+    color: "#f97316",
+    scaleId: "kalman_accel",
+    type: "line",
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter3State(c);
+      return r.filteredAcceleration.map((v, i) => tv(p[i].time, v));
+    },
+  },
+
+  // ====== カルマンスムーザー ======
+  {
+    id: "smoother_price",
+    label: "スムーザー",
+    group: "regime",
+    color: "#dc2626",
+    scaleId: "price",
+    type: "line",
+    lineWidth: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanSmoother(c);
+      return r.smoothedPrice.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "smoother_upper",
+    label: "スムーザー上限",
+    group: "regime",
+    color: "#fca5a5",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanSmoother(c);
+      return r.smoothedUpperBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "smoother_lower",
+    label: "スムーザー下限",
+    group: "regime",
+    color: "#fca5a5",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanSmoother(c);
+      return r.smoothedLowerBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "smoother_velocity",
+    label: "平滑化速度",
+    group: "regime",
+    color: "#b91c1c",
+    scaleId: "kalman_vel",
+    type: "line",
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanSmoother(c);
+      return r.smoothedVelocity.map((v, i) => tv(p[i].time, v));
     },
   },
 ];

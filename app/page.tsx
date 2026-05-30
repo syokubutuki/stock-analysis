@@ -296,6 +296,10 @@ const CandlestickPatternChart = dynamic(
   () => import("./components/analysis/CandlestickPatternChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const MarketStateDashboard = dynamic(
+  () => import("./components/analysis/MarketStateDashboard"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 const RegimeDistributionChart = dynamic(
   () => import("./components/analysis/RegimeDistributionChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={320} /> }
@@ -370,7 +374,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "entropy", label: "情報理論", description: "エントロピー・マルチスケール・Fisher情報量" },
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
-  { key: "regime", label: "レジーム分析", description: "HMM・変化点検出・カルマンフィルタ" },
+  { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出" },
   { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
@@ -629,6 +633,7 @@ export default function AnalysisPage() {
 
               {activeSection === "regime" && (
                 <>
+                  <MarketStateDashboard prices={filteredPrices} seriesMode={seriesMode} />
                   <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RegimeTechnicalChart prices={filteredPrices} />
                   <RegimeDistributionChart prices={filteredPrices} />
