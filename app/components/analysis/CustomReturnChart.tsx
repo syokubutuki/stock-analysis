@@ -17,6 +17,7 @@ interface Props {
 
 // エントリー/エグジットの価格ポイント定義
 type PriceSelector =
+  | "prevOpen"   // 前日始値
   | "prevClose"  // 前日終値
   | "open"       // 当日始値
   | "high"       // 当日高値
@@ -24,6 +25,7 @@ type PriceSelector =
   | "close";     // 当日終値
 
 const ENTRY_OPTIONS: { value: PriceSelector; label: string }[] = [
+  { value: "prevOpen", label: "前日始値" },
   { value: "prevClose", label: "前日終値" },
   { value: "open", label: "当日始値" },
   { value: "high", label: "当日高値" },
@@ -32,6 +34,7 @@ const ENTRY_OPTIONS: { value: PriceSelector; label: string }[] = [
 ];
 
 const EXIT_OPTIONS: { value: PriceSelector; label: string }[] = [
+  { value: "prevOpen", label: "前日始値" },
   { value: "prevClose", label: "前日終値" },
   { value: "open", label: "当日始値" },
   { value: "high", label: "当日高値" },
@@ -57,6 +60,10 @@ function getPrice(
   index: number,
   selector: PriceSelector
 ): number | null {
+  if (selector === "prevOpen") {
+    if (index <= 0) return null;
+    return prices[index - 1].open;
+  }
   if (selector === "prevClose") {
     if (index <= 0) return null;
     return prices[index - 1].close;
