@@ -131,7 +131,7 @@ export const SERIES: SeriesDef[] = [
     id: "open",
     label: "Open",
     group: "price",
-    color: "#6366f1",
+    color: "#f59e0b",
     scaleId: "price",
     type: "line",
     compute: (p) => p.map((x) => tv(x.time, x.open)),
@@ -944,7 +944,7 @@ export const SERIES: SeriesDef[] = [
     label: "Betti-0",
     group: "tda",
     color: "#3b82f6",
-    scaleId: "tda",
+    scaleId: "tda_b0",
     type: "line",
     compute: (p) => {
       const vals = p.map((x) => x.close);
@@ -959,7 +959,7 @@ export const SERIES: SeriesDef[] = [
     label: "Betti-1",
     group: "tda",
     color: "#ef4444",
-    scaleId: "tda",
+    scaleId: "tda_b1",
     type: "line",
     compute: (p) => {
       const vals = p.map((x) => x.close);
@@ -974,7 +974,7 @@ export const SERIES: SeriesDef[] = [
     label: "Total Persistence",
     group: "tda",
     color: "#a855f7",
-    scaleId: "tda",
+    scaleId: "tda_persist",
     type: "line",
     compute: (p) => {
       const vals = p.map((x) => x.close);
@@ -1044,4 +1044,4 @@ export const SERIES: SeriesDef[] = [
   },
 ];
 
-export const DEFAULT_ENABLED = new Set(["candle"]);
+export const DEFAULT_ENABLED = new Set(["candle", "volume"]);
