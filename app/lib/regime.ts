@@ -338,6 +338,7 @@ export interface KalmanResult {
   filterGain: number[];
   upperBand: number[];
   lowerBand: number[];
+  innovation: number[];
   innovationVariance: number[];
   logLikelihood: number;
 }
@@ -363,6 +364,7 @@ export function kalmanFilter(
   const filterGain: number[] = [];
   const upperBand: number[] = [];
   const lowerBand: number[] = [];
+  const innovation: number[] = [];
   const innovationVariance: number[] = [];
   let logLikelihood = 0;
 
@@ -373,16 +375,17 @@ export function kalmanFilter(
     predictedState.push(xPred);
 
     // Innovation
-    const innovation = observations[t] - xPred;
+    const innov = observations[t] - xPred;
     const S = pPred + R;
+    innovation.push(innov);
     innovationVariance.push(S);
 
     // Log-likelihood
-    logLikelihood += -0.5 * (Math.log(2 * Math.PI * S) + (innovation * innovation) / S);
+    logLikelihood += -0.5 * (Math.log(2 * Math.PI * S) + (innov * innov) / S);
 
     // Update
     const K = pPred / S;
-    x = xPred + K * innovation;
+    x = xPred + K * innov;
     P = (1 - K) * pPred;
 
     filteredState.push(x);
@@ -393,5 +396,152 @@ export function kalmanFilter(
     lowerBand.push(x - band);
   }
 
-  return { filteredState, predictedState, filterGain, upperBand, lowerBand, innovationVariance, logLikelihood };
+  return { filteredState, predictedState, filterGain, upperBand, lowerBand, innovation, innovationVariance, logLikelihood };
+}
+
+// ---- 2-State Kalman Filter (Price + Velocity) ----
+
+export interface Kalman2Result {
+  filteredPrice: number[];
+  filteredVelocity: number[];
+  upperBand: number[];
+  lowerBand: number[];
+  innovation: number[];
+  filterGain: number[];
+}
+
+export function kalmanFilter2State(
+  observations: number[],
+  processNoisePrice: number = 0.01,
+  processNoiseVelocity: number = 0.001,
+  measurementNoise: number = 1.0
+): Kalman2Result {
+  const n = observations.length;
+
+  const diff = observations.slice(1).map((v, i) => v - observations[i]);
+  const diffVar = diff.reduce((a, v) => a + v * v, 0) / diff.length;
+  const qp = processNoisePrice * diffVar;
+  const qv = processNoiseVelocity * diffVar;
+  const R = measurementNoise * diffVar;
+
+  // State: [price, velocity]
+  let x0 = observations[0];
+  let x1 = diff.length > 0 ? diff[0] : 0;
+  // Covariance matrix (2x2, stored as [P00, P01, P10, P11])
+  let P00 = diffVar, P01 = 0, P10 = 0, P11 = diffVar;
+
+  const filteredPrice: number[] = [];
+  const filteredVelocity: number[] = [];
+  const upperBand: number[] = [];
+  const lowerBand: number[] = [];
+  const innovation: number[] = [];
+  const filterGain: number[] = [];
+
+  for (let t = 0; t < n; t++) {
+    // Predict: x_pred = F * x, F = [[1,1],[0,1]]
+    const xp0 = x0 + x1;
+    const xp1 = x1;
+    // P_pred = F * P * F' + Q
+    const Pp00 = P00 + P01 + P10 + P11 + qp;
+    const Pp01 = P01 + P11;
+    const Pp10 = P10 + P11;
+    const Pp11 = P11 + qv;
+
+    // Innovation: y = z - H * x_pred, H = [1, 0]
+    const innov = observations[t] - xp0;
+    const S = Pp00 + R;
+    innovation.push(innov);
+
+    // Kalman gain: K = P_pred * H' / S
+    const K0 = Pp00 / S;
+    const K1 = Pp10 / S;
+    filterGain.push(K0);
+
+    // Update
+    x0 = xp0 + K0 * innov;
+    x1 = xp1 + K1 * innov;
+    P00 = (1 - K0) * Pp00;
+    P01 = (1 - K0) * Pp01;
+    P10 = Pp10 - K1 * Pp00;
+    P11 = Pp11 - K1 * Pp01;
+
+    filteredPrice.push(x0);
+    filteredVelocity.push(x1);
+
+    const band = 1.96 * Math.sqrt(P00 + R);
+    upperBand.push(x0 + band);
+    lowerBand.push(x0 - band);
+  }
+
+  return { filteredPrice, filteredVelocity, upperBand, lowerBand, innovation, filterGain };
+}
+
+// ---- Adaptive Kalman Filter ----
+
+export interface AdaptiveKalmanResult {
+  filteredState: number[];
+  upperBand: number[];
+  lowerBand: number[];
+  innovation: number[];
+  adaptiveQ: number[];
+  adaptiveR: number[];
+}
+
+export function adaptiveKalmanFilter(
+  observations: number[],
+  adaptWindow: number = 20
+): AdaptiveKalmanResult {
+  const n = observations.length;
+
+  const diff = observations.slice(1).map((v, i) => v - observations[i]);
+  const diffVar = diff.reduce((a, v) => a + v * v, 0) / diff.length;
+
+  let x = observations[0];
+  let P = diffVar;
+  let Q = 0.01 * diffVar;
+  let R = 1.0 * diffVar;
+
+  const filteredState: number[] = [];
+  const upperBand: number[] = [];
+  const lowerBand: number[] = [];
+  const innovationArr: number[] = [];
+  const adaptiveQArr: number[] = [];
+  const adaptiveRArr: number[] = [];
+
+  for (let t = 0; t < n; t++) {
+    // Predict
+    const xPred = x;
+    const pPred = P + Q;
+
+    // Innovation
+    const innov = observations[t] - xPred;
+    const S = pPred + R;
+    innovationArr.push(innov);
+
+    // Update
+    const K = pPred / S;
+    x = xPred + K * innov;
+    P = (1 - K) * pPred;
+
+    filteredState.push(x);
+
+    const band = 1.96 * Math.sqrt(P + R);
+    upperBand.push(x + band);
+    lowerBand.push(x - band);
+
+    // Adapt Q and R from recent innovations
+    if (t >= adaptWindow) {
+      const recentInnov = innovationArr.slice(t - adaptWindow + 1, t + 1);
+      const innovVar = recentInnov.reduce((a, v) => a + v * v, 0) / adaptWindow;
+      // R_new ~ innovation variance - predicted covariance contribution
+      R = Math.max(innovVar * 0.7, diffVar * 0.1);
+      // Q_new ~ residual
+      Q = Math.max(innovVar * 0.3, diffVar * 0.001);
+    }
+
+    adaptiveQArr.push(Q);
+    adaptiveRArr.push(R);
+  }
+
+  return { filteredState, upperBand, lowerBand, innovation: innovationArr, adaptiveQ: adaptiveQArr, adaptiveR: adaptiveRArr };
 }

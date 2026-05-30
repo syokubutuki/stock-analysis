@@ -29,7 +29,7 @@ import {
   phaseSpaceDensity,
   rollingTDA,
 } from "./attractor-investment";
-import { fitHMM, kalmanFilter } from "./regime";
+import { fitHMM, kalmanFilter, kalmanFilter2State, adaptiveKalmanFilter } from "./regime";
 
 // ---- Types ----
 
@@ -1039,6 +1039,149 @@ export const SERIES: SeriesDef[] = [
     compute: (p) => {
       const c = p.map((x) => x.close);
       const r = kalmanFilter(c);
+      return r.lowerBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman_innov",
+    label: "カルマン予測誤差",
+    group: "regime",
+    color: "#f97316",
+    scaleId: "kalman_innov",
+    type: "histogram",
+    colorFn: upDown,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter(c);
+      return r.innovation.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman_gain",
+    label: "カルマンゲイン",
+    group: "regime",
+    color: "#8b5cf6",
+    scaleId: "kalman_gain",
+    type: "line",
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter(c);
+      return r.filterGain.map((v, i) => tv(p[i].time, v));
+    },
+  },
+
+  // ====== 2状態カルマン ======
+  {
+    id: "kalman2_price",
+    label: "カルマン2状態",
+    group: "regime",
+    color: "#059669",
+    scaleId: "price",
+    type: "line",
+    lineWidth: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter2State(c);
+      return r.filteredPrice.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman2_upper",
+    label: "カルマン2状態上限",
+    group: "regime",
+    color: "#6ee7b7",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter2State(c);
+      return r.upperBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman2_lower",
+    label: "カルマン2状態下限",
+    group: "regime",
+    color: "#6ee7b7",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter2State(c);
+      return r.lowerBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman2_velocity",
+    label: "トレンド速度",
+    group: "regime",
+    color: "#10b981",
+    scaleId: "kalman_vel",
+    type: "histogram",
+    colorFn: upDown,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter2State(c);
+      return r.filteredVelocity.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "kalman2_innov",
+    label: "2状態予測誤差",
+    group: "regime",
+    color: "#f43f5e",
+    scaleId: "kalman_innov",
+    type: "histogram",
+    colorFn: upDown,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = kalmanFilter2State(c);
+      return r.innovation.map((v, i) => tv(p[i].time, v));
+    },
+  },
+
+  // ====== 適応型カルマン ======
+  {
+    id: "akalman",
+    label: "適応型カルマン",
+    group: "regime",
+    color: "#d946ef",
+    scaleId: "price",
+    type: "line",
+    lineWidth: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = adaptiveKalmanFilter(c);
+      return r.filteredState.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "akalman_upper",
+    label: "適応型カルマン上限",
+    group: "regime",
+    color: "#e879f9",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = adaptiveKalmanFilter(c);
+      return r.upperBand.map((v, i) => tv(p[i].time, v));
+    },
+  },
+  {
+    id: "akalman_lower",
+    label: "適応型カルマン下限",
+    group: "regime",
+    color: "#e879f9",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const r = adaptiveKalmanFilter(c);
       return r.lowerBand.map((v, i) => tv(p[i].time, v));
     },
   },
