@@ -239,7 +239,7 @@ export default function UnifiedChart({ prices, period }: Props) {
             {selectorOpen ? "◀ 系列" : "▶ 系列"}
           </button>
           {selectorOpen && (
-            <div className="mt-1 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-md p-1.5 space-y-0.5 max-h-[460px] overflow-y-auto w-48 text-xs">
+            <div className="mt-1 bg-white/50 backdrop-blur-sm border border-gray-200/50 rounded shadow-md p-1.5 space-y-0.5 max-h-[460px] overflow-y-auto w-48 text-xs">
               {GROUPS.map((group) => {
                 const series = groupedSeries.get(group.id) || [];
                 const isExpanded = expanded.has(group.id);
