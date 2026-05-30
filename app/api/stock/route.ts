@@ -4,55 +4,60 @@ const isFundCode = (ticker: string) => /^\d{7,8}$/.test(ticker);
 
 async function fetchFundData(ticker: string, range: string) {
   const now = new Date();
-  const to = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const toDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 
   const rangeMonths: Record<string, number> = {
     "1mo": 1, "3mo": 3, "6mo": 6, "1y": 12, "2y": 24, "3y": 36, "5y": 60, "10y": 120,
   };
   const months = rangeMonths[range] || 12;
-  const fromDate = new Date(now);
-  fromDate.setMonth(fromDate.getMonth() - months);
-  const from = `${fromDate.getFullYear()}${String(fromDate.getMonth() + 1).padStart(2, "0")}${String(fromDate.getDate()).padStart(2, "0")}`;
+  const fromDateObj = new Date(now);
+  fromDateObj.setMonth(fromDateObj.getMonth() - months);
+  const fromDate = `${fromDateObj.getFullYear()}${String(fromDateObj.getMonth() + 1).padStart(2, "0")}${String(fromDateObj.getDate()).padStart(2, "0")}`;
 
-  const baseUrl = `https://finance.yahoo.co.jp/quote/${encodeURIComponent(ticker)}/history?from=${from}&to=${to}&timeFrame=d`;
-  const headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
+  const headers: Record<string, string> = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  };
 
-  // Fetch first page to get total pages and fund name
-  const firstRes = await fetch(baseUrl, { headers });
-  if (!firstRes.ok) throw new Error(`HTTP ${firstRes.status}`);
-  const firstHtml = await firstRes.text();
+  // Step 1: Get JWT token and fund name from the HTML page
+  const pageRes = await fetch(
+    `https://finance.yahoo.co.jp/quote/${encodeURIComponent(ticker)}/history`,
+    { headers }
+  );
+  if (!pageRes.ok) throw new Error(`HTTP ${pageRes.status}`);
+  const html = await pageRes.text();
 
-  const stateMatch = firstHtml.match(/"mainFundHistory":\s*(\{.*?"isError"\s*:\s*(?:true|false)\s*\})/);
-  if (!stateMatch) throw new Error("No fund history data found");
+  const jwtMatch = html.match(/"jwtToken":"([^"]+)"/);
+  if (!jwtMatch) throw new Error("Failed to get JWT token");
+  const jwt = jwtMatch[1];
 
-  const historyState = JSON.parse(stateMatch[1]);
-  const totalPages = historyState.paging?.totalPage || 1;
-
-  const nameMatch = firstHtml.match(/"mainFundPriceBoard":\s*\{.*?"name"\s*:\s*"([^"]+)"/);
+  const nameMatch = html.match(/"mainFundPriceBoard":\{[^}]*"name"\s*:\s*"([^"]+)"/);
   const fundName = nameMatch ? nameMatch[1] : ticker;
 
-  type HistoryItem = { date: string; price: string; priceChange: string; netAssetsBalance: string };
-  let allHistories: HistoryItem[] = historyState.histories || [];
+  // Step 2: Fetch history data from BFF API
+  const bffHeaders = {
+    ...headers,
+    "jwt-token": jwt,
+    "Referer": `https://finance.yahoo.co.jp/quote/${ticker}/history`,
+  };
 
-  // Fetch remaining pages in parallel (max 5 concurrent)
-  if (totalPages > 1) {
-    const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-    const chunkSize = 5;
-    for (let i = 0; i < pageNumbers.length; i += chunkSize) {
-      const chunk = pageNumbers.slice(i, i + chunkSize);
-      const results = await Promise.all(
-        chunk.map(async (page) => {
-          const res = await fetch(`${baseUrl}&page=${page}`, { headers });
-          if (!res.ok) return [];
-          const html = await res.text();
-          const m = html.match(/"mainFundHistory":\s*(\{.*?"isError"\s*:\s*(?:true|false)\s*\})/);
-          if (!m) return [];
-          const state = JSON.parse(m[1]);
-          return (state.histories || []) as HistoryItem[];
-        })
-      );
-      allHistories = allHistories.concat(results.flat());
-    }
+  type HistoryItem = { date: string; price: string; priceChange: string; netAssetsBalance: string };
+  let allHistories: HistoryItem[] = [];
+  let page = 1;
+  const size = 100;
+
+  while (true) {
+    const apiUrl = `https://finance.yahoo.co.jp/bff-pc/v1/main/fund/price/history/${encodeURIComponent(ticker)}?fromDate=${fromDate}&toDate=${toDate}&page=${page}&size=${size}&timeFrame=daily`;
+    const res = await fetch(apiUrl, { headers: bffHeaders });
+    if (!res.ok) throw new Error(`BFF API error: HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error[0]?.message || "BFF API error");
+
+    const histories: HistoryItem[] = data.histories || [];
+    allHistories = allHistories.concat(histories);
+
+    if (!data.paging?.hasNext) break;
+    page++;
+    if (page > 50) break; // safety limit
   }
 
   const parseDate = (dateStr: string): string | null => {
