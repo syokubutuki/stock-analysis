@@ -8,6 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
+import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
@@ -331,6 +332,32 @@ export default function CustomReturnChart({ prices }: Props) {
           <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} />
         </div>
       )}
+
+      <AnalysisGuide title="カスタムリターン分析の読み方">
+        <p><span className="font-medium">基本定義:</span> 任意の2つの価格ポイント（エントリー/エグジット）を指定し、毎日その売買を繰り返した場合の仮想的なパフォーマンスを計算します。</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">対数リターン:</span> r_t = ln(P_exit / P_entry)。対数リターンを使用するため、累積リターンは単純な和 Σr_t で計算でき、日次の独立性が保たれます。</li>
+          <li><span className="font-medium">価格ポイント:</span> 前日終値(Close_&#123;t-1&#125;)、当日始値(Open_t)、高値(High_t)、安値(Low_t)、終値(Close_t)の5種類から選択します。</li>
+        </ul>
+        <p><span className="font-medium">プリセット戦略の意味:</span></p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">夜間リターン (前日終値→当日始値):</span> 引け後に買い、寄付きで売る。ニュース・海外市場の夜間の影響を捉えます。</li>
+          <li><span className="font-medium">日中リターン (当日始値→当日終値):</span> 寄付きで買い、引けで売る。ザラ場の需給を捉えます。</li>
+          <li><span className="font-medium">逆日中/逆夜間:</span> 上記のショート版。リターンの符号が反転します。</li>
+          <li><span className="font-medium">安値買い→高値売り:</span> その日の最安値で買い最高値で売る理想的シナリオ。実際には達成不可能ですが、日中レンジの大きさ（潜在的な利益機会）の上限を示します。</li>
+        </ul>
+        <p><span className="font-medium">統計指標:</span></p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">累積リターン:</span> Σr_t。期間全体の対数リターン合計。</li>
+          <li><span className="font-medium">年率リターン:</span> Σr_t / (N/252)。1年あたりの期待対数リターン（252は年間営業日数）。</li>
+          <li><span className="font-medium">年率ボラティリティ:</span> σ_daily × √252。日次標準偏差をスケーリングし年率換算したリスク指標。</li>
+          <li><span className="font-medium">シャープレシオ:</span> SR = 年率リターン / 年率ボラティリティ。リスク1単位あたりのリターン。0.5以上で良好、1.0以上で優秀とされます（無リスク金利=0と仮定）。</li>
+          <li><span className="font-medium">勝率:</span> r_t &gt; 0 の日数 / N × 100。</li>
+          <li><span className="font-medium">最大ドローダウン:</span> max(cumReturn_peak - cumReturn_t)。累積リターン曲線の最高値からの最大下落幅。戦略の最悪期を表します。</li>
+          <li><span className="font-medium">プロフィットファクター:</span> PF = |ΣProfit| / |ΣLoss| = (AvgWin × WinCount) / |AvgLoss × LossCount|。1超で期待値プラス。</li>
+        </ul>
+        <p><span className="font-medium">注意点:</span> この分析は取引コスト（手数料・スプレッド・スリッページ）を含みません。特に「高値買い」「安値売り」などの極値ベースの戦略は実際には執行不可能であり、あくまで理論的な上下限の参考値です。</p>
+      </AnalysisGuide>
     </div>
   );
 }

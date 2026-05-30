@@ -17,6 +17,7 @@ import {
 } from "../../lib/gap-analysis";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
@@ -633,6 +634,26 @@ export default function GapAnalysisChart({ prices, period }: Props) {
           <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={rollingRef} /></div>
         </div>
       )}
+      <AnalysisGuide title="ギャップ・リターン分解分析の読み方">
+        <p><span className="font-medium">基本定義:</span> 日次リターンを「夜間リターン」と「日中リターン」に分解します。</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">夜間リターン (Overnight Return):</span> r_night = ln(Open_t / Close_&#123;t-1&#125;)。前日終値から当日始値までの対数リターン。PTS（私設取引）、海外市場、ニュースなどの影響を反映します。</li>
+          <li><span className="font-medium">日中リターン (Intraday Return):</span> r_day = ln(Close_t / Open_t)。当日始値から終値までの対数リターン。ザラ場の需給を反映します。</li>
+          <li><span className="font-medium">日次リターン:</span> r_total = r_night + r_day = ln(Close_t / Close_&#123;t-1&#125;)。対数リターンの加法性により、夜間と日中の和が日次リターンと厳密に一致します。</li>
+        </ul>
+        <p><span className="font-medium">統計サマリー:</span></p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">夜間寄与率:</span> Σr_night / Σr_total × 100。全体リターンのうち夜間リターンが占める割合です。60%超なら夜間が支配的（ギャップ戦略の有効性を示唆）。</li>
+          <li><span className="font-medium">夜間↔日中 相関:</span> Corr(r_night, r_day) = Σ(r_night_i - μ_night)(r_day_i - μ_day) / (σ_night × σ_day × (N-1))。負の相関はギャップ反転（寄付きの過剰反応が日中に修正される）傾向を、正の相関はモメンタム継続を示します。</li>
+          <li><span className="font-medium">ギャップフィル率:</span> ギャップアップ日にLow ≤ 前日Close、またはギャップダウン日にHigh ≥ 前日Closeとなった割合。高いフィル率は平均回帰の強さを示します。</li>
+          <li><span className="font-medium">寄付き天井/底:</span> Open ≈ High（天井）またはOpen ≈ Low（底）の割合。高い天井率はギャップアップ後の下落パターンを示唆します。</li>
+        </ul>
+        <p><span className="font-medium">ギャップサイズ別条件付き分析:</span> 夜間リターンの絶対値を33/66パーセンタイルで小・中・大に3分割し、各バケットごとに日中リターンの平均、勝率、フィル率、反転率を算出します。反転率 = ギャップと日中リターンが逆符号の割合。大きいギャップほど反転率が高ければ、ギャップフェード戦略が有効です。</p>
+        <p><span className="font-medium">曜日別分解:</span> 曜日ごとにr_night, r_dayの平均・勝率・相関を集計します。月曜は週末のニュース蓄積で夜間リターンが大きく、金曜は持ち越しリスク回避で日中のパターンが変わることがあります。夜間+日中 ≈ 日次リターン ≈ 0（年率数%÷252）のため、符号が逆で大きさが近くなるのは自然です。</p>
+        <p><span className="font-medium">連鎖分析:</span> 前日の日中リターンを中央値で大幅/小幅×上昇/下落に分類し、翌日の夜間リターンの平均・勝率を算出します。前日の日中上昇後に翌日の夜間も上昇する傾向があれば、オーバーナイト保有戦略に活用できます。</p>
+        <p><span className="font-medium">象限別累積リターン:</span> 各日をGU→続伸(r_night&gt;0, r_day&gt;0)、GU→反転(r_night&gt;0, r_day≤0)、GD→続落(r_night≤0, r_day≤0)、GD→反転(r_night≤0, r_day&gt;0)に分類し、各象限の日に毎回r_totalを投資した場合の累積リターンを描画します。</p>
+        <p><span className="font-medium">ローリング寄与率・相関:</span> 60日移動窓で夜間寄与率 = Σr_night(窓内) / Σr_total(窓内)と、Corr(r_night, r_day)の時間変化を追跡します。市場レジームの変化（例：ボラティリティ拡大期に相関構造が変わる）を検出できます。</p>
+      </AnalysisGuide>
     </div>
   );
 }

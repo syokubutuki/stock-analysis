@@ -3,6 +3,7 @@
 import { useMemo, useCallback, useRef, useEffect } from "react";
 import { PricePoint } from "../../lib/types";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
@@ -1021,6 +1022,27 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           </div>
         </div>
       )}
+
+      <AnalysisGuide title="カレンダー分析の読み方">
+        <p><span className="font-medium">基本定義:</span> 各営業日の対数リターン r_t = ln(Close_t / Close_&#123;t-1&#125;) を曜日・月・年・月内週番号などのカレンダー属性で分類し、季節性（アノマリー）を検出します。</p>
+        <p><span className="font-medium">曜日別統計:</span></p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">平均リターン (μ_dow):</span> 各曜日に属する全営業日の対数リターンの算術平均。</li>
+          <li><span className="font-medium">中央値:</span> 外れ値に頑健な代表値。平均と中央値の乖離が大きい場合、分布の非対称性（歪度）を示唆します。</li>
+          <li><span className="font-medium">標準偏差 (σ_dow):</span> 不偏分散の平方根 σ = √(Σ(r_i - μ)² / (N-1))。曜日ごとのボラティリティの違いを捉えます。</li>
+          <li><span className="font-medium">勝率:</span> r_t &gt; 0 の日数 / 全日数 × 100。50%からの乖離が大きいほど方向性バイアスが強い。</li>
+          <li><span className="font-medium">p値:</span> 帰無仮説「当該曜日の平均リターン = 0」に対するt検定の有意確率。t = μ × √N / σ。p &lt; 0.05 で統計的に有意なアノマリーと判定します。</li>
+        </ul>
+        <p><span className="font-medium">月別統計:</span> 同様にr_tを月ごとに集計。「Sell in May」「1月効果」などのカレンダーアノマリーを定量的に検証します。</p>
+        <p><span className="font-medium">月内週番号別リターン:</span> 各月の営業日を週番号（第1週〜第5週）に分類。月末・月初のリバランス効果（Turn of Month効果）を検出します。</p>
+        <p><span className="font-medium">曜日×月 ヒートマップ:</span> 曜日と月の2次元クロス集計で平均リターンを色分け表示。特定の曜日×月の組み合わせに偏ったアノマリーを発見できます。</p>
+        <p><span className="font-medium">年×月 リターンヒートマップ:</span> 年と月の2次元で月間合計リターン Σr_t を表示。特定年の異常月（暴落・急騰）の特定や、季節性の時間的安定性を確認します。</p>
+        <p><span className="font-medium">前日騰落との関係:</span> 前日上昇(r_&#123;t-1&#125; &gt; 0)・下落(r_&#123;t-1&#125; ≤ 0)で条件分けし、翌日リターンの平均・勝率・p値を算出。自己相関（モメンタムまたはリバーサル）の有無を簡易的に検証します。</p>
+        <p><span className="font-medium">月内日別平均リターン:</span> 月の第1営業日〜第31営業日ごとの平均リターン。Turn of Month効果（月末最終2日+月初3日がプラス傾向）の視覚的確認に使います。</p>
+        <p><span className="font-medium">累積リターン（曜日別・月別）:</span> 特定の曜日/月にのみ投資した場合の累積対数リターン Σr_t の推移。右肩上がりなら当該期間は歴史的にプラスの期待値を持つことを意味します。</p>
+        <p><span className="font-medium">年間シーズナリティ曲線:</span> 各年について年初からの営業日番号でr_tを並べ、全年の平均累積リターン曲線を描画。年間を通じた典型的な値動きパターンを把握できます。</p>
+        <p><span className="font-medium">連騰・連落分析:</span> 連続して上昇/下落した日数（ストリーク）の最長・平均・回数を集計。ランダムウォーク仮説下での理論的連続日数（幾何分布 E[streak] = 1/p）と比較することで、トレンド継続性を評価します。</p>
+      </AnalysisGuide>
     </div>
   );
 }

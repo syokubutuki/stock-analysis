@@ -6,8 +6,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "ticker is required" }, { status: 400 });
   }
 
-  // 4桁数字なら東証銘柄として .T を付与
-  const symbol = /^\d{4}$/.test(ticker) ? `${ticker}.T` : ticker;
+  // 4桁数字なら東証銘柄、7〜8桁数字なら投資信託として .T を付与
+  const symbol = /^\d{4}$/.test(ticker) || /^\d{7,8}$/.test(ticker) ? `${ticker}.T` : ticker;
 
   try {
     const range = request.nextUrl.searchParams.get("range") || "1y";
@@ -51,14 +51,14 @@ export async function GET(request: NextRequest) {
     const prices = timestamps
       .map((ts: number, i: number) => {
         const close = adjClose ? adjClose[i] : quote.close[i];
-        if (close == null || quote.open[i] == null) return null;
+        if (close == null) return null;
         const date = new Date(ts * 1000);
         const time = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
         return {
           time,
-          open: quote.open[i],
-          high: quote.high[i],
-          low: quote.low[i],
+          open: quote.open[i] ?? close,
+          high: quote.high[i] ?? close,
+          low: quote.low[i] ?? close,
           close,
           volume: quote.volume[i] || 0,
         };
