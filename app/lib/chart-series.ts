@@ -131,7 +131,7 @@ export const SERIES: SeriesDef[] = [
     id: "open",
     label: "Open",
     group: "price",
-    color: "#f59e0b",
+    color: "#d97706",
     scaleId: "price",
     type: "line",
     compute: (p) => p.map((x) => tv(x.time, x.open)),
