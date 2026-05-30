@@ -113,11 +113,17 @@ export default function CustomReturnChart({ prices }: Props) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // 初期日付の設定
+  // 初期日付の設定（デフォルト: 直近1年分）
   useEffect(() => {
     if (prices.length > 0 && !startDate) {
-      setStartDate(prices[0].time);
-      setEndDate(prices[prices.length - 1].time);
+      const lastDate = prices[prices.length - 1].time;
+      const oneYearAgo = new Date(lastDate);
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10);
+      // prices内で1年前以降の最初の日付を探す
+      const firstValid = prices.find((p) => p.time >= oneYearAgoStr);
+      setStartDate(firstValid ? firstValid.time : prices[0].time);
+      setEndDate(lastDate);
     }
   }, [prices, startDate]);
 
@@ -127,6 +133,12 @@ export default function CustomReturnChart({ prices }: Props) {
   const returns = useMemo(
     () => computeCustomReturns(prices, entry, exit, effectiveStart, effectiveEnd),
     [prices, entry, exit, effectiveStart, effectiveEnd]
+  );
+
+  // バイ&ホールド累積リターン (前日終値→当日終値)
+  const buyHoldReturns = useMemo(
+    () => computeCustomReturns(prices, "prevClose", "close", effectiveStart, effectiveEnd),
+    [prices, effectiveStart, effectiveEnd]
   );
 
   // 統計
@@ -190,10 +202,24 @@ export default function CustomReturnChart({ prices }: Props) {
     });
     chartApiRef.current = chart;
 
+    // バイ&ホールド (灰色・破線)
+    const bhSeries = chart.addSeries(LineSeries, {
+      color: "#9ca3af",
+      lineWidth: 2,
+      lineStyle: 2,
+      priceFormat: { type: "custom", formatter: (v: number) => (v).toFixed(2) + "%" },
+      title: "B&H",
+    });
+    bhSeries.setData(
+      buyHoldReturns.map((r) => ({ time: r.time as Time, value: r.cumReturn * 100 }))
+    );
+
+    // カスタム戦略 (青)
     const series = chart.addSeries(LineSeries, {
       color: "#2563eb",
       lineWidth: 2,
       priceFormat: { type: "custom", formatter: (v: number) => (v).toFixed(2) + "%" },
+      title: "戦略",
     });
     series.setData(
       returns.map((r) => ({ time: r.time as Time, value: r.cumReturn * 100 }))
@@ -222,7 +248,7 @@ export default function CustomReturnChart({ prices }: Props) {
       chart.remove();
       chartApiRef.current = null;
     };
-  }, [returns]);
+  }, [returns, buyHoldReturns]);
 
   const applyPreset = useCallback((preset: typeof PRESETS[number]) => {
     setEntry(preset.entry);
@@ -315,22 +341,47 @@ export default function CustomReturnChart({ prices }: Props) {
         <div className="text-sm text-gray-400 py-8 text-center">データが不足しています</div>
       )}
 
+      {/* 凡例 */}
+      <div className="flex items-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-blue-600" /> 戦略</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-gray-400 border-dashed border-t border-gray-400" /> バイ&ホールド</span>
+      </div>
+
       {/* 統計 */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
-          <StatCell label="累積リターン" value={pctFmt(stats.totalReturn)} positive={stats.totalReturn > 0} />
-          <StatCell label="年率リターン" value={pctFmt(stats.annualReturn)} positive={stats.annualReturn > 0} />
-          <StatCell label="年率ボラティリティ" value={pctFmt(stats.annualVol)} />
-          <StatCell label="シャープレシオ" value={stats.sharpe.toFixed(3)} positive={stats.sharpe > 0} />
-          <StatCell label="勝率" value={pctFmt(stats.winRate)} />
-          <StatCell label="取引日数" value={`${stats.n}日`} />
-          <StatCell label="平均日次リターン" value={pctFmt(stats.avg, 4)} positive={stats.avg > 0} />
-          <StatCell label="日次標準偏差" value={pctFmt(stats.stdev, 4)} />
-          <StatCell label="平均利益" value={pctFmt(stats.avgWin, 4)} />
-          <StatCell label="平均損失" value={pctFmt(stats.avgLoss, 4)} />
-          <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative />
-          <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} />
-        </div>
+        <>
+          {/* バイ&ホールドとの比較 */}
+          {buyHoldReturns.length > 0 && (() => {
+            const bhTotal = buyHoldReturns[buyHoldReturns.length - 1].cumReturn;
+            const excess = stats.totalReturn - bhTotal;
+            const bhYears = buyHoldReturns.length / 252;
+            const bhAnnual = bhYears > 0 ? bhTotal / bhYears : 0;
+            const excessAnnual = stats.annualReturn - bhAnnual;
+            return (
+              <div className={`flex flex-wrap gap-3 p-3 rounded-lg border text-sm ${excess > 0 ? "bg-green-50 border-green-200" : excess < 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}>
+                <span className="font-medium">{excess > 0 ? "戦略がB&Hに勝っています" : excess < 0 ? "戦略がB&Hに負けています" : "戦略とB&Hが同等です"}</span>
+                <span>B&H累積: <span className="font-mono">{pctFmt(bhTotal)}</span></span>
+                <span>戦略累積: <span className="font-mono">{pctFmt(stats.totalReturn)}</span></span>
+                <span>超過リターン: <span className={`font-mono font-medium ${excess > 0 ? "text-green-700" : excess < 0 ? "text-red-700" : ""}`}>{excess > 0 ? "+" : ""}{pctFmt(excess)}</span></span>
+                <span>超過年率: <span className={`font-mono font-medium ${excessAnnual > 0 ? "text-green-700" : excessAnnual < 0 ? "text-red-700" : ""}`}>{excessAnnual > 0 ? "+" : ""}{pctFmt(excessAnnual)}</span></span>
+              </div>
+            );
+          })()}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+            <StatCell label="累積リターン" value={pctFmt(stats.totalReturn)} positive={stats.totalReturn > 0} />
+            <StatCell label="年率リターン" value={pctFmt(stats.annualReturn)} positive={stats.annualReturn > 0} />
+            <StatCell label="年率ボラティリティ" value={pctFmt(stats.annualVol)} />
+            <StatCell label="シャープレシオ" value={stats.sharpe.toFixed(3)} positive={stats.sharpe > 0} />
+            <StatCell label="勝率" value={pctFmt(stats.winRate)} />
+            <StatCell label="取引日数" value={`${stats.n}日`} />
+            <StatCell label="平均日次リターン" value={pctFmt(stats.avg, 4)} positive={stats.avg > 0} />
+            <StatCell label="日次標準偏差" value={pctFmt(stats.stdev, 4)} />
+            <StatCell label="平均利益" value={pctFmt(stats.avgWin, 4)} />
+            <StatCell label="平均損失" value={pctFmt(stats.avgLoss, 4)} />
+            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative />
+            <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} />
+          </div>
+        </>
       )}
 
       <AnalysisGuide title="カスタムリターン分析の読み方">
