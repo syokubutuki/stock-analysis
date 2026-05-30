@@ -316,10 +316,6 @@ const SimpleBacktestChart = dynamic(
   () => import("./components/analysis/SimpleBacktestChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
-const AlertSystemChart = dynamic(
-  () => import("./components/analysis/AlertSystemChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
-);
 const MultiTimeframeChart = dynamic(
   () => import("./components/analysis/MultiTimeframeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
@@ -503,7 +499,6 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
-                  <AlertSystemChart prices={filteredPrices} />
                   <UnifiedChart prices={allPrices} period={period} />
                   <StructureScorecardChart prices={filteredPrices} />
                   <BenchmarkChart prices={allPrices} period={period} />
