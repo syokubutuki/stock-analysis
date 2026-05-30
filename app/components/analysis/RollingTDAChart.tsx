@@ -48,8 +48,9 @@ export default function RollingTDAChart({ prices, seriesMode }: Props) {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
       grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
       width: bettiRef.current.clientWidth,
-      height: 180,
-      rightPriceScale: { visible: true },
+      height: 200,
+      rightPriceScale: { visible: true, borderColor: "#3b82f6" },
+      leftPriceScale: { visible: true, borderColor: "#ef4444" },
       timeScale: { timeVisible: false },
     });
     bettiChartRef.current = chart;
@@ -58,11 +59,13 @@ export default function RollingTDAChart({ prices, seriesMode }: Props) {
       color: "#3b82f6",
       lineWidth: 2,
       title: "β₀ (成分数)",
+      priceScaleId: "right",
     });
     const beta1Series = chart.addSeries(LineSeries, {
       color: "#ef4444",
       lineWidth: 2,
       title: "β₁ (ループ数)",
+      priceScaleId: "left",
     });
 
     beta0Series.setData(result.data.map(d => ({ time: d.time as Time, value: d.beta0 })));
@@ -160,7 +163,7 @@ export default function RollingTDAChart({ prices, seriesMode }: Props) {
       <div className="space-y-3 mb-3">
         <div>
           <div className="text-xs text-gray-500 mb-1">
-            ベッティ数の時間変化: <span className="text-blue-600">β₀ (成分数)</span> / <span className="text-red-600">β₁ (ループ数)</span>
+            ベッティ数の時間変化: <span className="text-blue-600">β₀ 成分数 [右軸]</span> / <span className="text-red-600">β₁ ループ数 [左軸]</span>
           </div>
           <div ref={bettiRef} className="w-full rounded border border-gray-100" />
         </div>
