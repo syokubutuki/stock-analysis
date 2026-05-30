@@ -9,6 +9,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStrategyPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -112,6 +113,7 @@ export default function CustomReturnChart({ prices }: Props) {
   const [exit, setExit] = useState<PriceSelector>("open");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [predResult, setPredResult] = useState<PredictionResult | null>(null);
 
   // 初期日付の設定（デフォルト: 直近1年分）
   useEffect(() => {
@@ -134,6 +136,16 @@ export default function CustomReturnChart({ prices }: Props) {
     () => computeCustomReturns(prices, entry, exit, effectiveStart, effectiveEnd),
     [prices, entry, exit, effectiveStart, effectiveEnd]
   );
+
+  // 各日の戦略リターン (予測パネルに渡す)
+  const dailyReturns = useMemo(() => {
+    return prices.map((_, i) => {
+      const ep = getPrice(prices, i, entry);
+      const xp = getPrice(prices, i, exit);
+      if (ep == null || xp == null || ep <= 0 || xp <= 0) return null;
+      return Math.log(xp / ep);
+    });
+  }, [prices, entry, exit]);
 
   // バイ&ホールド累積リターン (前日終値→当日終値)
   const buyHoldReturns = useMemo(
@@ -225,6 +237,19 @@ export default function CustomReturnChart({ prices }: Props) {
       returns.map((r) => ({ time: r.time as Time, value: r.cumReturn * 100 }))
     );
 
+    // 予測戦略 (オレンジ)
+    if (predResult && predResult.returns.length > 0) {
+      const predSeries = chart.addSeries(LineSeries, {
+        color: "#f59e0b",
+        lineWidth: 2,
+        priceFormat: { type: "custom", formatter: (v: number) => (v).toFixed(2) + "%" },
+        title: "予測",
+      });
+      predSeries.setData(
+        predResult.returns.map((r) => ({ time: r.time as Time, value: r.cumReturn * 100 }))
+      );
+    }
+
     // ゼロライン
     const zeroSeries = chart.addSeries(LineSeries, {
       color: "#d1d5db",
@@ -248,7 +273,7 @@ export default function CustomReturnChart({ prices }: Props) {
       chart.remove();
       chartApiRef.current = null;
     };
-  }, [returns, buyHoldReturns]);
+  }, [returns, buyHoldReturns, predResult]);
 
   const applyPreset = useCallback((preset: typeof PRESETS[number]) => {
     setEntry(preset.entry);
@@ -345,6 +370,7 @@ export default function CustomReturnChart({ prices }: Props) {
       <div className="flex items-center gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-blue-600" /> 戦略</span>
         <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-gray-400 border-dashed border-t border-gray-400" /> バイ&ホールド</span>
+        {predResult && <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-amber-500" /> GBDT予測</span>}
       </div>
 
       {/* 統計 */}
@@ -383,6 +409,15 @@ export default function CustomReturnChart({ prices }: Props) {
           </div>
         </>
       )}
+
+      {/* 予測モデルパネル */}
+      <PredictiveStrategyPanel
+        prices={prices}
+        dailyReturns={dailyReturns}
+        effectiveStart={effectiveStart}
+        effectiveEnd={effectiveEnd}
+        onResult={setPredResult}
+      />
 
       <AnalysisGuide title="カスタムリターン分析の読み方">
         <p><span className="font-medium">基本定義:</span> 任意の2つの価格ポイント（エントリー/エグジット）を指定し、毎日その売買を繰り返した場合の仮想的なパフォーマンスを計算します。</p>
