@@ -28,6 +28,38 @@ const CustomReturnChart = dynamic(
   () => import("./components/analysis/CustomReturnChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
 );
+const DistributionShapeChart = dynamic(
+  () => import("./components/analysis/DistributionShapeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ACFExtendedChart = dynamic(
+  () => import("./components/analysis/ACFExtendedChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const RollingMomentsChart = dynamic(
+  () => import("./components/analysis/RollingMomentsChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const LagDependenceChart = dynamic(
+  () => import("./components/analysis/LagDependenceChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const ConditionalViolinChart = dynamic(
+  () => import("./components/analysis/ConditionalViolinChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const CrossCorrelogramChart = dynamic(
+  () => import("./components/analysis/CrossCorrelogramChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const IndependenceTestsChart = dynamic(
+  () => import("./components/analysis/IndependenceTestsChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
+);
+const DistributionSurfaceChart = dynamic(
+  () => import("./components/analysis/DistributionSurfaceChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const TransformCharts = dynamic(
   () => import("./components/analysis/TransformCharts"),
   { ssr: false, loading: () => <ChartPlaceholder height={220} /> }
@@ -216,6 +248,26 @@ const LyapunovSpectrumChart = dynamic(
   () => import("./components/analysis/LyapunovSpectrumChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={600} /> }
 );
+const StructureScorecardChart = dynamic(
+  () => import("./components/analysis/StructureScorecardChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
+);
+const VolumeProfileChart = dynamic(
+  () => import("./components/analysis/VolumeProfileChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const HoldingPeriodChart = dynamic(
+  () => import("./components/analysis/HoldingPeriodChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const VolTermStructureChart = dynamic(
+  () => import("./components/analysis/VolTermStructureChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={520} /> }
+);
+const RegimeTechnicalChart = dynamic(
+  () => import("./components/analysis/RegimeTechnicalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 
 function ChartPlaceholder({ height }: { height: number }) {
   return (
@@ -388,12 +440,15 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
+                  <StructureScorecardChart prices={filteredPrices} />
                   <UnifiedChart prices={allPrices} period={period} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
+                  <VolumeProfileChart prices={filteredPrices} />
                   <GapAnalysisChart prices={allPrices} period={period} />
                   <CustomReturnChart prices={allPrices} />
+                  <HoldingPeriodChart prices={filteredPrices} />
                 </>
               )}
 
@@ -430,7 +485,15 @@ export default function AnalysisPage() {
               {activeSection === "distribution" && (
                 <>
                   <ReturnDistribution prices={filteredPrices} seriesMode={seriesMode} />
+                  <DistributionShapeChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ACFChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ACFExtendedChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <RollingMomentsChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <LagDependenceChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ConditionalViolinChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <CrossCorrelogramChart prices={filteredPrices} />
+                  <IndependenceTestsChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <DistributionSurfaceChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
@@ -439,6 +502,7 @@ export default function AnalysisPage() {
                   <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} />
                   <GarchChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ATRChart prices={filteredPrices} />
+                  <VolTermStructureChart prices={filteredPrices} />
                 </>
               )}
 
@@ -492,7 +556,10 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "regime" && (
-                <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
+                <>
+                  <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <RegimeTechnicalChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "causal" && (
