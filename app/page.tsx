@@ -332,6 +332,30 @@ const GarchVarChart = dynamic(
   () => import("./components/analysis/GarchVarChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const PropagatorChart = dynamic(
+  () => import("./components/analysis/PropagatorChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const PathIntegralChart = dynamic(
+  () => import("./components/analysis/PathIntegralChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={420} /> }
+);
+const DMDChart = dynamic(
+  () => import("./components/analysis/DMDChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const DecoherenceChart = dynamic(
+  () => import("./components/analysis/DecoherenceChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const MarketTimeChart = dynamic(
+  () => import("./components/analysis/MarketTimeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const DensityMatrixChart = dynamic(
+  () => import("./components/analysis/DensityMatrixChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -359,7 +383,8 @@ type SectionKey =
   | "calendar"
   | "regime"
   | "causal"
-  | "tailrisk";
+  | "tailrisk"
+  | "quantum";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "basic", label: "基本分析", description: "ローソク足・一目均衡表・支持/抵抗線・フィボナッチ・ベンチマーク比較" },
@@ -378,6 +403,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
+  { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
 export default function AnalysisPage() {
@@ -654,6 +680,17 @@ export default function AnalysisPage() {
 
               {activeSection === "calendar" && (
                 <SpiralHeatmap prices={filteredPrices} period={period} />
+              )}
+
+              {activeSection === "quantum" && (
+                <>
+                  <PropagatorChart prices={filteredPrices} />
+                  <PathIntegralChart prices={filteredPrices} />
+                  <DMDChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <DecoherenceChart prices={filteredPrices} />
+                  <MarketTimeChart prices={filteredPrices} />
+                  <DensityMatrixChart prices={filteredPrices} />
+                </>
               )}
             </div>
           </>
