@@ -7,7 +7,9 @@ import {
   LineSeries,
   HistogramSeries,
   type IChartApi,
+  type ISeriesApi,
   type Time,
+  type LogicalRange,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import {
@@ -15,7 +17,6 @@ import {
   SERIES,
   DEFAULT_ENABLED,
   type SeriesDef,
-  type TimeValue,
 } from "../../lib/chart-series";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
@@ -25,10 +26,29 @@ interface Props {
   period?: PeriodKey;
 }
 
+interface LegendEntry {
+  label: string;
+  color: string;
+  values: string;
+}
+
+function fmt(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1000)
+    return v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (abs >= 1) return v.toFixed(2);
+  if (abs >= 0.01) return v.toFixed(4);
+  return v.toFixed(6);
+}
+
 export default function UnifiedChart({ prices, period }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const savedRange = useRef<{ from: Time; to: Time } | null>(null);
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const seriesMapRef = useRef(new Map<string, ISeriesApi<any>>());
+  const seriesDefMapRef = useRef(new Map<ISeriesApi<any>, SeriesDef>());
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const savedLogicalRange = useRef<LogicalRange | null>(null);
   const prevPricesRef = useRef<PricePoint[]>(prices);
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(DEFAULT_ENABLED)
@@ -36,8 +56,9 @@ export default function UnifiedChart({ prices, period }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(["price"])
   );
-  const [computing, setComputing] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(true);
+  const [legendTime, setLegendTime] = useState("");
+  const [legendEntries, setLegendEntries] = useState<LegendEntry[]>([]);
 
   const toggle = useCallback((id: string) => {
     setEnabled((prev) => {
@@ -62,16 +83,9 @@ export default function UnifiedChart({ prices, period }: Props) {
     [enabled]
   );
 
-  // Build chart
+  // Create/destroy chart on mount
   useEffect(() => {
-    if (!containerRef.current || prices.length === 0) return;
-
-    // Detect if prices changed (new stock loaded) vs series toggle
-    const pricesChanged = prevPricesRef.current !== prices;
-    prevPricesRef.current = prices;
-    if (pricesChanged) {
-      savedRange.current = null;
-    }
+    if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
@@ -84,24 +98,114 @@ export default function UnifiedChart({ prices, period }: Props) {
       rightPriceScale: { visible: true },
       leftPriceScale: { visible: false },
       timeScale: { timeVisible: false },
-      crosshair: {
-        mode: 0, // Normal
-      },
+      crosshair: { mode: 0 },
     });
     chartRef.current = chart;
 
-    setComputing(true);
+    // Crosshair move: show values at cursor position
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time) return; // keep last shown values on mouse leave
+      const entries: LegendEntry[] = [];
+      for (const [api, data] of param.seriesData) {
+        const def = seriesDefMapRef.current.get(api);
+        if (!def) continue;
+        if (def.type === "candlestick" && "open" in data) {
+          const d = data as {
+            open: number;
+            high: number;
+            low: number;
+            close: number;
+          };
+          entries.push({
+            label: def.label,
+            color: def.color,
+            values: `O ${fmt(d.open)}  H ${fmt(d.high)}  L ${fmt(d.low)}  C ${fmt(d.close)}`,
+          });
+        } else if ("value" in data) {
+          entries.push({
+            label: def.label,
+            color: def.color,
+            values: fmt((data as { value: number }).value),
+          });
+        }
+      }
+      setLegendEntries(entries);
+      setLegendTime(String(param.time));
+    });
 
-    // Track which scales we've added so we can configure them
-    const usedScales = new Set<string>();
-    let seriesAdded = false;
+    const handleResize = () => {
+      if (containerRef.current) {
+        chart.applyOptions({ width: containerRef.current.clientWidth });
+      }
+    };
+    window.addEventListener("resize", handleResize);
 
-    for (const def of enabledSeries) {
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      seriesMapRef.current.clear();
+      seriesDefMapRef.current.clear();
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, []);
+
+  // Sync series when prices or enabled series change
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || prices.length === 0) return;
+
+    const pricesChanged = prevPricesRef.current !== prices;
+    prevPricesRef.current = prices;
+
+    if (pricesChanged) {
+      // New stock loaded: clear everything
+      savedLogicalRange.current = null;
+      for (const [, api] of seriesMapRef.current) {
+        chart.removeSeries(api);
+        seriesDefMapRef.current.delete(api);
+      }
+      seriesMapRef.current.clear();
+      setLegendEntries([]);
+      setLegendTime("");
+    } else {
+      // Series toggle: save current logical range (includes blank space beyond data)
       try {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = lr;
+      } catch {
+        // ignore
+      }
+    }
+
+    // Remove series no longer enabled
+    const enabledIds = new Set(enabledSeries.map((s) => s.id));
+    for (const [id, api] of seriesMapRef.current) {
+      if (!enabledIds.has(id)) {
+        chart.removeSeries(api);
+        seriesDefMapRef.current.delete(api);
+        seriesMapRef.current.delete(id);
+      }
+    }
+
+    // Collect already-used scales
+    const usedScales = new Set<string>();
+    for (const [, api] of seriesMapRef.current) {
+      const def = seriesDefMapRef.current.get(api);
+      if (def) usedScales.add(def.scaleId);
+    }
+
+    // Add newly enabled series
+    for (const def of enabledSeries) {
+      usedScales.add(def.scaleId);
+      if (seriesMapRef.current.has(def.id)) continue;
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let api: ISeriesApi<any>;
         if (def.type === "candlestick" && def.computeOHLC) {
           const data = def.computeOHLC(prices);
           if (data.length === 0) continue;
-          const s = chart.addSeries(CandlestickSeries, {
+          api = chart.addSeries(CandlestickSeries, {
             upColor: "#26a69a",
             downColor: "#ef5350",
             borderUpColor: "#26a69a",
@@ -110,7 +214,7 @@ export default function UnifiedChart({ prices, period }: Props) {
             wickDownColor: "#ef5350",
             priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
           });
-          s.setData(
+          api.setData(
             data.map((d) => ({
               time: d.time as Time,
               open: d.open,
@@ -119,47 +223,40 @@ export default function UnifiedChart({ prices, period }: Props) {
               close: d.close,
             }))
           );
-          usedScales.add(def.scaleId);
-          seriesAdded = true;
         } else if (def.type === "histogram") {
           const data = def.compute(prices);
           if (data.length === 0) continue;
-          const scaleId =
-            def.scaleId === "price" ? "right" : def.scaleId;
-          const s = chart.addSeries(HistogramSeries, {
-            priceScaleId: scaleId,
+          api = chart.addSeries(HistogramSeries, {
+            priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
           });
-          s.setData(
+          api.setData(
             data.map((d) => ({
               time: d.time as Time,
               value: d.value,
-              color: d.color
-                ?? (def.colorFn ? def.colorFn(d.value) : def.color),
+              color:
+                d.color ??
+                (def.colorFn ? def.colorFn(d.value) : def.color),
             }))
           );
-          usedScales.add(def.scaleId);
-          seriesAdded = true;
         } else {
-          // line
           const data = def.compute(prices);
           if (data.length === 0) continue;
-          const scaleId =
-            def.scaleId === "price" ? "right" : def.scaleId;
-          const s = chart.addSeries(LineSeries, {
+          api = chart.addSeries(LineSeries, {
             color: def.color,
             lineWidth: (def.lineWidth ?? 1) as 1 | 2 | 3 | 4,
             lineStyle: def.lineStyle ?? 0,
-            priceScaleId: scaleId,
+            priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
           });
-          s.setData(
+          api.setData(
             data.map((d) => ({
               time: d.time as Time,
               value: d.value,
             }))
           );
-          usedScales.add(def.scaleId);
-          seriesAdded = true;
         }
+
+        seriesMapRef.current.set(def.id, api);
+        seriesDefMapRef.current.set(api, def);
       } catch {
         // Skip series that fail to compute
       }
@@ -172,43 +269,22 @@ export default function UnifiedChart({ prices, period }: Props) {
       });
     }
 
-    // Set visible range only if at least one series was added
-    if (seriesAdded) {
-      if (savedRange.current) {
-        try {
-          chart.timeScale().setVisibleRange(savedRange.current);
-        } catch {
-          chart.timeScale().fitContent();
-        }
-      } else if (period) {
+    // Restore visible range
+    const hasSeries = seriesMapRef.current.size > 0;
+    if (savedLogicalRange.current && hasSeries) {
+      try {
+        chart.timeScale().setVisibleLogicalRange(savedLogicalRange.current);
+      } catch {
+        chart.timeScale().fitContent();
+      }
+    } else if (pricesChanged && hasSeries) {
+      if (period) {
         setInitialVisibleRange(chart, prices, period);
       } else {
         chart.timeScale().fitContent();
       }
     }
-    setComputing(false);
-
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
-      }
-    };
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      // Save visible range before destroying, using the local chart variable
-      if (seriesAdded) {
-        try {
-          const range = chart.timeScale().getVisibleRange();
-          if (range) savedRange.current = range as { from: Time; to: Time };
-        } catch {
-          // ignore
-        }
-      }
-      window.removeEventListener("resize", handleResize);
-      chart.remove();
-      chartRef.current = null;
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prices, enabledSeries]);
 
   // Group series by group
@@ -226,9 +302,37 @@ export default function UnifiedChart({ prices, period }: Props) {
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="font-bold text-gray-800 mb-3">Series Explorer</h3>
 
-      {/* Chart with overlay selector */}
       <div className="relative">
-        <div ref={containerRef} className="w-full rounded border border-gray-100" />
+        <div
+          ref={containerRef}
+          className="w-full rounded border border-gray-100"
+        />
+
+        {/* Crosshair legend overlay - top right */}
+        {legendEntries.length > 0 && (
+          <div className="absolute top-1 right-1 z-10 bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded shadow-sm px-2 py-1 text-xs pointer-events-none">
+            {legendTime && (
+              <div className="text-gray-500 font-medium mb-0.5">
+                {legendTime}
+              </div>
+            )}
+            {legendEntries.map((e) => (
+              <div
+                key={e.label}
+                className="flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span
+                  className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: e.color }}
+                />
+                <span className="text-gray-500">{e.label}</span>
+                <span className="font-mono text-gray-800 ml-auto pl-2">
+                  {e.values}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Overlay selector on the left */}
         <div className="absolute top-1 left-1 z-10 flex flex-col items-start">
@@ -243,7 +347,9 @@ export default function UnifiedChart({ prices, period }: Props) {
               {GROUPS.map((group) => {
                 const series = groupedSeries.get(group.id) || [];
                 const isExpanded = expanded.has(group.id);
-                const activeCount = series.filter((s) => enabled.has(s.id)).length;
+                const activeCount = series.filter((s) =>
+                  enabled.has(s.id)
+                ).length;
                 return (
                   <div key={group.id}>
                     <button
@@ -274,7 +380,9 @@ export default function UnifiedChart({ prices, period }: Props) {
                                   : "bg-gray-100/80 text-gray-500 hover:bg-gray-200/80"
                               }`}
                               style={
-                                isOn ? { backgroundColor: s.color } : undefined
+                                isOn
+                                  ? { backgroundColor: s.color }
+                                  : undefined
                               }
                             >
                               {s.label}
@@ -289,15 +397,9 @@ export default function UnifiedChart({ prices, period }: Props) {
             </div>
           )}
         </div>
-
-        {computing && (
-          <div className="absolute top-1 right-12 z-10 text-xs text-gray-400 bg-white/80 rounded px-2 py-0.5">
-            計算中...
-          </div>
-        )}
       </div>
 
-      {/* Legend */}
+      {/* Static legend */}
       {enabledSeries.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
           {enabledSeries
