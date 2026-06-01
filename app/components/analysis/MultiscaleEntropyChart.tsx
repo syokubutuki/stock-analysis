@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { multiscaleEntropy, fisherInformation } from "../../lib/multiscale-entropy";
+import { infoDecompositionWaterfall } from "../../lib/entropy-visualization";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -22,6 +23,7 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
   const mseCanvasRef = useRef<HTMLCanvasElement>(null);
   const fisherRef = useRef<HTMLDivElement>(null);
   const fisherChartRef = useRef<IChartApi | null>(null);
+  const waterfallRef = useRef<HTMLCanvasElement>(null);
 
   const { values: closes, times } = extractSeries(prices, seriesMode);
   const lr = logReturns(closes);
@@ -29,6 +31,8 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
 
   const mse = useMemo(() => multiscaleEntropy(lr, 20, 2), [prices, seriesMode]);
   const fisher = useMemo(() => fisherInformation(lr, lrTimes, 60, 20), [prices, seriesMode]);
+  const volumes = prices.map((p) => p.volume);
+  const waterfall = useMemo(() => infoDecompositionWaterfall(lr, volumes), [prices, seriesMode]);
 
   // MSE曲線
   useEffect(() => {
@@ -147,6 +151,65 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
     };
   }, [fisher]);
 
+  // ウォーターフォール
+  useEffect(() => {
+    const canvas = waterfallRef.current;
+    if (!canvas || waterfall.length === 0) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const width = parent.clientWidth;
+    const height = 180;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(0, 0, width, height);
+
+    const margin = { top: 25, right: 15, bottom: 35, left: 50 };
+    const pw = width - margin.left - margin.right;
+    const ph = height - margin.top - margin.bottom;
+
+    const maxVal = Math.max(...waterfall.map((w) => w.value), 0.001);
+    const n = waterfall.length;
+    const barWidth = pw / (n * 1.8);
+
+    for (let i = 0; i < n; i++) {
+      const item = waterfall[i];
+      const x = margin.left + (i * 1.8 + 0.4) * barWidth;
+      const barH = (item.value / maxVal) * ph;
+
+      ctx.fillStyle = item.color;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(x, margin.top + ph - barH, barWidth, barH);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, margin.top + ph - barH, barWidth, barH);
+
+      ctx.fillStyle = "#333";
+      ctx.font = "9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(item.value.toFixed(3), x + barWidth / 2, margin.top + ph - barH - 4);
+
+      ctx.fillStyle = "#666";
+      ctx.font = "8px sans-serif";
+      ctx.save();
+      ctx.translate(x + barWidth / 2, height - 3);
+      ctx.fillText(item.label, 0, 0);
+      ctx.restore();
+    }
+
+    ctx.fillStyle = "#333";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("情報分解ウォーターフォール", margin.left, margin.top - 8);
+  }, [waterfall]);
+
   // MSEの傾向分析
   const mseSlope = useMemo(() => {
     const valid = mse.filter((m) => isFinite(m.entropy) && m.entropy > 0);
@@ -183,6 +246,13 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
         <div>
           <div className="text-xs text-gray-500 mb-1">Fisher Information (60日窓) — スパイク = レジーム変化</div>
           <div ref={fisherRef} className="w-full rounded border border-gray-100" />
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <div className="text-xs text-gray-500 mb-1">情報分解 — リターンのエントロピーを構成要素に分解</div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden">
+          <canvas ref={waterfallRef} />
         </div>
       </div>
 

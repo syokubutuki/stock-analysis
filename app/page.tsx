@@ -112,6 +112,38 @@ const MultiscaleEntropyChart = dynamic(
   () => import("./components/analysis/MultiscaleEntropyChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
 );
+const EntropyExtendedChart = dynamic(
+  () => import("./components/analysis/EntropyExtendedChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const ConditionalEntropyChart = dynamic(
+  () => import("./components/analysis/ConditionalEntropyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const RollingTransferEntropyChart = dynamic(
+  () => import("./components/analysis/RollingTransferEntropyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const InformationStorageChart = dynamic(
+  () => import("./components/analysis/InformationStorageChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const ComplexityEntropyChart = dynamic(
+  () => import("./components/analysis/ComplexityEntropyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const SymbolicInfoFlowChart = dynamic(
+  () => import("./components/analysis/SymbolicInfoFlowChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const EntropyHeatmapChart = dynamic(
+  () => import("./components/analysis/EntropyHeatmapChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const EntropyRegimeChart = dynamic(
+  () => import("./components/analysis/EntropyRegimeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const OrdinalNetwork = dynamic(
   () => import("./components/analysis/OrdinalNetwork"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -396,7 +428,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
   { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT" },
   { key: "nonlinear", label: "非線形動力学", description: "アトラクタ・RQA・Lyapunov・位相空間予測・KM係数・TDA・投資シグナル" },
-  { key: "entropy", label: "情報理論", description: "エントロピー・マルチスケール・Fisher情報量" },
+  { key: "entropy", label: "情報理論", description: "エントロピー拡張・複雑度・情報フロー・レジーム検出・予測可能性" },
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出" },
@@ -637,7 +669,15 @@ export default function AnalysisPage() {
               {activeSection === "entropy" && (
                 <>
                   <EntropyDisplay prices={filteredPrices} seriesMode={seriesMode} />
+                  <EntropyExtendedChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ConditionalEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
                   <MultiscaleEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <EntropyHeatmapChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ComplexityEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <InformationStorageChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <RollingTransferEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <SymbolicInfoFlowChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <EntropyRegimeChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 

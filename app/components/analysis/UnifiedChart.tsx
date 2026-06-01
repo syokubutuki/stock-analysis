@@ -32,6 +32,24 @@ interface LegendEntry {
   values: string;
 }
 
+/** Reduce alpha of an rgba/hex color to 1/3 opacity for non-price histograms */
+function dimColor(color: string): string {
+  const m = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+  if (m) {
+    const a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+    return `rgba(${m[1]},${m[2]},${m[3]},${(a / 3).toFixed(3)})`;
+  }
+  // hex
+  const h = color.match(/^#([0-9a-f]{6})$/i);
+  if (h) {
+    const r = parseInt(h[1].slice(0, 2), 16);
+    const g = parseInt(h[1].slice(2, 4), 16);
+    const b = parseInt(h[1].slice(4, 6), 16);
+    return `rgba(${r},${g},${b},0.333)`;
+  }
+  return color;
+}
+
 function fmt(v: number): string {
   const abs = Math.abs(v);
   if (abs >= 1000)
@@ -232,17 +250,21 @@ export default function UnifiedChart({ prices, period }: Props) {
         } else if (def.type === "histogram") {
           const data = def.compute(prices);
           if (data.length === 0) continue;
+          const dim = def.scaleId !== "volume";
           api = chart.addSeries(HistogramSeries, {
             priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
           });
           api.setData(
-            data.map((d) => ({
-              time: d.time as Time,
-              value: d.value,
-              color:
+            data.map((d) => {
+              const raw =
                 d.color ??
-                (def.colorFn ? def.colorFn(d.value) : def.color),
-            }))
+                (def.colorFn ? def.colorFn(d.value) : def.color);
+              return {
+                time: d.time as Time,
+                value: d.value,
+                color: dim ? dimColor(raw) : raw,
+              };
+            })
           );
         } else {
           const data = def.compute(prices);
@@ -390,42 +412,22 @@ export default function UnifiedChart({ prices, period }: Props) {
           </div>
         )}
 
-        {/* PC: Overlay selector on the left */}
-        {!isMobile && (
-          <div className="absolute top-1 left-1 z-10 flex flex-col items-start">
-            <button
-              onClick={() => setSelectorOpen((v) => !v)}
-              className="bg-white/90 border border-gray-200 rounded px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 shadow-sm backdrop-blur-sm"
-            >
-              {selectorOpen ? "◀ 系列" : "▶ 系列"}
-            </button>
-            {selectorOpen && (
-              <div className="mt-1 bg-white/50 backdrop-blur-sm border border-gray-200/50 rounded shadow-md p-1.5 max-h-[460px] overflow-y-auto w-48 text-xs">
-                {selectorContent}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Mobile: toggle button at bottom-right of chart */}
-        {isMobile && (
+        {/* Overlay selector on the left (PC & Mobile共通) */}
+        <div className="absolute top-1 left-1 z-10 flex flex-col items-start">
           <button
             onClick={() => setSelectorOpen((v) => !v)}
-            className="absolute bottom-2 right-2 z-10 bg-white/90 border border-gray-300 rounded-full px-3 py-1 text-xs font-medium text-gray-600 shadow-md backdrop-blur-sm"
+            className="bg-white/90 border border-gray-200 rounded px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 shadow-sm backdrop-blur-sm"
           >
-            {selectorOpen ? "✕ 閉じる" : "▶ 系列"}
+            {selectorOpen ? "◀ 系列" : "▶ 系列"}
           </button>
-        )}
-
-        {/* Mobile: bottom sheet */}
-        {isMobile && selectorOpen && (
-          <div className="absolute bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-gray-300 rounded-t-lg shadow-lg max-h-[60%] overflow-y-auto">
-            <div className="sticky top-0 bg-white/95 backdrop-blur-sm flex justify-center py-1 border-b border-gray-100">
-              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          {selectorOpen && (
+            <div className={`mt-1 bg-white/50 backdrop-blur-sm border border-gray-200/50 rounded shadow-md p-1.5 overflow-y-auto text-xs ${
+              isMobile ? "max-h-[240px] w-44" : "max-h-[460px] w-48"
+            }`}>
+              {selectorContent}
             </div>
-            <div className="p-2">{selectorContent}</div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Mobile: crosshair legend below chart */}
