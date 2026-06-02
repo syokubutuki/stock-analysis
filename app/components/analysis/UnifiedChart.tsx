@@ -72,6 +72,7 @@ function useIsMobile(breakpoint = 768) {
 }
 
 export default function UnifiedChart({ prices, period }: Props) {
+  const fullscreenRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -87,6 +88,7 @@ export default function UnifiedChart({ prices, period }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(["price"])
   );
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= 768
   );
@@ -109,6 +111,36 @@ export default function UnifiedChart({ prices, period }: Props) {
       else next.add(groupId);
       return next;
     });
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = fullscreenRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      el.requestFullscreen();
+    }
+  }, []);
+
+  // Listen for fullscreenchange to sync state and resize chart
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      const chart = chartRef.current;
+      if (!chart || !containerRef.current) return;
+      // Wait a frame for the browser to apply fullscreen layout
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        const w = containerRef.current.clientWidth;
+        const mob = window.innerWidth < 768;
+        const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
+        chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: fs || !mob } });
+      });
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
   const enabledSeries = useMemo(
@@ -164,10 +196,11 @@ export default function UnifiedChart({ prices, period }: Props) {
 
     const handleResize = () => {
       if (!containerRef.current) return;
+      const fs = !!document.fullscreenElement;
       const mob = window.innerWidth < 768;
       const w = containerRef.current.clientWidth;
-      const h = mob ? 350 : 600;
-      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: !mob } });
+      const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
+      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: fs || !mob } });
     };
     window.addEventListener("resize", handleResize);
 
@@ -382,10 +415,10 @@ export default function UnifiedChart({ prices, period }: Props) {
   );
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div ref={fullscreenRef} className={`bg-white rounded-lg border border-gray-200 p-4${isFullscreen ? " flex flex-col h-screen" : ""}`}>
       <h3 className="font-bold text-gray-800 mb-3">Series Explorer</h3>
 
-      <div className="relative">
+      <div className={`relative${isFullscreen ? " flex-1" : ""}`}>
         <div
           ref={containerRef}
           className="w-full rounded border border-gray-100"
@@ -393,7 +426,7 @@ export default function UnifiedChart({ prices, period }: Props) {
 
         {/* PC: Crosshair legend - top right */}
         {!isMobile && legendEntries.length > 0 && (
-          <div className="absolute top-1 right-1 z-10 bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded shadow-sm px-2 py-1 text-xs pointer-events-none">
+          <div className="absolute top-7 right-1 z-10 bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded shadow-sm px-2 py-1 text-xs pointer-events-none">
             {legendTime && (
               <div className="text-gray-500 font-medium mb-0.5">
                 {legendTime}
@@ -413,6 +446,15 @@ export default function UnifiedChart({ prices, period }: Props) {
             ))}
           </div>
         )}
+
+        {/* Fullscreen toggle button */}
+        <button
+          onClick={toggleFullscreen}
+          className="absolute top-1 right-1 z-10 bg-white/90 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 shadow-sm backdrop-blur-sm"
+          title={isFullscreen ? "全画面解除" : "全画面表示"}
+        >
+          {isFullscreen ? "✕" : "⛶"}
+        </button>
 
         {/* Overlay selector on the left (PC & Mobile共通) */}
         <div className="absolute top-1 left-1 z-10 flex flex-col items-start">
