@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useMemo, useCallback, useRef, useEffect, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
@@ -28,6 +28,19 @@ interface DayData {
   closeReturn: number;
   intradayReturn: number;
   overnightReturn: number;
+  openReturn: number;
+  highReturn: number;
+  lowReturn: number;
+  logCloseReturn: number;
+  logIntradayReturn: number;
+  logOvernightReturn: number;
+}
+
+type ReturnTab = "rate" | "ohlc" | "log";
+
+interface BarDef {
+  color: string;
+  label: string;
 }
 
 // --- stat helpers ---
@@ -116,6 +129,46 @@ function returnColor(val: number, maxAbs: number): string {
   return "#f3f4f6";
 }
 
+// Return field keys for each raw data bucket
+type RawFieldKey = "close" | "intraday" | "overnight" | "open" | "high" | "low" | "logClose" | "logIntraday" | "logOvernight";
+type RawBucket = Record<RawFieldKey, number[]>;
+
+const TAB_DEFS: Record<ReturnTab, { barDefs: BarDef[]; fields: RawFieldKey[] }> = {
+  rate: {
+    barDefs: [
+      { color: "#3b82f6", label: "C\u2192C" },
+      { color: "#22c55e", label: "O\u2192C" },
+      { color: "#f59e0b", label: "C\u2192O" },
+    ],
+    fields: ["close", "intraday", "overnight"],
+  },
+  ohlc: {
+    barDefs: [
+      { color: "#3b82f6", label: "C\u2192C" },
+      { color: "#8b5cf6", label: "O\u2192O" },
+      { color: "#ef4444", label: "H\u2192H" },
+      { color: "#06b6d4", label: "L\u2192L" },
+    ],
+    fields: ["close", "open", "high", "low"],
+  },
+  log: {
+    barDefs: [
+      { color: "#3b82f6", label: "ln C\u2192C" },
+      { color: "#22c55e", label: "ln O\u2192C" },
+      { color: "#f59e0b", label: "ln C\u2192O" },
+    ],
+    fields: ["logClose", "logIntraday", "logOvernight"],
+  },
+};
+
+function makeRawBucket(): RawBucket {
+  return { close: [], intraday: [], overnight: [], open: [], high: [], low: [], logClose: [], logIntraday: [], logOvernight: [] };
+}
+
+function computeFieldStats(arr: number[]) {
+  return { mean: mean(arr), median: median(arr), std: std(arr), winRate: winRate(arr), pValue: tTestPValue(arr) };
+}
+
 // ============================================================
 export default function SpiralHeatmap({ prices, period }: Props) {
   // canvas refs
@@ -131,6 +184,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const domBarRef = useRef<HTMLCanvasElement>(null);
   const seasonRef = useRef<HTMLCanvasElement>(null);
 
+  const [returnTab, setReturnTab] = useState<ReturnTab>("rate");
+
   // === core data ===
   const days: DayData[] = useMemo(() => {
     if (prices.length < 2) return [];
@@ -138,6 +193,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return prices.slice(1).map((p, i) => {
       const prev = prices[i], d = new Date(p.time);
       const pc = prev.close || 1, op = p.open || pc;
+      const po = prev.open || 1, ph = prev.high || 1, pl = prev.low || 1;
       const y = d.getFullYear();
       yc[y] = (yc[y] || 0) + 1;
       return {
@@ -147,19 +203,32 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         closeReturn: (p.close - pc) / pc,
         intradayReturn: (p.close - op) / op,
         overnightReturn: (op - pc) / pc,
+        openReturn: (p.open - po) / po,
+        highReturn: (p.high - ph) / ph,
+        lowReturn: (p.low - pl) / pl,
+        logCloseReturn: Math.log(p.close / pc),
+        logIntradayReturn: Math.log(p.close / op),
+        logOvernightReturn: Math.log(op / pc),
       };
     });
   }, [prices]);
 
-  // === weekday raw returns (for box plot & grouped bar) ===
+  // === weekday raw returns ===
   const dowRaw = useMemo(() => {
-    const r: Record<number, { close: number[]; intraday: number[]; overnight: number[] }> = {};
-    for (const dow of DOW_TRADING) r[dow] = { close: [], intraday: [], overnight: [] };
+    const r: Record<number, RawBucket> = {};
+    for (const dow of DOW_TRADING) r[dow] = makeRawBucket();
     for (const d of days) {
       if (!(d.dayOfWeek in r)) continue;
-      r[d.dayOfWeek].close.push(d.closeReturn);
-      r[d.dayOfWeek].intraday.push(d.intradayReturn);
-      r[d.dayOfWeek].overnight.push(d.overnightReturn);
+      const b = r[d.dayOfWeek];
+      b.close.push(d.closeReturn);
+      b.intraday.push(d.intradayReturn);
+      b.overnight.push(d.overnightReturn);
+      b.open.push(d.openReturn);
+      b.high.push(d.highReturn);
+      b.low.push(d.lowReturn);
+      b.logClose.push(d.logCloseReturn);
+      b.logIntraday.push(d.logIntradayReturn);
+      b.logOvernight.push(d.logOvernightReturn);
     }
     return r;
   }, [days]);
@@ -168,31 +237,40 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const dowStats = useMemo(() =>
     DOW_TRADING.map(dow => {
       const c = dowRaw[dow]; if (!c || c.close.length === 0) return null;
-      return {
-        n: c.close.length,
-        close: { mean: mean(c.close), median: median(c.close), std: std(c.close), winRate: winRate(c.close), pValue: tTestPValue(c.close) },
-        intraday: { mean: mean(c.intraday), median: median(c.intraday), std: std(c.intraday), winRate: winRate(c.intraday) },
-        overnight: { mean: mean(c.overnight), median: median(c.overnight), std: std(c.overnight), winRate: winRate(c.overnight) },
-      };
+      const result: Record<string, { mean: number; median: number; std: number; winRate: number; pValue: number | null }> & { n: number } = { n: c.close.length } as any;
+      for (const key of Object.keys(c) as RawFieldKey[]) {
+        (result as any)[key] = computeFieldStats(c[key]);
+      }
+      return result;
     })
   , [dowRaw]);
 
   // === monthly raw returns ===
   const monthRaw = useMemo(() => {
-    const r = Array.from({ length: 12 }, () => ({ close: [] as number[], intraday: [] as number[], overnight: [] as number[] }));
-    for (const d of days) { r[d.month].close.push(d.closeReturn); r[d.month].intraday.push(d.intradayReturn); r[d.month].overnight.push(d.overnightReturn); }
+    const r = Array.from({ length: 12 }, () => makeRawBucket());
+    for (const d of days) {
+      const b = r[d.month];
+      b.close.push(d.closeReturn);
+      b.intraday.push(d.intradayReturn);
+      b.overnight.push(d.overnightReturn);
+      b.open.push(d.openReturn);
+      b.high.push(d.highReturn);
+      b.low.push(d.lowReturn);
+      b.logClose.push(d.logCloseReturn);
+      b.logIntraday.push(d.logIntradayReturn);
+      b.logOvernight.push(d.logOvernightReturn);
+    }
     return r;
   }, [days]);
 
   const monthStats = useMemo(() =>
     monthRaw.map(s => {
       if (s.close.length === 0) return null;
-      return {
-        n: s.close.length,
-        close: { mean: mean(s.close), std: std(s.close), winRate: winRate(s.close), pValue: tTestPValue(s.close) },
-        intraday: { mean: mean(s.intraday), std: std(s.intraday), winRate: winRate(s.intraday) },
-        overnight: { mean: mean(s.overnight), std: std(s.overnight), winRate: winRate(s.overnight) },
-      };
+      const result: Record<string, { mean: number; median: number; std: number; winRate: number; pValue: number | null }> & { n: number } = { n: s.close.length } as any;
+      for (const key of Object.keys(s) as RawFieldKey[]) {
+        (result as any)[key] = computeFieldStats(s[key]);
+      }
+      return result;
     })
   , [monthRaw]);
 
@@ -282,7 +360,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
   // === intraweek pattern ===
   const intraweekData = useMemo(() => {
-    // Group days into weeks, compute Mon→Fri cumulative within each week, then average
     const weeks: number[][] = [];
     let curWeek: number[] = [];
     for (const d of days) {
@@ -290,7 +367,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       if (d.dayOfWeek >= 1 && d.dayOfWeek <= 5) curWeek.push(d.closeReturn);
     }
     if (curWeek.length > 0) weeks.push(curWeek);
-    // Build cumulative for each week, then average by position
     const maxPos = 5;
     const avgCumul: { pos: number; avg: number }[] = [];
     for (let p = 0; p < maxPos; p++) {
@@ -329,22 +405,22 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
   const DOW_COLORS = ["#999", "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#999"];
   const MONTH_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#14b8a6","#06b6d4","#3b82f6","#6366f1","#8b5cf6","#a855f7","#ec4899","#f43f5e"];
-  const BAR_COLORS = { close: "#3b82f6", intraday: "#22c55e", overnight: "#f59e0b" };
 
   // =============== DRAW FUNCTIONS ===============
 
-  // Grouped bar chart (weekday or monthly)
+  // Grouped bar chart (generic: variable number of bars)
   const drawGroupedBar = useCallback((
     canvas: HTMLCanvasElement,
     labels: string[],
-    groups: { close: number; intraday: number; overnight: number }[],
+    barData: number[][],   // barData[barIdx][groupIdx]
+    barDefs: BarDef[],
   ) => {
     const r = initCanvas(canvas, 200); if (!r) return;
     const { ctx, width, height } = r;
     const pad = { top: 15, bottom: 30, left: 55, right: 15 };
     const plotW = width - pad.left - pad.right;
     const plotH = height - pad.top - pad.bottom;
-    const vals = groups.flatMap(g => [g.close, g.intraday, g.overnight]);
+    const vals = barData.flat();
     const maxAbs = Math.max(...vals.map(Math.abs), 0.0001);
     const zeroY = pad.top + plotH / 2;
 
@@ -357,37 +433,34 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       ctx.fillText((v * 100).toFixed(2) + "%", pad.left - 5, y + 3);
     }
 
-    const n = groups.length;
-    const groupW = plotW / n;
-    const barW = Math.max(3, groupW / 4.5);
+    const nGroups = labels.length;
+    const nBars = barDefs.length;
+    const groupW = plotW / nGroups;
+    const barW = Math.max(3, groupW / (nBars * 1.5));
     const gap = barW * 0.3;
+    const totalBarWidth = nBars * barW + (nBars - 1) * gap;
 
-    for (let i = 0; i < n; i++) {
-      const g = groups[i];
+    for (let i = 0; i < nGroups; i++) {
       const cx = pad.left + (i + 0.5) * groupW;
-      const bars = [
-        { val: g.close, color: BAR_COLORS.close },
-        { val: g.intraday, color: BAR_COLORS.intraday },
-        { val: g.overnight, color: BAR_COLORS.overnight },
-      ];
-      for (let j = 0; j < 3; j++) {
-        const x = cx - 1.5 * barW - gap + j * (barW + gap);
-        const barH = (bars[j].val / maxAbs) * (plotH / 2);
-        ctx.fillStyle = bars[j].color;
+      const startX = cx - totalBarWidth / 2;
+      for (let j = 0; j < nBars; j++) {
+        const x = startX + j * (barW + gap);
+        const val = barData[j][i];
+        const barH = (val / maxAbs) * (plotH / 2);
+        ctx.fillStyle = barDefs[j].color;
         ctx.fillRect(x, zeroY - Math.max(barH, 0), barW, Math.abs(barH));
       }
       ctx.fillStyle = "#666"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(labels[i], cx, height - 12);
+      ctx.fillText(labels[i], cx, height - 14);
     }
 
     // legend
     ctx.font = "9px sans-serif"; ctx.textAlign = "left";
-    const leg = [{ label: "前日比", color: BAR_COLORS.close }, { label: "日中", color: BAR_COLORS.intraday }, { label: "夜間", color: BAR_COLORS.overnight }];
     let lx = pad.left;
-    for (const l of leg) {
-      ctx.fillStyle = l.color; ctx.fillRect(lx, height - 5, 10, 3);
-      ctx.fillStyle = "#666"; ctx.fillText(l.label, lx + 13, height - 1);
-      lx += ctx.measureText(l.label).width + 25;
+    for (const def of barDefs) {
+      ctx.fillStyle = def.color; ctx.fillRect(lx, height - 5, 10, 3);
+      ctx.fillStyle = "#666"; ctx.fillText(def.label, lx + 13, height - 1);
+      lx += ctx.measureText(def.label).width + 25;
     }
   }, []);
 
@@ -523,16 +596,13 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
     let minV = Infinity, maxV = -Infinity;
     for (const p of data) { minV = Math.min(minV, p.avg); maxV = Math.max(maxV, p.avg); }
-    // include zero
     minV = Math.min(minV, 0); maxV = Math.max(maxV, 0);
     const range = maxV - minV || 0.01;
     const toY = (v: number) => pad.top + plotH * (1 - (v - minV) / range);
 
-    // zero line
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.left, toY(0)); ctx.lineTo(width - pad.right, toY(0)); ctx.stroke();
 
-    // Y-axis
     ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const val = minV + (range * i) / 4;
@@ -541,7 +611,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
     }
 
-    // area fill
     ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
     ctx.beginPath();
     for (let i = 0; i < data.length; i++) {
@@ -553,7 +622,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     ctx.lineTo(pad.left, toY(0));
     ctx.closePath(); ctx.fill();
 
-    // line
     ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 2;
     ctx.beginPath();
     for (let i = 0; i < data.length; i++) {
@@ -563,7 +631,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
     ctx.stroke();
 
-    // dots + labels
     const dowShort = ["月", "火", "水", "木", "金"];
     for (let i = 0; i < data.length; i++) {
       const x = pad.left + (data[i].pos / 4) * plotW;
@@ -700,31 +767,64 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     for (let m = 0; m < 12; m++) { const da = Math.round(m * (maxDay / 12)); if (da === 0) continue; const x = pad.left + (da / (maxDay - 1)) * plotW; ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke(); ctx.fillText(MONTH_LABELS[m], x, height - 8); }
   }, []);
 
+  // === helper to get bar data from raw buckets for current tab ===
+  const getBarData = useCallback((raw: RawBucket[], tab: ReturnTab): { barData: number[][]; barDefs: BarDef[] } => {
+    const def = TAB_DEFS[tab];
+    const barData = def.fields.map(field => raw.map(b => mean(b[field])));
+    return { barData, barDefs: def.barDefs };
+  }, []);
+
+  // === helper to get box plot data from raw buckets for current tab ===
+  const getBoxData = useCallback((raw: RawBucket[], tab: ReturnTab): { labels: string[]; arrays: number[][]; colors: string[] } => {
+    const def = TAB_DEFS[tab];
+    const labels: string[] = [];
+    const arrays: number[][] = [];
+    const colors: string[] = [];
+    for (const rawBucket of raw) {
+      for (let j = 0; j < def.fields.length; j++) {
+        labels.push(def.barDefs[j].label);
+        arrays.push(rawBucket[def.fields[j]]);
+        colors.push(def.barDefs[j].color);
+      }
+    }
+    return { labels, arrays, colors };
+  }, []);
+
   // === Draw all canvases ===
   useEffect(() => {
     if (days.length === 0) return;
 
+    const tabDef = TAB_DEFS[returnTab];
+
     // 1. Weekday grouped bar
     if (dowBarRef.current) {
-      const groups = DOW_TRADING.map(dow => {
-        const s = dowRaw[dow];
-        return { close: mean(s.close), intraday: mean(s.intraday), overnight: mean(s.overnight) };
-      });
-      drawGroupedBar(dowBarRef.current, DOW_TRADING.map(d => DOW_LABELS[d]), groups);
+      const rawArr = DOW_TRADING.map(dow => dowRaw[dow]);
+      const { barData, barDefs } = getBarData(rawArr, returnTab);
+      drawGroupedBar(dowBarRef.current, DOW_TRADING.map(d => DOW_LABELS[d]), barData, barDefs);
     }
 
     // 2. Monthly grouped bar
     if (monthBarRef.current) {
       const activeMonths = monthRaw.map((_, i) => i).filter(m => monthRaw[m].close.length > 0);
-      const groups = activeMonths.map(m => ({
-        close: mean(monthRaw[m].close), intraday: mean(monthRaw[m].intraday), overnight: mean(monthRaw[m].overnight),
-      }));
-      drawGroupedBar(monthBarRef.current, activeMonths.map(m => MONTH_LABELS[m]), groups);
+      const rawArr = activeMonths.map(m => monthRaw[m]);
+      const { barData, barDefs } = getBarData(rawArr, returnTab);
+      drawGroupedBar(monthBarRef.current, activeMonths.map(m => MONTH_LABELS[m]), barData, barDefs);
     }
 
-    // 3. Box plot
+    // 3. Box plot (weekday, tab-linked)
     if (dowBoxRef.current) {
-      drawBoxPlot(dowBoxRef.current, DOW_TRADING.map(d => DOW_LABELS[d]), DOW_TRADING.map(d => dowRaw[d].close), DOW_TRADING.map(d => DOW_COLORS[d]));
+      const rawArr = DOW_TRADING.map(dow => dowRaw[dow]);
+      const dowLabelsForBox: string[] = [];
+      const boxArrays: number[][] = [];
+      const boxColors: string[] = [];
+      for (let i = 0; i < rawArr.length; i++) {
+        for (let j = 0; j < tabDef.fields.length; j++) {
+          dowLabelsForBox.push(DOW_LABELS[DOW_TRADING[i]] + " " + tabDef.barDefs[j].label);
+          boxArrays.push(rawArr[i][tabDef.fields[j]]);
+          boxColors.push(tabDef.barDefs[j].color);
+        }
+      }
+      drawBoxPlot(dowBoxRef.current, dowLabelsForBox, boxArrays, boxColors);
     }
 
     // 4. Cross heatmap
@@ -749,7 +849,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
     if (domBarRef.current) drawDomBar(domBarRef.current, domStats);
     if (seasonRef.current) drawSeasonality(seasonRef.current, seasonality);
-  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, intraweekData, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawIntraweek, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality]);
+  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, intraweekData, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawIntraweek, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, getBarData, getBoxData]);
 
   if (days.length === 0) {
     return (
@@ -760,19 +860,41 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     );
   }
 
+  const tabDef = TAB_DEFS[returnTab];
+  const tabButtons = (
+    <div className="flex gap-1 mb-2">
+      {([["rate", "変化率"], ["ohlc", "OHLC"], ["log", "対数"]] as [ReturnTab, string][]).map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => setReturnTab(key)}
+          className={`px-2.5 py-1 text-xs rounded transition-colors ${
+            returnTab === key
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-5">
       <h3 className="font-bold text-gray-800">カレンダー分析</h3>
 
+      {/* Tab selector */}
+      {tabButtons}
+
       {/* ===== 1. Weekday grouped bar ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">曜日別 平均リターン比較 (前日比 / 日中 / 夜間)</div>
+        <div className="text-xs text-gray-500 mb-1">曜日別 平均リターン比較 ({tabDef.barDefs.map(d => d.label).join(" / ")})</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={dowBarRef} /></div>
       </div>
 
       {/* ===== 2. Weekday box plot ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">曜日別 リターン分布 (箱ひげ図)</div>
+        <div className="text-xs text-gray-500 mb-1">曜日別 リターン分布 (箱ひげ図 - {tabDef.barDefs.map(d => d.label).join(" / ")})</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={dowBoxRef} /></div>
       </div>
 
@@ -784,7 +906,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="py-1 px-2 text-left text-gray-500 font-medium"></th>
-                {DOW_TRADING.map((dow, i) => (
+                {DOW_TRADING.map((dow) => (
                   <th key={dow} className="py-1 px-2 text-center font-medium text-gray-700">{DOW_LABELS[dow]}</th>
                 ))}
               </tr>
@@ -794,41 +916,31 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                 <td className="py-1 px-2 text-gray-500">N</td>
                 {dowStats.map((s, i) => <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{s?.n ?? 0}</td>)}
               </tr>
-              <tr className="border-b border-gray-100 bg-gray-50"><td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>前日比</td></tr>
-              {(["mean", "median", "std", "winRate", "pValue"] as const).map(key => (
-                <tr key={`c-${key}`} className="border-b border-gray-100">
-                  <td className="py-1 px-2 text-gray-400">{key === "mean" ? "平均" : key === "median" ? "中央値" : key === "std" ? "標準偏差" : key === "winRate" ? "勝率" : "p値"}</td>
-                  {dowStats.map((s, i) => {
-                    if (!s) return <td key={i} className="py-1 px-2 text-center">-</td>;
-                    if (key === "pValue") { const pv = pValueLabel(s.close.pValue); return <td key={i} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; }
-                    if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(s.close.winRate)}</td>;
-                    if (key === "std") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct(s.close.std)}</td>;
-                    const v = s.close[key]; return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(v)}`}>{pct(v)}</td>;
-                  })}
-                </tr>
-              ))}
-              <tr className="border-b border-gray-100 bg-gray-50"><td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>日中</td></tr>
-              {(["mean", "median", "winRate"] as const).map(key => (
-                <tr key={`i-${key}`} className="border-b border-gray-100">
-                  <td className="py-1 px-2 text-gray-400">{key === "mean" ? "平均" : key === "median" ? "中央値" : "勝率"}</td>
-                  {dowStats.map((s, i) => {
-                    if (!s) return <td key={i} className="py-1 px-2 text-center">-</td>;
-                    if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(s.intraday.winRate)}</td>;
-                    const v = s.intraday[key]; return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(v)}`}>{pct(v)}</td>;
-                  })}
-                </tr>
-              ))}
-              <tr className="border-b border-gray-100 bg-gray-50"><td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>夜間</td></tr>
-              {(["mean", "median", "winRate"] as const).map(key => (
-                <tr key={`o-${key}`} className="border-b border-gray-100">
-                  <td className="py-1 px-2 text-gray-400">{key === "mean" ? "平均" : key === "median" ? "中央値" : "勝率"}</td>
-                  {dowStats.map((s, i) => {
-                    if (!s) return <td key={i} className="py-1 px-2 text-center">-</td>;
-                    if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(s.overnight.winRate)}</td>;
-                    const v = s.overnight[key]; return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(v)}`}>{pct(v)}</td>;
-                  })}
-                </tr>
-              ))}
+              {tabDef.fields.map((field, fi) => {
+                const label = tabDef.barDefs[fi].label;
+                const isFirst = fi === 0;
+                return (
+                  <React.Fragment key={field}>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <td className="py-1 px-2 text-gray-500 font-medium" colSpan={6}>{label}</td>
+                    </tr>
+                    {(isFirst ? ["mean", "median", "std", "winRate", "pValue"] as const : ["mean", "median", "winRate"] as const).map(key => (
+                      <tr key={`${field}-${key}`} className="border-b border-gray-100">
+                        <td className="py-1 px-2 text-gray-400">{key === "mean" ? "平均" : key === "median" ? "中央値" : key === "std" ? "標準偏差" : key === "winRate" ? "勝率" : "p値"}</td>
+                        {dowStats.map((s, i) => {
+                          if (!s) return <td key={i} className="py-1 px-2 text-center">-</td>;
+                          const fieldStats = (s as any)[field] as { mean: number; median: number; std: number; winRate: number; pValue: number | null };
+                          if (!fieldStats) return <td key={i} className="py-1 px-2 text-center">-</td>;
+                          if (key === "pValue") { const pv = pValueLabel(fieldStats.pValue); return <td key={i} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; }
+                          if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(fieldStats.winRate)}</td>;
+                          if (key === "std") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct(fieldStats.std)}</td>;
+                          const v = fieldStats[key]; return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(v)}`}>{pct(v)}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -836,7 +948,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
       {/* ===== 3. Monthly grouped bar ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">月別 平均リターン比較 (前日比 / 日中 / 夜間)</div>
+        <div className="text-xs text-gray-500 mb-1">月別 平均リターン比較 ({tabDef.barDefs.map(d => d.label).join(" / ")})</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={monthBarRef} /></div>
       </div>
 
@@ -856,30 +968,37 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                 <td className="py-1 px-1.5 text-gray-500">N</td>
                 {monthStats.map((s, m) => s && <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{s.n}</td>)}
               </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 px-1.5 text-gray-500">前日比 平均</td>
-                {monthStats.map((s, m) => s && <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(s.close.mean)}`}>{pct2(s.close.mean)}</td>)}
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 px-1.5 text-gray-500">標準偏差</td>
-                {monthStats.map((s, m) => s && <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(s.close.std)}</td>)}
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 px-1.5 text-gray-500">勝率</td>
-                {monthStats.map((s, m) => s && <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(s.close.winRate)}</td>)}
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 px-1.5 text-gray-500">p値</td>
-                {monthStats.map((s, m) => { if (!s) return null; const pv = pValueLabel(s.close.pValue); return <td key={m} className={`py-1 px-1.5 text-center font-mono ${pv.cls}`}>{pv.text}</td>; })}
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 px-1.5 text-gray-500">日中 平均</td>
-                {monthStats.map((s, m) => s && <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(s.intraday.mean)}`}>{pct2(s.intraday.mean)}</td>)}
-              </tr>
-              <tr>
-                <td className="py-1 px-1.5 text-gray-500">夜間 平均</td>
-                {monthStats.map((s, m) => s && <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(s.overnight.mean)}`}>{pct2(s.overnight.mean)}</td>)}
-              </tr>
+              {tabDef.fields.map((field, fi) => {
+                const label = tabDef.barDefs[fi].label;
+                const isFirst = fi === 0;
+                return (
+                  <React.Fragment key={field}>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <td className="py-1 px-1.5 text-gray-500 font-medium" colSpan={13}>{label}</td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="py-1 px-1.5 text-gray-500">平均</td>
+                      {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; return <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(fs.mean)}`}>{pct2(fs.mean)}</td>; })}
+                    </tr>
+                    {isFirst && (
+                      <>
+                        <tr className="border-b border-gray-100">
+                          <td className="py-1 px-1.5 text-gray-500">標準偏差</td>
+                          {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; return <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(fs.std)}</td>; })}
+                        </tr>
+                        <tr className="border-b border-gray-100">
+                          <td className="py-1 px-1.5 text-gray-500">勝率</td>
+                          {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; return <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(fs.winRate)}</td>; })}
+                        </tr>
+                        <tr className="border-b border-gray-100">
+                          <td className="py-1 px-1.5 text-gray-500">p値</td>
+                          {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; const pv = pValueLabel(fs.pValue); return <td key={m} className={`py-1 px-1.5 text-center font-mono ${pv.cls}`}>{pv.text}</td>; })}
+                        </tr>
+                      </>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -929,7 +1048,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
       {/* ===== 6. Cross heatmap ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">曜日 x 月 ヒートマップ (前日比 平均)</div>
+        <div className="text-xs text-gray-500 mb-1">曜日 x 月 ヒートマップ (C→C 平均)</div>
         <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={crossHeatRef} /></div>
       </div>
 
@@ -1024,22 +1143,27 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       )}
 
       <AnalysisGuide title="カレンダー分析の読み方">
-        <p><span className="font-medium">基本定義:</span> 各営業日の対数リターン r_t = ln(Close_t / Close_&#123;t-1&#125;) を曜日・月・年・月内週番号などのカレンダー属性で分類し、季節性（アノマリー）を検出します。</p>
-        <p><span className="font-medium">曜日別統計:</span></p>
+        <p><span className="font-medium">リターン種別（タブ切替）:</span></p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">平均リターン (μ_dow):</span> 各曜日に属する全営業日の対数リターンの算術平均。</li>
+          <li><span className="font-medium">変化率タブ:</span> C→C = (Close_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日終値）、O→C = (Close_t - Open_t) / Open_t（当日始値→当日終値＝日中リターン）、C→O = (Open_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日始値＝夜間リターン）</li>
+          <li><span className="font-medium">OHLCタブ:</span> C→C に加え、O→O = (Open_t - Open_&#123;t-1&#125;) / Open_&#123;t-1&#125;、H→H = (High_t - High_&#123;t-1&#125;) / High_&#123;t-1&#125;、L→L = (Low_t - Low_&#123;t-1&#125;) / Low_&#123;t-1&#125;。OHLC各価格の前日比を比較し、寄付・高値・安値それぞれの曜日/月パターンを把握。</li>
+          <li><span className="font-medium">対数タブ:</span> ln C→C = ln(Close_t / Close_&#123;t-1&#125;)、ln O→C = ln(Close_t / Open_t)、ln C→O = ln(Open_t / Close_&#123;t-1&#125;)。対数リターンは加法性を持ち、複利計算・長期累積に適する。</li>
+        </ul>
+        <p className="mt-2"><span className="font-medium">曜日別統計:</span></p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">平均リターン (μ_dow):</span> 各曜日に属する全営業日のリターンの算術平均。</li>
           <li><span className="font-medium">中央値:</span> 外れ値に頑健な代表値。平均と中央値の乖離が大きい場合、分布の非対称性（歪度）を示唆します。</li>
           <li><span className="font-medium">標準偏差 (σ_dow):</span> 不偏分散の平方根 σ = √(Σ(r_i - μ)² / (N-1))。曜日ごとのボラティリティの違いを捉えます。</li>
           <li><span className="font-medium">勝率:</span> r_t &gt; 0 の日数 / 全日数 × 100。50%からの乖離が大きいほど方向性バイアスが強い。</li>
           <li><span className="font-medium">p値:</span> 帰無仮説「当該曜日の平均リターン = 0」に対するt検定の有意確率。t = μ × √N / σ。p &lt; 0.05 で統計的に有意なアノマリーと判定します。</li>
         </ul>
-        <p><span className="font-medium">月別統計:</span> 同様にr_tを月ごとに集計。「Sell in May」「1月効果」などのカレンダーアノマリーを定量的に検証します。</p>
+        <p className="mt-2"><span className="font-medium">月別統計:</span> 同様にr_tを月ごとに集計。「Sell in May」「1月効果」などのカレンダーアノマリーを定量的に検証します。</p>
         <p><span className="font-medium">月内週番号別リターン:</span> 各月の営業日を週番号（第1週〜第5週）に分類。月末・月初のリバランス効果（Turn of Month効果）を検出します。</p>
         <p><span className="font-medium">曜日×月 ヒートマップ:</span> 曜日と月の2次元クロス集計で平均リターンを色分け表示。特定の曜日×月の組み合わせに偏ったアノマリーを発見できます。</p>
         <p><span className="font-medium">年×月 リターンヒートマップ:</span> 年と月の2次元で月間合計リターン Σr_t を表示。特定年の異常月（暴落・急騰）の特定や、季節性の時間的安定性を確認します。</p>
         <p><span className="font-medium">前日騰落との関係:</span> 前日上昇(r_&#123;t-1&#125; &gt; 0)・下落(r_&#123;t-1&#125; ≤ 0)で条件分けし、翌日リターンの平均・勝率・p値を算出。自己相関（モメンタムまたはリバーサル）の有無を簡易的に検証します。</p>
         <p><span className="font-medium">月内日別平均リターン:</span> 月の第1営業日〜第31営業日ごとの平均リターン。Turn of Month効果（月末最終2日+月初3日がプラス傾向）の視覚的確認に使います。</p>
-        <p><span className="font-medium">累積リターン（曜日別・月別）:</span> 特定の曜日/月にのみ投資した場合の累積対数リターン Σr_t の推移。右肩上がりなら当該期間は歴史的にプラスの期待値を持つことを意味します。</p>
+        <p><span className="font-medium">累積リターン（曜日別・月別）:</span> 特定の曜日/月にのみ投資した場合の累積リターン Σr_t の推移。右肩上がりなら当該期間は歴史的にプラスの期待値を持つことを意味します。</p>
         <p><span className="font-medium">年間シーズナリティ曲線:</span> 各年について年初からの営業日番号でr_tを並べ、全年の平均累積リターン曲線を描画。年間を通じた典型的な値動きパターンを把握できます。</p>
         <p><span className="font-medium">連騰・連落分析:</span> 連続して上昇/下落した日数（ストリーク）の最長・平均・回数を集計。ランダムウォーク仮説下での理論的連続日数（幾何分布 E[streak] = 1/p）と比較することで、トレンド継続性を評価します。</p>
       </AnalysisGuide>
