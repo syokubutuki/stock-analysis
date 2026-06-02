@@ -36,7 +36,10 @@ export default function SymbolicInfoFlowChart({ prices, seriesMode }: Props) {
   const pidRef = useRef<HTMLCanvasElement>(null);
 
   const { values, times } = extractSeries(prices, seriesMode);
-  const volumes = prices.map((p) => p.volume);
+  const volumes = useMemo(() => {
+    const vols = prices.map((p) => p.volume);
+    return vols.slice(vols.length - values.length);
+  }, [prices, seriesMode]);
   const absReturns = useMemo(() => values.map((v) => Math.abs(v)), [prices, seriesMode]);
 
   // Symbolic TE between all pairs

@@ -57,10 +57,17 @@ export default function EntropyRegimeChart({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
-  const { values: closes } = extractSeries(prices, "close");
+  const { values: closes, times: closeTimes } = extractSeries(prices, "close");
   const { values, times } = extractSeries(prices, seriesMode);
 
   const regimes = useMemo(() => detectRegimes(values, times, 30), [prices, seriesMode]);
+
+  // Build a time→close lookup for price overlay (handles length mismatch across modes)
+  const closeMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (let i = 0; i < closeTimes.length; i++) m.set(closeTimes[i], closes[i]);
+    return m;
+  }, [closes, closeTimes]);
 
   // 統計
   const stats = useMemo(() => {
@@ -88,12 +95,10 @@ export default function EntropyRegimeChart({ prices, seriesMode }: Props) {
     });
     chartRef.current = chart;
 
-    // 価格
-    const peWindow = 30;
-    const priceData = closes.slice(peWindow - 1).map((c, i) => ({
-      time: times[i + peWindow - 1] as Time,
-      value: c,
-    }));
+    // 価格 (regimeのtimeに合わせて対応するclose値を取得)
+    const priceData = regimes
+      .map((r) => ({ time: r.time as Time, value: closeMap.get(r.time) }))
+      .filter((d): d is { time: Time; value: number } => d.value !== undefined);
     const priceSeries = chart.addSeries(LineSeries, {
       color: "#333",
       lineWidth: 1,
@@ -142,7 +147,7 @@ export default function EntropyRegimeChart({ prices, seriesMode }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [regimes, closes]);
+  }, [regimes, closeMap]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">

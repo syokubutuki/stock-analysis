@@ -17,7 +17,10 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
   const returnLevelCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const { values: lr } = extractSeries(prices, seriesMode);
-  const volumes = prices.map((p) => p.volume);
+  const volumes = useMemo(() => {
+    const vols = prices.map((p) => p.volume);
+    return vols.slice(vols.length - lr.length);
+  }, [prices, seriesMode]);
   const volRet = logReturns(volumes.map((v) => v || 1));
 
   const evt = useMemo(() => extremeValueAnalysis(lr, 0.9), [prices, seriesMode]);

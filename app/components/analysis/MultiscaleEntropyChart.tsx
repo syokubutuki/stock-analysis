@@ -25,13 +25,20 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
   const fisherChartRef = useRef<IChartApi | null>(null);
   const waterfallRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: closes, times } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values, times } = extractSeries(prices, seriesMode);
+  // For raw price modes (close/open), convert to log-returns for entropy analysis.
+  // For return-based modes (diff/logReturn/etc.), use extracted values directly.
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
+  const lrTimes = needsTransform ? times.slice(1) : times;
 
   const mse = useMemo(() => multiscaleEntropy(lr, 20, 2), [prices, seriesMode]);
   const fisher = useMemo(() => fisherInformation(lr, lrTimes, 60, 20), [prices, seriesMode]);
-  const volumes = prices.map((p) => p.volume);
+  // Align volumes to lrTimes length (strip leading elements to match)
+  const volumes = useMemo(() => {
+    const vols = prices.map((p) => p.volume);
+    return vols.slice(vols.length - lrTimes.length);
+  }, [prices, seriesMode]);
   const waterfall = useMemo(() => infoDecompositionWaterfall(lr, volumes), [prices, seriesMode]);
 
   // MSE曲線

@@ -43,7 +43,10 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
   const scatterRef = useRef<HTMLCanvasElement>(null);
 
   const { values: lr, times } = extractSeries(prices, seriesMode);
-  const volumes = prices.map(p => p.volume);
+  const volumes = useMemo(() => {
+    const vols = prices.map(p => p.volume);
+    return vols.slice(vols.length - lr.length);
+  }, [prices, seriesMode]);
 
   const heatmap = useMemo(() => lagScatterHeatmap(lr, 50), [prices, seriesMode]);
   const copula = useMemo(() => copulaScatter(lr), [prices, seriesMode]);

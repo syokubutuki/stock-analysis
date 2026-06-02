@@ -24,9 +24,11 @@ export default function CausalChart({ prices, seriesMode }: Props) {
   const miChartRef = useRef<IChartApi | null>(null);
   const flowCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: closes } = extractSeries(prices, seriesMode);
-  const volumes = prices.map((p) => p.volume);
-  const lr = logReturns(closes);
+  const { values: extracted } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(extracted) : extracted;
+  const allVols = prices.map((p) => p.volume);
+  const volumes = allVols.slice(allVols.length - lr.length);
   const volReturns = logReturns(volumes.map((v) => v || 1));
 
   const autoMI = useMemo(() => timeLaggedMI(lr, 30), [prices, seriesMode]);

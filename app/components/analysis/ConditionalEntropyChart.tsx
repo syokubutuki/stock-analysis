@@ -45,7 +45,10 @@ export default function ConditionalEntropyChart({ prices, seriesMode }: Props) {
   const rateCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const { values, times } = extractSeries(prices, seriesMode);
-  const volumes = prices.map((p) => p.volume);
+  const volumes = useMemo(() => {
+    const vols = prices.map((p) => p.volume);
+    return vols.slice(vols.length - values.length);
+  }, [prices, seriesMode]);
 
   const condEnt = useMemo(() => conditionalEntropy(values, volumes), [prices, seriesMode]);
   const rates = useMemo(() => entropyRate(values, 8), [prices, seriesMode]);
