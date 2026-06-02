@@ -120,7 +120,8 @@ export default function UnifiedChart({ prices, period }: Props) {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const initHeight = window.innerWidth < 768 ? 350 : 600;
+    const initMobile = window.innerWidth < 768;
+    const initHeight = initMobile ? 350 : 600;
     const chart = createChart(containerRef.current, {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
       grid: {
@@ -129,7 +130,7 @@ export default function UnifiedChart({ prices, period }: Props) {
       },
       width: containerRef.current.clientWidth,
       height: initHeight,
-      rightPriceScale: { visible: true },
+      rightPriceScale: { visible: !initMobile },
       leftPriceScale: { visible: false },
       timeScale: { timeVisible: false },
       crosshair: { mode: 0 },
@@ -163,9 +164,10 @@ export default function UnifiedChart({ prices, period }: Props) {
 
     const handleResize = () => {
       if (!containerRef.current) return;
+      const mob = window.innerWidth < 768;
       const w = containerRef.current.clientWidth;
-      const h = window.innerWidth < 768 ? 350 : 600;
-      chart.applyOptions({ width: w, height: h });
+      const h = mob ? 350 : 600;
+      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: !mob } });
     };
     window.addEventListener("resize", handleResize);
 
