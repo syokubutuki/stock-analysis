@@ -154,6 +154,141 @@ export function computeMonteCarlo(
   };
 }
 
+// ─── A2. Price Forecast Simulator ────────────────────────────────────
+
+export interface PriceForecastResult {
+  lastPrice: number;
+  lastDate: string;
+  horizon: number;
+  /** Actual price paths (subset for display) */
+  paths: number[][];
+  /** Percentile bands as actual prices at each time step */
+  percentiles: {
+    p5: number[];
+    p10: number[];
+    p25: number[];
+    p50: number[];
+    p75: number[];
+    p90: number[];
+    p95: number[];
+  };
+  /** Historical prices for context (last N days) */
+  history: { date: string; price: number }[];
+  /** Future dates */
+  futureDates: string[];
+  /** Final price distribution stats */
+  finalStats: {
+    mean: number;
+    median: number;
+    std: number;
+    p5: number;
+    p95: number;
+    probUp: number; // probability of price going up
+  };
+}
+
+/** Add business days to a date string (skip weekends) */
+function addBusinessDays(startDate: string, days: number): string[] {
+  const dates: string[] = [];
+  const d = new Date(startDate + "T00:00:00");
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      dates.push(`${y}-${m}-${day}`);
+      added++;
+    }
+  }
+  return dates;
+}
+
+export function computePriceForecast(
+  prices: PricePoint[],
+  horizon: number = 60,
+  nPaths: number = 2000,
+): PriceForecastResult {
+  const emptyResult: PriceForecastResult = {
+    lastPrice: 0, lastDate: "", horizon,
+    paths: [], percentiles: { p5: [], p10: [], p25: [], p50: [], p75: [], p90: [], p95: [] },
+    history: [], futureDates: [],
+    finalStats: { mean: 0, median: 0, std: 0, p5: 0, p95: 0, probUp: 0 },
+  };
+
+  if (prices.length < 30) return emptyResult;
+
+  const ret = logReturns(prices);
+  if (ret.length < 10) return emptyResult;
+
+  const last = prices[prices.length - 1];
+  const lastPrice = last.close;
+  const lastDate = last.time;
+
+  // Historical context (last 60 trading days)
+  const histLen = Math.min(60, prices.length);
+  const history = prices.slice(-histLen).map(p => ({ date: p.time, price: p.close }));
+
+  // Future dates (business days)
+  const futureDates = addBusinessDays(lastDate, horizon);
+
+  // Bootstrap simulation
+  const rng = mulberry32(123);
+  const allPaths: number[][] = [];
+
+  for (let p = 0; p < nPaths; p++) {
+    const path: number[] = [lastPrice];
+    let cumLogReturn = 0;
+    for (let t = 0; t < horizon; t++) {
+      const idx = Math.floor(rng() * ret.length);
+      cumLogReturn += ret[idx];
+      path.push(lastPrice * Math.exp(cumLogReturn));
+    }
+    allPaths.push(path);
+  }
+
+  // Percentile bands at each step
+  const bands = { p5: [lastPrice], p10: [lastPrice], p25: [lastPrice], p50: [lastPrice], p75: [lastPrice], p90: [lastPrice], p95: [lastPrice] };
+
+  for (let t = 1; t <= horizon; t++) {
+    const vals = allPaths.map(path => path[t]).sort((a, b) => a - b);
+    bands.p5.push(percentile(vals, 5));
+    bands.p10.push(percentile(vals, 10));
+    bands.p25.push(percentile(vals, 25));
+    bands.p50.push(percentile(vals, 50));
+    bands.p75.push(percentile(vals, 75));
+    bands.p90.push(percentile(vals, 90));
+    bands.p95.push(percentile(vals, 95));
+  }
+
+  // Final distribution
+  const finals = allPaths.map(path => path[horizon]).sort((a, b) => a - b);
+  const probUp = finals.filter(v => v > lastPrice).length / nPaths;
+
+  // Display paths (subset)
+  const displayPaths = allPaths.slice(0, Math.min(200, nPaths));
+
+  return {
+    lastPrice,
+    lastDate,
+    horizon,
+    paths: displayPaths,
+    percentiles: bands,
+    history,
+    futureDates,
+    finalStats: {
+      mean: mean(finals),
+      median: percentile(finals, 50),
+      std: stddev(finals),
+      p5: percentile(finals, 5),
+      p95: percentile(finals, 95),
+      probUp,
+    },
+  };
+}
+
 // ─── B. GARCH-based VaR (#20) ───────────────────────────────────────
 
 export interface GarchVarResult {

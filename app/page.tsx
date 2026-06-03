@@ -356,6 +356,10 @@ const MultiTimeframeChart = dynamic(
   () => import("./components/analysis/MultiTimeframeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
 );
+const PriceForecastChart = dynamic(
+  () => import("./components/analysis/PriceForecastChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
+);
 const MonteCarloChart = dynamic(
   () => import("./components/analysis/MonteCarloChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -416,6 +420,7 @@ type SectionKey =
   | "regime"
   | "causal"
   | "tailrisk"
+  | "simulation"
   | "quantum";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
@@ -435,6 +440,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
+  { key: "simulation", label: "シミュレーション", description: "株価予測・モンテカルロ・カスタム売買・バックテスト" },
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
@@ -570,7 +576,6 @@ export default function AnalysisPage() {
                   <VolumeReturnChart prices={filteredPrices} />
                   <VolumeLeadChart prices={filteredPrices} />
                   <GapAnalysisChart prices={allPrices} period={period} />
-                  <CustomReturnChart prices={allPrices} />
                   <HoldingPeriodChart prices={filteredPrices} />
                   <MultiTimeframeChart prices={filteredPrices} />
                 </>
@@ -583,7 +588,6 @@ export default function AnalysisPage() {
                   <StochasticsChart prices={allPrices} period={period} />
                   <OBVVWAPChart prices={allPrices} period={period} />
                   <VolumeWeightedTechChart prices={filteredPrices} />
-                  <SimpleBacktestChart prices={filteredPrices} />
                 </>
               )}
 
@@ -605,7 +609,6 @@ export default function AnalysisPage() {
                 <>
                   <RiskMetricsPanel prices={allPrices} period={period} />
                   <DrawdownChart prices={allPrices} period={period} />
-                  <MonteCarloChart prices={filteredPrices} />
                   <GarchVarChart prices={filteredPrices} />
                 </>
               )}
@@ -720,6 +723,15 @@ export default function AnalysisPage() {
 
               {activeSection === "calendar" && (
                 <SpiralHeatmap prices={filteredPrices} period={period} />
+              )}
+
+              {activeSection === "simulation" && (
+                <>
+                  <PriceForecastChart prices={filteredPrices} />
+                  <MonteCarloChart prices={filteredPrices} />
+                  <CustomReturnChart prices={allPrices} />
+                  <SimpleBacktestChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "quantum" && (

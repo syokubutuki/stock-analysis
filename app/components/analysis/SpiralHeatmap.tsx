@@ -136,26 +136,26 @@ type RawBucket = Record<RawFieldKey, number[]>;
 const TAB_DEFS: Record<ReturnTab, { barDefs: BarDef[]; fields: RawFieldKey[] }> = {
   rate: {
     barDefs: [
-      { color: "#3b82f6", label: "C\u2192C" },
-      { color: "#22c55e", label: "O\u2192C" },
-      { color: "#f59e0b", label: "C\u2192O" },
+      { color: "#3b82f6", label: "前C→当C" },
+      { color: "#22c55e", label: "当O→当C" },
+      { color: "#f59e0b", label: "前C→当O" },
     ],
     fields: ["close", "intraday", "overnight"],
   },
   ohlc: {
     barDefs: [
-      { color: "#3b82f6", label: "C\u2192C" },
-      { color: "#8b5cf6", label: "O\u2192O" },
-      { color: "#ef4444", label: "H\u2192H" },
-      { color: "#06b6d4", label: "L\u2192L" },
+      { color: "#3b82f6", label: "前C→当C" },
+      { color: "#8b5cf6", label: "前O→当O" },
+      { color: "#ef4444", label: "前H→当H" },
+      { color: "#06b6d4", label: "前L→当L" },
     ],
     fields: ["close", "open", "high", "low"],
   },
   log: {
     barDefs: [
-      { color: "#3b82f6", label: "ln C\u2192C" },
-      { color: "#22c55e", label: "ln O\u2192C" },
-      { color: "#f59e0b", label: "ln C\u2192O" },
+      { color: "#3b82f6", label: "ln 前C→当C" },
+      { color: "#22c55e", label: "ln 当O→当C" },
+      { color: "#f59e0b", label: "ln 前C→当O" },
     ],
     fields: ["logClose", "logIntraday", "logOvernight"],
   },
@@ -1048,7 +1048,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
       {/* ===== 6. Cross heatmap ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">曜日 x 月 ヒートマップ (C→C 平均)</div>
+        <div className="text-xs text-gray-500 mb-1">曜日 x 月 ヒートマップ (前C→当C 平均)</div>
         <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={crossHeatRef} /></div>
       </div>
 
@@ -1145,9 +1145,9 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       <AnalysisGuide title="カレンダー分析の読み方">
         <p><span className="font-medium">リターン種別（タブ切替）:</span></p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">変化率タブ:</span> C→C = (Close_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日終値）、O→C = (Close_t - Open_t) / Open_t（当日始値→当日終値＝日中リターン）、C→O = (Open_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日始値＝夜間リターン）</li>
-          <li><span className="font-medium">OHLCタブ:</span> C→C に加え、O→O = (Open_t - Open_&#123;t-1&#125;) / Open_&#123;t-1&#125;、H→H = (High_t - High_&#123;t-1&#125;) / High_&#123;t-1&#125;、L→L = (Low_t - Low_&#123;t-1&#125;) / Low_&#123;t-1&#125;。OHLC各価格の前日比を比較し、寄付・高値・安値それぞれの曜日/月パターンを把握。</li>
-          <li><span className="font-medium">対数タブ:</span> ln C→C = ln(Close_t / Close_&#123;t-1&#125;)、ln O→C = ln(Close_t / Open_t)、ln C→O = ln(Open_t / Close_&#123;t-1&#125;)。対数リターンは加法性を持ち、複利計算・長期累積に適する。</li>
+          <li><span className="font-medium">変化率タブ:</span> 前C→当C = (Close_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日終値）、当O→当C = (Close_t - Open_t) / Open_t（当日始値→当日終値＝日中リターン）、前C→当O = (Open_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日始値＝夜間リターン）</li>
+          <li><span className="font-medium">OHLCタブ:</span> 前C→当C に加え、前O→当O = (Open_t - Open_&#123;t-1&#125;) / Open_&#123;t-1&#125;、前H→当H = (High_t - High_&#123;t-1&#125;) / High_&#123;t-1&#125;、前L→当L = (Low_t - Low_&#123;t-1&#125;) / Low_&#123;t-1&#125;。OHLC各価格の前日比を比較し、寄付・高値・安値それぞれの曜日/月パターンを把握。</li>
+          <li><span className="font-medium">対数タブ:</span> ln 前C→当C = ln(Close_t / Close_&#123;t-1&#125;)、ln 当O→当C = ln(Close_t / Open_t)、ln 前C→当O = ln(Open_t / Close_&#123;t-1&#125;)。対数リターンは加法性を持ち、複利計算・長期累積に適する。</li>
         </ul>
         <p className="mt-2"><span className="font-medium">曜日別統計:</span></p>
         <ul className="list-disc pl-4 space-y-1">
