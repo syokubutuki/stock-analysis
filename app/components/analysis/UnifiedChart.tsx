@@ -113,35 +113,43 @@ export default function UnifiedChart({ prices, period }: Props) {
     });
   }, []);
 
+  const resizeChartForFullscreen = useCallback((fs: boolean) => {
+    const chart = chartRef.current;
+    if (!chart || !containerRef.current) return;
+    requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const w = containerRef.current.clientWidth;
+      const mob = window.innerWidth < 768;
+      const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
+      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: fs || !mob } });
+    });
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     const el = fullscreenRef.current;
     if (!el) return;
     if (document.fullscreenElement) {
       document.exitFullscreen();
-    } else {
+    } else if (el.requestFullscreen) {
       el.requestFullscreen();
+    } else {
+      // CSS fallback for iOS Safari
+      const next = !isFullscreen;
+      setIsFullscreen(next);
+      resizeChartForFullscreen(next);
     }
-  }, []);
+  }, [isFullscreen, resizeChartForFullscreen]);
 
-  // Listen for fullscreenchange to sync state and resize chart
+  // Listen for fullscreenchange (native API)
   useEffect(() => {
     const onFullscreenChange = () => {
       const fs = !!document.fullscreenElement;
       setIsFullscreen(fs);
-      const chart = chartRef.current;
-      if (!chart || !containerRef.current) return;
-      // Wait a frame for the browser to apply fullscreen layout
-      requestAnimationFrame(() => {
-        if (!containerRef.current) return;
-        const w = containerRef.current.clientWidth;
-        const mob = window.innerWidth < 768;
-        const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
-        chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: fs || !mob } });
-      });
+      resizeChartForFullscreen(fs);
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
+  }, [resizeChartForFullscreen]);
 
   const enabledSeries = useMemo(
     () => SERIES.filter((s) => enabled.has(s.id)),
@@ -415,7 +423,7 @@ export default function UnifiedChart({ prices, period }: Props) {
   );
 
   return (
-    <div ref={fullscreenRef} className={`bg-white rounded-lg border border-gray-200 p-4${isFullscreen ? " flex flex-col h-screen" : ""}`}>
+    <div ref={fullscreenRef} className={`bg-white rounded-lg border border-gray-200 p-4${isFullscreen ? " fixed inset-0 z-50 flex flex-col h-screen overflow-auto [&:fullscreen]:static [&:fullscreen]:inset-auto [&:fullscreen]:z-auto" : ""}`}>
       <h3 className="font-bold text-gray-800 mb-3">Series Explorer</h3>
 
       <div className={`relative${isFullscreen ? " flex-1" : ""}`}>
