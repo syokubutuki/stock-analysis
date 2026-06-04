@@ -408,6 +408,18 @@ const ArimaChart = dynamic(
   () => import("./components/analysis/ArimaChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const AsymmetricGarchChart = dynamic(
+  () => import("./components/analysis/AsymmetricGarchChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const CornishFisherChart = dynamic(
+  () => import("./components/analysis/CornishFisherChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const VolConeChart = dynamic(
+  () => import("./components/analysis/VolConeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -626,6 +638,7 @@ export default function AnalysisPage() {
                   <RiskMetricsPanel prices={allPrices} period={period} />
                   <DrawdownChart prices={allPrices} period={period} />
                   <GarchVarChart prices={filteredPrices} />
+                  <CornishFisherChart prices={filteredPrices} />
                 </>
               )}
 
@@ -658,6 +671,8 @@ export default function AnalysisPage() {
                   <GarchChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ATRChart prices={filteredPrices} />
                   <VolTermStructureChart prices={filteredPrices} />
+                  <AsymmetricGarchChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <VolConeChart prices={filteredPrices} />
                 </>
               )}
 
