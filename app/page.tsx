@@ -436,6 +436,10 @@ const BehavioralChart = dynamic(
   () => import("./components/analysis/BehavioralChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const FinanceTheoryChart = dynamic(
+  () => import("./components/analysis/FinanceTheoryChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -657,6 +661,7 @@ export default function AnalysisPage() {
                   <DrawdownChart prices={allPrices} period={period} />
                   <GarchVarChart prices={filteredPrices} />
                   <CornishFisherChart prices={filteredPrices} />
+                  <FinanceTheoryChart prices={filteredPrices} />
                 </>
               )}
 
