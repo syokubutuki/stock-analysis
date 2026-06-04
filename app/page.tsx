@@ -440,6 +440,18 @@ const FinanceTheoryChart = dynamic(
   () => import("./components/analysis/FinanceTheoryChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
 );
+const HillEstimatorChart = dynamic(
+  () => import("./components/analysis/HillEstimatorChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const StructuralBreakChart = dynamic(
+  () => import("./components/analysis/StructuralBreakChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const ExtraTechnicalChart = dynamic(
+  () => import("./components/analysis/ExtraTechnicalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -637,6 +649,7 @@ export default function AnalysisPage() {
                   <StochasticsChart prices={allPrices} period={period} />
                   <OBVVWAPChart prices={allPrices} period={period} />
                   <VolumeWeightedTechChart prices={filteredPrices} />
+                  <ExtraTechnicalChart prices={filteredPrices} />
                 </>
               )}
 
@@ -764,6 +777,7 @@ export default function AnalysisPage() {
                   <RegimeTechnicalChart prices={filteredPrices} />
                   <RegimeDistributionChart prices={filteredPrices} />
                   <RegimeTransitionChart prices={filteredPrices} />
+                  <StructuralBreakChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
@@ -775,6 +789,7 @@ export default function AnalysisPage() {
                 <>
                   <TailRiskChart prices={filteredPrices} seriesMode={seriesMode} />
                   <CopulaChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <HillEstimatorChart prices={filteredPrices} />
                 </>
               )}
 
