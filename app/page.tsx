@@ -428,6 +428,14 @@ const HestonChart = dynamic(
   () => import("./components/analysis/HestonChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
 );
+const MicrostructureChart = dynamic(
+  () => import("./components/analysis/MicrostructureChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const BehavioralChart = dynamic(
+  () => import("./components/analysis/BehavioralChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -614,6 +622,7 @@ export default function AnalysisPage() {
                   <GapAnalysisChart prices={allPrices} period={period} />
                   <HoldingPeriodChart prices={filteredPrices} />
                   <MultiTimeframeChart prices={filteredPrices} />
+                  <BehavioralChart prices={filteredPrices} />
                 </>
               )}
 
@@ -638,6 +647,7 @@ export default function AnalysisPage() {
                   <GapScatterChart prices={allPrices} period={period} />
                   <IntradayRangeChart prices={allPrices} period={period} />
                   <RangeVolatilityChart prices={allPrices} period={period} />
+                  <MicrostructureChart prices={filteredPrices} />
                 </>
               )}
 
