@@ -392,6 +392,22 @@ const DensityMatrixChart = dynamic(
   () => import("./components/analysis/DensityMatrixChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
 );
+const UnitRootChart = dynamic(
+  () => import("./components/analysis/UnitRootChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const StylizedFactsChart = dynamic(
+  () => import("./components/analysis/StylizedFactsChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const MeanReversionChart = dynamic(
+  () => import("./components/analysis/MeanReversionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ArimaChart = dynamic(
+  () => import("./components/analysis/ArimaChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -631,6 +647,8 @@ export default function AnalysisPage() {
                   <DistributionSurfaceChart prices={filteredPrices} seriesMode={seriesMode} />
                   <PredictionAccuracyChart prices={filteredPrices} />
                   <InfoRatioDashboard prices={filteredPrices} />
+                  <UnitRootChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <StylizedFactsChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
@@ -731,6 +749,8 @@ export default function AnalysisPage() {
                   <MonteCarloChart prices={filteredPrices} />
                   <CustomReturnChart prices={allPrices} />
                   <SimpleBacktestChart prices={filteredPrices} />
+                  <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ArimaChart prices={filteredPrices} />
                 </>
               )}
 
