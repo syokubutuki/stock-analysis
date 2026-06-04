@@ -420,6 +420,14 @@ const VolConeChart = dynamic(
   () => import("./components/analysis/VolConeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const JumpDiffusionChart = dynamic(
+  () => import("./components/analysis/JumpDiffusionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const HestonChart = dynamic(
+  () => import("./components/analysis/HestonChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -673,6 +681,7 @@ export default function AnalysisPage() {
                   <VolTermStructureChart prices={filteredPrices} />
                   <AsymmetricGarchChart prices={filteredPrices} seriesMode={seriesMode} />
                   <VolConeChart prices={filteredPrices} />
+                  <HestonChart prices={filteredPrices} />
                 </>
               )}
 
@@ -766,6 +775,7 @@ export default function AnalysisPage() {
                   <SimpleBacktestChart prices={filteredPrices} />
                   <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ArimaChart prices={filteredPrices} />
+                  <JumpDiffusionChart prices={filteredPrices} />
                 </>
               )}
 
