@@ -356,6 +356,18 @@ export default function UnifiedChart({ prices, period }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prices, enabledSeries]);
 
+  // Update visible range when period changes
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !period || seriesMapRef.current.size === 0) return;
+    try {
+      setInitialVisibleRange(chart, prices, period);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
+
   const groupedSeries = useMemo(() => {
     const map = new Map<string, SeriesDef[]>();
     for (const s of SERIES) {

@@ -55,7 +55,7 @@ export default function BehavioralChart({ prices }: Props) {
       if (anchorRef.current) chart.applyOptions({ width: anchorRef.current.clientWidth });
     });
     ro.observe(anchorRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); anchorApiRef.current = null; };
   }, [result]);
 
   const mom = result.momentum;
