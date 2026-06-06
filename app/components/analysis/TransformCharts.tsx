@@ -36,6 +36,7 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
   const [mode, setMode] = useState<TransformMode>("logReturn");
 
   const { values: closes, times } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
 
   useEffect(() => {
     if (!containerRef.current || closes.length < 2) return;
@@ -56,15 +57,15 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
     let dataTimesArr: string[] = [];
 
     if (mode === "logReturn") {
-      data = logReturns(closes);
-      dataTimesArr = times.slice(1);
+      data = needsTransform ? logReturns(closes) : closes;
+      dataTimesArr = needsTransform ? times.slice(1) : times;
     } else if (mode === "rank") {
-      const lr = logReturns(closes);
+      const lr = needsTransform ? logReturns(closes) : closes;
       data = rankTransform(lr);
-      dataTimesArr = times.slice(1);
+      dataTimesArr = needsTransform ? times.slice(1) : times;
     } else {
-      data = volNormalizedReturns(closes, 20);
-      dataTimesArr = times.slice(1);
+      data = needsTransform ? volNormalizedReturns(closes, 20) : closes;
+      dataTimesArr = needsTransform ? times.slice(1) : times;
     }
 
     if (mode === "logReturn" || mode === "volNorm") {
@@ -107,7 +108,7 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
   }, [prices, mode, seriesMode]);
 
   // 統計情報
-  const lr = logReturns(closes);
+  const lr = needsTransform ? logReturns(closes) : closes;
   const mean = lr.length > 0 ? lr.reduce((a, b) => a + b, 0) / lr.length : 0;
   const std = lr.length > 0
     ? Math.sqrt(lr.reduce((a, v) => a + (v - mean) ** 2, 0) / lr.length)
@@ -165,16 +166,51 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="スケール変換の読み方">
-        <p><span className="font-medium">対数リターン (Log Return):</span> {"ln(P_t / P_{t-1})"} で計算される対数差分です。通常の変化率と異なり、加法的に積み上がる性質があります(例: 2日間のリターン = 1日目 + 2日目)。金融工学の標準的な尺度であり、正規分布の仮定との相性が良いとされます。</p>
-        <p><span className="font-medium">順位変換 (Rank Transform):</span> 各日のリターンを全期間中での相対的な順位(0〜1)に変換します。外れ値の影響を完全に排除でき、分布の形状に依存しないノンパラメトリックな分析が可能です。0.5付近が中央値で、1に近いほど高リターンの日です。</p>
-        <p><span className="font-medium">ボラティリティ正規化リターン:</span> 各日のリターンを直近20日間の標準偏差で割ったものです。「ボラティリティが高い時期の1%」と「低い時期の1%」を同じ尺度で比較できます。±2を超える値は統計的に異常な動き(約5%の確率)を意味します。</p>
-        <p><span className="font-medium">統計指標の見方:</span></p>
+      <AnalysisGuide title="スケール変換分析の詳細理論">
+        <p className="font-medium text-gray-700">1. スケール変換とは</p>
+        <p>株価の生データを分析に適した形に変換する前処理です。変換方法によって異なる側面が可視化され、各変換の統計量を比較することで、データの構造的な特徴を把握できます。</p>
+        <p className="mt-1">地図に例えると、対数リターンは「標高差の地図」、順位変換は「標高の順位地図」、ボラ正規化は「その地域の平均的な起伏で割った相対地図」です。同じ地形でも異なる地図を使うと異なる情報が得られます。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"対数リターン: r_t = ln(P_t / P_{t-1})\n  性質: r_{t→t+n} = Σ r_i（加法的）\n\n順位変換: R_t = rank(r_t) / (N+1)\n  R_t ∈ (0, 1)、一様分布に従う\n\nボラティリティ正規化: z_t = r_t / σ_{t,20}\n  σ_{t,20} = std(r_{t-19}, ..., r_t)  (20日ローリング標準偏差)"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>r_t</strong>: 対数リターン。連続複利ベースの収益率</li>
+          <li><strong>R_t</strong>: 順位変換値。外れ値の影響を完全に排除した相対位置</li>
+          <li><strong>z_t</strong>: 正規化リターン。局所的なボラティリティで標準化したもの</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">平均リターン:</span> 期間中の1日あたり平均収益率。年率換算は × 252(営業日数)。</li>
-          <li><span className="font-medium">標準偏差:</span> リスクの大きさ。年率換算は × √252。日次で1%を超えるとボラティリティが高い銘柄。</li>
-          <li><span className="font-medium">歪度(Skewness):</span> 分布の非対称性。負の歪度は大きな下落が起きやすい(ファットテール)。正の歪度は大きな上昇が起きやすい。絶対値が0.5を超えると有意な偏り。</li>
-          <li><span className="font-medium">尖度(Kurtosis, 超過):</span> 分布の裾の厚さ。正規分布なら0。正の値が大きいほど極端な値動きが多い。株式リターンは典型的に正の超過尖度を示し、3〜10程度が一般的です。尖度が高い時期は、リスク管理を厳格にすべきです。</li>
+          <li><strong>対数リターン</strong>: {"ln(P_t/P_{t-1})"}で計算。算術リターン（ΔP/P）と異なり、加法的に積み上がる。金融工学の標準的な尺度</li>
+          <li><strong>順位変換</strong>: データを順位に変換し0〜1に正規化。ノンパラメトリック分析の基盤。外れ値に完全にロバスト</li>
+          <li><strong>ボラティリティ正規化</strong>: 局所的なボラティリティで割ることで、異なるボラティリティ環境下のリターンを同一尺度で比較可能にする</li>
+          <li><strong>超過尖度</strong>: 尖度から3を引いた値。正規分布なら0。正ならファットテール（極端な値動きが多い）</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>対数リターンの平均</strong>: 日次平均 × 252 ≈ 年率リターン。正なら期間中に上昇トレンド</li>
+          <li><strong>標準偏差 × √252 {">"} 30%</strong>: 高ボラティリティ銘柄。リスク管理を厳格にすべき</li>
+          <li><strong>歪度の絶対値 {">"} 0.5</strong>: 有意な非対称性。負ならダウンサイドリスクが大きい</li>
+          <li><strong>超過尖度 {">"} 3</strong>: 強いファットテール。正規分布ベースのリスク計算は不適切</li>
+          <li><strong>ボラ正規化で |z_t| {">"} 2</strong>: その時点でのボラ環境を考慮しても異常な動き（約5%の確率）</li>
+          <li><strong>ボラ正規化で |z_t| {">"} 3</strong>: 極めて稀な動き（約0.3%の確率）。イベント駆動の可能性</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>異常検知</strong>: ボラ正規化リターンが±3を超えた日は、通常では説明できない動き。ニュースの確認や一時的なポジション調整を検討</li>
+          <li><strong>リスク指標の補正</strong>: 超過尖度が大きい銘柄では、正規分布ベースのVaRにCornish-Fisher補正を適用して過小評価を防ぐ</li>
+          <li><strong>相関分析の前処理</strong>: 順位変換を使えば、外れ値に頑健なSpearman相関やKendall相関の基盤が得られる</li>
+          <li><strong>ボラ環境の比較</strong>: ボラ正規化により、異なる時期のリターンを公平に比較でき、銘柄間の比較にも使える</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>対数リターンと算術リターンの差</strong>: 大きな変動（±10%超）では両者の乖離が無視できない。レバレッジ計算では算術リターンが適切な場合がある</li>
+          <li><strong>順位変換の情報損失</strong>: 値の大きさの情報が失われるため、「どれだけ大きく動いたか」は把握できない</li>
+          <li><strong>ボラ正規化の遅延</strong>: 20日ローリング標準偏差は過去のボラティリティに基づくため、ボラティリティの急変時には正規化が不完全</li>
+          <li><strong>定常性の前提</strong>: 各変換は暗黙的に定常性（統計的性質が時間で変わらない）を仮定するが、実際の株価は非定常であることが多い</li>
         </ul>
       </AnalysisGuide>
     </div>

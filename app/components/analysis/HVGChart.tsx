@@ -23,9 +23,10 @@ export default function HVGChart({ prices, seriesMode }: Props) {
   const degreeChartRef = useRef<IChartApi | null>(null);
   const distCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: closes, times } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values, times } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
+  const lrTimes = needsTransform ? times.slice(1) : times;
 
   const hvg = useMemo(() => computeHVG(lr, 50), [prices, seriesMode]);
 
@@ -166,9 +167,48 @@ export default function HVGChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="HVGの読み方">
-        <p><span className="font-medium">HVG (Horizontal Visibility Graph):</span> NVG(Natural Visibility Graph, 既存)の簡略版。2点i,jの間の全ての値がmin(v_i, v_j)未満なら接続します。ランダム系列の理論的な指数減衰率 λ=ln(3/2)≈0.405 が既知なので、実測値との比較で非線形構造の強さを定量できます。</p>
-        <p><span className="font-medium">λの解釈:</span> λが理論値より大きい場合、次数分布がより急速に減衰→短距離接続が支配的→相関の減衰が速い。λが小さい場合、長距離接続が多い→持続的な構造がある。</p>
+      <AnalysisGuide title="HVG（水平可視グラフ）の詳細理論">
+        <p className="font-medium text-gray-700">1. HVGとは</p>
+        <p>HVG（Horizontal Visibility Graph）は、時系列データをネットワーク（グラフ）に変換する手法です。NVG（Natural Visibility Graph）の簡略版で、計算が高速かつ理論的な基準値が既知であるという利点があります。</p>
+        <p className="mt-1">日常的な例えでいうと、一列に並んだ高さの異なるビルを想像してください。あるビル同士が「水平に見通せる」（間にあるビルが両方より低い）場合に線で結びます。こうしてできた「見通しネットワーク」が HVG です。ランダムな高さのビル群と、規則的に並んだビル群ではネットワークの形が大きく異なります。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"2点 i, j (i < j) が接続される条件:\n∀k (i < k < j): x_k < min(x_i, x_j)\n\n次数分布の指数減衰フィット:\nP(k) ∝ exp(-λk)\n\nランダム系列の理論値: λ_random = ln(3/2) ≈ 0.405"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>x_i, x_j</strong>: 時刻 i, j のデータ値（対数リターン）</li>
+          <li><strong>k</strong>: ノードの次数（接続されている辺の数）</li>
+          <li><strong>λ</strong>: 次数分布の指数減衰率。小さいほど長距離接続が多い</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>次数（degree）</strong>: あるノードに接続されているエッジの数。次数が高いノードは多くの過去・未来のデータ点と「見通せる」状態にある</li>
+          <li><strong>次数分布</strong>: ネットワーク全体での次数の出現頻度。ランダム系列では指数分布、長期記憶のある系列ではべき乗則に近づく</li>
+          <li><strong>指数減衰率 λ</strong>: 次数分布がどれだけ急速に減衰するかを表すパラメータ。ランダムウォークの理論値 ln(3/2)≈0.405 との比較が鍵</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>λ ≈ 0.405（理論値付近）</strong>: 系列はランダムウォークに近い。価格変動に特別な構造がない</li>
+          <li><strong>λ {">"} 0.405</strong>: 次数分布がより急速に減衰。短距離接続が支配的で、相関の減衰が速い（反平均回帰的）</li>
+          <li><strong>λ {"<"} 0.405</strong>: 長距離接続が多い。持続的な構造（トレンドや周期性）が存在する</li>
+          <li><strong>次数時系列のスパイク</strong>: その時点のデータが多くの他の時点から「見通せる」＝局所的な極値（高値・安値）である可能性</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>トレンド持続性の判定</strong>: λが理論値より明確に小さい場合、価格にトレンド持続性があり、モメンタム戦略が有効な可能性</li>
+          <li><strong>レジーム変化の検出</strong>: ローリングでλを計算し、理論値を跨ぐ変化はランダム↔トレンドのレジーム転換を示唆</li>
+          <li><strong>DFA Hurst指数との併用</strong>: HVGのλとDFAのHurst指数が共にトレンド持続性を示す場合、信頼度が高まる</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>データ長依存</strong>: 短い系列（100点未満）ではλの推定が不安定。少なくとも500点以上が望ましい</li>
+          <li><strong>NVGとの違い</strong>: HVGはNVGより接続条件が緩く、情報量はやや少ない。両者を比較することでより堅牢な結論が得られる</li>
+          <li><strong>非定常性への感度</strong>: トレンドの存在自体がλを変化させるため、リターン系列（定常化済み）に適用するのが基本</li>
+          <li><strong>理論値の前提</strong>: λ=ln(3/2)はiid（独立同分布）の理論値であり、実際の金融データは厳密にはiidでない点に注意</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

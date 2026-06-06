@@ -225,10 +225,53 @@ export default function TDAChart({ prices, seriesMode }: Props) {
       <div className="text-xs text-gray-500 mb-1">Fisher-Rao距離 — リターン分布の変化速度 (スパイク=レジーム変化)</div>
       <div ref={frRef} className="w-full rounded border border-gray-100" />
 
-      <AnalysisGuide title="TDA・Fisher-Raoの読み方">
-        <p><span className="font-medium">パーシステントホモロジー:</span> Takens埋め込みから点群のトポロジー(接続成分H₀、ループH₁)を抽出。Persistence Diagramで対角線から遠い点が「消えにくい=頑健な構造」。対角線上の点はノイズです。</p>
-        <p><span className="font-medium">Betti曲線:</span> 閾値εを増やしたときの位相的特徴の数。β₀の急減はクラスターの統合、β₁のピークはループ(周期的構造)の出現を示します。</p>
-        <p><span className="font-medium">Fisher-Rao距離:</span> 連続する窓のリターン分布間のHellinger距離から計算。分布の形状変化を検出し、スパイクはレジーム転換(ボラティリティシフト、トレンド反転等)を示唆します。</p>
+      <AnalysisGuide title="TDA・Fisher-Rao分析の詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>位相的データ解析（TDA）は、データの「形」を数学的に分析する手法です。株価の時系列を高次元空間に埋め込み、そこに現れる「穴」や「ループ」の構造を検出します。Fisher-Rao距離はリターン分布の形状変化を測定し、レジーム転換を検出します。</p>
+        <p className="mt-1">地図の等高線に例えると、水位を上げていったときに「島が合体する」（H₀：接続成分の消滅）や「湖ができる」（H₁：ループの出現）タイミングを記録するのがパーシステントホモロジーです。長く残る島や湖は「本物の地形」、すぐ消えるものは「ノイズ」です。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"パーシステントホモロジー:\n  Vietoris-Rips複体: σ ∈ VR(ε) ⟺ d(x_i,x_j) ≤ ε, ∀ x_i,x_j ∈ σ\n  各特徴の寿命: persistence = death - birth\n\nBetti数: β_k = rank(H_k) (k次ホモロジー群のランク)\n  β₀: 連結成分の数, β₁: 独立なループの数\n\nFisher-Rao距離 (Hellinger近似):\n  d_H(p,q) = √(1 - Σ √(p_i · q_i))"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>ε</strong>: 閾値パラメータ。点間の距離がε以下なら接続される</li>
+          <li><strong>birth / death</strong>: 位相的特徴が「生まれる」εと「消える」εの値</li>
+          <li><strong>persistence</strong>: 特徴の寿命（death - birth）。大きいほど頑健な構造</li>
+          <li><strong>d_H</strong>: Hellinger距離。2つの確率分布の類似度を測る</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>パーシステントホモロジー</strong>: 閾値εを連続的に変化させたときに現れる位相的特徴（穴やループ）の「出現と消滅」を追跡する手法</li>
+          <li><strong>Persistence Diagram</strong>: 各位相的特徴を(birth, death)の座標にプロットした図。対角線から遠いほど頑健な構造</li>
+          <li><strong>H₀（0次ホモロジー）</strong>: 接続成分の数。「独立した島の数」に相当</li>
+          <li><strong>H₁（1次ホモロジー）</strong>: 独立なループの数。周期的構造やサイクルの存在を示す</li>
+          <li><strong>Betti曲線</strong>: εの関数としてBetti数をプロットした曲線。位相的特徴の変化を1次元で可視化</li>
+          <li><strong>Fisher-Rao距離</strong>: 情報幾何学に基づく確率分布間の距離。分布の「形の違い」を測定する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>Persistence Diagramの対角線から遠い点</strong>: 消えにくい頑健な構造。株価の力学系に本質的なトポロジー</li>
+          <li><strong>対角線近傍の点</strong>: ノイズ。短命な位相的特徴で、分析上は無視してよい</li>
+          <li><strong>β₀の急減</strong>: 複数のクラスター（独立した状態群）が1つに統合される閾値。アトラクタのスケールを示す</li>
+          <li><strong>β₁のピーク</strong>: ループ（周期的構造）が最も多く存在する閾値。市場に周期的パターンがある証拠</li>
+          <li><strong>Fisher-Rao距離のスパイク</strong>: リターン分布の形状が急変した時点。レジーム転換（ボラティリティシフト、トレンド反転）を示唆</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>構造変化の早期検出</strong>: Fisher-Rao距離のスパイクは、移動平均クロスなど遅行指標より早くレジーム変化を検出できる場合がある</li>
+          <li><strong>周期構造の確認</strong>: β₁が有意に高い場合、周期戦略（サイクル投資）が有効な可能性。Betti曲線のピーク位置から周期のスケールを読み取れる</li>
+          <li><strong>異常検知</strong>: Persistence Diagramに通常と異なるパターン（異常に長命な特徴）が現れた場合、市場構造の変化を警戒</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>埋め込みパラメータ依存</strong>: Takens埋め込みの次元と遅延時間の選択で結果が変わる。最適パラメータの事前選定が重要</li>
+          <li><strong>計算コスト</strong>: パーシステントホモロジーの計算量はデータ点数に対して超線形に増加。大規模データでは近似が必要</li>
+          <li><strong>解釈の難しさ</strong>: 位相的特徴と経済的意味の対応は直感的でない場合がある。他の分析と併用して判断すべき</li>
+          <li><strong>Fisher-Rao距離の窓長</strong>: 比較する分布の推定窓長によって感度が変わる。短すぎると推定が不安定、長すぎると変化の検出が遅れる</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

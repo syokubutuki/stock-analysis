@@ -100,10 +100,52 @@ export default function FractalExtChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="フラクタル拡張の読み方">
-        <p><span className="font-medium">R/S解析:</span> Hurstの古典的Rescaled Range法。DFA(既に実装済み)とは異なるアルゴリズムでHurst指数を推定します。H{`<`}0.5=反平均回帰, H=0.5=ランダムウォーク, H{`>`}0.5=トレンド持続性。DFAとR/Sの値が一致するとHurst推定の信頼性が高まります。</p>
-        <p><span className="font-medium">DCCA (Detrended Cross-Correlation):</span> DFAの2変数版。価格リターンと出来高リターンのスケール依存的な相関を測定します。ρ_DCCA(s)が特定スケールで高い場合、そのスケールでの連動性が強いことを示します。Cross-Hurst指数はクロスコリレーションのスケーリング指数です。</p>
-        <p><span className="font-medium">相関次元 (Grassberger-Procaccia):</span> 位相空間再構成後のアトラクタの次元。低い値({`<`}3)なら低次元の決定論的構造がある可能性。高い値はノイズ支配的で、予測困難を示唆します。Lyapunov指数(既存)が「カオスの強さ」なら、相関次元は「アトラクタの複雑さ」を測定します。</p>
+      <AnalysisGuide title="フラクタル拡張分析の詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>DFA（既存）に加え、R/S解析・DCCA・相関次元の3手法でフラクタル構造を多角的に評価します。異なるアルゴリズムで同じ性質（長期記憶・トレンド持続性）を測定し、結果の一致度で信頼性を判断します。</p>
+        <p className="mt-1">海岸線の長さに例えると、定規の長さ（スケール）を変えると測定値が変わるのがフラクタルです。株価も見る時間スケールによって振る舞いが変わり、そのスケーリング則がHurst指数として定量化されます。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"R/S解析: (R/S)_n ∝ n^H\n  R_n = max(累積偏差) - min(累積偏差), S_n = 標準偏差\n\nDCCA相関係数: ρ_DCCA(s) = F²_XY(s) / [F_XX(s) · F_YY(s)]\n  F²_XY(s) = DFA共分散関数\n\n相関次元: C(r) ∝ r^D₂ (r→0)\n  C(r) = (2/N(N-1)) Σ Θ(r - ||x_i - x_j||)"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>H（Hurst指数）</strong>: log-logプロットの傾きから推定。0〜1の値をとる</li>
+          <li><strong>ρ_DCCA(s)</strong>: スケールsでの価格-出来高のフラクタル相関。-1〜1の範囲</li>
+          <li><strong>D₂（相関次元）</strong>: アトラクタの複雑さ。Θはヘヴィサイドの階段関数</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>R/S解析（Rescaled Range）</strong>: Hurstが1950年代にナイル川の水位予測のために開発した古典的手法。累積偏差のレンジを標準偏差で正規化する</li>
+          <li><strong>DCCA（Detrended Cross-Correlation Analysis）</strong>: DFAの2変数版。異なる時系列間のスケール依存的な相関を測定する</li>
+          <li><strong>Cross-Hurst指数</strong>: DCCAのスケーリング指数。2系列間の長期記憶の相互作用を表す</li>
+          <li><strong>相関次元（Grassberger-Procaccia法）</strong>: 位相空間に再構成したアトラクタの「実効的な次元」。決定論的構造の複雑さを測る</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>H {"<"} 0.5</strong>: 反持続性（平均回帰）。上がった後に下がりやすい。平均回帰戦略向き</li>
+          <li><strong>H ≈ 0.5</strong>: ランダムウォーク。過去の動きが将来を予測しない</li>
+          <li><strong>H {">"} 0.5</strong>: 持続性（トレンド継続）。上がった後にさらに上がりやすい。モメンタム戦略向き</li>
+          <li><strong>R/SとDFAのH値が近い</strong>: Hurst推定の信頼性が高い</li>
+          <li><strong>ρ_DCCA(s)が特定スケールで高い</strong>: そのスケール（日数）で価格と出来高の連動が特に強い</li>
+          <li><strong>相関次元 {"<"} 3</strong>: 低次元の決定論的構造がある可能性。予測モデルが有効かもしれない</li>
+          <li><strong>相関次元 {">"} 5</strong>: ノイズ支配的。統計的予測が困難</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>戦略選択</strong>: H {">"} 0.5ならトレンドフォロー、H {"<"} 0.5なら逆張り・平均回帰戦略が理論的に整合する</li>
+          <li><strong>スケール別連動性</strong>: ρ_DCCAが高いスケールに合わせた保有期間設定。例えば20日スケールで高ければスイングトレード向き</li>
+          <li><strong>予測可能性の評価</strong>: 相関次元が低い銘柄は、非線形モデル（ニューラルネットなど）による予測が有効な候補</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>有限データバイアス</strong>: R/S解析は短期依存（ARMA成分）の影響でHを過大推定する傾向がある。DFAとの比較が重要</li>
+          <li><strong>非定常性</strong>: トレンドや構造変化があるとH推定が歪む。リターン系列への適用が基本</li>
+          <li><strong>相関次元の収束</strong>: 埋め込み次元を上げてもD₂が収束しない場合、決定論的構造がないか、データが不足している</li>
+          <li><strong>時変性</strong>: Hurst指数は時間とともに変化する。ローリング推定で現在の状態を確認すべき</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

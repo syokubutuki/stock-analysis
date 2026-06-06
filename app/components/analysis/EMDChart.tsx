@@ -28,9 +28,10 @@ export default function EMDChart({ prices, seriesMode }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const residueChartRef = useRef<IChartApi | null>(null);
 
-  const { values: closes, times } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values, times } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
+  const lrTimes = needsTransform ? times.slice(1) : times;
 
   const emdResult = useMemo(() => computeEMD(lr, 5), [prices, seriesMode]);
 

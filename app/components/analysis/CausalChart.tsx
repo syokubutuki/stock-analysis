@@ -199,10 +199,52 @@ export default function CausalChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="因果・情報伝達の読み方">
-        <p><span className="font-medium">相互情報量 (MI):</span> 2変数間の非線形依存性の測定。ピアソン相関が線形関係のみを捉えるのに対し、MIはあらゆる依存関係を捕捉します。自己MIのラグプロット(非線形ACF)で最初の極小値が非線形力学の最適埋め込み遅延τです。</p>
-        <p><span className="font-medium">Transfer Entropy:</span> X→Yの方向性のある情報の流れを測定。Granger因果性の非線形一般化です。出来高→価格のTEが大きければ「出来高が価格変動を予測する情報を持っている」ことを意味します。サロゲートテスト(シャッフル検定)でp値を算出しています。</p>
-        <p><span className="font-medium">Granger因果性:</span> 線形VAR(p)モデルに基づく古典的因果検定。BICでラグ次数を選択し、F検定で有意性を判定します。Transfer Entropyと方向が一致するかで線形/非線形の情報伝達を区別できます。</p>
+      <AnalysisGuide title="因果・情報伝達分析の詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>株価と出来高の間に「情報の流れ」があるかを検証する分析です。単なる相関ではなく、「出来高の変化が将来の価格を予測できるか」「その逆はどうか」という因果的な方向性を調べます。</p>
+        <p className="mt-1">電話の通話記録に例えると、相関は「AさんとBさんがよく電話する」という事実、Transfer Entropyは「Aさんが先に電話をかけた後にBさんが行動を変える」という方向性のある影響を捉えます。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"相互情報量: MI(X;Y) = Σ p(x,y) log[p(x,y) / (p(x)p(y))]\n\nTransfer Entropy: TE(X→Y) = Σ p(y_{t+1}, y_t, x_t) log[p(y_{t+1}|y_t,x_t) / p(y_{t+1}|y_t)]\n\nGranger因果性: F = [(RSS_restricted - RSS_full)/p] / [RSS_full/(T-2p-1)]"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>MI(X;Y)</strong>: XとYの相互情報量。0なら独立、大きいほど依存性が強い</li>
+          <li><strong>TE(X→Y)</strong>: XからYへの情報移転量。Xの過去がYの予測にどれだけ寄与するか</li>
+          <li><strong>RSS</strong>: 残差平方和。制約付きモデル（Xなし）と完全モデル（Xあり）の予測精度の差をF検定する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>相互情報量（MI）</strong>: 2変数間の非線形依存性の総合指標。ピアソン相関が線形関係のみ捉えるのに対し、あらゆる依存関係を捕捉する</li>
+          <li><strong>自己MI</strong>: 自分自身のラグとのMI。非線形版のACF。最初の極小値が最適埋め込み遅延τ</li>
+          <li><strong>Transfer Entropy（TE）</strong>: 方向性のある情報の流れを測定する指標。Granger因果性の非線形一般化</li>
+          <li><strong>サロゲートテスト</strong>: 時系列をシャッフルしてTEを再計算し、元のTEが偶然では説明できないか検定する方法</li>
+          <li><strong>Granger因果性</strong>: 線形VARモデルに基づく古典的因果検定。BICでラグ次数を選択しF検定で有意性を判定する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>MI {">"} 0.1</strong>: 価格と出来高に意味のある依存関係がある</li>
+          <li><strong>TE(出来高→価格) {">"} TE(価格→出来高)</strong>: 出来高が価格に先行して情報を持つ。出来高分析が有効な銘柄</li>
+          <li><strong>TE(価格→出来高) {">"} TE(出来高→価格)</strong>: 価格変動が出来高を誘発する。ニュース駆動型の銘柄に多い</li>
+          <li><strong>Granger p値 {"<"} 0.05</strong>: 線形的な因果関係が統計的に有意</li>
+          <li><strong>TEとGrangerの方向が一致</strong>: 線形・非線形ともに同じ因果方向を支持。信頼度が高い</li>
+          <li><strong>TEは有意だがGrangerは非有意</strong>: 非線形的な因果関係が存在。線形モデルでは捉えきれない情報の流れがある</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>出来高先行シグナル</strong>: TE(出来高→価格)が有意な銘柄では、出来高の急増を価格変動の先行指標として活用できる</li>
+          <li><strong>テクニカル指標の選択</strong>: 出来高→価格の因果が強い銘柄ではOBV・VWAPなど出来高ベースの指標が有効</li>
+          <li><strong>情報の非対称性</strong>: 双方向のTEが共に大きい銘柄は、価格と出来高のフィードバックループが強く、ボラティリティが拡大しやすい</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>サンプルサイズ</strong>: MIとTEの推定にはビニング（離散化）が必要で、データが少ないと推定が不安定になる。最低200点以上推奨</li>
+          <li><strong>ビン数の影響</strong>: 離散化のビン数によって結果が変わりうる。本実装では平方根則を採用</li>
+          <li><strong>因果 ≠ メカニズム</strong>: 統計的因果は「予測に有用」を意味するだけで、経済的なメカニズムの証明ではない</li>
+          <li><strong>Grangerの線形仮定</strong>: Granger因果性は線形VARモデルが前提。非線形な依存関係を見落とす可能性があるため、TEとの併用が重要</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

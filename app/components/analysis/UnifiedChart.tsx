@@ -121,7 +121,7 @@ export default function UnifiedChart({ prices, period }: Props) {
       const w = containerRef.current.clientWidth;
       const mob = window.innerWidth < 768;
       const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
-      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: fs || !mob } });
+      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: !mob } });
     });
   }, []);
 
@@ -208,7 +208,7 @@ export default function UnifiedChart({ prices, period }: Props) {
       const mob = window.innerWidth < 768;
       const w = containerRef.current.clientWidth;
       const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
-      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: fs || !mob } });
+      chart.applyOptions({ width: w, height: h, rightPriceScale: { visible: !mob } });
     };
     window.addEventListener("resize", handleResize);
 

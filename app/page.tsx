@@ -452,6 +452,42 @@ const ExtraTechnicalChart = dynamic(
   () => import("./components/analysis/ExtraTechnicalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const VarianceRatioChart = dynamic(
+  () => import("./components/analysis/VarianceRatioChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const LombScargleChart = dynamic(
+  () => import("./components/analysis/LombScargleChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const VolSmileChart = dynamic(
+  () => import("./components/analysis/VolSmileChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const OptimalStoppingChart = dynamic(
+  () => import("./components/analysis/OptimalStoppingChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const VarianceGammaChart = dynamic(
+  () => import("./components/analysis/VarianceGammaChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const FBMChart = dynamic(
+  () => import("./components/analysis/FBMChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SSAChart = dynamic(
+  () => import("./components/analysis/SSAChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const BOCPDChart = dynamic(
+  () => import("./components/analysis/BOCPDChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const CCMChart = dynamic(
+  () => import("./components/analysis/CCMChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -487,20 +523,20 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "basic", label: "基本分析", description: "ローソク足・一目均衡表・支持/抵抗線・フィボナッチ・ベンチマーク比較" },
   { key: "technical", label: "テクニカル", description: "RSI・MACD・BB・ADX・ストキャスティクス・OBV/VWAP" },
   { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
-  { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率" },
+  { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率・ボラティリティスマイル" },
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化" },
-  { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF" },
+  { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF・分散比検定" },
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
-  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT" },
+  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT・SSA・Lomb-Scargle" },
   { key: "nonlinear", label: "非線形動力学", description: "アトラクタ・RQA・Lyapunov・位相空間予測・KM係数・TDA・投資シグナル" },
   { key: "entropy", label: "情報理論", description: "エントロピー拡張・複雑度・情報フロー・レジーム検出・予測可能性" },
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
-  { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出" },
-  { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量" },
+  { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
+  { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
-  { key: "simulation", label: "シミュレーション", description: "株価予測・モンテカルロ・カスタム売買・バックテスト" },
+  { key: "simulation", label: "シミュレーション", description: "株価予測・モンテカルロ・カスタム売買・バックテスト・分数BM・VG過程・最適停止" },
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
@@ -608,10 +644,11 @@ export default function AnalysisPage() {
 
             {/* セクションタブ */}
             <div className="flex gap-1 flex-wrap border-b border-gray-200 pb-2">
-              {SECTIONS.map(({ key, label }) => (
+              {SECTIONS.map(({ key, label, description }) => (
                 <button
                   key={key}
                   onClick={() => setActiveSection(key)}
+                  title={description}
                   className={`px-3 py-1.5 text-sm rounded-t font-medium transition-colors ${
                     activeSection === key
                       ? "bg-blue-600 text-white"
@@ -621,6 +658,9 @@ export default function AnalysisPage() {
                   {label}
                 </button>
               ))}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {SECTIONS.find(s => s.key === activeSection)?.description}
             </div>
 
             {/* セクション内容 */}
@@ -675,6 +715,7 @@ export default function AnalysisPage() {
                   <GarchVarChart prices={filteredPrices} />
                   <CornishFisherChart prices={filteredPrices} />
                   <FinanceTheoryChart prices={filteredPrices} />
+                  <VolSmileChart prices={filteredPrices} />
                 </>
               )}
 
@@ -698,6 +739,7 @@ export default function AnalysisPage() {
                   <InfoRatioDashboard prices={filteredPrices} />
                   <UnitRootChart prices={filteredPrices} seriesMode={seriesMode} />
                   <StylizedFactsChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <VarianceRatioChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
@@ -720,6 +762,8 @@ export default function AnalysisPage() {
                   <EMDChart prices={filteredPrices} seriesMode={seriesMode} />
                   <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} />
                   <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <LombScargleChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <SSAChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
@@ -778,11 +822,15 @@ export default function AnalysisPage() {
                   <RegimeDistributionChart prices={filteredPrices} />
                   <RegimeTransitionChart prices={filteredPrices} />
                   <StructuralBreakChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <BOCPDChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "causal" && (
-                <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
+                <>
+                  <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <CCMChart prices={filteredPrices} seriesMode={seriesMode} />
+                </>
               )}
 
               {activeSection === "tailrisk" && (
@@ -806,6 +854,9 @@ export default function AnalysisPage() {
                   <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ArimaChart prices={filteredPrices} />
                   <JumpDiffusionChart prices={filteredPrices} />
+                  <OptimalStoppingChart prices={filteredPrices} />
+                  <VarianceGammaChart prices={filteredPrices} />
+                  <FBMChart prices={filteredPrices} />
                 </>
               )}
 

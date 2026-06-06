@@ -520,12 +520,52 @@ export default function BenchmarkChart({ prices, period }: Props) {
         </div>
       )}
 
-      <AnalysisGuide title="ベンチマーク比較の読み方">
-        <p><span className="font-medium">Beta:</span> 比較先に対する感応度。1なら同じ動き、{">"}1なら比較先以上に変動（攻撃的）、{"<"}1なら比較先より安定（防御的）。</p>
-        <p><span className="font-medium">Alpha (年率):</span> 比較先対比の超過リターン。正のAlphaは比較先を上回るパフォーマンス。</p>
-        <p><span className="font-medium">TE (トラッキングエラー):</span> 超過リターンの標準偏差（年率）。比較先からの乖離度合い。</p>
-        <p><span className="font-medium">IR (情報レシオ):</span> Alpha / TE。リスク調整済み超過リターン。0.5以上で良好。</p>
-        <p><span className="font-medium">複数銘柄の比較:</span> 日経225以外にも任意の銘柄コードを追加して、分析対象との関係性を比較できます。相関が低い銘柄同士は分散投資効果が期待できます。</p>
+      <AnalysisGuide title="ベンチマーク比較の詳細理論">
+        <p className="font-medium text-gray-700">1. ベンチマーク比較とは</p>
+        <p>個別銘柄のパフォーマンスを市場全体（ベンチマーク）と比較し、「市場の動きに対してどれだけ連動するか」「市場を上回っているか」を定量的に評価する分析です。マラソンのペースメーカーに例えると、ペースメーカー（ベンチマーク）より速く走れたか（Alpha）、ペースメーカーの加速に対してどれだけ反応するか（Beta）、ペースメーカーからどれだけ離れて走るか（TE）を測ります。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"回帰モデル: r_i = α + β · r_m + ε\n\nBeta: β = Cov(r_i, r_m) / Var(r_m)\n\nAlpha (年率): α_annual = (α_daily) × 252\n\nTracking Error: TE = Std(r_i - r_m) × √252\n\nInformation Ratio: IR = α_annual / TE\n\n相関係数: ρ = Cov(r_i, r_m) / (σ_i · σ_m)"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>r_i</strong>: 分析対象の日次リターン</li>
+          <li><strong>r_m</strong>: ベンチマーク（比較先）の日次リターン</li>
+          <li><strong>ε</strong>: 残差（銘柄固有のリスク成分）</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>Beta（ベータ）</strong>: ベンチマークに対する感応度。1なら同じ動き、{">"}1ならベンチマーク以上に変動（攻撃的）、{"<"}1ならより安定（防御的）</li>
+          <li><strong>Alpha（アルファ、年率）</strong>: ベンチマーク対比の超過リターン。正のAlphaはベンチマークを上回るパフォーマンスを示す</li>
+          <li><strong>Tracking Error（TE）</strong>: 超過リターン（r_i - r_m）の標準偏差を年率換算したもの。ベンチマークからの乖離度合い</li>
+          <li><strong>Information Ratio（IR）</strong>: Alpha / TE。リスク調整済みの超過リターン。能動的なリスクテイクがどれだけ報われたかを示す</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>Beta {">"} 1.2</strong>: ベンチマークの1.2倍以上動く高ベータ銘柄。上昇相場では有利だが下落時の損失も大きい</li>
+          <li><strong>Beta {"<"} 0.8</strong>: ディフェンシブ銘柄。市場全体が下落してもダメージが小さい</li>
+          <li><strong>Alpha {">"} 0</strong>: ベンチマーク対比で超過リターンを獲得。銘柄固有の価値創造がある</li>
+          <li><strong>IR {">"} 0.5</strong>: 良好な情報レシオ。能動的なリスクテイクが効率的に報われている</li>
+          <li><strong>IR {">"} 1.0</strong>: 優秀。アクティブファンドマネージャーの上位水準</li>
+          <li><strong>TE {">"} 20%</strong>: ベンチマークとの乖離が大きい。独自の値動きをする銘柄</li>
+          <li><strong>相関が低い銘柄ペア</strong>: 分散投資効果が高く、ポートフォリオのリスク低減に有効</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>市場見通しに応じた銘柄選択</strong>: 上昇相場を見込むなら高Beta銘柄、下落リスクを警戒するなら低Beta銘柄を選好</li>
+          <li><strong>分散投資の構築</strong>: 相関が低い銘柄同士を組み合わせることで、ポートフォリオ全体のリスクを効率的に低減できる</li>
+          <li><strong>ヘッジ比率の計算</strong>: Betaをもとに先物やETFで市場リスクをヘッジする際の比率を決定できる（例: Beta=1.3ならベンチマーク先物を1.3単位売り）</li>
+          <li><strong>アクティブリターンの評価</strong>: Alpha・IRの推移を追跡し、銘柄が持続的にベンチマークを上回れているかを確認</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ベンチマーク選択バイアス</strong>: 不適切なベンチマーク（例: テック株に対してTOPIXを使用）ではBeta・Alphaの解釈が歪む。業種に合ったベンチマークを選ぶことが重要</li>
+          <li><strong>Betaの時変性</strong>: Betaは一定ではなく時期によって変動する。特に危機時にはBetaが急上昇する傾向がある（相関の崩壊）</li>
+          <li><strong>Alphaの持続性</strong>: 過去のAlphaが将来も続くとは限らない。統計的に有意かどうか（t検定）も確認すべき</li>
+          <li><strong>期間依存性</strong>: 計算期間によって結果が大きく変わる。短期間の結果は不安定なため、少なくとも1年以上のデータで評価することが望ましい</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

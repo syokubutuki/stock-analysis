@@ -16,9 +16,11 @@ export default function KramersMoyalChart({ prices, seriesMode }: Props) {
   const driftCanvasRef = useRef<HTMLCanvasElement>(null);
   const potentialCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: closes } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
-  const km = useMemo(() => kramersMoyal(closes.slice(0, -1), lr, 20), [prices, seriesMode]);
+  const { values } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
+  const priceLevels = needsTransform ? values.slice(0, -1) : values;
+  const km = useMemo(() => kramersMoyal(priceLevels, lr, 20), [prices, seriesMode]);
 
   // Drift + Diffusion plot
   useEffect(() => {
@@ -239,10 +241,54 @@ export default function KramersMoyalChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="Kramers-Moyal・ポテンシャルの読み方">
-        <p><span className="font-medium">Kramers-Moyal係数:</span> 確率微分方程式 dp = μ(p)dt + σ(p)dW の局所係数を、各価格帯での条件付きモーメントから非パラメトリックに推定します。μ(p)が正なら上昇圧力、負なら下降圧力がその価格帯にあります。</p>
-        <p><span className="font-medium">ポテンシャル関数:</span> V(p) = -∫μ(p)dp を数値積分。物理学の「ポテンシャルエネルギー」のアナロジー。極小点(安定平衡)は株価のアトラクタ(引力点)、極大点(不安定平衡)は反発点です。ボールが谷底に転がるように、株価はポテンシャルの極小に向かう傾向があります。</p>
-        <p><span className="font-medium">拡散 σ(p):</span> 各価格帯でのボラティリティ。安い価格帯と高い価格帯で拡散が異なれば、価格レベル依存のリスク構造があることを意味します。</p>
+      <AnalysisGuide title="Kramers-Moyal・ポテンシャル分析の詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>株価の確率的な動きを物理学の「力」と「ポテンシャルエネルギー」で表現する分析です。各価格帯で株価がどちらに引っ張られやすいか（ドリフト）、どれだけ揺らぐか（拡散）を推定し、安定点や不安定点を可視化します。</p>
+        <p className="mt-1">ボールが起伏のある地面の上を転がるイメージです。谷底（ポテンシャルの極小）にはボールが引き寄せられ、丘の頂上（極大）からは転げ落ちます。株価も同様に「居心地のいい価格帯」と「不安定な価格帯」があり、この分析でそれを定量化します。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"確率微分方程式: dp = μ(p)dt + σ(p)dW\n\nKramers-Moyal係数（第n次）:\n  M_n(p) = lim(Δt→0) (1/Δt) E[(p(t+Δt)-p(t))^n | p(t)=p]\n  第1次 M₁ = μ(p): ドリフト（局所的な方向性）\n  第2次 M₂ = σ²(p): 拡散（局所的なボラティリティ）\n\nポテンシャル関数: V(p) = -∫μ(p)dp"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>μ(p)</strong>: ドリフト係数。価格pでの局所的な上昇/下降圧力</li>
+          <li><strong>σ(p)</strong>: 拡散係数。価格pでのボラティリティ（揺らぎの大きさ）</li>
+          <li><strong>V(p)</strong>: ポテンシャル関数。ドリフトの逆符号の累積。物理学のポテンシャルエネルギーに対応</li>
+          <li><strong>dW</strong>: ウィーナー過程の増分（ランダムなノイズ成分）</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ドリフト μ(p)</strong>: 各価格帯での平均的な価格変化の方向と大きさ。正なら上昇圧力、負なら下降圧力</li>
+          <li><strong>拡散 σ(p)</strong>: 各価格帯でのボラティリティ。価格レベルによってリスクが異なることを示す</li>
+          <li><strong>安定平衡点</strong>: ポテンシャルの極小値。株価が引き寄せられやすい「居心地のいい価格帯」</li>
+          <li><strong>不安定平衡点</strong>: ポテンシャルの極大値。株価が留まりにくい「不安定な価格帯」。どちらかの安定点に向かって離れる</li>
+          <li><strong>非パラメトリック推定</strong>: 特定の確率分布を仮定せず、データそのものから各価格帯の統計量を直接計算する方法</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ドリフト μ(p) {">"} 0</strong>: その価格帯では上昇圧力がある。株価は上方向に動きやすい</li>
+          <li><strong>ドリフト μ(p) {"<"} 0</strong>: その価格帯では下降圧力がある。株価は下方向に動きやすい</li>
+          <li><strong>μ(p)がゼロを横切る点</strong>: 正→負の交差は安定平衡（株価が戻りやすい水準）、負→正の交差は不安定平衡</li>
+          <li><strong>ポテンシャルの谷（極小）</strong>: 株価が滞在しやすいゾーン。支持・抵抗線の理論的裏付け</li>
+          <li><strong>ポテンシャルの丘（極大）</strong>: 株価が通過しやすいゾーン。ブレイクアウトが起きやすい水準</li>
+          <li><strong>拡散σ(p)が高い価格帯</strong>: その水準ではボラティリティが高く、値動きが荒い</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>サポート/レジスタンスの定量化</strong>: ポテンシャルの谷は理論的なサポート・レジスタンス水準。テクニカル分析の経験則を物理モデルで裏付ける</li>
+          <li><strong>ブレイクアウト判断</strong>: ポテンシャルの丘を越えると、次の谷まで急速に動く可能性がある。丘の高さが低いほどブレイクアウトしやすい</li>
+          <li><strong>リスク管理</strong>: 拡散σ(p)が高い価格帯ではポジションを縮小するなど、価格水準に応じたリスク調整が可能</li>
+          <li><strong>平均回帰戦略</strong>: 現在価格が安定平衡点から離れている場合、平衡点に向かう回帰を見込んだ逆張りが検討できる</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>データビン幅依存</strong>: 価格帯のビン幅（分割の細かさ）によってドリフト・拡散の推定値が変わる。細かすぎるとノイズ、粗すぎると構造を見落とす</li>
+          <li><strong>定常性の仮定</strong>: 推定期間中にドリフトやポテンシャルが変化しないことを暗黙に仮定。構造変化がある場合は短い窓で再推定が必要</li>
+          <li><strong>有限サンプル</strong>: 価格帯の端（極端な高値・安値）ではデータが少なく、推定が不安定になる</li>
+          <li><strong>高次項の無視</strong>: Kramers-Moyal展開を2次で打ち切っているため、ジャンプ過程など非ガウス的な要素は捉えきれない</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

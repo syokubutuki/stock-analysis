@@ -25,8 +25,9 @@ const PATTERN_LABELS: Record<string, string> = {
 export default function OrdinalNetwork({ prices, seriesMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: closes } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
+  const { values } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
   const network = useMemo(() => buildOrdinalNetwork(lr, 3, 1), [prices, seriesMode]);
 
   // ネットワーク描画

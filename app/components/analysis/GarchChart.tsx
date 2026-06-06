@@ -243,10 +243,55 @@ export default function GarchChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="GARCH・レバレッジ・ジャンプの読み方">
-        <p><span className="font-medium">GARCH(1,1):</span> σ²(t) = ω + α·r²(t-1) + β·σ²(t-1)。EWMAの一般化で、α,βをデータから最尤推定します。α+βが1に近いほどボラティリティショックが持続します(IGARCH)。半減期はショックが半分に減衰するまでの日数です。</p>
-        <p><span className="font-medium">レバレッジ効果:</span> 株価下落後にボラティリティが上昇しやすい非対称性。News Impact Curveは「今日のリターンが明日のボラに与える影響」を可視化。左側(負リターン)が右側より高ければレバレッジ効果あり。</p>
-        <p><span className="font-medium">ジャンプ検出:</span> Bipower Variationで連続成分のボラティリティを推定し、それを大きく超えるリターンを「ジャンプ」として検出します。ジャンプ比率は全分散に占めるジャンプ成分の割合です。</p>
+      <AnalysisGuide title="GARCH・レバレッジ・ジャンプの詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>株価のボラティリティ（値動きの激しさ）は一定ではなく、大きく動いた日の翌日はまた大きく動きやすい性質（ボラティリティクラスタリング）があります。GARCHモデルはこの「荒れの連鎖」を数式で捉えるモデルです。</p>
+        <p className="mt-1">嵐の後の海に例えると、嵐が去った直後はまだ波が高く、徐々に凪いでいきます。GARCHは「今日の波の高さ」を「昨日の波」と「昨日の突風」から予測するモデルです。加えて、レバレッジ効果（下落時に波がより高くなる非対称性）とジャンプ（突然の巨大波）も分析します。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"GARCH(1,1): σ²_t = ω + α·r²_{t-1} + β·σ²_{t-1}\n\n半減期: HL = ln(0.5) / ln(α + β)\n\nBipower Variation: BV = (π/2) · (1/n) Σ|r_t|·|r_{t-1}|\n\nジャンプ検出: J_t = |r_t| / √BV > 閾値"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>σ²_t</strong>: 今日の条件付き分散（ボラティリティの二乗）</li>
+          <li><strong>ω</strong>: ベースとなる最低限のボラティリティ。凪の日でもゼロにはならない定数</li>
+          <li><strong>α</strong>: 直前のショック（リターンの二乗）への反応度。大きいほど急変に敏感</li>
+          <li><strong>β</strong>: 前日のボラティリティの持続度。大きいほど荒れが長引く</li>
+          <li><strong>BV</strong>: 連続的な価格変動成分のみの分散推定。ジャンプの影響を除去できる</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>条件付きボラティリティ</strong>: 直近の市場状況を加味した「今日のボラティリティ」。固定値でなく日々変動する</li>
+          <li><strong>IGARCH</strong>: α+β=1の状態。ボラティリティショックが永続し、長期の無条件分散が発散する</li>
+          <li><strong>レバレッジ効果</strong>: 株価下落後にボラティリティが上昇しやすい非対称性。Blackにより1976年に報告された</li>
+          <li><strong>News Impact Curve</strong>: 「今日のリターンが明日のボラティリティに与える影響」を可視化した曲線</li>
+          <li><strong>Bipower Variation (BV)</strong>: 隣接するリターンの絶対値の積の平均。連続的な変動のみを推定しジャンプを分離する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>α+β {">"} 0.95</strong>: ボラティリティショックの持続性が非常に高い。荒れた相場が長期化しやすい</li>
+          <li><strong>α+β ≈ 1.0</strong>: IGARCH状態。ショックが永続する危険なサイン</li>
+          <li><strong>半減期が20日以上</strong>: ショックの影響が1ヶ月近く残る。ボラティリティ戦略の保有期間の目安になる</li>
+          <li><strong>News Impact Curveの左右非対称</strong>: 左（負リターン）が右より高ければレバレッジ効果あり。日本株では顕著に見られることが多い</li>
+          <li><strong>ジャンプ比率 {">"} 10%</strong>: 全分散のうちジャンプ（不連続変動）が相当割合を占める。決算発表やイベント駆動の値動きが多い銘柄</li>
+          <li><strong>ジャンプ検出の赤点</strong>: 通常のボラティリティでは説明できない異常な値動きが発生した日</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ポジションサイジング</strong>: 条件付きボラティリティが高い時期はポジションを縮小し、低い時期に拡大するリスクパリティ的運用</li>
+          <li><strong>オプション戦略</strong>: レバレッジ効果が強い銘柄ではプット（下落保険）がコール（上昇権利）より割高になりやすく、プットスプレッド売りなどの戦略が検討可能</li>
+          <li><strong>ジャンプリスクの管理</strong>: ジャンプ比率が高い銘柄では、ストップロスだけでなくオプションでのヘッジが有効</li>
+          <li><strong>ボラティリティ売買</strong>: GARCH予測ボラティリティとインプライドボラティリティの乖離はオプションの割安/割高を示唆する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>正規分布の仮定</strong>: 標準GARCH(1,1)はリターンの正規性を仮定。実際のファットテールにはt分布GARCHやGJR-GARCH（別セクション）がより適切</li>
+          <li><strong>構造変化への弱さ</strong>: 市場構造が急変すると、過去データで推定したパラメータが無効になる</li>
+          <li><strong>最尤推定の局所解</strong>: パラメータ推定が局所最適に陥る場合がある。初期値依存性に注意</li>
+          <li><strong>ジャンプ閾値の恣意性</strong>: ジャンプ検出の閾値設定（何σ以上をジャンプとするか）には裁量が入る</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

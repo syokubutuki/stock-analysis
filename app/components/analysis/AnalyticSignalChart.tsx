@@ -25,9 +25,10 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
   const ampChartRef = useRef<IChartApi | null>(null);
   const freqChartRef = useRef<IChartApi | null>(null);
 
-  const { values: closes, times } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values, times } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
+  const lrTimes = needsTransform ? times.slice(1) : times;
 
   const result = useMemo(() => computeAnalyticSignal(lr), [prices, seriesMode]);
   const stats = useMemo(() => analyticSignalStats(result), [result]);

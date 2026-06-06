@@ -23,9 +23,10 @@ export default function VisibilityGraphChart({ prices, seriesMode }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const degDistRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: closes, times } = extractSeries(prices, seriesMode);
-  const lr = logReturns(closes);
-  const lrTimes = times.slice(1);
+  const { values, times } = extractSeries(prices, seriesMode);
+  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const lr = needsTransform ? logReturns(values) : values;
+  const lrTimes = needsTransform ? times.slice(1) : times;
 
   const vg = useMemo(
     () => computeVisibilityGraph(lr, lrTimes, 50),

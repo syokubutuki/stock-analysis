@@ -220,10 +220,54 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="テイルリスクの読み方">
-        <p><span className="font-medium">EVT (極値統計):</span> リターンの裾(極端値)をGPD (Generalized Pareto Distribution)でモデル化。形状パラメータξ{`>`}0で厚い裾(パレート型)、ξ=0で指数型、ξ{`<`}0で有界な裾。正規分布仮定よりもリスクを適切に評価できます。</p>
-        <p><span className="font-medium">高次キュムラント:</span> κ₃(歪度)・κ₄(尖度)は既存の分布チャートにもありますが、κ₅・κ₆まで計算することでガウスからの逸脱をより精密に定量します。全てが0に近ければ正規分布に近い。</p>
-        <p><span className="font-medium">再現期間リターン:</span> 「N日に1回起きうる最大損失」の推定。250日=約1年に1回の損失水準、500日=約2年に1回の損失水準。</p>
+      <AnalysisGuide title="テイルリスク分析の詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>通常の統計（平均・標準偏差）では捉えきれない「極端な値動き」のリスクを専門的に評価する分析です。極値統計理論（EVT）で裾の厚さをモデル化し、高次キュムラントで分布の歪みを精密に定量します。</p>
+        <p className="mt-1">堤防の設計に例えると、「過去50年で最大の洪水」だけでなく「100年に1度の洪水はどの高さか」を推定するのがEVTです。平均的な水位（平均リターン）だけでは、堤防（リスク管理）を正しく設計できません。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"GPD (一般化パレート分布):\n  G(x; ξ, β) = 1 - (1 + ξx/β)^{-1/ξ}  (ξ≠0)\n  G(x; 0, β) = 1 - exp(-x/β)  (ξ=0)\n\n再現期間レベル:\n  x_T = u + (β/ξ)·[(T·n_u/n)^ξ - 1]\n  T: 再現期間, u: 閾値, n_u: 超過数, n: 総数\n\n第k次キュムラント:\n  κ_k = d^k/dt^k [log M(t)]_{t=0}\n  M(t) = E[e^{tX}] (モーメント母関数)"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>ξ（形状パラメータ）</strong>: 裾の厚さを決定する最重要パラメータ</li>
+          <li><strong>β（尺度パラメータ）</strong>: 裾の広がりのスケール</li>
+          <li><strong>u（閾値）</strong>: GPDを適用する損失の下限値</li>
+          <li><strong>κ_k</strong>: 第k次キュムラント。κ₃=歪度、κ₄=超過尖度に対応</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>EVT（極値統計理論）</strong>: 確率分布の裾（極端な値）の挙動を専門的に扱う統計理論。Fisher-Tippett-Gnedenkoの定理に基づく</li>
+          <li><strong>GPD（一般化パレート分布）</strong>: 閾値を超えた超過量の分布をモデル化。正規分布やt分布では捉えきれない裾を精密にフィットする</li>
+          <li><strong>形状パラメータ ξ</strong>: ξ{">"} 0で厚い裾（パレート型、極端な損失が比較的頻繁）、ξ=0で指数型（中程度の裾）、ξ{"<"} 0で有界な裾（損失に上限がある）</li>
+          <li><strong>再現期間</strong>: ある水準の損失が「平均的にN日に1回起きる」という頻度の表現</li>
+          <li><strong>高次キュムラント</strong>: κ₅・κ₆は正規分布では0。非ゼロの値はガウスからの高次の逸脱を示す</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ξ {">"} 0</strong>: 厚い裾。正規分布が予測するより「ありえない」急落が実際には起こりうる。ξが大きいほど危険</li>
+          <li><strong>ξ ≈ 0.2〜0.4</strong>: 日本株の典型的な値。正規分布仮定のVaRは大幅に過小評価される水準</li>
+          <li><strong>Q-Qプロットが45度線に乗る</strong>: GPDのフィットが良好。裾のモデルとして信頼できる</li>
+          <li><strong>再現期間250日（≈1年）の損失</strong>: 年に1回程度起こりうる最大損失の目安。ストップロスの参考に</li>
+          <li><strong>再現期間2500日（≈10年）の損失</strong>: リーマンショック級のイベントに対応する損失水準</li>
+          <li><strong>κ₅・κ₆が大きい</strong>: 分布の裾が正規分布から大きく逸脱。VaR・CVaRなどの従来のリスク指標を補正すべき</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ポジションサイジング</strong>: ξが大きい銘柄では正規分布VaRの2〜3倍のリスクバッファを確保する</li>
+          <li><strong>ストップロス設定</strong>: 再現期間250日の損失水準を参考にストップロスを設定すると、年1回程度の発動頻度</li>
+          <li><strong>ヘッジ判断</strong>: ξ{">"} 0.3の銘柄ではプットオプションの購入など、テイルリスクヘッジを積極的に検討</li>
+          <li><strong>ポートフォリオ構築</strong>: ξが小さい（裾が薄い）銘柄を選好することで、ポートフォリオ全体のテイルリスクを低減</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>閾値uの選択</strong>: GPDの推定結果は閾値uに依存する。低すぎるとGPD近似が不正確、高すぎるとデータ不足。Mean Excess Plotで適切な閾値を選定すべき</li>
+          <li><strong>データ量の制約</strong>: 極端な事象は定義上まれなため、推定に十分な超過データが必要。最低500日以上のデータが望ましい</li>
+          <li><strong>定常性の仮定</strong>: EVTは分布が時間的に不変であることを仮定。市場構造の変化があると推定が歪む</li>
+          <li><strong>再現期間の過信</strong>: 再現期間はあくまで確率的な推定であり、「次にいつ起きるか」は予測できない。10年に1度の損失が連続して起こる可能性もある</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

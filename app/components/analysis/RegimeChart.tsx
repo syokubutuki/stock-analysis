@@ -282,10 +282,55 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
       <div className="text-xs text-gray-500 mb-1">カルマンフィルタ (Local Level Model) — 推定トレンド + 95%信頼区間</div>
       <div ref={kalmanRef} className="w-full rounded border border-gray-100" />
 
-      <AnalysisGuide title="レジーム分析の読み方">
-        <p><span className="font-medium">HMM (隠れマルコフモデル):</span> リターン系列を3つの隠れ状態(低ボラ/中ボラ/高ボラ)でモデル化。Baum-Welchアルゴリズム(EM法)で遷移確率と各状態のパラメータを同時推定します。グラフは各時点の状態確率を示し、遷移行列は状態間の移行しやすさを表します。</p>
-        <p><span className="font-medium">変化点検出:</span> CUSUM(累積和)の最大偏差点をBinary Segmentationで再帰的に分割。BIC基準で有意な変化点のみを採用します。セグメント平均の段差がリターンの構造的変化を示します。</p>
-        <p><span className="font-medium">カルマンフィルタ:</span> Local Levelモデル(ランダムウォーク+ノイズ)で株価の隠れたトレンドを推定。青い線が推定トレンド、点線が95%信頼区間です。状態空間モデルの最も基本的な形であり、量子力学的アプローチとの対応が深いです。</p>
+      <AnalysisGuide title="レジーム分析の詳細理論">
+        <p className="font-medium text-gray-700">1. この分析の概要</p>
+        <p>市場には「穏やかな上昇期」「荒れた下落期」など異なる状態（レジーム）があり、それぞれで株価の振る舞いが大きく異なります。この分析では3つの手法で市場レジームを推定し、構造的な変化点を検出します。</p>
+        <p className="mt-1">天気に例えると、HMMは「今日の天気から明日の天気（晴れ/曇り/雨）を確率的に予測するモデル」、変化点検出は「季節の変わり目（春→夏など）を特定する手法」、カルマンフィルタは「雲や霧の向こうにある太陽の位置（真のトレンド）を推定する手法」です。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"HMM:\n  遷移確率: P(S_t=j | S_{t-1}=i) = a_ij\n  出力分布: r_t | S_t=k ~ N(μ_k, σ²_k)\n  推定法: Baum-Welch (EM法)\n\n変化点検出 (CUSUM):\n  C_t = Σ_{i=1}^{t} (r_i - r̄)\n  変化点 = argmax|C_t - 線形補間|\n  モデル選択: BIC = -2·logL + p·log(n)\n\nカルマンフィルタ (Local Level):\n  状態方程式: θ_t = θ_{t-1} + η_t,  η ~ N(0, σ²_η)\n  観測方程式: y_t = θ_t + ε_t,  ε ~ N(0, σ²_ε)"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>a_ij</strong>: 状態iから状態jへの遷移確率</li>
+          <li><strong>μ_k, σ²_k</strong>: 状態kでのリターンの平均と分散</li>
+          <li><strong>θ_t</strong>: カルマンフィルタが推定する「隠れたトレンド」</li>
+          <li><strong>σ²_η / σ²_ε</strong>: トレンドの変動幅とノイズの大きさの比。シグナル/ノイズ比を決定する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>HMM（隠れマルコフモデル）</strong>: 観測できないレジーム（隠れ状態）が確率的に遷移し、各レジームに応じた分布からリターンが生成されるモデル</li>
+          <li><strong>Baum-Welchアルゴリズム</strong>: HMMのパラメータ（遷移確率・出力分布）を最尤推定するEM法の一種</li>
+          <li><strong>遷移行列</strong>: レジーム間の移行確率をまとめた行列。対角要素が大きいほどレジームが持続しやすい</li>
+          <li><strong>CUSUM（累積和）</strong>: リターンの累積偏差を計算し、構造変化の位置を特定する手法</li>
+          <li><strong>Binary Segmentation</strong>: CUSUMで検出した変化点で系列を分割し、各部分で再帰的に変化点を探索する方法</li>
+          <li><strong>カルマンフィルタ</strong>: ノイズを含む観測データから隠れた状態変数（真のトレンド）を逐次推定する手法</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>HMM状態確率のグラフ</strong>: 各時点でどのレジーム（低ボラ/中ボラ/高ボラ）に属するかの確率。色が濃いレジームが支配的</li>
+          <li><strong>遷移行列の対角要素 {">"} 0.95</strong>: レジームが安定して持続する（平均滞在日数 = 1/(1-a_ii)）</li>
+          <li><strong>変化点の赤い垂直線</strong>: リターンの構造が統計的に有意に変わった時点。セグメント間の平均の差がレジーム変化の大きさ</li>
+          <li><strong>カルマンの青い線</strong>: ノイズを除去した推定トレンド。移動平均より適応的でラグが少ない</li>
+          <li><strong>カルマンの点線（95%信頼区間）</strong>: 区間が広い時期はトレンドの不確実性が高い</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>戦略切替</strong>: 低ボラレジームではトレンドフォロー、高ボラレジームではポジション縮小・ヘッジ強化</li>
+          <li><strong>エントリー/イグジット</strong>: 高ボラ→低ボラへのレジーム遷移はエントリーの好機、逆はリスクオフのシグナル</li>
+          <li><strong>変化点前後の分析</strong>: 変化点直後はトレンドが形成されやすく、モメンタム戦略が有効になりやすい</li>
+          <li><strong>カルマントレンドの方向</strong>: 推定トレンドが上向きなら中長期の上昇基調、下向きなら下降基調と判断</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>HMMの局所解問題</strong>: Baum-Welchは初期値に依存し、局所最適に陥る場合がある。複数の初期値で検証すべき</li>
+          <li><strong>状態数の選択</strong>: 本実装は3状態固定。実際の市場はより多くのレジームを持つ可能性がある</li>
+          <li><strong>事後的バイアス</strong>: 全期間のデータを使ってレジームを推定するため、リアルタイム判定より精度が高く見えるバイアスがある</li>
+          <li><strong>変化点のラグ</strong>: 変化点検出は事後的な分析であり、リアルタイムでの検出には遅れが生じる</li>
+          <li><strong>カルマンフィルタの仮定</strong>: Local Levelモデルは最も単純な状態空間モデルであり、トレンドの傾きの変化は捉えられない</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

@@ -189,15 +189,51 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="リターン分布の読み方">
-        <p><span className="font-medium">ヒストグラム:</span> 日次対数リターンの出現頻度を表示しています。青い曲線は同じ平均・標準偏差を持つ正規分布のPDFです。正規分布と実際の分布の乖離がテールリスクの正体です。</p>
-        <p><span className="font-medium">Q-Qプロット:</span> 観測値の分位と正規分布の理論分位を対比させた散布図です。点が赤い45度線上に乗っていれば正規分布に従っています。</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">両端で45度線から上に離れる(S字):</span> ファットテール。極端な値動きが正規分布の予測より多い。</li>
-          <li><span className="font-medium">片方だけ離れる:</span> 非対称なテール。上か下の一方だけリスクが大きい。</li>
+      <AnalysisGuide title="リターン分布分析の詳細理論">
+        <p className="font-medium text-gray-700">1. リターン分布分析とは</p>
+        <p>株価の日次リターンがどのような確率分布に従っているかを調べる分析です。多くの金融モデルは「リターンは正規分布に従う」と仮定しますが、実際の株式リターンは正規分布より裾が厚く（ファットテール）、非対称であることが知られています。コインの表裏に例えると、正規分布は「公平なコイン」、実際の株式リターンは「稀にだけ出る特殊な面がある偏ったコイン」のようなものです。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"対数リターン: r_t = ln(P_t / P_{t-1})\n\n歪度: S = (1/n) Σ [(r_t - μ)/σ]³\n尖度(超過): K = (1/n) Σ [(r_t - μ)/σ]⁴ - 3\n\nJarque-Bera検定統計量:\n  JB = (n/6) · [S² + (K²/4)]\n  帰無仮説 H₀: S=0 かつ K=0 (正規分布)\n  JB ~ χ²(2),  p < 0.05 なら正規性を棄却"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>S（歪度）</strong>: 分布の非対称性。負なら左裾が厚い（大幅下落が多い）、正なら右裾が厚い</li>
+          <li><strong>K（超過尖度）</strong>: 分布の裾の厚さ。正規分布は0、正の値ほど極端な値動きが多い</li>
+          <li><strong>JB</strong>: 歪度と尖度の同時検定統計量。χ²分布に従う</li>
         </ul>
-        <p><span className="font-medium">Jarque-Bera検定:</span> 歪度と尖度から正規性を検定します。p値が0.05未満なら「正規分布ではない」と判定(棄却)。株式リターンはほぼ常に棄却されます。</p>
-        <p><span className="font-medium">トレードへの活用:</span> 超過尖度が大きい銘柄は、VaR等の正規分布ベースのリスク計算が過小評価になります。テールリスクを意識したポジションサイズ管理が必要です。</p>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ヒストグラム</strong>: 日次対数リターンの出現頻度を棒グラフで表示。青い曲線は同じ平均・標準偏差を持つ正規分布のPDF</li>
+          <li><strong>Q-Qプロット</strong>: 観測値の分位と正規分布の理論分位を対比させた散布図。45度線上に乗れば正規分布に従う</li>
+          <li><strong>ファットテール</strong>: 正規分布が予測するより極端な値（±3σ以上）が頻繁に出現する性質</li>
+          <li><strong>Jarque-Bera検定</strong>: 歪度と尖度から正規性を同時検定する手法。株式リターンではほぼ常に棄却される</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ヒストグラムが青い曲線より裾が広い</strong>: ファットテール。正規分布の予測よりも極端な値動きが多い</li>
+          <li><strong>Q-Qプロットが両端でS字に離れる</strong>: 両側ファットテール。急騰・急落ともに正規分布より多く発生</li>
+          <li><strong>Q-Qプロットが片方だけ離れる</strong>: 非対称なテール。上か下の一方だけリスクが大きい</li>
+          <li><strong>歪度 {"<"} -0.5</strong>: 有意な左の偏り。大幅下落のリスクが高い</li>
+          <li><strong>超過尖度 {">"} 3</strong>: 非常に厚い裾。正規分布ベースのリスク計算は大幅に過小評価される</li>
+          <li><strong>JB検定 p {"<"} 0.05</strong>: 正規分布仮説を棄却。ほぼすべての株式で棄却される</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ポジションサイジング</strong>: 超過尖度が大きい銘柄では、正規分布ベースのVaRが過小評価されるため、ポジションを保守的に設定すべき</li>
+          <li><strong>リスク指標の選択</strong>: ファットテールが顕著な銘柄では、VaRではなくCVaR（期待ショートフォール）やEVTベースの指標を使用</li>
+          <li><strong>オプション戦略</strong>: 負の歪度が強い銘柄では、プットの理論価値が正規分布モデルより高い（OTMプットの売りに注意）</li>
+          <li><strong>テールリスクヘッジ</strong>: 超過尖度が高い銘柄では、深いOTMプットでのテイルリスクヘッジを検討</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>サンプルサイズ依存</strong>: 歪度・尖度の推定は外れ値に非常に敏感。少なくとも1年以上（252日）のデータが望ましい</li>
+          <li><strong>非定常性</strong>: 分布の形状は時期によって変動する（ボラティリティクラスタリング）。全期間の統計量は「平均的な分布」に過ぎない</li>
+          <li><strong>JB検定の限界</strong>: 歪度と尖度のみで正規性を判定するため、他の形状の逸脱（多峰性など）は検出できない</li>
+          <li><strong>対数リターンの前提</strong>: 対数リターンが使用されるため、非常に大きな変動率（-100%に近い下落）では近似精度が低下する</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );

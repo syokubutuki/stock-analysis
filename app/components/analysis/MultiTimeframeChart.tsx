@@ -85,16 +85,48 @@ export default function MultiTimeframeChart({ prices }: Props) {
       })()}
 
       <AnalysisGuide title="マルチタイムフレーム分析の詳細理論">
-        <p className="font-medium text-gray-700">1. 時間集約の原理</p>
-        <p>日足の対数リターンを週足/月足に集約します。週足リターン = Σ(日足リターン)。もしリターンがiidなら、分散は日数に比例し、歪度は0に近づき、尖度は3に近づきます（中心極限定理）。</p>
-        <p className="font-medium text-gray-700 mt-3">2. 集約による変化の意味</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>尖度の低下速度</strong>: {"iidなら尖度は1/√nで低下。それより遅い場合は正の依存関係（ボラクラスタリング等）。"}</li>
-          <li><strong>Hurstの変化</strong>: 真のフラクタル過程ではHurstはスケール不変。変化する場合はマルチフラクタル性を示唆。</li>
-          <li><strong>ACF(1)の変化</strong>: 日足でACF(1)≈0でも週足で正になる場合、低周波のモメンタムが存在。</li>
+        <p className="font-medium text-gray-700">1. マルチタイムフレーム分析とは</p>
+        <p>同じ株価データを異なる時間スケール（日足・週足・月足）で集約し、時間スケールによって統計的性質がどう変化するかを分析する手法です。中心極限定理（CLT）の効果とフラクタル構造を同時に検証できます。</p>
+        <p className="mt-1">カメラのズームに例えると、日足は「接写」で細かいノイズまで見え、月足は「引き」で大局的なトレンドが見えます。ズームレベルを変えても同じ模様が見えれば（フラクタル）、市場の構造が全スケールで自己相似であることを意味します。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
+        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"時間集約: r_weekly = Σ_{i∈week} r_daily_i\n\nCLT予測（iid仮定）:\n  分散: σ²_n = n · σ²_1  (nは集約日数)\n  歪度: S_n = S_1 / √n\n  超過尖度: K_n = K_1 / n\n\nHurst安定性検定:\n  H_daily ≈ H_weekly ≈ H_monthly → スケール不変（真のフラクタル）\n  H値がスケールで変化 → マルチフラクタル性"}</p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><strong>n</strong>: 集約日数（週足≈5、月足≈21）</li>
+          <li><strong>S_n, K_n</strong>: 集約後の歪度・尖度。iid仮定でのCLT予測値と実測値の差が依存構造を表す</li>
+          <li><strong>H</strong>: 各スケールでのHurst指数。スケール間の安定性がフラクタル性の指標</li>
         </ul>
-        <p className="font-medium text-gray-700 mt-3">3. リサンプリング方法</p>
-        <p>週足: ISO週ベースで最終取引日をClose、週内の最高値をHigh、最安値をLow、最初の取引日をOpen、出来高は合計。月足も同様にYYYY-MMでグループ化。</p>
+
+        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>中心極限定理（CLT）</strong>: iid（独立同一分布）な確率変数の和は、標本数が増えると正規分布に近づくという定理</li>
+          <li><strong>ボラティリティクラスタリング</strong>: 大きな変動の後に大きな変動が続きやすい性質。iid仮定に反する典型的な現象</li>
+          <li><strong>マルチフラクタル性</strong>: Hurst指数がスケールによって異なる性質。単一のフラクタル指数では記述できない複雑な構造</li>
+          <li><strong>リサンプリング</strong>: 日足データを週足・月足に変換する処理。OHLCVそれぞれに適切な集約方法を適用する</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>尖度がCLT予測より遅く低下</strong>: ボラティリティクラスタリング等の正の依存関係がある。週足・月足でもファットテールが残存</li>
+          <li><strong>尖度がCLT予測通りに低下</strong>: リターンが概ねiidに近い。短期的な依存構造が弱い</li>
+          <li><strong>Hurstがスケールで安定</strong>: 真のフラクタル過程。どのスケールでも同じトレンド持続性/反持続性が見られる</li>
+          <li><strong>Hurstがスケールで変化</strong>: マルチフラクタル性。短期と長期で異なる戦略が必要</li>
+          <li><strong>日足ACF(1)≈0だが週足で正</strong>: 日足では見えない低周波モメンタムが存在。スイングトレード向き</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>保有期間の選択</strong>: Hurstが最も0.5から乖離するスケールが、最も予測可能性のある保有期間の目安となる</li>
+          <li><strong>戦略の整合性確認</strong>: 短期戦略を採用する場合は日足の統計、中長期なら週足・月足の統計を基にリスク管理すべき</li>
+          <li><strong>リスク計算のスケーリング</strong>: iid仮定が成り立たない場合、日次VaR × √nで月次VaRを推定すると過小評価になる</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>サンプル数の減少</strong>: 月足に集約すると標本数が約1/21になり、統計量の信頼性が低下する。最低3年以上のデータが望ましい</li>
+          <li><strong>√n則の誤用</strong>: 日次ボラティリティから年次ボラティリティへのスケーリング（×√252）はiid仮定が必要。依存構造がある場合は過小評価になる</li>
+          <li><strong>リサンプリングの恣意性</strong>: 週足の開始曜日や月足の区切り方で結果が若干変わる。ISO週基準で統一することが重要</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );
