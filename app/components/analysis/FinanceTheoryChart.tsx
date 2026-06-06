@@ -71,7 +71,7 @@ export default function FinanceTheoryChart({ prices }: Props) {
       if (vrpRef.current) chart.applyOptions({ width: vrpRef.current.clientWidth });
     });
     ro.observe(vrpRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); vrpApiRef.current = null; };
   }, [result]);
 
   const { kelly, bs, varianceSwap } = result;

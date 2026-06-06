@@ -57,7 +57,7 @@ export default function MicrostructureChart({ prices }: Props) {
       if (rollRef.current) chart.applyOptions({ width: rollRef.current.clientWidth });
     });
     ro.observe(rollRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); rollApiRef.current = null; };
   }, [result]);
 
   // Amihud chart
@@ -94,7 +94,7 @@ export default function MicrostructureChart({ prices }: Props) {
       if (amihudRef.current) chart.applyOptions({ width: amihudRef.current.clientWidth });
     });
     ro.observe(amihudRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); amihudApiRef.current = null; };
   }, [result]);
 
   return (

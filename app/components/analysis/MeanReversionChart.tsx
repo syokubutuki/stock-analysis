@@ -62,7 +62,7 @@ export default function MeanReversionChart({ prices, seriesMode }: Props) {
       if (hlChartRef.current) chart.applyOptions({ width: hlChartRef.current.clientWidth });
     });
     ro.observe(hlChartRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); hlApiRef.current = null; };
   }, [result]);
 
   // OU simulation on canvas

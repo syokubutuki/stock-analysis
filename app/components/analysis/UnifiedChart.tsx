@@ -232,7 +232,7 @@ export default function UnifiedChart({ prices, period }: Props) {
     if (pricesChanged) {
       savedLogicalRange.current = null;
       for (const [, api] of seriesMapRef.current) {
-        chart.removeSeries(api);
+        try { chart.removeSeries(api); } catch { /* chart may be disposed */ }
         seriesDefMapRef.current.delete(api);
       }
       seriesMapRef.current.clear();
@@ -250,7 +250,7 @@ export default function UnifiedChart({ prices, period }: Props) {
     const enabledIds = new Set(enabledSeries.map((s) => s.id));
     for (const [id, api] of seriesMapRef.current) {
       if (!enabledIds.has(id)) {
-        chart.removeSeries(api);
+        try { chart.removeSeries(api); } catch { /* chart may be disposed */ }
         seriesDefMapRef.current.delete(api);
         seriesMapRef.current.delete(id);
       }

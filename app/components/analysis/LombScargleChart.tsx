@@ -84,6 +84,7 @@ export default function LombScargleChart({ prices, seriesMode }: Props) {
     return () => {
       ro.disconnect();
       chart.remove();
+      chartApiRef.current = null;
     };
   }, [result]);
 

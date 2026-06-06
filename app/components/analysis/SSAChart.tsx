@@ -83,6 +83,7 @@ export default function SSAChart({ prices, seriesMode }: Props) {
     return () => {
       ro.disconnect();
       chart.remove();
+      chartApiRef.current = null;
     };
   }, [result, times]);
 

@@ -79,7 +79,7 @@ export default function StructuralBreakChart({ prices, seriesMode }: Props) {
       if (cusumRef.current) chart.applyOptions({ width: cusumRef.current.clientWidth });
     });
     ro.observe(cusumRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); cusumApiRef.current = null; };
   }, [result]);
 
   return (

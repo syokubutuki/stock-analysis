@@ -71,7 +71,7 @@ export default function AsymmetricGarchChart({ prices, seriesMode }: Props) {
       if (chartRef.current) chart.applyOptions({ width: chartRef.current.clientWidth });
     });
     ro.observe(chartRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); chartApiRef.current = null; };
   }, [result, times]);
 
   const bestColor =

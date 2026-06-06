@@ -96,6 +96,7 @@ export default function BOCPDChart({ prices, seriesMode }: Props) {
     return () => {
       ro.disconnect();
       chart.remove();
+      probApiRef.current = null;
     };
   }, [result, lrTimes]);
 

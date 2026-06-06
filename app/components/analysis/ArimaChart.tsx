@@ -114,7 +114,7 @@ export default function ArimaChart({ prices }: Props) {
       if (chartRef.current) chart.applyOptions({ width: chartRef.current.clientWidth });
     });
     ro.observe(chartRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); chartApiRef.current = null; };
   }, [result, prices, times]);
 
   // Residuals chart
@@ -157,7 +157,7 @@ export default function ArimaChart({ prices }: Props) {
       if (residRef.current) chart.applyOptions({ width: residRef.current.clientWidth });
     });
     ro.observe(residRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); residApiRef.current = null; };
   }, [result, times]);
 
   const bestAR = result.bestModel === "AR" ? result.original : result.differenced;

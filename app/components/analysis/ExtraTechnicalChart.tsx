@@ -54,7 +54,7 @@ export default function ExtraTechnicalChart({ prices }: Props) {
       if (cciRef.current) chart.applyOptions({ width: cciRef.current.clientWidth });
     });
     ro.observe(cciRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); cciApiRef.current = null; };
   }, [result]);
 
   // Williams %R chart
@@ -88,7 +88,7 @@ export default function ExtraTechnicalChart({ prices }: Props) {
       if (wrRef.current) chart.applyOptions({ width: wrRef.current.clientWidth });
     });
     ro.observe(wrRef.current);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { ro.disconnect(); chart.remove(); wrApiRef.current = null; };
   }, [result]);
 
   const sarTrend = result.sar.currentTrend;
