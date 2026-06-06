@@ -8,6 +8,26 @@ export interface CCMPoint {
   rho: number;
 }
 
+/** Per-trial rho values at each library size */
+export interface CCMTrialPoint {
+  librarySize: number;
+  trialRhos: number[];
+  meanRho: number;
+}
+
+/** Cross-map prediction vs actual at largest library size */
+export interface CCMScatter {
+  predicted: number[];
+  actual: number[];
+  rho: number;
+}
+
+export interface CCMDetailedResult {
+  points: CCMPoint[];
+  trials: CCMTrialPoint[];
+  scatter: CCMScatter;
+}
+
 export interface CCMResult {
   returnToVol: CCMPoint[];
   volToReturn: CCMPoint[];
@@ -16,6 +36,18 @@ export interface CCMResult {
   convergenceReturnVol: boolean;
   convergenceReturnVolume: boolean;
   interpretation: string;
+  // Intermediate data
+  detailed: {
+    returnToVol: CCMDetailedResult;
+    volToReturn: CCMDetailedResult;
+    returnToVolume: CCMDetailedResult;
+    volumeToReturn: CCMDetailedResult;
+  };
+  inputSeries: {
+    returns: number[];
+    absReturns: number[];
+    volumeChanges: number[];
+  };
 }
 
 /**
@@ -46,14 +78,15 @@ function dist(a: number[], b: number[]): number {
 
 /**
  * Cross-map prediction: predict Y from X's shadow manifold
- * Returns correlation between predicted and actual Y
+ * Returns correlation and optionally the prediction/actual arrays
  */
 function crossMap(
   Mx: number[][], // X's shadow manifold
   y: number[], // target Y values (aligned with Mx)
   E: number,
-  libIndices: number[]
-): number {
+  libIndices: number[],
+  returnScatter?: boolean
+): { rho: number; predicted: number[]; actual: number[] } {
   const nn = E + 1; // number of nearest neighbors
   const predictions: number[] = [];
   const actuals: number[] = [];
@@ -88,8 +121,12 @@ function crossMap(
   }
 
   // Pearson correlation
-  if (predictions.length < 5) return 0;
-  return pearsonCorr(predictions, actuals);
+  const rho = predictions.length < 5 ? 0 : pearsonCorr(predictions, actuals);
+  return {
+    rho,
+    predicted: returnScatter ? predictions : [],
+    actual: returnScatter ? actuals : [],
+  };
 }
 
 function pearsonCorr(x: number[], y: number[]): number {
@@ -113,14 +150,21 @@ function pearsonCorr(x: number[], y: number[]): number {
 
 /**
  * Compute CCM between two series at multiple library sizes
+ * Returns detailed results including per-trial rho and scatter data
  */
-export function computeCCM(
+export function computeCCMDetailed(
   x: number[],
   y: number[],
   E: number = 3,
   tau: number = 1,
   libSizes?: number[]
-): CCMPoint[] {
+): CCMDetailedResult {
+  const emptyResult: CCMDetailedResult = {
+    points: [],
+    trials: [],
+    scatter: { predicted: [], actual: [], rho: 0 },
+  };
+
   // Subsample for performance
   const maxN = 1000;
   let xSub = x;
@@ -133,41 +177,68 @@ export function computeCCM(
 
   const Mx = embed(xSub, E, tau);
   const n = Mx.length;
-  if (n < 20) return [];
+  if (n < 20) return emptyResult;
 
   // Align Y to embedding
   const yAligned = ySub.slice((E - 1) * tau);
-  if (yAligned.length < n) return [];
+  if (yAligned.length < n) return emptyResult;
 
   // Library sizes
   const defaultSizes = [20, 50, 100, 200, 500, n].filter((s) => s <= n && s >= E + 2);
   const sizes = libSizes || defaultSizes;
 
   const rng = mulberry32Ccm(42);
-  const nTrials = 5; // average over random subsets
+  const nTrials = 5;
 
-  const result: CCMPoint[] = [];
+  const points: CCMPoint[] = [];
+  const trials: CCMTrialPoint[] = [];
 
-  for (const L of sizes) {
-    let sumRho = 0;
+  for (let si = 0; si < sizes.length; si++) {
+    const L = sizes[si];
+    const isLast = si === sizes.length - 1;
+    const trialRhos: number[] = [];
+    let lastScatter: { predicted: number[]; actual: number[] } = { predicted: [], actual: [] };
+
     for (let trial = 0; trial < nTrials; trial++) {
-      // Random subset of indices
       const indices = Array.from({ length: n }, (_, i) => i);
-      // Fisher-Yates shuffle
       for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(rng() * (i + 1));
         [indices[i], indices[j]] = [indices[j], indices[i]];
       }
       const libIndices = indices.slice(0, L);
 
-      const rho = crossMap(Mx, yAligned, E, libIndices);
-      sumRho += rho;
+      const res = crossMap(Mx, yAligned, E, libIndices, isLast && trial === 0);
+      trialRhos.push(res.rho);
+      if (isLast && trial === 0) {
+        lastScatter = { predicted: res.predicted, actual: res.actual };
+      }
     }
 
-    result.push({ librarySize: L, rho: sumRho / nTrials });
+    const meanRho = trialRhos.reduce((a, b) => a + b, 0) / nTrials;
+    points.push({ librarySize: L, rho: meanRho });
+    trials.push({ librarySize: L, trialRhos, meanRho });
+
+    if (isLast) {
+      return {
+        points,
+        trials,
+        scatter: { ...lastScatter, rho: meanRho },
+      };
+    }
   }
 
-  return result;
+  return { points, trials, scatter: { predicted: [], actual: [], rho: 0 } };
+}
+
+/** Backward-compatible wrapper */
+export function computeCCM(
+  x: number[],
+  y: number[],
+  E: number = 3,
+  tau: number = 1,
+  libSizes?: number[]
+): CCMPoint[] {
+  return computeCCMDetailed(x, y, E, tau, libSizes).points;
 }
 
 function mulberry32Ccm(seed: number): () => number {
@@ -184,6 +255,11 @@ function mulberry32Ccm(seed: number): () => number {
  * Full CCM analysis between return, volatility, and volume
  */
 export function fullCCMAnalysis(prices: PricePoint[]): CCMResult {
+  const emptyDetailed: CCMDetailedResult = {
+    points: [],
+    trials: [],
+    scatter: { predicted: [], actual: [], rho: 0 },
+  };
   const empty: CCMResult = {
     returnToVol: [],
     volToReturn: [],
@@ -192,6 +268,13 @@ export function fullCCMAnalysis(prices: PricePoint[]): CCMResult {
     convergenceReturnVol: false,
     convergenceReturnVolume: false,
     interpretation: "データが不足しています。",
+    detailed: {
+      returnToVol: emptyDetailed,
+      volToReturn: emptyDetailed,
+      returnToVolume: emptyDetailed,
+      volumeToReturn: emptyDetailed,
+    },
+    inputSeries: { returns: [], absReturns: [], volumeChanges: [] },
   };
 
   if (prices.length < 60) return empty;
@@ -213,13 +296,11 @@ export function fullCCMAnalysis(prices: PricePoint[]): CCMResult {
     volumeChanges.push(vc);
   }
 
-  // CCM: return ↔ volatility (absolute returns)
-  const returnToVol = computeCCM(returns, absReturns, 3, 1);
-  const volToReturn = computeCCM(absReturns, returns, 3, 1);
-
-  // CCM: return ↔ volume
-  const returnToVolume = computeCCM(returns, volumeChanges, 3, 1);
-  const volumeToReturn = computeCCM(volumeChanges, returns, 3, 1);
+  // CCM with detailed results
+  const dReturnToVol = computeCCMDetailed(returns, absReturns, 3, 1);
+  const dVolToReturn = computeCCMDetailed(absReturns, returns, 3, 1);
+  const dReturnToVolume = computeCCMDetailed(returns, volumeChanges, 3, 1);
+  const dVolumeToReturn = computeCCMDetailed(volumeChanges, returns, 3, 1);
 
   // Convergence test: rho increases with library size
   const checkConvergence = (pts: CCMPoint[]): boolean => {
@@ -229,8 +310,8 @@ export function fullCCMAnalysis(prices: PricePoint[]): CCMResult {
     return last > first + 0.05 && last > 0.1;
   };
 
-  const convergenceReturnVol = checkConvergence(returnToVol);
-  const convergenceReturnVolume = checkConvergence(returnToVolume);
+  const convergenceReturnVol = checkConvergence(dReturnToVol.points);
+  const convergenceReturnVolume = checkConvergence(dReturnToVolume.points);
 
   // Interpretation
   const parts: string[] = [];
@@ -238,13 +319,13 @@ export function fullCCMAnalysis(prices: PricePoint[]): CCMResult {
   if (convergenceReturnVol) {
     parts.push("リターン→ボラティリティの因果関係が示唆されます（レバレッジ効果と整合的）");
   }
-  if (checkConvergence(volToReturn)) {
+  if (checkConvergence(dVolToReturn.points)) {
     parts.push("ボラティリティ→リターンの因果関係が示唆されます（ボラティリティフィードバック）");
   }
   if (convergenceReturnVolume) {
     parts.push("リターン→出来高の因果関係が示唆されます");
   }
-  if (checkConvergence(volumeToReturn)) {
+  if (checkConvergence(dVolumeToReturn.points)) {
     parts.push("出来高→リターンの因果関係が示唆されます");
   }
 
@@ -254,12 +335,19 @@ export function fullCCMAnalysis(prices: PricePoint[]): CCMResult {
       : "CCM分析では明確な非線形因果関係は検出されませんでした。Granger因果（線形）も併せて確認してください。";
 
   return {
-    returnToVol,
-    volToReturn,
-    returnToVolume,
-    volumeToReturn,
+    returnToVol: dReturnToVol.points,
+    volToReturn: dVolToReturn.points,
+    returnToVolume: dReturnToVolume.points,
+    volumeToReturn: dVolumeToReturn.points,
     convergenceReturnVol,
     convergenceReturnVolume,
     interpretation,
+    detailed: {
+      returnToVol: dReturnToVol,
+      volToReturn: dVolToReturn,
+      returnToVolume: dReturnToVolume,
+      volumeToReturn: dVolumeToReturn,
+    },
+    inputSeries: { returns, absReturns, volumeChanges },
   };
 }
