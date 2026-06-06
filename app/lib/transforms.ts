@@ -62,3 +62,47 @@ export function cumulativeLogReturns(closes: number[]): number[] {
   }
   return result;
 }
+
+// 差分変換（1次・2次）
+export function differencing(values: number[], order: number = 1): number[] {
+  let result = values.slice();
+  for (let d = 0; d < order; d++) {
+    const next: number[] = [];
+    for (let i = 1; i < result.length; i++) {
+      next.push(result[i] - result[i - 1]);
+    }
+    result = next;
+  }
+  return result;
+}
+
+// Box-Cox変換: λ=0 → ln(x), λ≠0 → (x^λ - 1)/λ
+export function boxCoxTransform(values: number[], lambda: number = 0.5): number[] {
+  return values.map((v) => {
+    if (v <= 0) return 0;
+    if (Math.abs(lambda) < 1e-10) return Math.log(v);
+    return (Math.pow(v, lambda) - 1) / lambda;
+  });
+}
+
+// ドローダウン: ピークからの下落率
+export function drawdown(values: number[]): number[] {
+  if (values.length === 0) return [];
+  let peak = values[0];
+  return values.map((v) => {
+    if (v > peak) peak = v;
+    return peak > 0 ? (v - peak) / peak : 0;
+  });
+}
+
+// ローリングZスコア: (x_t - μ_w) / σ_w
+export function rollingZScore(values: number[], window: number = 60): number[] {
+  return values.map((v, i) => {
+    const start = Math.max(0, i - window + 1);
+    const slice = values.slice(start, i + 1);
+    const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
+    const variance = slice.reduce((a, x) => a + (x - mean) ** 2, 0) / slice.length;
+    const sigma = Math.sqrt(variance);
+    return sigma > 1e-10 ? (v - mean) / sigma : 0;
+  });
+}
