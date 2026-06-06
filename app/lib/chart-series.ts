@@ -30,6 +30,32 @@ import {
   rollingTDA,
 } from "./attractor-investment";
 import { fitHMM, kalmanFilter, kalmanFilter2State, adaptiveKalmanFilter, kalmanFilter3State, kalmanSmoother } from "./regime";
+import { computeSSA } from "./ssa";
+import { rollingEntropy } from "./entropy";
+import {
+  rollingRenyi,
+  rollingTsallis,
+  rollingApEn,
+  rollingWeightedPE,
+  rollingConditionalEntropy,
+} from "./entropy-extended";
+import {
+  rollingCEPlane,
+  rollingAIS,
+  rollingPredictability,
+  rollingInfoRatio,
+} from "./complexity";
+import { rollingHalfLife } from "./mean-reversion";
+import { unitRootTest } from "./unit-root";
+import { computeBOCPD } from "./bocpd";
+import { detectStructuralBreaks } from "./structural-break";
+import { fitGJR, fitEGARCH } from "./gjr-egarch";
+import { rollSpread, amihudIlliquidity } from "./microstructure";
+import { anchoringAnalysis } from "./behavioral";
+import { fitAR } from "./arima";
+import { computeVisibilityGraph } from "./visibility-graph";
+import { computeRecurrenceNetwork } from "./recurrence-network";
+import { rollingSpectralEntropy } from "./hilbert-huang-spectrum";
 
 // ---- Types ----
 
@@ -88,6 +114,15 @@ export const GROUPS: SeriesGroup[] = [
   { id: "nonlinear", label: "非線形" },
   { id: "tda", label: "TDA" },
   { id: "regime", label: "レジーム" },
+  { id: "decomp", label: "SSA分解" },
+  { id: "entropy", label: "エントロピー" },
+  { id: "complexity", label: "複雑性" },
+  { id: "meanrev", label: "平均回帰" },
+  { id: "break", label: "構造変化" },
+  { id: "micro", label: "マイクロ構造" },
+  { id: "behavioral", label: "行動ファイナンス" },
+  { id: "arima", label: "ARIMA" },
+  { id: "network", label: "ネットワーク" },
 ];
 
 // ---- Helpers ----
@@ -627,6 +662,34 @@ export const SERIES: SeriesDef[] = [
     scaleId: "vol",
     type: "line",
     compute: (p) => computeRangeVolatility(p).map((x) => tv(x.time, x.yangZhang)),
+  },
+  {
+    id: "gjr_vol",
+    label: "GJR-GARCH Vol",
+    group: "volatility",
+    color: "#be123c",
+    scaleId: "vol",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      if (lr.length < 30) return [];
+      const g = fitGJR(lr);
+      return g.conditionalVol.map((v, i) => tv(p[i + 1].time, v));
+    },
+  },
+  {
+    id: "egarch_vol",
+    label: "EGARCH Vol",
+    group: "volatility",
+    color: "#9f1239",
+    scaleId: "vol",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      if (lr.length < 30) return [];
+      const g = fitEGARCH(lr);
+      return g.conditionalVol.map((v, i) => tv(p[i + 1].time, v));
+    },
   },
 
   // ====== ギャップ ======
@@ -1282,6 +1345,433 @@ export const SERIES: SeriesDef[] = [
       const c = p.map((x) => x.close);
       const r = kalmanSmoother(c);
       return r.smoothedVelocity.map((v, i) => tv(p[i].time, v));
+    },
+  },
+
+  // ====== SSA分解 ======
+  {
+    id: "ssa_trend",
+    label: "SSAトレンド",
+    group: "decomp",
+    color: "#2563eb",
+    scaleId: "price",
+    type: "line",
+    lineWidth: 2,
+    compute: (p) => {
+      const recent = p.slice(-1000);
+      const c = recent.map((x) => x.close);
+      if (c.length < 60) return [];
+      const r = computeSSA(c);
+      if (r.trend.length !== c.length) return [];
+      return r.trend.map((v, i) => tv(recent[i].time, v));
+    },
+  },
+  {
+    id: "ssa_periodic",
+    label: "SSA周期成分",
+    group: "decomp",
+    color: "#7c3aed",
+    scaleId: "ssa_osc",
+    type: "line",
+    compute: (p) => {
+      const recent = p.slice(-1000);
+      const c = recent.map((x) => x.close);
+      if (c.length < 60) return [];
+      const r = computeSSA(c);
+      if (r.periodic.length !== c.length) return [];
+      return r.periodic.map((v, i) => tv(recent[i].time, v));
+    },
+  },
+  {
+    id: "ssa_noise",
+    label: "SSAノイズ",
+    group: "decomp",
+    color: "#9ca3af",
+    scaleId: "ssa_osc",
+    type: "line",
+    compute: (p) => {
+      const recent = p.slice(-1000);
+      const c = recent.map((x) => x.close);
+      if (c.length < 60) return [];
+      const r = computeSSA(c);
+      if (r.noise.length !== c.length) return [];
+      return r.noise.map((v, i) => tv(recent[i].time, v));
+    },
+  },
+
+  // ====== エントロピー ======
+  {
+    id: "ent_shannon",
+    label: "Shannonエントロピー",
+    group: "entropy",
+    color: "#2563eb",
+    scaleId: "ent_sh",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingEntropy(lr, times).map((x) => tv(x.time, x.shannon));
+    },
+  },
+  {
+    id: "ent_perm",
+    label: "順列エントロピー",
+    group: "entropy",
+    color: "#0891b2",
+    scaleId: "ent_pe",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingEntropy(lr, times).map((x) => tv(x.time, x.permutation));
+    },
+  },
+  {
+    id: "ent_renyi",
+    label: "Rényiエントロピー",
+    group: "entropy",
+    color: "#7c3aed",
+    scaleId: "ent_re",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingRenyi(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+  {
+    id: "ent_tsallis",
+    label: "Tsallisエントロピー",
+    group: "entropy",
+    color: "#db2777",
+    scaleId: "ent_ts",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingTsallis(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+  {
+    id: "ent_apen",
+    label: "近似エントロピー",
+    group: "entropy",
+    color: "#ea580c",
+    scaleId: "ent_ap",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingApEn(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+  {
+    id: "ent_wpe",
+    label: "重み付順列エントロピー",
+    group: "entropy",
+    color: "#16a34a",
+    scaleId: "ent_wpe",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingWeightedPE(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+  {
+    id: "ent_cond",
+    label: "条件付エントロピー",
+    group: "entropy",
+    color: "#0d9488",
+    scaleId: "ent_cond",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 62) return [];
+      // 1期ラグの条件付エントロピー H(r_t | r_{t-1})
+      const x = lr.slice(1);
+      const y = lr.slice(0, -1);
+      return rollingConditionalEntropy(x, y, times.slice(1)).map((d) =>
+        tv(d.time, d.value)
+      );
+    },
+  },
+  {
+    id: "spectral_entropy",
+    label: "スペクトルエントロピー",
+    group: "entropy",
+    color: "#9333ea",
+    scaleId: "ent_spec",
+    type: "line",
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      if (c.length < 80) return [];
+      const r = rollingSpectralEntropy(c);
+      return r.indices.map((idx, k) => tv(p[idx].time, r.entropy[k]));
+    },
+  },
+
+  // ====== 複雑性 ======
+  {
+    id: "ce_pe",
+    label: "複雑性-順列エントロピー",
+    group: "complexity",
+    color: "#2563eb",
+    scaleId: "ce_pe",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingCEPlane(lr, times).map((x) => tv(x.time, x.pe));
+    },
+  },
+  {
+    id: "ce_sc",
+    label: "統計的複雑性",
+    group: "complexity",
+    color: "#dc2626",
+    scaleId: "ce_sc",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingCEPlane(lr, times).map((x) => tv(x.time, x.sc));
+    },
+  },
+  {
+    id: "ais",
+    label: "能動情報蓄積",
+    group: "complexity",
+    color: "#7c3aed",
+    scaleId: "ais",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingAIS(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+  {
+    id: "predictability",
+    label: "予測可能性指数",
+    group: "complexity",
+    color: "#16a34a",
+    scaleId: "predict",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return rollingPredictability(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+  {
+    id: "info_ratio",
+    label: "情報比(スケール)",
+    group: "complexity",
+    color: "#ea580c",
+    scaleId: "inforatio",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 120) return [];
+      return rollingInfoRatio(lr, times).map((x) => tv(x.time, x.value));
+    },
+  },
+
+  // ====== 平均回帰 ======
+  {
+    id: "half_life",
+    label: "平均回帰半減期",
+    group: "meanrev",
+    color: "#0891b2",
+    scaleId: "halflife",
+    type: "line",
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const times = p.map((x) => x.time);
+      if (c.length < 61) return [];
+      return rollingHalfLife(c, times).map((x) => tv(x.time, x.halfLife));
+    },
+  },
+
+  // ====== 構造変化 ======
+  {
+    id: "rolling_adf",
+    label: "ローリングADF統計量",
+    group: "break",
+    color: "#2563eb",
+    scaleId: "adf",
+    type: "line",
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      const times = p.map((x) => x.time);
+      if (c.length < 253) return [];
+      return unitRootTest(c, times).rollingADF.map((x) => tv(x.time, x.stat));
+    },
+  },
+  {
+    id: "bocpd_prob",
+    label: "変化点確率(BOCPD)",
+    group: "break",
+    color: "#dc2626",
+    scaleId: "prob",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 30) return [];
+      const r = computeBOCPD(lr, times);
+      return r.changeProbability.map((v, i) => tv(times[i], v));
+    },
+  },
+  {
+    id: "cusum",
+    label: "CUSUM",
+    group: "break",
+    color: "#7c3aed",
+    scaleId: "cusum",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 60) return [];
+      return detectStructuralBreaks(lr, times).cusum.map((x) =>
+        tv(x.time, x.value)
+      );
+    },
+  },
+
+  // ====== マイクロ構造 ======
+  {
+    id: "roll_spread",
+    label: "Rollスプレッド(bps)",
+    group: "micro",
+    color: "#0891b2",
+    scaleId: "spread",
+    type: "line",
+    compute: (p) => rollSpread(p).rollingSpread.map((x) => tv(x.time, x.spread)),
+  },
+  {
+    id: "amihud",
+    label: "Amihud非流動性",
+    group: "micro",
+    color: "#ea580c",
+    scaleId: "amihud",
+    type: "line",
+    compute: (p) =>
+      amihudIlliquidity(p).rollingAmihud.map((x) => tv(x.time, x.amihud)),
+  },
+
+  // ====== 行動ファイナンス ======
+  {
+    id: "anchoring_ratio",
+    label: "アンカリング比率(52週高値)",
+    group: "behavioral",
+    color: "#db2777",
+    scaleId: "anchor",
+    type: "line",
+    compute: (p) =>
+      anchoringAnalysis(p).rollingRatio.map((x) => tv(x.time, x.ratio)),
+  },
+
+  // ====== ARIMA ======
+  {
+    id: "ar_fitted",
+    label: "AR当てはめ値",
+    group: "arima",
+    color: "#2563eb",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const c = p.map((x) => x.close);
+      if (c.length < 30) return [];
+      const ar = fitAR(c);
+      const out: TimeValue[] = [];
+      for (let t = ar.order; t < c.length; t++) {
+        out.push(tv(p[t].time, c[t] - ar.residuals[t]));
+      }
+      return out;
+    },
+  },
+  {
+    id: "ar_resid",
+    label: "AR残差(対数リターン)",
+    group: "arima",
+    color: "#dc2626",
+    scaleId: "ar_resid",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 30) return [];
+      const ar = fitAR(lr);
+      const out: TimeValue[] = [];
+      for (let t = ar.order; t < lr.length; t++) {
+        out.push(tv(times[t], ar.residuals[t]));
+      }
+      return out;
+    },
+  },
+
+  // ====== ネットワーク ======
+  {
+    id: "vg_degree",
+    label: "可視グラフ次数",
+    group: "network",
+    color: "#7c3aed",
+    scaleId: "vg_deg",
+    type: "line",
+    compute: (p) => {
+      const recent = p.slice(-750);
+      const c = recent.map((x) => x.close);
+      const times = recent.map((x) => x.time);
+      if (c.length < 30) return [];
+      return computeVisibilityGraph(c, times).degreeSeries.map((x) =>
+        tv(x.time, x.degree)
+      );
+    },
+  },
+  {
+    id: "rn_degree",
+    label: "再帰NW次数",
+    group: "network",
+    color: "#0891b2",
+    scaleId: "rn_deg",
+    type: "line",
+    compute: (p) => {
+      const recent = p.slice(-500);
+      const c = recent.map((x) => x.close);
+      if (c.length < 30) return [];
+      const r = computeRecurrenceNetwork(c);
+      return r.degreeSeries.map((v, i) => tv(recent[i].time, v));
+    },
+  },
+  {
+    id: "rn_clustering",
+    label: "再帰NWクラスタ係数",
+    group: "network",
+    color: "#16a34a",
+    scaleId: "rn_clust",
+    type: "line",
+    compute: (p) => {
+      const recent = p.slice(-500);
+      const c = recent.map((x) => x.close);
+      if (c.length < 30) return [];
+      const r = computeRecurrenceNetwork(c);
+      return r.localClustering.map((v, i) => tv(recent[i].time, v));
     },
   },
 ];
