@@ -436,7 +436,9 @@ export default function UnifiedChart({ prices, period }: Props) {
 
   return (
     <div ref={fullscreenRef} className={`bg-white rounded-lg border border-gray-200 p-4${isFullscreen ? " fixed inset-0 z-50 flex flex-col h-screen overflow-auto [&:fullscreen]:static [&:fullscreen]:inset-auto [&:fullscreen]:z-auto" : ""}`}>
-      <h3 className="font-bold text-gray-800 mb-3">Series Explorer</h3>
+      {!isFullscreen && (
+        <h3 className="font-bold text-gray-800 mb-3">Series Explorer</h3>
+      )}
 
       <div className={`relative${isFullscreen ? " flex-1" : ""}`}>
         <div
