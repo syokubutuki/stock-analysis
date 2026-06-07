@@ -79,6 +79,25 @@ export interface SeriesGroup {
   label: string;
 }
 
+// ---- Web Worker メッセージ型 ----
+export interface ComputedSeries {
+  id: string;
+  kind: "line" | "histogram" | "candlestick";
+  line?: TimeValue[];
+  ohlc?: TimeOHLC[];
+}
+
+export interface SeriesWorkerRequest {
+  reqId: number;
+  prices: PricePoint[];
+  ids: string[];
+}
+
+export interface SeriesWorkerResponse {
+  reqId: number;
+  results: ComputedSeries[];
+}
+
 export interface SeriesDef {
   id: string;
   label: string;
@@ -126,6 +145,21 @@ export const GROUPS: SeriesGroup[] = [
   { id: "network", label: "ネットワーク" },
 ];
 
+// 計算が重いグループ（Worker への依頼を「軽い系列を先」「重い系列を後」の
+// 2段階に分け、価格やSMA等を先に描画して体感速度を上げるために使用）
+export const HEAVY_GROUPS = new Set<string>([
+  "nonlinear",
+  "tda",
+  "network",
+  "decomp",
+  "regime",
+  "entropy",
+  "complexity",
+  "break",
+  "arima",
+  "meanrev",
+]);
+
 // ---- Helpers ----
 
 const tv = (time: string, value: number): TimeValue => ({ time, value });
@@ -143,6 +177,89 @@ function bestMaFit(series: number[]): SarimaFit | null {
   }
   return best;
 }
+
+// ---- Render単位メモ化 ----
+// 同一の prices 配列参照に対して重い計算を1度だけ実行し、結果を共有する。
+// 兄弟系列（例: BB上限/中央/下限）を同時表示しても計算は1回で済む。
+// prices が更新されると参照が変わり WeakMap のエントリは自動的にGCされる。
+// 注意: 返り値オブジェクトは各系列から「読み取り専用」で参照される前提。
+function memoBy<R>(fn: (p: PricePoint[]) => R): (p: PricePoint[]) => R {
+  const cache = new WeakMap<PricePoint[], R>();
+  return (p) => {
+    if (cache.has(p)) return cache.get(p) as R;
+    const v = fn(p);
+    cache.set(p, v);
+    return v;
+  };
+}
+
+// 単一引数(prices)の関数はそのままラップ
+const mTrend = memoBy(computeTrendSeries);
+const mBollinger = memoBy(computeBollinger);
+const mMACD = memoBy(computeMACD);
+const mADX = memoBy(computeADX);
+const mATR = memoBy(computeATR);
+const mKeltner = memoBy(computeKeltnerChannel);
+const mVWAP = memoBy(computeVWAP);
+const mOBV = memoBy(computeOBV);
+const mStoch = memoBy(computeStochastics);
+const mVolume = memoBy(analyzeVolume);
+const mGap = memoBy(computeGapSeries);
+const mDrawdown = memoBy(computeDrawdownSeries);
+const mRangeVol = memoBy(computeRangeVolatility);
+const mRisk = memoBy(rollingRiskMetrics);
+const mCandle = memoBy(computeCandleMetrics);
+const mIntraday = memoBy(computeIntradayRange);
+const mMFEMAE = memoBy(computeMFEMAE);
+
+// 派生系列（close/対数リターン抽出を内部で行う）。入力配列は毎回新規生成し、
+// 共有による in-place 変更リスクを避けつつ、重い当てはめ結果だけを共有する。
+const mKalman1 = memoBy((p: PricePoint[]) => kalmanFilter(p.map((x) => x.close)));
+const mKalman2 = memoBy((p: PricePoint[]) => kalmanFilter2State(p.map((x) => x.close)));
+const mAKalman = memoBy((p: PricePoint[]) => adaptiveKalmanFilter(p.map((x) => x.close)));
+const mKalman3 = memoBy((p: PricePoint[]) => kalmanFilter3State(p.map((x) => x.close)));
+const mSmoother = memoBy((p: PricePoint[]) => kalmanSmoother(p.map((x) => x.close)));
+const mGarch = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  return lr.length < 30 ? null : fitGarch(lr);
+});
+const mGJR = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  return lr.length < 30 ? null : fitGJR(lr);
+});
+const mEGARCH = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  return lr.length < 30 ? null : fitEGARCH(lr);
+});
+const mTDA = memoBy((p: PricePoint[]) => {
+  const vals = p.map((x) => x.close);
+  const times = p.map((x) => x.time);
+  return vals.length < 180 ? null : rollingTDA(vals, times);
+});
+const mRQA = memoBy((p: PricePoint[]) => {
+  const vals = p.map((x) => x.close);
+  const times = p.map((x) => x.time);
+  return vals.length < 150 ? null : rollingRQA(vals, times);
+});
+const mPhase = memoBy((p: PricePoint[]) => {
+  const vals = p.map((x) => x.close);
+  const times = p.map((x) => x.time);
+  return vals.length < 50 ? null : phaseSpaceDensity(vals, times);
+});
+const mRecurNet = memoBy((p: PricePoint[]) => {
+  const recent = p.slice(-500);
+  const c = recent.map((x) => x.close);
+  return c.length < 30 ? null : { recent, net: computeRecurrenceNetwork(c) };
+});
+const mSSA = memoBy((p: PricePoint[]) => {
+  const recent = p.slice(-1000);
+  const c = recent.map((x) => x.close);
+  return c.length < 60 ? null : { recent, ssa: computeSSA(c), n: c.length };
+});
+const mBestMa = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  return lr.length < 50 ? null : bestMaFit(lr);
+});
 
 // ---- Series Catalog ----
 
@@ -208,7 +325,7 @@ export const SERIES: SeriesDef[] = [
     color: "#059669",
     scaleId: "price",
     type: "line",
-    compute: (p) => computeVWAP(p).map((x) => tv(x.time, x.vwap)),
+    compute: (p) => mVWAP(p).map((x) => tv(x.time, x.vwap)),
   },
 
   // ====== 移動平均 ======
@@ -220,7 +337,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     compute: (p) =>
-      computeTrendSeries(p)
+      mTrend(p)
         .filter((x) => x.sma5 !== null)
         .map((x) => tv(x.time, x.sma5!)),
   },
@@ -232,7 +349,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     compute: (p) =>
-      computeTrendSeries(p)
+      mTrend(p)
         .filter((x) => x.sma25 !== null)
         .map((x) => tv(x.time, x.sma25!)),
   },
@@ -244,7 +361,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     compute: (p) =>
-      computeTrendSeries(p)
+      mTrend(p)
         .filter((x) => x.sma75 !== null)
         .map((x) => tv(x.time, x.sma75!)),
   },
@@ -258,7 +375,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     lineStyle: 2,
-    compute: (p) => computeBollinger(p).map((x) => tv(x.time, x.upper)),
+    compute: (p) => mBollinger(p).map((x) => tv(x.time, x.upper)),
   },
   {
     id: "bb_middle",
@@ -267,7 +384,7 @@ export const SERIES: SeriesDef[] = [
     color: "#64748b",
     scaleId: "price",
     type: "line",
-    compute: (p) => computeBollinger(p).map((x) => tv(x.time, x.middle)),
+    compute: (p) => mBollinger(p).map((x) => tv(x.time, x.middle)),
   },
   {
     id: "bb_lower",
@@ -277,7 +394,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     lineStyle: 2,
-    compute: (p) => computeBollinger(p).map((x) => tv(x.time, x.lower)),
+    compute: (p) => mBollinger(p).map((x) => tv(x.time, x.lower)),
   },
   {
     id: "kelt_upper",
@@ -287,7 +404,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     lineStyle: 3,
-    compute: (p) => computeKeltnerChannel(p).map((x) => tv(x.time, x.upper)),
+    compute: (p) => mKeltner(p).map((x) => tv(x.time, x.upper)),
   },
   {
     id: "kelt_middle",
@@ -296,7 +413,7 @@ export const SERIES: SeriesDef[] = [
     color: "#b45309",
     scaleId: "price",
     type: "line",
-    compute: (p) => computeKeltnerChannel(p).map((x) => tv(x.time, x.middle)),
+    compute: (p) => mKeltner(p).map((x) => tv(x.time, x.middle)),
   },
   {
     id: "kelt_lower",
@@ -306,7 +423,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     lineStyle: 3,
-    compute: (p) => computeKeltnerChannel(p).map((x) => tv(x.time, x.lower)),
+    compute: (p) => mKeltner(p).map((x) => tv(x.time, x.lower)),
   },
 
   // ====== 出来高 ======
@@ -318,7 +435,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "volume",
     type: "histogram",
     compute: (p) => {
-      const bars = analyzeVolume(p);
+      const bars = mVolume(p);
       return bars.map((b) => ({
         time: b.time,
         value: b.volume,
@@ -333,7 +450,7 @@ export const SERIES: SeriesDef[] = [
     color: "#ff9800",
     scaleId: "volume",
     type: "line",
-    compute: (p) => analyzeVolume(p).map((b) => tv(b.time, b.avgVolume)),
+    compute: (p) => mVolume(p).map((b) => tv(b.time, b.avgVolume)),
   },
   {
     id: "obv",
@@ -342,7 +459,7 @@ export const SERIES: SeriesDef[] = [
     color: "#2196f3",
     scaleId: "obv",
     type: "line",
-    compute: (p) => computeOBV(p).map((x) => tv(x.time, x.obv)),
+    compute: (p) => mOBV(p).map((x) => tv(x.time, x.obv)),
   },
   {
     id: "obv_ma",
@@ -352,7 +469,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "obv",
     type: "line",
     lineStyle: 2,
-    compute: (p) => computeOBV(p).map((x) => tv(x.time, x.obvMA)),
+    compute: (p) => mOBV(p).map((x) => tv(x.time, x.obvMA)),
   },
 
   // ====== オシレーター ======
@@ -372,7 +489,7 @@ export const SERIES: SeriesDef[] = [
     color: "#3b82f6",
     scaleId: "osc",
     type: "line",
-    compute: (p) => computeStochastics(p).map((x) => tv(x.time, x.slowK)),
+    compute: (p) => mStoch(p).map((x) => tv(x.time, x.slowK)),
   },
   {
     id: "stoch_d",
@@ -382,7 +499,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "osc",
     type: "line",
     lineStyle: 2,
-    compute: (p) => computeStochastics(p).map((x) => tv(x.time, x.slowD)),
+    compute: (p) => mStoch(p).map((x) => tv(x.time, x.slowD)),
   },
   {
     id: "adx",
@@ -392,7 +509,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "osc",
     type: "line",
     lineWidth: 2,
-    compute: (p) => computeADX(p).map((x) => tv(x.time, x.adx)),
+    compute: (p) => mADX(p).map((x) => tv(x.time, x.adx)),
   },
   {
     id: "plus_di",
@@ -401,7 +518,7 @@ export const SERIES: SeriesDef[] = [
     color: "#22c55e",
     scaleId: "osc",
     type: "line",
-    compute: (p) => computeADX(p).map((x) => tv(x.time, x.plusDI)),
+    compute: (p) => mADX(p).map((x) => tv(x.time, x.plusDI)),
   },
   {
     id: "minus_di",
@@ -410,7 +527,7 @@ export const SERIES: SeriesDef[] = [
     color: "#ef4444",
     scaleId: "osc",
     type: "line",
-    compute: (p) => computeADX(p).map((x) => tv(x.time, x.minusDI)),
+    compute: (p) => mADX(p).map((x) => tv(x.time, x.minusDI)),
   },
   {
     id: "bb_pctb",
@@ -419,7 +536,7 @@ export const SERIES: SeriesDef[] = [
     color: "#64748b",
     scaleId: "ratio",
     type: "line",
-    compute: (p) => computeBollinger(p).map((x) => tv(x.time, x.percentB)),
+    compute: (p) => mBollinger(p).map((x) => tv(x.time, x.percentB)),
   },
   {
     id: "bb_bw",
@@ -428,7 +545,7 @@ export const SERIES: SeriesDef[] = [
     color: "#475569",
     scaleId: "bw",
     type: "line",
-    compute: (p) => computeBollinger(p).map((x) => tv(x.time, x.bandwidth)),
+    compute: (p) => mBollinger(p).map((x) => tv(x.time, x.bandwidth)),
   },
 
   // ====== MACD ======
@@ -439,7 +556,7 @@ export const SERIES: SeriesDef[] = [
     color: "#3b82f6",
     scaleId: "macd",
     type: "line",
-    compute: (p) => computeMACD(p).map((x) => tv(x.time, x.macd)),
+    compute: (p) => mMACD(p).map((x) => tv(x.time, x.macd)),
   },
   {
     id: "macd_signal",
@@ -448,7 +565,7 @@ export const SERIES: SeriesDef[] = [
     color: "#ef4444",
     scaleId: "macd",
     type: "line",
-    compute: (p) => computeMACD(p).map((x) => tv(x.time, x.signal)),
+    compute: (p) => mMACD(p).map((x) => tv(x.time, x.signal)),
   },
   {
     id: "macd_hist",
@@ -458,7 +575,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "macd",
     type: "histogram",
     colorFn: upDown,
-    compute: (p) => computeMACD(p).map((x) => tv(x.time, x.histogram)),
+    compute: (p) => mMACD(p).map((x) => tv(x.time, x.histogram)),
   },
 
   // ====== 差分 ======
@@ -538,7 +655,7 @@ export const SERIES: SeriesDef[] = [
     type: "histogram",
     colorFn: upDown,
     compute: (p) => {
-      const gaps = computeGapSeries(p);
+      const gaps = mGap(p);
       return gaps.map((g) => tv(g.time, g.overnightReturn));
     },
   },
@@ -551,7 +668,7 @@ export const SERIES: SeriesDef[] = [
     type: "histogram",
     colorFn: upDown,
     compute: (p) => {
-      const gaps = computeGapSeries(p);
+      const gaps = mGap(p);
       return gaps.map((g) => tv(g.time, g.intradayReturn));
     },
   },
@@ -622,7 +739,7 @@ export const SERIES: SeriesDef[] = [
     color: "#f97316",
     scaleId: "atr",
     type: "line",
-    compute: (p) => computeATR(p).map((x) => tv(x.time, x.atr)),
+    compute: (p) => mATR(p).map((x) => tv(x.time, x.atr)),
   },
   {
     id: "atr_pct",
@@ -631,7 +748,7 @@ export const SERIES: SeriesDef[] = [
     color: "#fb923c",
     scaleId: "vol",
     type: "line",
-    compute: (p) => computeATR(p).map((x) => tv(x.time, x.atrPercent)),
+    compute: (p) => mATR(p).map((x) => tv(x.time, x.atrPercent)),
   },
   {
     id: "garch_vol",
@@ -641,10 +758,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "vol",
     type: "line",
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const lr = logReturns(c);
-      if (lr.length < 30) return [];
-      const g = fitGarch(lr);
+      const g = mGarch(p);
+      if (!g) return [];
       return g.conditionalVol.map((v, i) => tv(p[i + 1].time, v));
     },
   },
@@ -655,7 +770,7 @@ export const SERIES: SeriesDef[] = [
     color: "#0891b2",
     scaleId: "vol",
     type: "line",
-    compute: (p) => computeRangeVolatility(p).map((x) => tv(x.time, x.parkinson)),
+    compute: (p) => mRangeVol(p).map((x) => tv(x.time, x.parkinson)),
   },
   {
     id: "rv_garman",
@@ -664,7 +779,7 @@ export const SERIES: SeriesDef[] = [
     color: "#0e7490",
     scaleId: "vol",
     type: "line",
-    compute: (p) => computeRangeVolatility(p).map((x) => tv(x.time, x.garmanKlass)),
+    compute: (p) => mRangeVol(p).map((x) => tv(x.time, x.garmanKlass)),
   },
   {
     id: "rv_yang",
@@ -673,7 +788,7 @@ export const SERIES: SeriesDef[] = [
     color: "#155e75",
     scaleId: "vol",
     type: "line",
-    compute: (p) => computeRangeVolatility(p).map((x) => tv(x.time, x.yangZhang)),
+    compute: (p) => mRangeVol(p).map((x) => tv(x.time, x.yangZhang)),
   },
   {
     id: "gjr_vol",
@@ -683,9 +798,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "vol",
     type: "line",
     compute: (p) => {
-      const lr = logReturns(p.map((x) => x.close));
-      if (lr.length < 30) return [];
-      const g = fitGJR(lr);
+      const g = mGJR(p);
+      if (!g) return [];
       return g.conditionalVol.map((v, i) => tv(p[i + 1].time, v));
     },
   },
@@ -697,9 +811,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "vol",
     type: "line",
     compute: (p) => {
-      const lr = logReturns(p.map((x) => x.close));
-      if (lr.length < 30) return [];
-      const g = fitEGARCH(lr);
+      const g = mEGARCH(p);
+      if (!g) return [];
       return g.conditionalVol.map((v, i) => tv(p[i + 1].time, v));
     },
   },
@@ -713,7 +826,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "cum_gap",
     type: "line",
     compute: (p) => {
-      const gaps = computeGapSeries(p);
+      const gaps = mGap(p);
       const cum = computeCumulativeReturns(gaps);
       return cum.map((c) => tv(c.time, c.overnight * 100));
     },
@@ -726,7 +839,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "cum_gap",
     type: "line",
     compute: (p) => {
-      const gaps = computeGapSeries(p);
+      const gaps = mGap(p);
       const cum = computeCumulativeReturns(gaps);
       return cum.map((c) => tv(c.time, c.intraday * 100));
     },
@@ -739,7 +852,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "cum_gap",
     type: "line",
     compute: (p) => {
-      const gaps = computeGapSeries(p);
+      const gaps = mGap(p);
       const cum = computeCumulativeReturns(gaps);
       return cum.map((c) => tv(c.time, c.total * 100));
     },
@@ -753,7 +866,7 @@ export const SERIES: SeriesDef[] = [
     color: "#dc2626",
     scaleId: "dd",
     type: "line",
-    compute: (p) => computeDrawdownSeries(p).map((x) => tv(x.time, x.drawdown * 100)),
+    compute: (p) => mDrawdown(p).map((x) => tv(x.time, x.drawdown * 100)),
   },
   {
     id: "peak",
@@ -763,7 +876,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     lineStyle: 2,
-    compute: (p) => computeDrawdownSeries(p).map((x) => tv(x.time, x.peak)),
+    compute: (p) => mDrawdown(p).map((x) => tv(x.time, x.peak)),
   },
   {
     id: "roll_sharpe",
@@ -772,7 +885,7 @@ export const SERIES: SeriesDef[] = [
     color: "#22c55e",
     scaleId: "risk_ratio",
     type: "line",
-    compute: (p) => rollingRiskMetrics(p).map((x) => tv(x.time, x.sharpe)),
+    compute: (p) => mRisk(p).map((x) => tv(x.time, x.sharpe)),
   },
   {
     id: "roll_sortino",
@@ -781,7 +894,7 @@ export const SERIES: SeriesDef[] = [
     color: "#3b82f6",
     scaleId: "risk_ratio",
     type: "line",
-    compute: (p) => rollingRiskMetrics(p).map((x) => tv(x.time, x.sortino)),
+    compute: (p) => mRisk(p).map((x) => tv(x.time, x.sortino)),
   },
   {
     id: "roll_vol",
@@ -790,7 +903,7 @@ export const SERIES: SeriesDef[] = [
     color: "#f97316",
     scaleId: "vol",
     type: "line",
-    compute: (p) => rollingRiskMetrics(p).map((x) => tv(x.time, x.vol)),
+    compute: (p) => mRisk(p).map((x) => tv(x.time, x.vol)),
   },
   {
     id: "roll_var95",
@@ -799,7 +912,7 @@ export const SERIES: SeriesDef[] = [
     color: "#dc2626",
     scaleId: "ret",
     type: "line",
-    compute: (p) => rollingRiskMetrics(p).map((x) => tv(x.time, x.var95)),
+    compute: (p) => mRisk(p).map((x) => tv(x.time, x.var95)),
   },
   {
     id: "mfe",
@@ -808,7 +921,7 @@ export const SERIES: SeriesDef[] = [
     color: "#22c55e",
     scaleId: "mfe",
     type: "line",
-    compute: (p) => computeMFEMAE(p).map((x) => tv(x.time, x.mfe * 100)),
+    compute: (p) => mMFEMAE(p).map((x) => tv(x.time, x.mfe * 100)),
   },
   {
     id: "mae",
@@ -817,7 +930,7 @@ export const SERIES: SeriesDef[] = [
     color: "#dc2626",
     scaleId: "mfe",
     type: "line",
-    compute: (p) => computeMFEMAE(p).map((x) => tv(x.time, x.mae * 100)),
+    compute: (p) => mMFEMAE(p).map((x) => tv(x.time, x.mae * 100)),
   },
 
   // ====== ローソク足構造 ======
@@ -828,7 +941,7 @@ export const SERIES: SeriesDef[] = [
     color: "#6366f1",
     scaleId: "ratio",
     type: "line",
-    compute: (p) => computeCandleMetrics(p).map((x) => tv(x.time, x.bodyRatio)),
+    compute: (p) => mCandle(p).map((x) => tv(x.time, x.bodyRatio)),
   },
   {
     id: "upper_shadow",
@@ -837,7 +950,7 @@ export const SERIES: SeriesDef[] = [
     color: "#dc2626",
     scaleId: "ratio",
     type: "line",
-    compute: (p) => computeCandleMetrics(p).map((x) => tv(x.time, x.upperShadowRatio)),
+    compute: (p) => mCandle(p).map((x) => tv(x.time, x.upperShadowRatio)),
   },
   {
     id: "lower_shadow",
@@ -846,7 +959,7 @@ export const SERIES: SeriesDef[] = [
     color: "#2563eb",
     scaleId: "ratio",
     type: "line",
-    compute: (p) => computeCandleMetrics(p).map((x) => tv(x.time, x.lowerShadowRatio)),
+    compute: (p) => mCandle(p).map((x) => tv(x.time, x.lowerShadowRatio)),
   },
   {
     id: "close_pos",
@@ -855,7 +968,7 @@ export const SERIES: SeriesDef[] = [
     color: "#0ea5e9",
     scaleId: "ratio",
     type: "line",
-    compute: (p) => computeCandleMetrics(p).map((x) => tv(x.time, x.closePosition)),
+    compute: (p) => mCandle(p).map((x) => tv(x.time, x.closePosition)),
   },
   {
     id: "body_ratio_ma",
@@ -865,7 +978,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "ratio",
     type: "line",
     compute: (p) => {
-      const m = computeCandleMetrics(p);
+      const m = mCandle(p);
       return rollingCandleStats(m).map((x) => tv(x.time, x.bodyRatioMA));
     },
   },
@@ -877,7 +990,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "ratio",
     type: "line",
     compute: (p) => {
-      const m = computeCandleMetrics(p);
+      const m = mCandle(p);
       return rollingCandleStats(m).map((x) => tv(x.time, x.closePositionMA));
     },
   },
@@ -890,7 +1003,7 @@ export const SERIES: SeriesDef[] = [
     color: "#f97316",
     scaleId: "nrange",
     type: "line",
-    compute: (p) => computeIntradayRange(p).map((x) => tv(x.time, x.normalizedRange * 100)),
+    compute: (p) => mIntraday(p).map((x) => tv(x.time, x.normalizedRange * 100)),
   },
   {
     id: "range_ma",
@@ -900,7 +1013,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "nrange",
     type: "line",
     compute: (p) => {
-      const ir = computeIntradayRange(p);
+      const ir = mIntraday(p);
       return rollingRange(ir).map((x) => tv(x.time, x.rangeMA * 100));
     },
   },
@@ -929,10 +1042,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "density",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 50) return [];
-      const r = phaseSpaceDensity(vals, times);
+      const r = mPhase(p);
+      if (!r) return [];
       return r.times.map((t, i) => tv(t, r.density[i]));
     },
   },
@@ -944,10 +1055,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "density",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 50) return [];
-      const r = phaseSpaceDensity(vals, times);
+      const r = mPhase(p);
+      if (!r) return [];
       return r.times.map((t, i) => tv(t, r.novelty[i]));
     },
   },
@@ -959,10 +1068,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "rqa",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 150) return [];
-      const r = rollingRQA(vals, times);
+      const r = mRQA(p);
+      if (!r) return [];
       return r.data.map((x) => tv(x.time, x.det));
     },
   },
@@ -974,10 +1081,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "rqa",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 150) return [];
-      const r = rollingRQA(vals, times);
+      const r = mRQA(p);
+      if (!r) return [];
       return r.data.map((x) => tv(x.time, x.lam));
     },
   },
@@ -989,10 +1094,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "rqa",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 150) return [];
-      const r = rollingRQA(vals, times);
+      const r = mRQA(p);
+      if (!r) return [];
       return r.data.map((x) => tv(x.time, x.recurrenceRate));
     },
   },
@@ -1022,10 +1125,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "tda_b0",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 180) return [];
-      const r = rollingTDA(vals, times);
+      const r = mTDA(p);
+      if (!r) return [];
       return r.data.map((x) => tv(x.time, x.beta0));
     },
   },
@@ -1037,10 +1138,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "tda_b1",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 180) return [];
-      const r = rollingTDA(vals, times);
+      const r = mTDA(p);
+      if (!r) return [];
       return r.data.map((x) => tv(x.time, x.beta1));
     },
   },
@@ -1052,10 +1151,8 @@ export const SERIES: SeriesDef[] = [
     scaleId: "tda_persist",
     type: "line",
     compute: (p) => {
-      const vals = p.map((x) => x.close);
-      const times = p.map((x) => x.time);
-      if (vals.length < 180) return [];
-      const r = rollingTDA(vals, times);
+      const r = mTDA(p);
+      if (!r) return [];
       return r.data.map((x) => tv(x.time, x.totalPersistence));
     },
   },
@@ -1084,8 +1181,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "price",
     type: "line",
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter(c);
+      const r = mKalman1(p);
       return r.filteredState.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1098,8 +1194,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter(c);
+      const r = mKalman1(p);
       return r.upperBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1112,8 +1207,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter(c);
+      const r = mKalman1(p);
       return r.lowerBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1126,8 +1220,7 @@ export const SERIES: SeriesDef[] = [
     type: "histogram",
     colorFn: upDown,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter(c);
+      const r = mKalman1(p);
       return r.innovation.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1139,8 +1232,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "kalman_gain",
     type: "line",
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter(c);
+      const r = mKalman1(p);
       return r.filterGain.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1155,8 +1247,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineWidth: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter2State(c);
+      const r = mKalman2(p);
       return r.filteredPrice.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1169,8 +1260,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter2State(c);
+      const r = mKalman2(p);
       return r.upperBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1183,8 +1273,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter2State(c);
+      const r = mKalman2(p);
       return r.lowerBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1197,8 +1286,7 @@ export const SERIES: SeriesDef[] = [
     type: "histogram",
     colorFn: upDown,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter2State(c);
+      const r = mKalman2(p);
       return r.filteredVelocity.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1211,8 +1299,7 @@ export const SERIES: SeriesDef[] = [
     type: "histogram",
     colorFn: upDown,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter2State(c);
+      const r = mKalman2(p);
       return r.innovation.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1227,8 +1314,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineWidth: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = adaptiveKalmanFilter(c);
+      const r = mAKalman(p);
       return r.filteredState.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1241,8 +1327,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = adaptiveKalmanFilter(c);
+      const r = mAKalman(p);
       return r.upperBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1255,8 +1340,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = adaptiveKalmanFilter(c);
+      const r = mAKalman(p);
       return r.lowerBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1270,8 +1354,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineWidth: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter3State(c);
+      const r = mKalman3(p);
       return r.filteredPrice.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1284,8 +1367,7 @@ export const SERIES: SeriesDef[] = [
     type: "histogram",
     colorFn: upDown,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter3State(c);
+      const r = mKalman3(p);
       return r.filteredVelocity.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1297,8 +1379,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "kalman_accel",
     type: "line",
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanFilter3State(c);
+      const r = mKalman3(p);
       return r.filteredAcceleration.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1313,8 +1394,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineWidth: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanSmoother(c);
+      const r = mSmoother(p);
       return r.smoothedPrice.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1327,8 +1407,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanSmoother(c);
+      const r = mSmoother(p);
       return r.smoothedUpperBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1341,8 +1420,7 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanSmoother(c);
+      const r = mSmoother(p);
       return r.smoothedLowerBand.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1354,8 +1432,7 @@ export const SERIES: SeriesDef[] = [
     scaleId: "kalman_vel",
     type: "line",
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      const r = kalmanSmoother(c);
+      const r = mSmoother(p);
       return r.smoothedVelocity.map((v, i) => tv(p[i].time, v));
     },
   },
@@ -1370,12 +1447,9 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineWidth: 2,
     compute: (p) => {
-      const recent = p.slice(-1000);
-      const c = recent.map((x) => x.close);
-      if (c.length < 60) return [];
-      const r = computeSSA(c);
-      if (r.trend.length !== c.length) return [];
-      return r.trend.map((v, i) => tv(recent[i].time, v));
+      const r = mSSA(p);
+      if (!r || r.ssa.trend.length !== r.n) return [];
+      return r.ssa.trend.map((v, i) => tv(r.recent[i].time, v));
     },
   },
   {
@@ -1386,12 +1460,9 @@ export const SERIES: SeriesDef[] = [
     scaleId: "ssa_osc",
     type: "line",
     compute: (p) => {
-      const recent = p.slice(-1000);
-      const c = recent.map((x) => x.close);
-      if (c.length < 60) return [];
-      const r = computeSSA(c);
-      if (r.periodic.length !== c.length) return [];
-      return r.periodic.map((v, i) => tv(recent[i].time, v));
+      const r = mSSA(p);
+      if (!r || r.ssa.periodic.length !== r.n) return [];
+      return r.ssa.periodic.map((v, i) => tv(r.recent[i].time, v));
     },
   },
   {
@@ -1402,12 +1473,9 @@ export const SERIES: SeriesDef[] = [
     scaleId: "ssa_osc",
     type: "line",
     compute: (p) => {
-      const recent = p.slice(-1000);
-      const c = recent.map((x) => x.close);
-      if (c.length < 60) return [];
-      const r = computeSSA(c);
-      if (r.noise.length !== c.length) return [];
-      return r.noise.map((v, i) => tv(recent[i].time, v));
+      const r = mSSA(p);
+      if (!r || r.ssa.noise.length !== r.n) return [];
+      return r.ssa.noise.map((v, i) => tv(r.recent[i].time, v));
     },
   },
 
@@ -1750,11 +1818,9 @@ export const SERIES: SeriesDef[] = [
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const lr = logReturns(p.map((x) => x.close));
-      const times = p.slice(1).map((x) => x.time);
-      if (lr.length < 50) return [];
-      const fit = bestMaFit(lr);
+      const fit = mBestMa(p);
       if (!fit) return [];
+      const times = p.slice(1).map((x) => x.time);
       const out: TimeValue[] = [];
       for (let i = 0; i < fit.fitted.length && i < times.length; i++) {
         if (!Number.isNaN(fit.fitted[i])) out.push(tv(times[i], fit.fitted[i]));
@@ -1770,11 +1836,9 @@ export const SERIES: SeriesDef[] = [
     scaleId: "arima_lr",
     type: "line",
     compute: (p) => {
-      const lr = logReturns(p.map((x) => x.close));
-      const times = p.slice(1).map((x) => x.time);
-      if (lr.length < 50) return [];
-      const fit = bestMaFit(lr);
+      const fit = mBestMa(p);
       if (!fit) return [];
+      const times = p.slice(1).map((x) => x.time);
       const out: TimeValue[] = [];
       for (let i = 0; i < fit.residuals.length && i < times.length; i++) {
         if (!Number.isNaN(fit.residuals[i])) out.push(tv(times[i], fit.residuals[i]));
@@ -1825,11 +1889,9 @@ export const SERIES: SeriesDef[] = [
     scaleId: "rn_deg",
     type: "line",
     compute: (p) => {
-      const recent = p.slice(-500);
-      const c = recent.map((x) => x.close);
-      if (c.length < 30) return [];
-      const r = computeRecurrenceNetwork(c);
-      return r.degreeSeries.map((v, i) => tv(recent[i].time, v));
+      const r = mRecurNet(p);
+      if (!r) return [];
+      return r.net.degreeSeries.map((v, i) => tv(r.recent[i].time, v));
     },
   },
   {
@@ -1840,13 +1902,51 @@ export const SERIES: SeriesDef[] = [
     scaleId: "rn_clust",
     type: "line",
     compute: (p) => {
-      const recent = p.slice(-500);
-      const c = recent.map((x) => x.close);
-      if (c.length < 30) return [];
-      const r = computeRecurrenceNetwork(c);
-      return r.localClustering.map((v, i) => tv(recent[i].time, v));
+      const r = mRecurNet(p);
+      if (!r) return [];
+      return r.net.localClustering.map((v, i) => tv(r.recent[i].time, v));
     },
   },
 ];
 
 export const DEFAULT_ENABLED = new Set(["candle", "volume"]);
+
+// ---- プリセット（系列をまとめてON）----
+export interface SeriesPreset {
+  id: string;
+  label: string;
+  ids: string[];
+}
+
+export const PRESETS: SeriesPreset[] = [
+  {
+    id: "trend",
+    label: "トレンド",
+    ids: ["candle", "sma5", "sma25", "sma75", "kalman2_price"],
+  },
+  {
+    id: "volatility",
+    label: "ボラティリティ",
+    ids: ["close", "ewma_vol", "garch_vol", "atr", "rv_yang"],
+  },
+  {
+    id: "oscillator",
+    label: "オシレーター",
+    ids: ["rsi", "stoch_k", "stoch_d", "macd_line", "macd_signal", "macd_hist"],
+  },
+  {
+    id: "regime",
+    label: "レジーム判定",
+    ids: ["candle", "hmm_state", "bocpd_prob", "rolling_adf"],
+  },
+  {
+    id: "risk",
+    label: "リスク",
+    ids: ["close", "drawdown", "roll_sharpe", "roll_var95"],
+  },
+  {
+    id: "volume",
+    label: "出来高",
+    ids: ["candle", "volume", "obv", "obv_ma"],
+  },
+];

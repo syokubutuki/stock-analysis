@@ -16,7 +16,11 @@ import {
   GROUPS,
   SERIES,
   DEFAULT_ENABLED,
+  PRESETS,
+  HEAVY_GROUPS,
   type SeriesDef,
+  type ComputedSeries,
+  type SeriesWorkerResponse,
 } from "../../lib/chart-series";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
@@ -59,6 +63,23 @@ function fmt(v: number): string {
   return v.toFixed(6);
 }
 
+const LS_ENABLED = "unifiedChart.enabled";
+const LS_EXPANDED = "unifiedChart.expanded";
+
+function loadSet(key: string, fallback: Iterable<string>): Set<string> {
+  if (typeof window === "undefined") return new Set(fallback);
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr as string[]);
+    }
+  } catch {
+    // ignore malformed storage
+  }
+  return new Set(fallback);
+}
+
 function useIsMobile(breakpoint = 768) {
   const [mobile, setMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth < breakpoint
@@ -81,12 +102,23 @@ export default function UnifiedChart({ prices, period }: Props) {
   /* eslint-enable @typescript-eslint/no-explicit-any */
   const savedLogicalRange = useRef<LogicalRange | null>(null);
   const prevPricesRef = useRef<PricePoint[]>(prices);
+  // Web Worker による系列計算（メインスレッドのブロッキング回避）
+  const workerRef = useRef<Worker | null>(null);
+  const computedRef = useRef(new Map<string, ComputedSeries>());
+  const reqPrevPricesRef = useRef<PricePoint[]>(prices);
+  const reqIdRef = useRef(0);
+  const pendingChunksRef = useRef(0);
+  const pendingRangeResetRef = useRef(true);
+  // 現在のペイン構成（scaleId の並び。price が常にペイン0）
+  const currentScaleOrderRef = useRef<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [version, setVersion] = useState(0);
   const isMobile = useIsMobile();
   const [enabled, setEnabled] = useState<Set<string>>(
-    () => new Set(DEFAULT_ENABLED)
+    () => loadSet(LS_ENABLED, DEFAULT_ENABLED)
   );
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(["price"])
+    () => loadSet(LS_EXPANDED, ["price"])
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(
@@ -94,6 +126,15 @@ export default function UnifiedChart({ prices, period }: Props) {
   );
   const [legendTime, setLegendTime] = useState("");
   const [legendEntries, setLegendEntries] = useState<LegendEntry[]>([]);
+  const [query, setQuery] = useState("");
+
+  const applyPreset = useCallback((ids: string[]) => {
+    setEnabled(new Set(ids));
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setEnabled(new Set());
+  }, []);
 
   const toggle = useCallback((id: string) => {
     setEnabled((prev) => {
@@ -221,23 +262,114 @@ export default function UnifiedChart({ prices, period }: Props) {
     };
   }, []);
 
-  // Sync series when prices or enabled series change
+  // Web Worker のライフサイクル管理
+  useEffect(() => {
+    const worker = new Worker(
+      new URL("../../lib/chart-series.worker.ts", import.meta.url)
+    );
+    workerRef.current = worker;
+    worker.onmessage = (e: MessageEvent<SeriesWorkerResponse>) => {
+      const { reqId, results } = e.data;
+      if (reqId !== reqIdRef.current) return; // 古い応答は破棄
+      for (const r of results) computedRef.current.set(r.id, r);
+      pendingChunksRef.current -= 1;
+      if (pendingChunksRef.current <= 0) setLoading(false);
+      setVersion((v) => v + 1);
+    };
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []);
+
+  // 計算リクエスト: prices / 有効系列の変化で未計算分だけWorkerに依頼
+  useEffect(() => {
+    if (prices.length === 0) return;
+
+    if (reqPrevPricesRef.current !== prices) {
+      reqPrevPricesRef.current = prices;
+      computedRef.current.clear();
+    }
+
+    const missing = enabledSeries.filter((s) => !computedRef.current.has(s.id));
+
+    if (missing.length === 0) {
+      // 全て計算済み → 描画だけ更新（削除系のトグル等）
+      setVersion((v) => v + 1);
+      return;
+    }
+
+    // 軽い系列を先に、重い系列を後に依頼（段階描画）
+    const light = missing
+      .filter((s) => !HEAVY_GROUPS.has(s.group))
+      .map((s) => s.id);
+    const heavy = missing
+      .filter((s) => HEAVY_GROUPS.has(s.group))
+      .map((s) => s.id);
+
+    const reqId = ++reqIdRef.current;
+    pendingChunksRef.current = (light.length ? 1 : 0) + (heavy.length ? 1 : 0);
+    setLoading(true);
+    if (light.length) workerRef.current?.postMessage({ reqId, prices, ids: light });
+    if (heavy.length) workerRef.current?.postMessage({ reqId, prices, ids: heavy });
+  }, [prices, enabledSeries]);
+
+  // 選択状態を localStorage に永続化
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_ENABLED, JSON.stringify([...enabled]));
+    } catch {
+      // ignore
+    }
+  }, [enabled]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_EXPANDED, JSON.stringify([...expanded]));
+    } catch {
+      // ignore
+    }
+  }, [expanded]);
+
+  // 計算済みデータをチャートに反映（scaleId 単位でペイン分割）
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || prices.length === 0) return;
 
+    // 計算済みで非空のデータを持つ系列のみ描画対象
+    const renderable = enabledSeries.filter((def) => {
+      const c = computedRef.current.get(def.id);
+      if (!c) return false;
+      const len =
+        def.type === "candlestick" ? c.ohlc?.length ?? 0 : c.line?.length ?? 0;
+      return len > 0;
+    });
+
+    // 望ましいペイン構成: scaleId の出現順（price は必ずペイン0）
+    const desiredOrder: string[] = [];
+    for (const def of renderable) {
+      if (!desiredOrder.includes(def.scaleId)) desiredOrder.push(def.scaleId);
+    }
+    const pIdx = desiredOrder.indexOf("price");
+    if (pIdx > 0) {
+      desiredOrder.splice(pIdx, 1);
+      desiredOrder.unshift("price");
+    }
+    const paneOf = (scaleId: string) =>
+      Math.max(0, desiredOrder.indexOf(scaleId));
+
     const pricesChanged = prevPricesRef.current !== prices;
     prevPricesRef.current = prices;
 
+    const prev = currentScaleOrderRef.current;
+    const sameLayout =
+      !pricesChanged &&
+      prev.length === desiredOrder.length &&
+      prev.every((s, i) => s === desiredOrder[i]);
+
+    // 現在の表示レンジを保存（価格更新時はリセット）
     if (pricesChanged) {
       savedLogicalRange.current = null;
-      for (const [, api] of seriesMapRef.current) {
-        try { chart.removeSeries(api); } catch { /* chart may be disposed */ }
-        seriesDefMapRef.current.delete(api);
-      }
-      seriesMapRef.current.clear();
-      setLegendEntries([]);
-      setLegendTime("");
+      pendingRangeResetRef.current = true;
     } else {
       try {
         const lr = chart.timeScale().getVisibleLogicalRange();
@@ -247,42 +379,28 @@ export default function UnifiedChart({ prices, period }: Props) {
       }
     }
 
-    const enabledIds = new Set(enabledSeries.map((s) => s.id));
-    for (const [id, api] of seriesMapRef.current) {
-      if (!enabledIds.has(id)) {
-        try { chart.removeSeries(api); } catch { /* chart may be disposed */ }
-        seriesDefMapRef.current.delete(api);
-        seriesMapRef.current.delete(id);
-      }
-    }
-
-    const usedScales = new Set<string>();
-    for (const [, api] of seriesMapRef.current) {
-      const def = seriesDefMapRef.current.get(api);
-      if (def) usedScales.add(def.scaleId);
-    }
-
-    for (const def of enabledSeries) {
-      usedScales.add(def.scaleId);
-      if (seriesMapRef.current.has(def.id)) continue;
-
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addOne = (def: SeriesDef, paneIndex: number): ISeriesApi<any> | null => {
+      const computed = computedRef.current.get(def.id);
+      if (!computed) return null;
+      const priceScaleId = def.scaleId === "price" ? "right" : def.scaleId;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let api: ISeriesApi<any>;
-        if (def.type === "candlestick" && def.computeOHLC) {
-          const data = def.computeOHLC(prices);
-          if (data.length === 0) continue;
-          api = chart.addSeries(CandlestickSeries, {
-            upColor: "#26a69a",
-            downColor: "#ef5350",
-            borderUpColor: "#26a69a",
-            borderDownColor: "#ef5350",
-            wickUpColor: "#26a69a",
-            wickDownColor: "#ef5350",
-            priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
-          });
+        if (def.type === "candlestick" && computed.ohlc) {
+          const api = chart.addSeries(
+            CandlestickSeries,
+            {
+              upColor: "#26a69a",
+              downColor: "#ef5350",
+              borderUpColor: "#26a69a",
+              borderDownColor: "#ef5350",
+              wickUpColor: "#26a69a",
+              wickDownColor: "#ef5350",
+              priceScaleId,
+            },
+            paneIndex
+          );
           api.setData(
-            data.map((d) => ({
+            computed.ohlc.map((d) => ({
               time: d.time as Time,
               open: d.open,
               high: d.high,
@@ -290,18 +408,19 @@ export default function UnifiedChart({ prices, period }: Props) {
               close: d.close,
             }))
           );
+          return api;
         } else if (def.type === "histogram") {
-          const data = def.compute(prices);
-          if (data.length === 0) continue;
+          const data = computed.line ?? [];
           const dim = def.scaleId !== "volume";
-          api = chart.addSeries(HistogramSeries, {
-            priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
-          });
+          const api = chart.addSeries(
+            HistogramSeries,
+            { priceScaleId },
+            paneIndex
+          );
           api.setData(
             data.map((d) => {
               const raw =
-                d.color ??
-                (def.colorFn ? def.colorFn(d.value) : def.color);
+                d.color ?? (def.colorFn ? def.colorFn(d.value) : def.color);
               return {
                 time: d.time as Time,
                 value: d.value,
@@ -309,34 +428,94 @@ export default function UnifiedChart({ prices, period }: Props) {
               };
             })
           );
+          return api;
         } else {
-          const data = def.compute(prices);
-          if (data.length === 0) continue;
-          api = chart.addSeries(LineSeries, {
-            color: def.color,
-            lineWidth: (def.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-            lineStyle: def.lineStyle ?? 0,
-            priceScaleId: def.scaleId === "price" ? "right" : def.scaleId,
-          });
-          api.setData(
-            data.map((d) => ({
-              time: d.time as Time,
-              value: d.value,
-            }))
+          const data = computed.line ?? [];
+          const api = chart.addSeries(
+            LineSeries,
+            {
+              color: def.color,
+              lineWidth: (def.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+              lineStyle: def.lineStyle ?? 0,
+              priceScaleId,
+            },
+            paneIndex
           );
+          api.setData(
+            data.map((d) => ({ time: d.time as Time, value: d.value }))
+          );
+          return api;
         }
-
-        seriesMapRef.current.set(def.id, api);
-        seriesDefMapRef.current.set(api, def);
       } catch {
-        // Skip series that fail to compute
+        return null;
       }
+    };
+
+    if (sameLayout) {
+      // ペイン構成が不変 → 差分のみ更新（チャートのちらつきを抑制）
+      const renderIds = new Set(renderable.map((s) => s.id));
+      for (const [id, api] of seriesMapRef.current) {
+        if (!renderIds.has(id)) {
+          try { chart.removeSeries(api); } catch { /* disposed */ }
+          seriesDefMapRef.current.delete(api);
+          seriesMapRef.current.delete(id);
+        }
+      }
+      for (const def of renderable) {
+        if (seriesMapRef.current.has(def.id)) continue;
+        const api = addOne(def, paneOf(def.scaleId));
+        if (api) {
+          seriesMapRef.current.set(def.id, api);
+          seriesDefMapRef.current.set(api, def);
+        }
+      }
+    } else {
+      // ペイン構成が変化 → 全系列を再構築
+      for (const [, api] of seriesMapRef.current) {
+        try { chart.removeSeries(api); } catch { /* disposed */ }
+      }
+      seriesMapRef.current.clear();
+      seriesDefMapRef.current.clear();
+      if (pricesChanged) {
+        setLegendEntries([]);
+        setLegendTime("");
+      }
+      for (const def of renderable) {
+        const api = addOne(def, paneOf(def.scaleId));
+        if (api) {
+          seriesMapRef.current.set(def.id, api);
+          seriesDefMapRef.current.set(api, def);
+        }
+      }
+      // 余分なペインを除去（高インデックス側から）
+      try {
+        const need = Math.max(1, desiredOrder.length);
+        while (chart.panes().length > need) {
+          chart.removePane(chart.panes().length - 1);
+        }
+      } catch {
+        // ignore
+      }
+      // ペイン高さ: 価格(ペイン0)を大きく、サブペインは均等
+      try {
+        const panes = chart.panes();
+        if (panes.length > 1) {
+          panes.forEach((pane, i) => pane.setStretchFactor(i === 0 ? 3 : 1));
+        }
+      } catch {
+        // ignore
+      }
+      currentScaleOrderRef.current = desiredOrder;
     }
 
-    if (usedScales.has("volume")) {
-      chart.priceScale("volume").applyOptions({
-        scaleMargins: { top: 0.75, bottom: 0 },
-      });
+    if (desiredOrder.includes("volume")) {
+      try {
+        chart
+          .priceScale("volume", paneOf("volume"))
+          .applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
+      } catch {
+        // ignore
+      }
     }
 
     const hasSeries = seriesMapRef.current.size > 0;
@@ -346,7 +525,8 @@ export default function UnifiedChart({ prices, period }: Props) {
       } catch {
         chart.timeScale().fitContent();
       }
-    } else if (pricesChanged && hasSeries) {
+    } else if (pendingRangeResetRef.current && hasSeries) {
+      pendingRangeResetRef.current = false;
       if (period) {
         setInitialVisibleRange(chart, prices, period);
       } else {
@@ -354,7 +534,7 @@ export default function UnifiedChart({ prices, period }: Props) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prices, enabledSeries]);
+  }, [prices, enabledSeries, version]);
 
   // Update visible range when period changes
   useEffect(() => {
@@ -378,6 +558,12 @@ export default function UnifiedChart({ prices, period }: Props) {
     return map;
   }, []);
 
+  const q = query.trim().toLowerCase();
+  const searchResults = useMemo(
+    () => (q ? SERIES.filter((s) => s.label.toLowerCase().includes(q)) : []),
+    [q]
+  );
+
   // Shared selector content
   const selectorContent = (
     <div
@@ -387,7 +573,70 @@ export default function UnifiedChart({ prices, period }: Props) {
           : "space-y-0.5"
       }
     >
-      {GROUPS.map((group) => {
+      {/* 検索ボックス */}
+      <div className="relative mb-1">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="系列を検索…"
+          className="w-full pl-2 pr-6 py-1 text-[11px] rounded border border-gray-200 bg-white/80 focus:outline-none focus:border-blue-300"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs px-1"
+            title="クリア"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* プリセット & 全クリア */}
+      <div className="flex flex-wrap gap-0.5 mb-1.5">
+        {PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            onClick={() => applyPreset(preset.ids)}
+            className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+          >
+            {preset.label}
+          </button>
+        ))}
+        <button
+          onClick={clearAll}
+          className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+        >
+          全クリア
+        </button>
+      </div>
+
+      {/* 検索中: フラットな結果一覧 */}
+      {q ? (
+        searchResults.length === 0 ? (
+          <p className="text-[11px] text-gray-400 px-1 py-2">該当なし</p>
+        ) : (
+          <div className="flex flex-wrap gap-0.5">
+            {searchResults.map((s) => {
+              const isOn = enabled.has(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => toggle(s.id)}
+                  className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+                    isOn ? "text-white" : "bg-gray-100/80 text-gray-500 hover:bg-gray-200/80"
+                  }`}
+                  style={isOn ? { backgroundColor: s.color } : undefined}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        )
+      ) : (
+      GROUPS.map((group) => {
         const series = groupedSeries.get(group.id) || [];
         const isExpanded = expanded.has(group.id);
         const activeCount = series.filter((s) => enabled.has(s.id)).length;
@@ -430,7 +679,8 @@ export default function UnifiedChart({ prices, period }: Props) {
             )}
           </div>
         );
-      })}
+      })
+      )}
     </div>
   );
 
@@ -445,6 +695,14 @@ export default function UnifiedChart({ prices, period }: Props) {
           ref={containerRef}
           className="w-full rounded border border-gray-100"
         />
+
+        {/* 計算中インジケータ */}
+        {loading && (
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2.5 py-1 text-xs text-gray-600 shadow-sm backdrop-blur-sm pointer-events-none">
+            <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+            計算中…
+          </div>
+        )}
 
         {/* PC: Crosshair legend - top right */}
         {!isMobile && legendEntries.length > 0 && (
