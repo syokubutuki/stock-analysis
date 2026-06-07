@@ -53,6 +53,7 @@ import { fitGJR, fitEGARCH } from "./gjr-egarch";
 import { rollSpread, amihudIlliquidity } from "./microstructure";
 import { anchoringAnalysis } from "./behavioral";
 import { fitAR } from "./arima";
+import { fitSarima, SarimaFit } from "./sarima";
 import { computeVisibilityGraph } from "./visibility-graph";
 import { computeRecurrenceNetwork } from "./recurrence-network";
 import { rollingSpectralEntropy } from "./hilbert-huang-spectrum";
@@ -131,6 +132,17 @@ const tv = (time: string, value: number): TimeValue => ({ time, value });
 const green = "rgba(38,166,154,0.6)";
 const red = "rgba(239,83,80,0.6)";
 const upDown = (v: number) => (v >= 0 ? green : red);
+
+// 純粋MA(q)モデルを次数 1..4 でBIC最小により自動選択（移動平均過程用）
+function bestMaFit(series: number[]): SarimaFit | null {
+  let best: SarimaFit | null = null;
+  for (let q = 1; q <= 4; q++) {
+    const fit = fitSarima(series, { p: 0, d: 0, q, P: 0, D: 0, Q: 0, s: 0 });
+    if (!fit.ok) continue;
+    if (!best || fit.bic < best.bic) best = fit;
+  }
+  return best;
+}
 
 // ---- Series Catalog ----
 
@@ -1686,32 +1698,35 @@ export const SERIES: SeriesDef[] = [
       anchoringAnalysis(p).rollingRatio.map((x) => tv(x.time, x.ratio)),
   },
 
-  // ====== ARIMA ======
+  // ====== ARIMA(自己回帰AR・移動平均MA・差分Iを個別に) ======
+  // --- 自己回帰過程 AR(p)（対数リターン基準、次数はBIC自動選択）---
   {
-    id: "ar_fitted",
-    label: "AR当てはめ値",
+    id: "ar_process_fitted",
+    label: "自己回帰AR 当てはめ値(対数R)",
     group: "arima",
     color: "#2563eb",
-    scaleId: "price",
+    scaleId: "arima_lr",
     type: "line",
     lineStyle: 2,
     compute: (p) => {
-      const c = p.map((x) => x.close);
-      if (c.length < 30) return [];
-      const ar = fitAR(c);
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 30) return [];
+      const ar = fitAR(lr);
       const out: TimeValue[] = [];
-      for (let t = ar.order; t < c.length; t++) {
-        out.push(tv(p[t].time, c[t] - ar.residuals[t]));
+      // 当てはめ値 = 実測値 − 残差（1期先予測）
+      for (let t = ar.order; t < lr.length; t++) {
+        out.push(tv(times[t], lr[t] - ar.residuals[t]));
       }
       return out;
     },
   },
   {
-    id: "ar_resid",
-    label: "AR残差(対数リターン)",
+    id: "ar_process_resid",
+    label: "自己回帰AR 残差(対数R)",
     group: "arima",
-    color: "#dc2626",
-    scaleId: "ar_resid",
+    color: "#60a5fa",
+    scaleId: "arima_lr",
     type: "line",
     compute: (p) => {
       const lr = logReturns(p.map((x) => x.close));
@@ -1721,6 +1736,64 @@ export const SERIES: SeriesDef[] = [
       const out: TimeValue[] = [];
       for (let t = ar.order; t < lr.length; t++) {
         out.push(tv(times[t], ar.residuals[t]));
+      }
+      return out;
+    },
+  },
+  // --- 移動平均過程 MA(q)（対数リターン基準、次数はBIC自動選択）---
+  {
+    id: "ma_process_fitted",
+    label: "移動平均MA 当てはめ値(対数R)",
+    group: "arima",
+    color: "#dc2626",
+    scaleId: "arima_lr",
+    type: "line",
+    lineStyle: 2,
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 50) return [];
+      const fit = bestMaFit(lr);
+      if (!fit) return [];
+      const out: TimeValue[] = [];
+      for (let i = 0; i < fit.fitted.length && i < times.length; i++) {
+        if (!Number.isNaN(fit.fitted[i])) out.push(tv(times[i], fit.fitted[i]));
+      }
+      return out;
+    },
+  },
+  {
+    id: "ma_process_resid",
+    label: "移動平均MA 残差(対数R)",
+    group: "arima",
+    color: "#f87171",
+    scaleId: "arima_lr",
+    type: "line",
+    compute: (p) => {
+      const lr = logReturns(p.map((x) => x.close));
+      const times = p.slice(1).map((x) => x.time);
+      if (lr.length < 50) return [];
+      const fit = bestMaFit(lr);
+      if (!fit) return [];
+      const out: TimeValue[] = [];
+      for (let i = 0; i < fit.residuals.length && i < times.length; i++) {
+        if (!Number.isNaN(fit.residuals[i])) out.push(tv(times[i], fit.residuals[i]));
+      }
+      return out;
+    },
+  },
+  // --- 差分過程 I (1階差分 Δclose) ---
+  {
+    id: "diff_process",
+    label: "差分過程(1階差分 Δclose)",
+    group: "arima",
+    color: "#059669",
+    scaleId: "arima_diff",
+    type: "line",
+    compute: (p) => {
+      const out: TimeValue[] = [];
+      for (let i = 1; i < p.length; i++) {
+        out.push(tv(p[i].time, p[i].close - p[i - 1].close));
       }
       return out;
     },
