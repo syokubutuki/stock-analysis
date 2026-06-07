@@ -852,7 +852,7 @@ export default function AnalysisPage() {
                   <CustomReturnChart prices={allPrices} />
                   <SimpleBacktestChart prices={filteredPrices} />
                   <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ArimaChart prices={filteredPrices} />
+                  <ArimaChart prices={filteredPrices} seriesMode={seriesMode} />
                   <JumpDiffusionChart prices={filteredPrices} />
                   <OptimalStoppingChart prices={filteredPrices} />
                   <VarianceGammaChart prices={filteredPrices} />
