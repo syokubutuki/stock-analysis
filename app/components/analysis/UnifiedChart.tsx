@@ -109,8 +109,6 @@ export default function UnifiedChart({ prices, period }: Props) {
   const reqIdRef = useRef(0);
   const pendingChunksRef = useRef(0);
   const pendingRangeResetRef = useRef(true);
-  // 現在のペイン構成（scaleId の並び。price が常にペイン0）
-  const currentScaleOrderRef = useRef<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState(0);
   const isMobile = useIsMobile();
@@ -330,46 +328,24 @@ export default function UnifiedChart({ prices, period }: Props) {
     }
   }, [expanded]);
 
-  // 計算済みデータをチャートに反映（scaleId 単位でペイン分割）
+  // 計算済みデータをチャートに反映（全系列を同一ペインに重ねて表示）
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || prices.length === 0) return;
 
-    // 計算済みで非空のデータを持つ系列のみ描画対象
-    const renderable = enabledSeries.filter((def) => {
-      const c = computedRef.current.get(def.id);
-      if (!c) return false;
-      const len =
-        def.type === "candlestick" ? c.ohlc?.length ?? 0 : c.line?.length ?? 0;
-      return len > 0;
-    });
-
-    // 望ましいペイン構成: scaleId の出現順（price は必ずペイン0）
-    const desiredOrder: string[] = [];
-    for (const def of renderable) {
-      if (!desiredOrder.includes(def.scaleId)) desiredOrder.push(def.scaleId);
-    }
-    const pIdx = desiredOrder.indexOf("price");
-    if (pIdx > 0) {
-      desiredOrder.splice(pIdx, 1);
-      desiredOrder.unshift("price");
-    }
-    const paneOf = (scaleId: string) =>
-      Math.max(0, desiredOrder.indexOf(scaleId));
-
     const pricesChanged = prevPricesRef.current !== prices;
     prevPricesRef.current = prices;
 
-    const prev = currentScaleOrderRef.current;
-    const sameLayout =
-      !pricesChanged &&
-      prev.length === desiredOrder.length &&
-      prev.every((s, i) => s === desiredOrder[i]);
-
-    // 現在の表示レンジを保存（価格更新時はリセット）
     if (pricesChanged) {
       savedLogicalRange.current = null;
       pendingRangeResetRef.current = true;
+      for (const [, api] of seriesMapRef.current) {
+        try { chart.removeSeries(api); } catch { /* disposed */ }
+        seriesDefMapRef.current.delete(api);
+      }
+      seriesMapRef.current.clear();
+      setLegendEntries([]);
+      setLegendTime("");
     } else {
       try {
         const lr = chart.timeScale().getVisibleLogicalRange();
@@ -379,26 +355,43 @@ export default function UnifiedChart({ prices, period }: Props) {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const addOne = (def: SeriesDef, paneIndex: number): ISeriesApi<any> | null => {
+    const enabledIds = new Set(enabledSeries.map((s) => s.id));
+    for (const [id, api] of seriesMapRef.current) {
+      if (!enabledIds.has(id)) {
+        try { chart.removeSeries(api); } catch { /* disposed */ }
+        seriesDefMapRef.current.delete(api);
+        seriesMapRef.current.delete(id);
+      }
+    }
+
+    const usedScales = new Set<string>();
+    for (const [, api] of seriesMapRef.current) {
+      const def = seriesDefMapRef.current.get(api);
+      if (def) usedScales.add(def.scaleId);
+    }
+
+    for (const def of enabledSeries) {
+      usedScales.add(def.scaleId);
+      if (seriesMapRef.current.has(def.id)) continue;
+
       const computed = computedRef.current.get(def.id);
-      if (!computed) return null;
+      if (!computed) continue; // まだWorkerの計算待ち
+
       const priceScaleId = def.scaleId === "price" ? "right" : def.scaleId;
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let api: ISeriesApi<any>;
         if (def.type === "candlestick" && computed.ohlc) {
-          const api = chart.addSeries(
-            CandlestickSeries,
-            {
-              upColor: "#26a69a",
-              downColor: "#ef5350",
-              borderUpColor: "#26a69a",
-              borderDownColor: "#ef5350",
-              wickUpColor: "#26a69a",
-              wickDownColor: "#ef5350",
-              priceScaleId,
-            },
-            paneIndex
-          );
+          if (computed.ohlc.length === 0) continue;
+          api = chart.addSeries(CandlestickSeries, {
+            upColor: "#26a69a",
+            downColor: "#ef5350",
+            borderUpColor: "#26a69a",
+            borderDownColor: "#ef5350",
+            wickUpColor: "#26a69a",
+            wickDownColor: "#ef5350",
+            priceScaleId,
+          });
           api.setData(
             computed.ohlc.map((d) => ({
               time: d.time as Time,
@@ -408,15 +401,11 @@ export default function UnifiedChart({ prices, period }: Props) {
               close: d.close,
             }))
           );
-          return api;
         } else if (def.type === "histogram") {
           const data = computed.line ?? [];
+          if (data.length === 0) continue;
           const dim = def.scaleId !== "volume";
-          const api = chart.addSeries(
-            HistogramSeries,
-            { priceScaleId },
-            paneIndex
-          );
+          api = chart.addSeries(HistogramSeries, { priceScaleId });
           api.setData(
             data.map((d) => {
               const raw =
@@ -428,94 +417,31 @@ export default function UnifiedChart({ prices, period }: Props) {
               };
             })
           );
-          return api;
         } else {
           const data = computed.line ?? [];
-          const api = chart.addSeries(
-            LineSeries,
-            {
-              color: def.color,
-              lineWidth: (def.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-              lineStyle: def.lineStyle ?? 0,
-              priceScaleId,
-            },
-            paneIndex
-          );
+          if (data.length === 0) continue;
+          api = chart.addSeries(LineSeries, {
+            color: def.color,
+            lineWidth: (def.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+            lineStyle: def.lineStyle ?? 0,
+            priceScaleId,
+          });
           api.setData(
             data.map((d) => ({ time: d.time as Time, value: d.value }))
           );
-          return api;
         }
-      } catch {
-        return null;
-      }
-    };
 
-    if (sameLayout) {
-      // ペイン構成が不変 → 差分のみ更新（チャートのちらつきを抑制）
-      const renderIds = new Set(renderable.map((s) => s.id));
-      for (const [id, api] of seriesMapRef.current) {
-        if (!renderIds.has(id)) {
-          try { chart.removeSeries(api); } catch { /* disposed */ }
-          seriesDefMapRef.current.delete(api);
-          seriesMapRef.current.delete(id);
-        }
-      }
-      for (const def of renderable) {
-        if (seriesMapRef.current.has(def.id)) continue;
-        const api = addOne(def, paneOf(def.scaleId));
-        if (api) {
-          seriesMapRef.current.set(def.id, api);
-          seriesDefMapRef.current.set(api, def);
-        }
-      }
-    } else {
-      // ペイン構成が変化 → 全系列を再構築
-      for (const [, api] of seriesMapRef.current) {
-        try { chart.removeSeries(api); } catch { /* disposed */ }
-      }
-      seriesMapRef.current.clear();
-      seriesDefMapRef.current.clear();
-      if (pricesChanged) {
-        setLegendEntries([]);
-        setLegendTime("");
-      }
-      for (const def of renderable) {
-        const api = addOne(def, paneOf(def.scaleId));
-        if (api) {
-          seriesMapRef.current.set(def.id, api);
-          seriesDefMapRef.current.set(api, def);
-        }
-      }
-      // 余分なペインを除去（高インデックス側から）
-      try {
-        const need = Math.max(1, desiredOrder.length);
-        while (chart.panes().length > need) {
-          chart.removePane(chart.panes().length - 1);
-        }
+        seriesMapRef.current.set(def.id, api);
+        seriesDefMapRef.current.set(api, def);
       } catch {
-        // ignore
+        // Skip series that fail to render
       }
-      // ペイン高さ: 価格(ペイン0)を大きく、サブペインは均等
-      try {
-        const panes = chart.panes();
-        if (panes.length > 1) {
-          panes.forEach((pane, i) => pane.setStretchFactor(i === 0 ? 3 : 1));
-        }
-      } catch {
-        // ignore
-      }
-      currentScaleOrderRef.current = desiredOrder;
     }
 
-    if (desiredOrder.includes("volume")) {
-      try {
-        chart
-          .priceScale("volume", paneOf("volume"))
-          .applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
-      } catch {
-        // ignore
-      }
+    if (usedScales.has("volume")) {
+      chart.priceScale("volume").applyOptions({
+        scaleMargins: { top: 0.75, bottom: 0 },
+      });
     }
 
     const hasSeries = seriesMapRef.current.size > 0;
