@@ -432,6 +432,10 @@ const MicrostructureChart = dynamic(
   () => import("./components/analysis/MicrostructureChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const CrashSurgeStreakChart = dynamic(
+  () => import("./components/analysis/CrashSurgeStreakChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 const BehavioralChart = dynamic(
   () => import("./components/analysis/BehavioralChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -696,6 +700,7 @@ export default function AnalysisPage() {
               {activeSection === "ohlc" && (
                 <>
                   <CandleStructureChart prices={allPrices} period={period} />
+                  <CrashSurgeStreakChart prices={filteredPrices} />
                   <CandlestickPatternChart prices={filteredPrices} />
                   <IntradayPathChart prices={filteredPrices} />
                   <ClosePositionChart prices={filteredPrices} />

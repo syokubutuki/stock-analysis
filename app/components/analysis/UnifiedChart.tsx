@@ -119,6 +119,13 @@ export default function UnifiedChart({ prices, period }: Props) {
     () => loadSet(LS_EXPANDED, ["price"])
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // resize ハンドラのクロージャから最新の全画面状態を参照するための ref。
+  // iOS Safari 等は Fullscreen API 非対応で document.fullscreenElement が
+  // 常に null のため、CSS フォールバック時の全画面状態を別途保持する。
+  const isFullscreenRef = useRef(false);
+  useEffect(() => {
+    isFullscreenRef.current = isFullscreen;
+  }, [isFullscreen]);
   const [selectorOpen, setSelectorOpen] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= 768
   );
@@ -243,7 +250,10 @@ export default function UnifiedChart({ prices, period }: Props) {
 
     const handleResize = () => {
       if (!containerRef.current) return;
-      const fs = !!document.fullscreenElement;
+      // CSS フォールバック全画面（iOS Safari 等）では document.fullscreenElement が
+      // null のため、isFullscreenRef も併せて見る。これがないとスマホで下に
+      // スクロール→アドレスバー開閉による resize で高さが 350 に戻ってしまう。
+      const fs = !!document.fullscreenElement || isFullscreenRef.current;
       const mob = window.innerWidth < 768;
       const w = containerRef.current.clientWidth;
       const h = fs ? window.innerHeight - 80 : mob ? 350 : 600;
