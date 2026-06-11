@@ -88,6 +88,10 @@ const AttractorExplorer = dynamic(
   () => import("./components/analysis/AttractorExplorer"),
   { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
 );
+const WeeklyPhaseAttractorChart = dynamic(
+  () => import("./components/analysis/WeeklyPhaseAttractorChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
 const EntropyDisplay = dynamic(
   () => import("./components/analysis/EntropyDisplay"),
   { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
@@ -777,6 +781,7 @@ export default function AnalysisPage() {
                   <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} />
                   <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} />
                   <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
+                  <WeeklyPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RollingRQAChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LocalLyapunovChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LyapunovSpectrumChart prices={filteredPrices} seriesMode={seriesMode} />
