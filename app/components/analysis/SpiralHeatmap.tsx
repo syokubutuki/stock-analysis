@@ -4,6 +4,18 @@ import React, { useMemo, useCallback, useRef, useEffect, useState } from "react"
 import { PricePoint } from "../../lib/types";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
+import {
+  computeStrategy,
+  buyHoldEquity,
+  buyHoldMetrics,
+  weekdayMatrix,
+  type TradeSpec,
+  type Timing,
+  type Side,
+  type MatrixMetric,
+  type EquityPoint,
+  type StrategyResult,
+} from "../../lib/weekday-trade";
 
 interface Props {
   prices: PricePoint[];
@@ -18,6 +30,13 @@ const MONTH_LABELS = [
   "1月","2月","3月","4月","5月","6月",
   "7月","8月","9月","10月","11月","12月",
 ];
+// 曜日トレード戦略の重ね描き用カラーパレット
+const STRAT_COLORS = ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+const TIMING_LABEL: Record<Timing, string> = { open: "始値", close: "終値" };
+function specLabel(s: TradeSpec): string {
+  const dow = ["", "月", "火", "水", "木", "金"];
+  return `${dow[s.entryDow]}${TIMING_LABEL[s.entryTiming]}→${dow[s.exitDow]}${TIMING_LABEL[s.exitTiming]}${s.side === "short" ? " [売]" : ""}`;
+}
 
 interface DayData {
   date: string;
@@ -226,6 +245,26 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     setDistDows(prev => prev.includes(dow) ? prev.filter(d => d !== dow) : [...prev, dow].sort((a, b) => a - b));
   }, []);
 
+  // === 曜日トレード・シミュレータ state ===
+  const tradeEquityRef = useRef<HTMLCanvasElement>(null);
+  const tradeMatrixRef = useRef<HTMLCanvasElement>(null);
+  // 編集中のスペック（ビルダー）
+  const [builder, setBuilder] = useState<TradeSpec>({ entryDow: 1, entryTiming: "close", exitDow: 2, exitTiming: "close", side: "long" });
+  // 比較対象として確定した戦略リスト（ユーザー例: 月→火, 水→木, 月→木）
+  const [specs, setSpecs] = useState<TradeSpec[]>([
+    { entryDow: 1, entryTiming: "close", exitDow: 2, exitTiming: "close", side: "long" },
+    { entryDow: 3, entryTiming: "close", exitDow: 4, exitTiming: "close", side: "long" },
+    { entryDow: 1, entryTiming: "close", exitDow: 4, exitTiming: "close", side: "long" },
+  ]);
+  const [tradeCompound, setTradeCompound] = useState(true);
+  const [matrixMetric, setMatrixMetric] = useState<MatrixMetric>("total");
+  const addSpec = useCallback(() => {
+    setSpecs(prev => prev.length >= 6 ? prev : [...prev, builder]);
+  }, [builder]);
+  const removeSpec = useCallback((idx: number) => {
+    setSpecs(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
   // === core data ===
   const days: DayData[] = useMemo(() => {
     if (prices.length < 2) return [];
@@ -430,29 +469,53 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return s;
   }, [days]);
 
-  // === intraweek pattern ===
+  // === intraweek pattern (月→金 + 翌月: 週末ギャップを含む) ===
   const intraweekData = useMemo(() => {
-    const weeks: number[][] = [];
-    let curWeek: number[] = [];
+    // 各週を曜日キーの辞書で保持（祝日欠落に頑健 / 翌週月曜の参照に必要）
+    const weeks: Record<number, number>[] = [];
+    let cur: Record<number, number> = {};
+    let started = false;
     for (const d of days) {
-      if (d.dayOfWeek === 1 && curWeek.length > 0) { weeks.push(curWeek); curWeek = []; }
-      if (d.dayOfWeek >= 1 && d.dayOfWeek <= 5) curWeek.push(d.closeReturn);
+      if (d.dayOfWeek === 1 && started) { weeks.push(cur); cur = {}; started = false; }
+      if (d.dayOfWeek >= 1 && d.dayOfWeek <= 5) { cur[d.dayOfWeek] = d.closeReturn; started = true; }
     }
-    if (curWeek.length > 0) weeks.push(curWeek);
-    const maxPos = 5;
-    const avgCumul: { pos: number; avg: number }[] = [];
-    for (let p = 0; p < maxPos; p++) {
+    if (started) weeks.push(cur);
+
+    const avgCumul: { pos: number; avg: number; weekend: boolean }[] = [];
+    // pos 0..4 = 月火水木金: 月曜起点の週内累積
+    for (let w = 1; w <= 5; w++) {
       const vals: number[] = [];
-      for (const w of weeks) {
-        if (w.length > p) {
-          let cum = 0; for (let j = 0; j <= p; j++) cum += w[j];
-          vals.push(cum);
-        }
+      for (const wk of weeks) {
+        let cum = 0; let ok = false;
+        for (let d = 1; d <= w; d++) { if (wk[d] !== undefined) { cum += wk[d]; ok = true; } }
+        if (ok) vals.push(cum);
       }
-      if (vals.length > 0) avgCumul.push({ pos: p, avg: mean(vals) });
+      if (vals.length > 0) avgCumul.push({ pos: w - 1, avg: mean(vals), weekend: false });
     }
+    // pos 5 = 翌月: 当週の週内累積(月→金) に 週末ギャップ(=翌週月曜のcloseReturn) を加算
+    const wkVals: number[] = [];
+    for (let i = 0; i < weeks.length - 1; i++) {
+      const wk = weeks[i], nxt = weeks[i + 1];
+      if (nxt[1] === undefined) continue;
+      let cum = 0;
+      for (let d = 1; d <= 5; d++) if (wk[d] !== undefined) cum += wk[d];
+      wkVals.push(cum + nxt[1]);
+    }
+    if (wkVals.length > 0) avgCumul.push({ pos: 5, avg: mean(wkVals), weekend: true });
     return avgCumul;
   }, [days]);
+
+  // === 曜日トレード: 各戦略の結果 / バイ&ホールド / 全組合せマトリクス ===
+  const tradeResults = useMemo<StrategyResult[]>(
+    () => specs.map(s => computeStrategy(prices, s, tradeCompound)),
+    [specs, prices, tradeCompound],
+  );
+  const bhEquity = useMemo<EquityPoint[]>(() => buyHoldEquity(prices, tradeCompound), [prices, tradeCompound]);
+  const bhMetrics = useMemo(() => buyHoldMetrics(prices, tradeCompound), [prices, tradeCompound]);
+  const tradeMatrix = useMemo(
+    () => weekdayMatrix(prices, builder.entryTiming, builder.exitTiming, builder.side, tradeCompound, matrixMetric),
+    [prices, builder.entryTiming, builder.exitTiming, builder.side, tradeCompound, matrixMetric],
+  );
 
   // === year x month returns ===
   const yearMonthData = useMemo(() => {
@@ -659,18 +722,20 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
   }, []);
 
-  // Intraweek pattern
-  const drawIntraweek = useCallback((canvas: HTMLCanvasElement, data: { pos: number; avg: number }[]) => {
+  // Intraweek pattern (月→金 に 翌月曜=週末ギャップ を追加)
+  const drawIntraweek = useCallback((canvas: HTMLCanvasElement, data: { pos: number; avg: number; weekend: boolean }[]) => {
     const r = initCanvas(canvas, 180); if (!r) return;
     const { ctx, width, height } = r;
     if (data.length < 2) return;
     const pad = { top: 15, bottom: 25, left: 55, right: 15 };
     const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
+    const maxPos = Math.max(...data.map(d => d.pos), 1); // 5 if 翌月曜あり
     let minV = Infinity, maxV = -Infinity;
     for (const p of data) { minV = Math.min(minV, p.avg); maxV = Math.max(maxV, p.avg); }
     minV = Math.min(minV, 0); maxV = Math.max(maxV, 0);
     const range = maxV - minV || 0.01;
     const toY = (v: number) => pad.top + plotH * (1 - (v - minV) / range);
+    const toX = (pos: number) => pad.left + (pos / maxPos) * plotW;
 
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.left, toY(0)); ctx.lineTo(width - pad.right, toY(0)); ctx.stroke();
@@ -683,33 +748,38 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
     }
 
-    ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
-    ctx.beginPath();
-    for (let i = 0; i < data.length; i++) {
-      const x = pad.left + (data[i].pos / 4) * plotW;
-      const y = toY(data[i].avg);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    // 金曜(週末をまたぐ前)の位置に縦の区切り線を入れて週末区間を示す
+    const fri = data.find(d => d.pos === 4);
+    if (fri && data.some(d => d.weekend)) {
+      const fx = toX(4);
+      ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(fx, pad.top); ctx.lineTo(fx, pad.top + plotH); ctx.stroke();
+      ctx.setLineDash([]);
     }
-    ctx.lineTo(pad.left + (data[data.length - 1].pos / 4) * plotW, toY(0));
-    ctx.lineTo(pad.left, toY(0));
-    ctx.closePath(); ctx.fill();
 
-    ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let i = 0; i < data.length; i++) {
-      const x = pad.left + (data[i].pos / 4) * plotW;
-      const y = toY(data[i].avg);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    // 平日区間(実線) と 週末区間(破線) を分けて描画
+    for (let i = 1; i < data.length; i++) {
+      const x0 = toX(data[i - 1].pos), y0 = toY(data[i - 1].avg);
+      const x1 = toX(data[i].pos), y1 = toY(data[i].avg);
+      ctx.strokeStyle = data[i].weekend ? "#f59e0b" : "#3b82f6";
+      ctx.lineWidth = 2;
+      ctx.setLineDash(data[i].weekend ? [5, 4] : []);
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.setLineDash([]);
     }
-    ctx.stroke();
 
-    const dowShort = ["月", "火", "水", "木", "金"];
+    const labels = ["月", "火", "水", "木", "金", "月"];
     for (let i = 0; i < data.length; i++) {
-      const x = pad.left + (data[i].pos / 4) * plotW;
+      const x = toX(data[i].pos);
       const y = toY(data[i].avg);
-      ctx.fillStyle = "#3b82f6"; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      const col = data[i].weekend ? "#f59e0b" : "#3b82f6";
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#666"; ctx.textAlign = "center"; ctx.font = "10px sans-serif";
-      ctx.fillText(dowShort[i] || "", x, height - 8);
+      ctx.fillText(labels[data[i].pos] || "", x, height - 8);
+      if (data[i].weekend) {
+        ctx.fillStyle = "#f59e0b"; ctx.font = "8px sans-serif";
+        ctx.fillText("(翌週)", x, height - 18);
+      }
     }
   }, []);
 
@@ -983,6 +1053,130 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
   }, []);
 
+  // 曜日トレード: エクイティカーブ（複数戦略 + バイ&ホールド）
+  const drawEquityCurves = useCallback((
+    canvas: HTMLCanvasElement,
+    bh: EquityPoint[],
+    strategies: { label: string; color: string; points: EquityPoint[] }[],
+  ) => {
+    const r = initCanvas(canvas, 260); if (!r) return;
+    const { ctx, width, height } = r;
+    const pad = { top: 15, bottom: 38, left: 55, right: 15 };
+    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
+    const allPts = [...bh, ...strategies.flatMap(s => s.points)];
+    if (allPts.length < 2) {
+      ctx.fillStyle = "#9ca3af"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("トレードが成立していません", width / 2, height / 2);
+      return;
+    }
+    let tMin = Infinity, tMax = -Infinity, vMin = 0, vMax = 0;
+    for (const p of allPts) { tMin = Math.min(tMin, p.t); tMax = Math.max(tMax, p.t); vMin = Math.min(vMin, p.v); vMax = Math.max(vMax, p.v); }
+    const tRange = tMax - tMin || 1, vRange = vMax - vMin || 0.01;
+    const toX = (t: number) => pad.left + ((t - tMin) / tRange) * plotW;
+    const toY = (v: number) => pad.top + plotH * (1 - (v - vMin) / vRange);
+
+    // y grid + labels (%)
+    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    for (let i = 0; i <= 5; i++) {
+      const val = vMin + (vRange * i) / 5;
+      const y = pad.top + plotH * (1 - i / 5);
+      ctx.fillText((val * 100).toFixed(0) + "%", pad.left - 5, y + 3);
+      ctx.strokeStyle = val === 0 ? "#d1d5db" : "#f0f0f0"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+    }
+    // zero line emphasis
+    if (vMin <= 0 && vMax >= 0) {
+      const zy = toY(0);
+      ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zy); ctx.lineTo(width - pad.right, zy); ctx.stroke();
+    }
+    // x date labels (start / mid / end)
+    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    for (let i = 0; i <= 4; i++) {
+      const t = tMin + (tRange * i) / 4;
+      const x = pad.left + (plotW * i) / 4;
+      const d = new Date(t);
+      ctx.fillText(`${d.getFullYear()}/${d.getMonth() + 1}`, x, height - 26);
+    }
+
+    // buy & hold (grey, behind)
+    ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < bh.length; i++) { const x = toX(bh[i].t), y = toY(bh[i].v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.stroke();
+
+    // strategies
+    for (const s of strategies) {
+      if (s.points.length < 2) continue;
+      ctx.strokeStyle = s.color; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 0; i < s.points.length; i++) { const x = toX(s.points[i].t), y = toY(s.points[i].v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+
+    // legend
+    ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
+    const legendItems = [{ label: "バイ&ホールド", color: "#9ca3af" }, ...strategies];
+    for (const it of legendItems) {
+      ctx.strokeStyle = it.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lx, height - 6); ctx.lineTo(lx + 14, height - 6); ctx.stroke();
+      ctx.fillStyle = "#666"; ctx.fillText(it.label, lx + 17, height - 3);
+      lx += ctx.measureText(it.label).width + 32;
+      if (lx > width - 80) { lx = pad.left; }
+    }
+  }, []);
+
+  // 曜日トレード: 全組合せ(エントリー曜日 × エグジット曜日)ヒートマップ
+  const drawWeekdayMatrix = useCallback((
+    canvas: HTMLCanvasElement,
+    grid: (number | null)[][],
+    metric: MatrixMetric,
+  ) => {
+    const dow = ["月", "火", "水", "木", "金"];
+    const cellW = 56, cellH = 30, labelW = 60, headerH = 34;
+    const totalH = headerH + 5 * cellH + 5;
+    const r = initCanvas(canvas, totalH); if (!r) return;
+    const { ctx } = r;
+    let maxAbs = 0;
+    for (const row of grid) for (const v of row) if (v !== null) maxAbs = Math.max(maxAbs, Math.abs(v));
+    const fmt = (v: number) => metric === "winRate" ? (v * 100).toFixed(0) + "%" : metric === "sharpe" ? v.toFixed(2) : (v * 100).toFixed(1) + "%";
+
+    // headers
+    ctx.fillStyle = "#666"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("エグジット曜日 →", labelW + 5 * cellW / 2, 12);
+    for (let j = 0; j < 5; j++) ctx.fillText(dow[j], labelW + j * cellW + cellW / 2, headerH - 6);
+    // row label (vertical-ish, just text)
+    ctx.save();
+    ctx.translate(10, headerH + 5 * cellH / 2); ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = "#666"; ctx.textAlign = "center"; ctx.fillText("エントリー曜日", 0, 0);
+    ctx.restore();
+
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = "#666"; ctx.textAlign = "right"; ctx.font = "10px sans-serif";
+      ctx.fillText(dow[i], labelW - 6, headerH + i * cellH + cellH / 2 + 3);
+      for (let j = 0; j < 5; j++) {
+        const v = grid[i][j];
+        const x = labelW + j * cellW, y = headerH + i * cellH;
+        let bg = "#f9fafb";
+        if (v !== null) {
+          if (metric === "winRate") {
+            const t = Math.min(1, Math.abs(v - 0.5) / 0.25);
+            bg = v >= 0.5 ? `rgba(22,163,74,${0.15 + 0.7 * t})` : `rgba(220,38,38,${0.15 + 0.7 * t})`;
+          } else {
+            bg = returnColor(v, maxAbs);
+          }
+        }
+        ctx.fillStyle = bg; ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
+        if (v !== null) {
+          const strong = metric === "winRate" ? Math.abs(v - 0.5) > 0.18 : Math.abs(v) > maxAbs * 0.6;
+          ctx.fillStyle = strong ? "#fff" : "#333";
+          ctx.textAlign = "center"; ctx.font = "9px sans-serif";
+          ctx.fillText(fmt(v), x + cellW / 2, y + cellH / 2 + 3);
+        } else {
+          ctx.fillStyle = "#d1d5db"; ctx.textAlign = "center"; ctx.font = "9px sans-serif";
+          ctx.fillText("-", x + cellW / 2, y + cellH / 2 + 3);
+        }
+      }
+    }
+  }, []);
+
   // === helper to get bar data from raw buckets for current tab ===
   const getBarData = useCallback((raw: RawBucket[], tab: ReturnTab): { barData: number[][]; barDefs: BarDef[] } => {
     const def = TAB_DEFS[tab];
@@ -1071,6 +1265,19 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   useEffect(() => {
     if (distRef.current) drawDistribution(distRef.current, distGroups, distShowHist, distShowNormal);
   }, [distGroups, distShowHist, distShowNormal, drawDistribution]);
+
+  // === Draw 曜日トレード・シミュレータ ===
+  useEffect(() => {
+    if (tradeEquityRef.current) {
+      const strategies = tradeResults.map((res, i) => ({
+        label: specLabel(specs[i]),
+        color: STRAT_COLORS[i % STRAT_COLORS.length],
+        points: res.equity,
+      }));
+      drawEquityCurves(tradeEquityRef.current, bhEquity, strategies);
+    }
+    if (tradeMatrixRef.current) drawWeekdayMatrix(tradeMatrixRef.current, tradeMatrix, matrixMetric);
+  }, [tradeResults, specs, bhEquity, tradeMatrix, matrixMetric, drawEquityCurves, drawWeekdayMatrix]);
 
   if (days.length === 0) {
     return (
@@ -1335,8 +1542,138 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
       {/* ===== 4. Intraweek pattern ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">週内パターン (月→金 平均累積リターン推移)</div>
+        <div className="text-xs text-gray-500 mb-1">
+          週内パターン (月→金→翌月 平均累積リターン推移)
+          <span className="text-amber-600 ml-1">※金→月の橙破線＝週末ギャップ</span>
+        </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={intraweekRef} /></div>
+      </div>
+
+      {/* ===== 曜日トレード・シミュレータ ===== */}
+      <div className="border border-emerald-100 rounded-lg p-3 bg-emerald-50/30">
+        <div className="text-sm font-medium text-gray-700 mb-2">
+          曜日トレード・シミュレータ
+          <span className="text-xs font-normal text-gray-400">（任意の曜日・注文タイミングで売買した累積リターンをバイ&ホールドと比較）</span>
+        </div>
+
+        {/* builder */}
+        <div className="flex flex-wrap items-end gap-2 mb-2 text-[11px]">
+          <div>
+            <div className="text-gray-400 mb-0.5">エントリー</div>
+            <div className="flex gap-1">
+              <select value={builder.entryDow} onChange={e => setBuilder(b => ({ ...b, entryDow: Number(e.target.value) }))} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
+                {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{DOW_LABELS[d]}</option>)}
+              </select>
+              <select value={builder.entryTiming} onChange={e => setBuilder(b => ({ ...b, entryTiming: e.target.value as Timing }))} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
+                <option value="open">始値</option>
+                <option value="close">終値</option>
+              </select>
+            </div>
+          </div>
+          <div className="text-gray-400 pb-1">→</div>
+          <div>
+            <div className="text-gray-400 mb-0.5">エグジット</div>
+            <div className="flex gap-1">
+              <select value={builder.exitDow} onChange={e => setBuilder(b => ({ ...b, exitDow: Number(e.target.value) }))} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
+                {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{DOW_LABELS[d]}</option>)}
+              </select>
+              <select value={builder.exitTiming} onChange={e => setBuilder(b => ({ ...b, exitTiming: e.target.value as Timing }))} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
+                <option value="open">始値</option>
+                <option value="close">終値</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div className="text-gray-400 mb-0.5">方向</div>
+            <div className="flex gap-1">
+              {(["long", "short"] as Side[]).map(sd => (
+                <button key={sd} onClick={() => setBuilder(b => ({ ...b, side: sd }))} className={`px-2 py-0.5 rounded transition-colors ${builder.side === sd ? (sd === "long" ? "bg-blue-600 text-white" : "bg-rose-600 text-white") : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>
+                  {sd === "long" ? "ロング(買)" : "ショート(売)"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={addSpec} disabled={specs.length >= 6} className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40">+ 比較に追加</button>
+          <label className="flex items-center gap-1 cursor-pointer text-gray-500 pb-1 ml-auto">
+            <input type="checkbox" checked={tradeCompound} onChange={e => setTradeCompound(e.target.checked)} className="accent-emerald-600" />
+            複利 Π(1+r)（オフで単純合計 Σr）
+          </label>
+        </div>
+
+        {/* active strategy chips */}
+        <div className="flex flex-wrap gap-1 mb-2">
+          {specs.map((s, i) => (
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border" style={{ borderColor: STRAT_COLORS[i % STRAT_COLORS.length], color: STRAT_COLORS[i % STRAT_COLORS.length] }}>
+              {specLabel(s)}
+              <button onClick={() => removeSpec(i)} className="text-gray-400 hover:text-gray-700 leading-none">×</button>
+            </span>
+          ))}
+          {specs.length === 0 && <span className="text-[11px] text-gray-400">戦略を「比較に追加」してください</span>}
+        </div>
+
+        {/* equity curve */}
+        <div className="w-full rounded border border-gray-100 bg-white overflow-hidden"><canvas ref={tradeEquityRef} /></div>
+
+        {/* metrics table */}
+        {specs.length > 0 && (
+          <div className="overflow-x-auto mt-2">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="py-1 px-2 text-left text-gray-500 font-medium">戦略</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">取引数</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">総リターン</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">年率</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">Sharpe</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">最大DD</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">勝率</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">平均/回</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium">滞在率</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeResults.map((res, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 px-2 font-medium" style={{ color: STRAT_COLORS[i % STRAT_COLORS.length] }}>{specLabel(specs[i])}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{res.nTrades}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.totalReturn)}`}>{pct2(res.totalReturn)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.annualized)}`}>{pct2(res.annualized)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{res.sharpe.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(res.maxDD)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(res.winRate)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.avgTrade)}`}>{pct(res.avgTrade)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(res.exposure)}</td>
+                  </tr>
+                ))}
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <td className="py-1 px-2 font-medium text-gray-500">バイ&ホールド</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}>{pct2(bhMetrics.totalReturn)}</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.annualized)}`}>{pct2(bhMetrics.annualized)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-600">{bhMetrics.sharpe.toFixed(2)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(bhMetrics.maxDD)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-600">100%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* all-combinations matrix */}
+        <div className="mt-3">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs text-gray-500">全組合せヒートマップ</span>
+            <span className="text-[11px] text-gray-400">（現在の注文タイミング {TIMING_LABEL[builder.entryTiming]}→{TIMING_LABEL[builder.exitTiming]} / {builder.side === "long" ? "ロング" : "ショート"}で計算）</span>
+            <div className="flex gap-1 ml-auto">
+              {([["total", "総リターン"], ["sharpe", "Sharpe"], ["winRate", "勝率"]] as [MatrixMetric, string][]).map(([k, l]) => (
+                <button key={k} onClick={() => setMatrixMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${matrixMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><canvas ref={tradeMatrixRef} /></div>
+        </div>
       </div>
 
       {/* ===== 5. Week-of-month bar ===== */}
@@ -1508,6 +1845,26 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         <p><span className="font-medium">累積リターン（曜日別・月別）:</span> 特定の曜日/月にのみ投資した場合の累積リターン Σr_t の推移。右肩上がりなら当該期間は歴史的にプラスの期待値を持つことを意味します。</p>
         <p><span className="font-medium">年間シーズナリティ曲線:</span> 各年について年初からの営業日番号でr_tを並べ、全年の平均累積リターン曲線を描画。年間を通じた典型的な値動きパターンを把握できます。</p>
         <p><span className="font-medium">連騰・連落分析:</span> 連続して上昇/下落した日数（ストリーク）の最長・平均・回数を集計。ランダムウォーク仮説下での理論的連続日数（幾何分布 E[streak] = 1/p）と比較することで、トレンド継続性を評価します。</p>
+
+        <p className="mt-2 font-medium text-gray-700">週内パターン（月→金→翌月）</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">何を見るか:</span> 各週を月曜起点でそろえ、月→火→水→木→金 と<span className="font-medium">週内で累積した平均リターン</span>の推移を描きます。さらに金曜の累積に<span className="font-medium">週末ギャップ（金曜終値→翌週月曜終値 = 翌週月曜のリターン）</span>を足した「翌月（橙破線）」を追加し、週をまたぐ動きまで連続して把握できます。</li>
+          <li><span className="font-medium">計算:</span> 位置 w（月=1..金=5）の値は各週について Σ&#123;d=1..w&#125; r_d（r_d = その曜日の前日比終値リターン）を全週平均したもの。翌月の点は各週の Σ&#123;d=1..5&#125; r_d に翌週月曜の r を加えて平均します。</li>
+          <li><span className="font-medium">読み方:</span> 金→翌月の橙破線が<span className="font-medium">下向きなら「週末持ち越しでギャップダウンしやすい（Weekend/Monday効果）」</span>、上向きなら週明けに買われやすい傾向。平日区間（青実線）の傾きの差から、週の前半・後半どちらに上昇が偏るかを読み取ります。</li>
+          <li><span className="font-medium">注意:</span> 平均累積は「典型的な週」の姿であり、個々の週のばらつき（分散）は表現しません。祝日で欠落した曜日はその週ではスキップして累積するため、位置ごとにサンプル数が異なります。</li>
+        </ul>
+
+        <p className="mt-2 font-medium text-gray-700">曜日トレード・シミュレータ</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">何をするか:</span> 「月曜の終値で買い、火曜の終値で売る」のように、<span className="font-medium">任意のエントリー曜日・エグジット曜日と注文タイミング（始値/終値）</span>を指定して、毎週そのトレードを繰り返した場合の累積リターンを実データで再現し、バイ&ホールド（B&H）と比較します。複数戦略を重ねて描画できます。</li>
+          <li><span className="font-medium">トレード判定:</span> 各営業日に始値=2i・終値=2i+1 という時刻順序を割り当て、エントリー時刻より<span className="font-medium">後</span>に来る最初のエグジット曜日でポジションを解消します。これにより「月始値→月終値（日中）」「金終値→翌週月終値（持ち越し）」も一貫して扱えます。1トレード解消後の翌営業日から次のエントリーを探すため、原則<span className="font-medium">週1回</span>のトレードになります。</li>
+          <li><span className="font-medium">ロング/ショート:</span> ロングは r = P_exit/P_entry − 1、ショートはその符号反転 r = −(P_exit/P_entry − 1)。「木→金は下がりやすい」のような下落区間をショートで取れます。</li>
+          <li><span className="font-medium">累積方式:</span> <span className="font-medium">複利</span> Π(1+r_k)−1 は実際の資産推移に忠実でB&Hと同じ土俵。<span className="font-medium">単純合計</span> Σr_k は符号や寄与の比較に向きます（チェックボックスで切替）。</li>
+          <li><span className="font-medium">指標:</span> 総リターン／年率（複利は (1+総)^(252/N日)−1）／Sharpe（トレード単位の平均/標準偏差を年間トレード回数で年率化）／最大DD（資産曲線のピークからの最大下落率）／勝率／平均リターン/回／<span className="font-medium">滞在率（exposure）</span>＝ポジション保有日数 / 全営業日。</li>
+          <li><span className="font-medium">滞在率の意味:</span> 曜日トレードは市場にいる時間がB&Hより短いため、総リターンが小さくても<span className="font-medium">滞在率20%でB&H並み</span>なら「リスクに晒す時間あたりの効率は高い」と解釈できます。単純な総リターン比較だけで優劣を決めないこと。</li>
+          <li><span className="font-medium">全組合せヒートマップ:</span> エントリー曜日×エグジット曜日の25通りを、現在の注文タイミング・方向で一括計算し、総リターン/Sharpe/勝率を色分け表示。<span className="font-medium">手動で試さずに最良の曜日ペアを発見</span>できます（緑=プラス/勝ち越し、赤=マイナス/負け越し、トレード数3未満は「-」）。</li>
+          <li><span className="font-medium">注意点:</span> ①取引コスト・スリッページ・税は未考慮で、頻繁な売買では実効リターンが大きく削れます。②過去の曜日アノマリーは将来も続く保証がなく、発見後に消滅（アルファの裁定消滅）することが多い。③多数の組合せを試すと偶然有意に見える組合せが出る<span className="font-medium">多重比較</span>の罠に注意。④始値約定は寄付の流動性・ギャップの影響を受け、実約定が乖離する場合があります。</li>
+        </ul>
       </AnalysisGuide>
     </div>
   );
