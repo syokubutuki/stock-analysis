@@ -344,11 +344,26 @@ computePhaseAugmentedSimplex(prices, seriesMode,
 - 設計判断: 座標を1本足せばノイズでも僅かに ρ が動くため、シャッフル対照を超えて初めて「効く」と判定。UI に重みスライダー(0〜3)で感度確認。
 - 既存 `attractor-investment.ts` の simplex を使わず自前実装した理由: 位相座標を距離計算に組み込むカスタム埋め込みが必要で、既存APIは生系列前提のため。
 
-**未実装(次の着手候補)**
-- 曜日条件付き KM ポテンシャル(§6.3, 既存 `KramersMoyalChart` 流用)。
-- 窓ごとサロゲートによる厳密なローリング有意性(計算重 → Worker 化前提)。
-- 重い計算の Web Worker 化(現状は B=499・ローリング・Simplex とも main thread で許容範囲)。
-- S-map(局所線形)版での非線形性テスト。
+### 残り候補 実装/判断 (2026-06-12)
+
+**曜日条件付き KM — 実装済み**(`computeWeeklyPhaseKM(prices, phaseMode)`)
+- 設計変更: 価格条件付け(§6.3 の文言)はデータ5分割で脆弱なため、**週次位相 φ を状態変数とした KM** として実装。
+- 日次対数リターンを増分とし(seriesMode 非依存)、曜日別ドリフト μ(φ)=E[r\|曜日]・拡散 σ(φ)=std(r\|曜日)・月→金の累積経路を算出。
+- 出力: `entryPhase`(累積の谷=積み増し), `exitPhase`(ピーク=軽量化), `highVolPhase`/`lowVolPhase`(§6.1 リスク季節性)。UI はテーブル+トレード解釈。
+
+**窓ごとサロゲートによる厳密なローリング有意性 — 実装済み**(`computeRollingPL` を改修)
+- 各窓で曜日シャッフルサロゲート(B=99)を実行 → 窓ごと95%閾値・片側p値・`significant`。
+- 計算量見積り: 窓数(~95) × B(99) × O(W·m) ≈ 7M 演算 → main thread で軽量。**Worker 化は不要と判断**。
+- `aboveRatio` は窓ごと有意の期間割合に変更。UI は窓ごと閾値(灰線)+有意点(赤)。`globalThreshold` は参考のみ。
+
+**Web Worker 化 — 見送り**
+- B=499(全期間)・窓ごとB=99・Simplex(nShuffle=20)いずれも実測上 main thread で許容範囲のため未実施。将来データ長や B を大幅増する場合に `sarima.worker.ts` パターンで導入。
+
+**S-map 非線形性テスト — 重複のため見送り**
+- 既存 `app/lib/attractor-investment.ts` の `testNonlinearity()` / `smapPrediction()` と `SimplexPredictionChart` で実装済み。本コンポーネントへの再実装は重複。週内特化が必要になれば「位相つき S-map の θ スイープ」として将来追加。
+
+### 実装完了サマリ
+設計 §3.A〜§3.E + トレード適用(§6.1/§6.3/§6.4)を本コンポーネント1つに集約。残タスクは Worker 化と位相つき S-map のみ(いずれも任意)。
 
 ---
 

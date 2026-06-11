@@ -420,14 +420,15 @@ export function computeWeeklySpectrum(
 export interface RollingPLResult {
   ok: boolean;
   message?: string;
-  points: { time: string; PL: number }[];
-  threshold: number; // 全期間サロゲートの95%閾値 (メタゲートのしきい)
+  // significant: 窓ごとサロゲートの95%超 / pValue: 窓ごと片側p値
+  points: { time: string; PL: number; threshold: number; significant: boolean; pValue: number }[];
+  globalThreshold: number; // 全期間サロゲートの95%閾値 (参考線)
   window: number;
-  aboveRatio: number; // 閾値超の期間割合
+  aboveRatio: number; // 窓ごと有意の期間割合
 }
 
-// ローリングPL(t): 窓ごとに位相ロックF比を計算し、全期間サロゲート閾値と比較
-// PL(t) が閾値を超える期間だけ曜日チルトを有効化する (メタゲート, §6.4)
+// ローリングPL(t): 窓ごとに位相ロックF比 + 窓ごとサロゲート(曜日シャッフル)で有意性を判定。
+// 有意な期間だけ曜日チルトを有効化する (メタゲート, §6.4)。
 export function computeRollingPL(
   prices: PricePoint[],
   seriesMode: SeriesMode,
@@ -437,15 +438,17 @@ export function computeRollingPL(
     phaseMode: PhaseMode;
     window?: number;
     step?: number;
-    threshold: number;
+    globalThreshold: number;
+    surrogateB?: number;
   }
 ): RollingPLResult {
   const window = opts.window ?? 252;
   const step = opts.step ?? 21;
+  const B = opts.surrogateB ?? 99;
   const empty: RollingPLResult = {
     ok: false,
     points: [],
-    threshold: opts.threshold,
+    globalThreshold: opts.globalThreshold,
     window,
     aboveRatio: 0,
   };
@@ -454,19 +457,125 @@ export function computeRollingPL(
   const N = V.length;
   if (N < window + step) return { ...empty, message: "ローリングに必要なデータが不足" };
 
-  const points: { time: string; PL: number }[] = [];
+  const points: RollingPLResult["points"] = [];
   let above = 0;
   for (let start = 0; start + window <= N; start += step) {
     const Vw = V.slice(start, start + window);
     const Pw = P.slice(start, start + window);
     const f = fRatio(Vw, Pw, m);
     if (f.groupsPresent < 2) continue;
-    points.push({ time: T[start + window - 1], PL: f.PL });
-    if (f.PL > opts.threshold) above++;
+
+    // 窓ごとサロゲート
+    const surr: number[] = [];
+    const Ps = Pw.slice();
+    for (let b = 0; b < B; b++) {
+      shuffleInPlace(Ps);
+      surr.push(fRatio(Vw, Ps, m).PL);
+    }
+    surr.sort((a, b) => a - b);
+    const q95 = surr[Math.min(B - 1, Math.floor(0.95 * B))];
+    let ge = 0;
+    for (const s of surr) if (s >= f.PL) ge++;
+    const pValue = (1 + ge) / (B + 1);
+    const significant = f.PL > q95;
+
+    points.push({ time: T[start + window - 1], PL: f.PL, threshold: q95, significant, pValue });
+    if (significant) above++;
   }
   const aboveRatio = points.length ? above / points.length : 0;
 
-  return { ok: true, points, threshold: opts.threshold, window, aboveRatio };
+  return { ok: true, points, globalThreshold: opts.globalThreshold, window, aboveRatio };
+}
+
+// ============================================================================
+// 曜日条件付き Kramers-Moyal (週次位相を状態変数とした ドリフト/拡散/累積経路)
+// ============================================================================
+
+export interface WeeklyPhaseKMResult {
+  ok: boolean;
+  message?: string;
+  drift: number[]; // μ(φ)=E[r|曜日], length 5
+  diffusion: number[]; // σ(φ)=std(r|曜日), length 5
+  cumulative: number[]; // 月→金の累積平均リターン経路, length 5
+  counts: number[];
+  entryPhase: number; // 累積の谷 = 積み増し候補 (§6.3)
+  exitPhase: number; // 累積のピーク = 軽量化候補 (§6.3)
+  highVolPhase: number; // 拡散最大 = サイズ縮小候補 (§6.1)
+  lowVolPhase: number; // 拡散最小
+}
+
+// 価格条件付け(データ分割で脆弱)ではなく、週次位相 φ を状態変数とした KM。
+// 日次対数リターンを増分とし、曜日ごとのドリフト/拡散と週内累積経路を出す。
+// seriesMode によらず close→logReturn を増分に使う(KMは増分のモデルのため)。
+export function computeWeeklyPhaseKM(
+  prices: PricePoint[],
+  phaseMode: PhaseMode
+): WeeklyPhaseKMResult {
+  const empty: WeeklyPhaseKMResult = {
+    ok: false, drift: [], diffusion: [], cumulative: [], counts: [],
+    entryPhase: 0, exitPhase: 0, highVolPhase: 0, lowVolPhase: 0,
+  };
+  const closes = prices.map((p) => p.close);
+  const times = prices.map((p) => p.time);
+  const r: number[] = [];
+  const rt: string[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0 && closes[i] > 0) {
+      r.push(Math.log(closes[i] / closes[i - 1]));
+      rt.push(times[i]);
+    }
+  }
+  if (r.length < 50) return { ...empty, message: "データ不足" };
+
+  let phases: number[];
+  if (phaseMode === "calendar") {
+    phases = rt.map(weekdayIndex);
+  } else {
+    const start0 = Math.max(0, weekdayIndex(rt[0]));
+    phases = rt.map((_, i) => (start0 + i) % K);
+  }
+
+  const sum = new Array(K).fill(0);
+  const sumSq = new Array(K).fill(0);
+  const counts = new Array(K).fill(0);
+  for (let i = 0; i < r.length; i++) {
+    const k = phases[i];
+    if (k < 0) continue;
+    sum[k] += r[i];
+    sumSq[k] += r[i] * r[i];
+    counts[k]++;
+  }
+
+  const drift = new Array(K).fill(0);
+  const diffusion = new Array(K).fill(0);
+  for (let k = 0; k < K; k++) {
+    if (counts[k] > 0) {
+      drift[k] = sum[k] / counts[k];
+      diffusion[k] = Math.sqrt(Math.max(0, sumSq[k] / counts[k] - drift[k] * drift[k]));
+    }
+  }
+
+  const cumulative = new Array(K).fill(0);
+  let acc = 0;
+  for (let k = 0; k < K; k++) {
+    acc += drift[k];
+    cumulative[k] = acc;
+  }
+
+  const argmin = (a: number[]) => a.reduce((bi, v, i) => (v < a[bi] ? i : bi), 0);
+  const argmax = (a: number[]) => a.reduce((bi, v, i) => (v > a[bi] ? i : bi), 0);
+
+  return {
+    ok: true,
+    drift,
+    diffusion,
+    cumulative,
+    counts,
+    entryPhase: argmin(cumulative),
+    exitPhase: argmax(cumulative),
+    highVolPhase: argmax(diffusion),
+    lowVolPhase: argmin(diffusion),
+  };
 }
 
 // ============================================================================

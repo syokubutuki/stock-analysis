@@ -9,6 +9,7 @@ import {
   computeWeeklySpectrum,
   computeRollingPL,
   computePhaseAugmentedSimplex,
+  computeWeeklyPhaseKM,
   PhaseMode,
   PHASE_MODE_LABELS,
   WEEKDAY_LABELS,
@@ -53,7 +54,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     [prices, seriesMode]
   );
 
-  // フェーズ3: ローリングPL(t) — 閾値は全期間サロゲートの95%
+  // フェーズ3: ローリングPL(t) — 窓ごとサロゲートで有意性判定
   const rollResult = useMemo(
     () =>
       result.ok
@@ -61,10 +62,16 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
             tau,
             dim,
             phaseMode,
-            threshold: result.surrogateQ95,
+            globalThreshold: result.surrogateQ95,
           })
         : null,
     [prices, seriesMode, tau, dim, phaseMode, result]
+  );
+
+  // 曜日条件付き KM (週次位相のドリフト/拡散/累積経路)
+  const kmResult = useMemo(
+    () => computeWeeklyPhaseKM(prices, phaseMode),
+    [prices, phaseMode]
   );
 
   // フェーズ3-E: 位相つき Simplex 予測スキル比較
@@ -387,24 +394,21 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     const margin = 36;
     const pts = rollResult.points;
     const n = pts.length;
-    const maxPL = Math.max(...pts.map((p) => p.PL), rollResult.threshold) || 1;
+    const maxPL =
+      Math.max(...pts.map((p) => Math.max(p.PL, p.threshold)), rollResult.globalThreshold) || 1;
     const sx = (i: number) => margin + (i / (n - 1)) * (width - margin * 2);
     const sy = (pl: number) => height - margin - (pl / maxPL) * (height - margin * 2);
 
-    // 閾値線 + 上側シェード
-    const ty = sy(rollResult.threshold);
-    ctx.fillStyle = "rgba(220,38,38,0.06)";
-    ctx.fillRect(margin, margin, width - margin * 2, ty - margin);
-    ctx.strokeStyle = "#f59e0b";
-    ctx.setLineDash([4, 3]);
+    // 窓ごと95%閾値 (薄いグレー線)
+    ctx.strokeStyle = "#d1d5db";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(margin, ty);
-    ctx.lineTo(width - margin, ty);
+    pts.forEach((p, i) => {
+      const x = sx(i), y = sy(p.threshold);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
     ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = "#d97706";
-    ctx.font = "9px sans-serif";
-    ctx.fillText("95%閾値", width - margin - 44, ty - 3);
 
     // PL(t)
     ctx.strokeStyle = "#2563eb";
@@ -416,9 +420,9 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
       else ctx.lineTo(x, y);
     });
     ctx.stroke();
-    // 閾値超の点を強調
+    // 窓ごと有意の点を強調
     for (let i = 0; i < n; i++) {
-      if (pts[i].PL > rollResult.threshold) {
+      if (pts[i].significant) {
         ctx.fillStyle = "#dc2626";
         ctx.beginPath();
         ctx.arc(sx(i), sy(pts[i].PL), 2.5, 0, Math.PI * 2);
@@ -432,7 +436,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     ctx.textAlign = "right";
     ctx.fillText(pts[n - 1].time, width - margin, height - margin + 12);
     ctx.textAlign = "left";
-    ctx.fillText(`ローリングPL(t) 窓=${rollResult.window}日 (赤=閾値超=チルト有効)`, margin, 14);
+    ctx.fillText(`ローリングPL(t) 窓=${rollResult.window}日 (赤=窓ごと有意=チルト有効 / 灰=窓ごと95%閾値)`, margin, 14);
   }, [rollResult]);
 
   return (
@@ -603,9 +607,9 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
             {rollResult && rollResult.ok ? (
               <>
                 <p className="text-xs text-gray-600 mb-1">
-                  閾値超の期間割合 = <b>{(rollResult.aboveRatio * 100).toFixed(1)}%</b>
+                  窓ごと有意の期間割合 = <b>{(rollResult.aboveRatio * 100).toFixed(1)}%</b>
                   <span className="text-gray-400">
-                    {" "}— この期間だけ曜日チルトを有効化する(メタゲート)
+                    {" "}— 各窓を自分のサロゲートで検定。有意な期間だけ曜日チルトを有効化(メタゲート)
                   </span>
                 </p>
                 <div className="flex justify-center">
@@ -673,6 +677,69 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
             )}
           </div>
 
+          {/* 曜日条件付き KM: トレード適用 */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h4 className="font-semibold text-gray-700 text-sm mb-2">
+              曜日条件付き Kramers-Moyal (トレード適用: リスク季節性 & 方向バイアス)
+            </h4>
+            {kmResult.ok ? (
+              <>
+                <table className="w-full text-xs text-center border-collapse">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-200">
+                      <th className="py-1 px-2 text-left">曜日</th>
+                      <th className="py-1 px-2">点数</th>
+                      <th className="py-1 px-2">ドリフト μ (日次)</th>
+                      <th className="py-1 px-2">拡散 σ (ボラ)</th>
+                      <th className="py-1 px-2">週内累積</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {WEEKDAY_LABELS.map((l, k) => (
+                      <tr key={k} className="border-b border-gray-100">
+                        <td className="py-1 px-2 text-left">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full mr-1 align-middle" style={{ background: WEEKDAY_COLORS[k] }} />
+                          {l}
+                        </td>
+                        <td className="py-1 px-2">{kmResult.counts[k]}</td>
+                        <td className={`py-1 px-2 font-mono ${kmResult.drift[k] >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {(kmResult.drift[k] * 100).toFixed(3)}%
+                        </td>
+                        <td className={`py-1 px-2 font-mono ${k === kmResult.highVolPhase ? "text-red-600 font-bold" : k === kmResult.lowVolPhase ? "text-blue-600" : ""}`}>
+                          {(kmResult.diffusion[k] * 100).toFixed(3)}%
+                        </td>
+                        <td className={`py-1 px-2 font-mono ${k === kmResult.entryPhase ? "text-blue-600 font-bold" : k === kmResult.exitPhase ? "text-green-600 font-bold" : ""}`}>
+                          {(kmResult.cumulative[k] * 100).toFixed(3)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
+                  <p>
+                    <b>リスク季節性 (§6.1, 最も堅い)</b>: 高ボラ曜日 =
+                    <span className="text-red-600 font-bold"> {WEEKDAY_LABELS[kmResult.highVolPhase]}</span>
+                    → サイズ/ストップ縮小。低ボラ =
+                    <span className="text-blue-600 font-bold"> {WEEKDAY_LABELS[kmResult.lowVolPhase]}</span>。
+                  </p>
+                  <p>
+                    <b>方向バイアス (§6.3, 弱い修飾子)</b>: 累積の谷 =
+                    <span className="text-blue-600 font-bold"> {WEEKDAY_LABELS[kmResult.entryPhase]}</span>
+                    (積み増し候補) / ピーク =
+                    <span className="text-green-600 font-bold"> {WEEKDAY_LABELS[kmResult.exitPhase]}</span>
+                    (軽量化候補)。
+                  </p>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  週次位相 φ(曜日) を状態変数とした KM。ドリフト μ(φ)=曜日別平均リターン、拡散 σ(φ)=曜日別ボラ。
+                  累積=月から金への μ の累積。方向バイアスはローリングPLが有意な期間のみ適用すること(メタゲート)。
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">{kmResult.message ?? "計算不可"}</p>
+            )}
+          </div>
+
           <AnalysisGuide title="週内位相アトラクタの詳細理論">
             <p className="font-medium text-gray-700">1. 何を検証しているか</p>
             <p>
@@ -713,8 +780,9 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
               <li><b>ストロボ分散比</b>: 曜日別の集中度。&lt;1の曜日はその曜日の状態が特に集中=不動点的(ボラ季節性の兆候)。</li>
               <li><b>リカレンスのラグ構造</b>: RR(ℓ)がラグ5・10・15(赤)で平均より突出すれば週次の再帰=独立な傍証。</li>
               <li><b>Lomb-Scargle</b>: 周期5(緑線)にピーク&FAP&lt;5%なら週次の正弦的周期成分が有意。散布・サロゲートと別原理の裏取り。</li>
-              <li><b>ローリングPL(t)</b>: 全期間有意でも位相ロックは出没する(非定常)。閾値超の窓(赤点)だけ運用するのがメタゲート。</li>
+              <li><b>ローリングPL(t)</b>: 全期間有意でも位相ロックは出没する(非定常)。各窓を<b>窓ごとサロゲート</b>で検定し、有意な窓(赤点)だけ運用するのがメタゲート。灰線は窓ごと95%閾値。</li>
               <li><b>位相つきSimplex</b>: 埋め込み座標に週次位相 (cos,sin) を足して予測スキルρが上がるか。ベースライン<b>と</b>位相シャッフル対照の両方を上回れば「週内構造はトレードに効く」最終確認。改善ゼロなら構造があっても予測には使えない(リスク/執行タイミングのみ)。</li>
+              <li><b>曜日条件付きKM</b>: 拡散σ(φ)の高い曜日はサイズ縮小(§6.1, 最も堅い)。累積の谷曜日で積み増し・ピーク曜日で軽量化(§6.3)。ただし方向はローリングPLが有意な期間のみ。</li>
             </ul>
 
             <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>
