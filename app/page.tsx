@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { useAnalysisData } from "./hooks/useAnalysisData";
+import Link from "next/link";
+import { useAnalysisData, PeriodKey } from "./hooks/useAnalysisData";
 import PeriodSelector from "./components/analysis/PeriodSelector";
 import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
 import WatchlistPanel from "./components/WatchlistPanel";
@@ -561,17 +562,62 @@ export default function AnalysisPage() {
     useAnalysisData();
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
+  const [tickerInput, setTickerInput] = useState("");
+
+  // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const savedSection = localStorage.getItem("sa:section") as SectionKey | null;
+      const savedMode = localStorage.getItem("sa:seriesMode") as SeriesMode | null;
+      const savedPeriod = localStorage.getItem("sa:period") as PeriodKey | null;
+      const savedTicker = localStorage.getItem("sa:lastTicker");
+      if (savedSection) setActiveSection(savedSection);
+      if (savedMode) setSeriesMode(savedMode);
+      if (savedPeriod) setPeriod(savedPeriod);
+      if (savedTicker) {
+        setTickerInput(savedTicker);
+        fetchStock(savedTicker);
+      }
+    } catch {
+      // localStorage 利用不可（プライベートモード等）の場合は無視
+    }
+  }, [fetchStock, setPeriod]);
+
+  // 取得成功した銘柄・現在の表示状態を保存する
+  useEffect(() => {
+    if (data?.ticker) {
+      try {
+        localStorage.setItem("sa:lastTicker", data.ticker);
+      } catch {}
+    }
+  }, [data?.ticker]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sa:section", activeSection);
+    } catch {}
+  }, [activeSection]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sa:seriesMode", seriesMode);
+    } catch {}
+  }, [seriesMode]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sa:period", period);
+    } catch {}
+  }, [period]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      const form = e.currentTarget;
-      const input = form.elements.namedItem("ticker") as HTMLInputElement;
-      if (input.value.trim()) {
-        fetchStock(input.value.trim());
+      if (tickerInput.trim()) {
+        fetchStock(tickerInput.trim());
       }
     },
-    [fetchStock]
+    [fetchStock, tickerInput]
   );
 
   return (
@@ -584,12 +630,12 @@ export default function AnalysisPage() {
               市場の隠れた構造をデータから抽出する
             </p>
           </div>
-          <a
+          <Link
             href="/feedback"
             className="shrink-0 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
           >
             ご意見・ご要望
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -600,6 +646,8 @@ export default function AnalysisPage() {
             <input
               name="ticker"
               type="text"
+              value={tickerInput}
+              onChange={(e) => setTickerInput(e.target.value)}
               placeholder="銘柄コード (例: 9984, 8306)"
               className="px-4 py-2 border border-gray-300 rounded-lg text-base w-56 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
             />
@@ -614,7 +662,10 @@ export default function AnalysisPage() {
           <WatchlistPanel
             currentTicker={data?.ticker ?? null}
             currentName={data?.name ?? null}
-            onSelect={(ticker) => fetchStock(ticker)}
+            onSelect={(ticker) => {
+              setTickerInput(ticker);
+              fetchStock(ticker);
+            }}
           />
           {data && (
             <>
@@ -921,9 +972,9 @@ export default function AnalysisPage() {
       <footer className="text-center text-xs text-gray-400 py-8 space-y-1">
         <p>株価データはYahoo Financeより取得。投資判断の参考としてご利用ください。</p>
         <p>
-          <a href="/feedback" className="text-blue-500 hover:text-blue-600 underline">
+          <Link href="/feedback" className="text-blue-500 hover:text-blue-600 underline">
             機能改善のご意見・ご要望はこちら
-          </a>
+          </Link>
         </p>
       </footer>
     </div>
