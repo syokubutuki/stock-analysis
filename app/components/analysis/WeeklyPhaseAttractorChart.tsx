@@ -9,6 +9,9 @@ import {
   computeWeeklySpectrum,
   computeRollingPL,
   computePhaseAugmentedSimplex,
+  computePhaseAugmentedSmap,
+  computeRegimeStratifiedPL,
+  computeAdaptivePhaseAttractor,
   computeWeeklyPhaseKM,
   PhaseMode,
   PHASE_MODE_LABELS,
@@ -34,6 +37,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
   const lagRef = useRef<HTMLCanvasElement>(null);
   const specRef = useRef<HTMLCanvasElement>(null);
   const rollRef = useRef<HTMLCanvasElement>(null);
+  const smapRef = useRef<HTMLCanvasElement>(null);
 
   const result = useMemo(
     () => computeWeeklyPhaseAttractor(prices, seriesMode, { tau, dim, phaseMode }),
@@ -72,6 +76,26 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
   const kmResult = useMemo(
     () => computeWeeklyPhaseKM(prices, phaseMode),
     [prices, phaseMode]
+  );
+
+  // A. 位相つき S-map (θスイープ)
+  const smapResult = useMemo(
+    () => computePhaseAugmentedSmap(prices, seriesMode, { tau, dim, phaseMode, phaseWeight }),
+    [prices, seriesMode, tau, dim, phaseMode, phaseWeight]
+  );
+
+  // B1. レジーム層別PL
+  const regimeResult = useMemo(
+    () => computeRegimeStratifiedPL(prices, seriesMode, { tau, dim, phaseMode }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [prices, seriesMode, tau, dim, phaseMode, seed]
+  );
+
+  // B3. 適応的位相 (Hilbert)
+  const adaptiveResult = useMemo(
+    () => computeAdaptivePhaseAttractor(prices, seriesMode, { tau, dim }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [prices, seriesMode, tau, dim, seed]
   );
 
   // フェーズ3-E: 位相つき Simplex 予測スキル比較
@@ -439,6 +463,61 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     ctx.fillText(`ローリングPL(t) 窓=${rollResult.window}日 (赤=窓ごと有意=チルト有効 / 灰=窓ごと95%閾値)`, margin, 14);
   }, [rollResult]);
 
+  // A: S-map θスイープ (ρ vs θ)
+  useEffect(() => {
+    const canvas = smapRef.current;
+    if (!canvas || !smapResult.ok) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const width = Math.min(parent.clientWidth - 16, 560);
+    const height = 220;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+
+    const margin = 40;
+    const th = smapResult.thetas;
+    const nT = th.length;
+    const allRho = [...smapResult.rhoBase, ...smapResult.rhoAug];
+    const rMax = Math.max(...allRho, 0.05);
+    const rMin = Math.min(...allRho, 0);
+    const rr = rMax - rMin || 1;
+    const sx = (i: number) => margin + (i / (nT - 1)) * (width - margin * 2);
+    const sy = (rho: number) => height - margin - ((rho - rMin) / rr) * (height - margin * 2);
+
+    // ゼロ線
+    if (rMin < 0) {
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.beginPath(); ctx.moveTo(margin, sy(0)); ctx.lineTo(width - margin, sy(0)); ctx.stroke();
+    }
+    const drawCurve = (rho: number[], color: string) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      rho.forEach((v, i) => { const x = sx(i), y = sy(v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+      ctx.stroke();
+      rho.forEach((v, i) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(sx(i), sy(v), 2.5, 0, Math.PI * 2); ctx.fill(); });
+    };
+    drawCurve(smapResult.rhoBase, "#2563eb");
+    drawCurve(smapResult.rhoAug, "#dc2626");
+
+    // X軸ラベル
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "center";
+    th.forEach((t, i) => ctx.fillText(`${t}`, sx(i), height - margin + 12));
+    ctx.textAlign = "left";
+    ctx.fillText("予測スキルρ vs θ (青=埋め込みのみ / 赤=+週次位相)", margin, 14);
+    ctx.fillText("θ (0=大域線形 → 大=局所非線形)", margin, height - 6);
+  }, [smapResult]);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="font-bold text-gray-800 mb-1">週内位相アトラクタ (動力学的週内アノマリー)</h3>
@@ -626,6 +705,102 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
             )}
           </div>
 
+          {/* B1: レジーム層別PL */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h4 className="font-semibold text-gray-700 text-sm mb-2">
+              レジーム層別 位相ロック (週内構造はどのボラ状態で出るか)
+            </h4>
+            {regimeResult.ok ? (
+              <>
+                <table className="w-full text-xs text-center border-collapse">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-200">
+                      <th className="py-1 px-2 text-left">レジーム</th>
+                      <th className="py-1 px-2">点数</th>
+                      <th className="py-1 px-2">PL</th>
+                      <th className="py-1 px-2">95%閾値</th>
+                      <th className="py-1 px-2">p値</th>
+                      <th className="py-1 px-2">判定</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {([
+                      { label: "高ボラ期", d: regimeResult.high },
+                      { label: "低ボラ期", d: regimeResult.low },
+                      { label: "全期間", d: regimeResult.all },
+                    ] as const).map((row, i) => {
+                      const sig = row.d.PL > row.d.q95;
+                      return (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-1 px-2 text-left">{row.label}</td>
+                          <td className="py-1 px-2">{row.d.n}</td>
+                          <td className={`py-1 px-2 font-mono ${sig ? "text-red-600 font-bold" : ""}`}>{row.d.PL.toFixed(3)}</td>
+                          <td className="py-1 px-2 font-mono text-gray-400">{row.d.q95.toFixed(3)}</td>
+                          <td className="py-1 px-2 font-mono">{row.d.pValue.toFixed(4)}</td>
+                          <td className={`py-1 px-2 ${sig ? "text-red-600 font-bold" : "text-gray-400"}`}>{sig ? "有意" : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  日次対数リターンの{21}日ローリングσ中央値で高/低ボラに2分し、各レジームで位相ロックを別々に検定。
+                  片方だけ有意なら「週内構造はそのボラ状態でのみ出現」= メタゲートをボラ軸でも条件付け可能。
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">{regimeResult.message ?? "計算不可"}</p>
+            )}
+          </div>
+
+          {/* B3: 適応的位相 */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h4 className="font-semibold text-gray-700 text-sm mb-2">
+              適応的位相 (固定5でなくデータ駆動の瞬時位相)
+            </h4>
+            {adaptiveResult.ok ? (
+              <>
+                <p className="text-xs text-gray-600 mb-1">
+                  採用IMF = <b>{adaptiveResult.selectedImf}</b>（平均周期 {adaptiveResult.selectedPeriod.toFixed(1)} 営業日, {adaptiveResult.nGroups}分割）
+                </p>
+                <table className="w-full text-xs text-center border-collapse">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-200">
+                      <th className="py-1 px-2 text-left">位相の定義</th>
+                      <th className="py-1 px-2">PL</th>
+                      <th className="py-1 px-2">95%閾値</th>
+                      <th className="py-1 px-2">p値</th>
+                      <th className="py-1 px-2">判定</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {([
+                      { label: "適応的位相 (Hilbert)", d: adaptiveResult.adaptive },
+                      { label: "カレンダー曜日", d: adaptiveResult.calendar },
+                    ] as const).map((row, i) => {
+                      const sig = row.d.PL > row.d.q95;
+                      return (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-1 px-2 text-left">{row.label}</td>
+                          <td className={`py-1 px-2 font-mono ${sig ? "text-red-600 font-bold" : ""}`}>{row.d.PL.toFixed(3)}</td>
+                          <td className="py-1 px-2 font-mono text-gray-400">{row.d.q95.toFixed(3)}</td>
+                          <td className="py-1 px-2 font-mono">{row.d.pValue.toFixed(4)}</td>
+                          <td className={`py-1 px-2 ${sig ? "text-red-600 font-bold" : "text-gray-400"}`}>{sig ? "有意" : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  EMDで週次近傍のIMFを抽出→Hilbert変換で瞬時位相→{adaptiveResult.nGroups}分割して位相ロックを検定。
+                  適応的位相のPLがカレンダー曜日を上回れば、市場の内在サイクルは暦の曜日とずれている可能性。
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">{adaptiveResult.message ?? "計算不可"}</p>
+            )}
+          </div>
+
           {/* フェーズ3-E: 位相つき予測スキル */}
           <div className="mt-6 pt-4 border-t border-gray-200">
             <h4 className="font-semibold text-gray-700 text-sm mb-2">
@@ -674,6 +849,36 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
               </>
             ) : (
               <p className="text-sm text-gray-500 py-4 text-center">{simplexResult.message ?? "計算不可"}</p>
+            )}
+          </div>
+
+          {/* A: S-map θスイープ */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h4 className="font-semibold text-gray-700 text-sm mb-2">
+              S-map θスイープ (非線形性テスト & 位相つき局所線形予測)
+            </h4>
+            {smapResult.ok ? (
+              <>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm mb-2">
+                  <span className={`font-bold ${smapResult.nonlinear ? "text-red-700" : "text-gray-600"}`}>
+                    {smapResult.nonlinear ? "非線形性: あり" : "非線形性: 乏しい"}
+                  </span>
+                  <span className="text-gray-600">最適θ = <b>{smapResult.bestThetaBase}</b></span>
+                  <span className="text-gray-600">ρ(θ=0)={smapResult.rhoLinearBase.toFixed(3)} → ρ_best={smapResult.rhoBestBase.toFixed(3)}</span>
+                  <span className={smapResult.phaseHelps ? "text-red-600 font-bold" : "text-gray-400"}>
+                    {smapResult.phaseHelps ? "位相つきで更に改善" : "位相つきの追加改善なし"}
+                  </span>
+                </div>
+                <div className="flex justify-center">
+                  <canvas ref={smapRef} className="rounded border border-gray-200" />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  θを上げると局所線形(非線形)モデルに近づく。ρがθ&gt;0で改善すれば非線形性の証拠(Sugihara-May)。
+                  赤(位相つき)が青(埋め込みのみ)の最大を上回れば、週内位相は非線形予測にも効く。
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">{smapResult.message ?? "計算不可"}</p>
             )}
           </div>
 

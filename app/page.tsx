@@ -92,6 +92,14 @@ const WeeklyPhaseAttractorChart = dynamic(
   () => import("./components/analysis/WeeklyPhaseAttractorChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
 );
+const PeriodicPhaseAttractorChart = dynamic(
+  () => import("./components/analysis/PeriodicPhaseAttractorChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const WeeklyPhaseSyncChart = dynamic(
+  () => import("./components/analysis/WeeklyPhaseSyncChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const EntropyDisplay = dynamic(
   () => import("./components/analysis/EntropyDisplay"),
   { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
@@ -569,11 +577,19 @@ export default function AnalysisPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-xl font-bold text-gray-900">株価構造分析</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            市場の隠れた構造をデータから抽出する
-          </p>
+        <div className="max-w-7xl mx-auto flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">株価構造分析</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              市場の隠れた構造をデータから抽出する
+            </p>
+          </div>
+          <a
+            href="/feedback"
+            className="shrink-0 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+          >
+            ご意見・ご要望
+          </a>
         </div>
       </header>
 
@@ -782,6 +798,8 @@ export default function AnalysisPage() {
                   <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} />
                   <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
                   <WeeklyPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <PeriodicPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <WeeklyPhaseSyncChart />
                   <RollingRQAChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LocalLyapunovChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LyapunovSpectrumChart prices={filteredPrices} seriesMode={seriesMode} />
@@ -900,8 +918,13 @@ export default function AnalysisPage() {
         )}
       </main>
 
-      <footer className="text-center text-xs text-gray-400 py-8">
-        株価データはYahoo Financeより取得。投資判断の参考としてご利用ください。
+      <footer className="text-center text-xs text-gray-400 py-8 space-y-1">
+        <p>株価データはYahoo Financeより取得。投資判断の参考としてご利用ください。</p>
+        <p>
+          <a href="/feedback" className="text-blue-500 hover:text-blue-600 underline">
+            機能改善のご意見・ご要望はこちら
+          </a>
+        </p>
       </footer>
     </div>
   );

@@ -1,6 +1,6 @@
 # 週内位相アトラクタ — 動力学的な週内アノマリーの検証とトレード応用
 
-> **ステータス: フェーズ1〜3 実装済み** (2026-06-11)
+> **ステータス: フェーズ1〜3 + 拡張(S-map/B1〜B4) 実装済み** (2026-06-12)
 > 本書は設計思想・検証方法・トレード応用・将来拡張を記録する。
 > 後からの見直し・改善・発展のための起点。実装メモは §9 参照。
 >
@@ -363,7 +363,42 @@ computePhaseAugmentedSimplex(prices, seriesMode,
 - 既存 `app/lib/attractor-investment.ts` の `testNonlinearity()` / `smapPrediction()` と `SimplexPredictionChart` で実装済み。本コンポーネントへの再実装は重複。週内特化が必要になれば「位相つき S-map の θ スイープ」として将来追加。
 
 ### 実装完了サマリ
-設計 §3.A〜§3.E + トレード適用(§6.1/§6.3/§6.4)を本コンポーネント1つに集約。残タスクは Worker 化と位相つき S-map のみ(いずれも任意)。
+設計 §3.A〜§3.E + トレード適用(§6.1/§6.3/§6.4)を本コンポーネント1つに集約。
+
+### 拡張機能(A + B1〜B4) 実装済み (2026-06-12)
+
+3コンポーネント構成に分割。計算は全て `weekly-phase-attractor.ts` に集約。
+
+**A. 位相つき S-map θスイープ**(`computePhaseAugmentedSmap`)
+- 自前の重み付き局所線形回帰(`smapCore` + `solveWLS`/`gaussSolve` ガウス消去)。窓を maxLib=500/maxPred=300 に制限し main thread で軽量化。
+- θ=[0,0.1,0.3,0.5,1,2,4,8] をスイープ。ρ(θ)が θ>0 で改善=非線形(Sugihara-May)。位相つき(赤)がベースライン(青)最大を上回れば位相が非線形予測に効く。
+- 既存 `attractor-investment.ts` の S-map は加重平均(真の局所線形でない)ため、週内位相特化として自前実装。
+- UI: 既存 `WeeklyPhaseAttractorChart` に ρ vs θ 折れ線パネル追加。
+
+**B1. レジーム層別 位相ロック**(`computeRegimeStratifiedPL`)
+- 日次対数リターンの21日ローリングσ中央値で高/低ボラに2分し、各レジームで PL+サロゲート(B=299)を別々に検定。
+- 片方だけ有意なら「週内構造はそのボラ状態でのみ出現」→ メタゲートをボラ軸でも条件付け可能。UI はテーブル(高/低/全)。
+
+**B3. 適応的位相 (Hilbert)**(`computeAdaptivePhaseAttractor`)
+- `computeEMD` で週次近傍(平均周期≈5)の IMF を抽出 → `hilbertTransform` で瞬時位相 → nGroups分割で PL 検定。カレンダー曜日 PL と比較。
+- 適応的位相 PL がカレンダーを上回れば、内在サイクルが暦の曜日とずれている可能性。UI は比較テーブル。
+
+**B4. 一般周期アトラクタ**(`computePeriodicPhaseAttractor` + `fRatio` を nGroups 一般化)
+- 週内(5)の枠組みを月内(21)・四半期内(63)へ。位相 = 埋め込み点インデックス mod 周期(営業日位相)。
+- 新コンポーネント `PeriodicPhaseAttractorChart`(周期セレクタ5/21/63、散布図+重心巡回+PL+サロゲート)。
+
+**B2. 週次位相同期 (Kuramoto)**(`computeWeeklyPhaseSync`)
+- 各銘柄の曜日別ドリフト第1高調波 → 選好位相θ・振幅A。秩序変数 r=|(1/N)Σexp(iθ)| と振幅加重 r_w。
+- 新コンポーネント `WeeklyPhaseSyncChart`(ティッカー手入力+既定バスケット=米セクターETF、`/api/stock` でクライアント取得、位相円+秩序変数描画)。
+
+**見送り**
+- B5 イベント位相: ユーザー判断で実装しない。
+- Web Worker 化: 全計算 main thread で許容範囲(S-mapは窓制限済み)。
+
+### 残タスク(任意・将来)
+- 適応的位相/Kuramoto のローリング化(時間変化=レジーム指標)。
+- 一般周期の暦ベース位相(月末効果の厳密検証)。
+- 外部イベント(決算/FOMC)位相: 日付データ投入UIが前提。
 
 ---
 

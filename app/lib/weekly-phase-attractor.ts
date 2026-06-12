@@ -14,6 +14,7 @@ import { PricePoint } from "./types";
 import { SeriesMode, extractSeries } from "./series-mode";
 import { takensEmbedding } from "./nonlinear";
 import { computeLombScargle } from "./lomb-scargle";
+import { computeEMD, hilbertTransform } from "./emd";
 
 export type PhaseMode = "calendar" | "business";
 
@@ -74,11 +75,11 @@ interface FResult {
   groupsPresent: number;
 }
 
-// 一元配置分散分析のF比を多次元で計算
-function fRatio(V: number[][], P: number[], m: number): FResult {
+// 一元配置分散分析のF比を多次元で計算 (nGroups: 位相のグループ数, 既定=週=5)
+function fRatio(V: number[][], P: number[], m: number, nGroups: number = K): FResult {
   const N = V.length;
-  const sum: number[][] = Array.from({ length: K }, () => new Array(m).fill(0));
-  const counts = new Array(K).fill(0);
+  const sum: number[][] = Array.from({ length: nGroups }, () => new Array(m).fill(0));
+  const counts = new Array(nGroups).fill(0);
   const overall = new Array(m).fill(0);
 
   for (let i = 0; i < N; i++) {
@@ -98,7 +99,7 @@ function fRatio(V: number[][], P: number[], m: number): FResult {
 
   let sBetween = 0;
   let groupsPresent = 0;
-  for (let k = 0; k < K; k++) {
+  for (let k = 0; k < nGroups; k++) {
     if (counts[k] === 0) continue;
     groupsPresent++;
     let d = 0;
@@ -110,7 +111,7 @@ function fRatio(V: number[][], P: number[], m: number): FResult {
   }
 
   let sWithin = 0;
-  const groupSpread = new Array(K).fill(0);
+  const groupSpread = new Array(nGroups).fill(0);
   for (let i = 0; i < N; i++) {
     const k = P[i];
     let d = 0;
@@ -735,4 +736,486 @@ export function computePhaseAugmentedSimplex(
     deltaRho,
     improves,
   };
+}
+
+// ============================================================================
+// A. 位相つき S-map (θスイープ): 非線形性テスト + 位相が予測に効くか
+// ============================================================================
+
+// ガウス消去(部分ピボット, p<=6)
+function gaussSolve(A: number[][], b: number[]): number[] | null {
+  const p = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < p; col++) {
+    let piv = col;
+    for (let r = col + 1; r < p; r++)
+      if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    if (Math.abs(M[piv][col]) < 1e-12) return null;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    for (let r = 0; r < p; r++) {
+      if (r === col) continue;
+      const f = M[r][col] / M[col][col];
+      for (let c = col; c <= p; c++) M[r][c] -= f * M[col][c];
+    }
+  }
+  return M.map((row, i) => row[p] / row[i]);
+}
+
+// 重み付き最小二乗 (正規方程式 + 軽いリッジ)
+function solveWLS(X: number[][], y: number[], w: number[]): number[] | null {
+  const n = X.length, p = X[0].length;
+  const A = Array.from({ length: p }, () => new Array(p).fill(0));
+  const b = new Array(p).fill(0);
+  for (let i = 0; i < n; i++) {
+    const wi = w[i];
+    if (wi <= 0) continue;
+    for (let a = 0; a < p; a++) {
+      b[a] += wi * X[i][a] * y[i];
+      for (let c = 0; c < p; c++) A[a][c] += wi * X[i][a] * X[i][c];
+    }
+  }
+  for (let a = 0; a < p; a++) A[a][a] += 1e-8;
+  return gaussSolve(A, b);
+}
+
+// S-map コア: θで局所性を制御した重み付き局所線形回帰
+// θ=0 → 大域線形(AR的), θ大 → 局所線形(非線形)。計算量を抑えるため窓を制限。
+function smapCore(
+  coords: number[][],
+  v0: number[],
+  theta: number,
+  maxLib = 500,
+  maxPred = 300
+): number {
+  const n = coords.length;
+  const dimC = coords[0].length;
+  const predCount = Math.min(maxPred, Math.floor(n * 0.3));
+  if (predCount < 20) return 0;
+  const predStart = n - 1 - predCount;
+  const libStart = Math.max(0, predStart - maxLib);
+  const actual: number[] = [], predicted: number[] = [];
+
+  for (let t = predStart; t < n - 1; t++) {
+    const dists: number[] = [];
+    let dsum = 0, dcnt = 0;
+    for (let j = libStart; j < predStart; j++) {
+      let d = 0;
+      for (let c = 0; c < dimC; c++) { const dd = coords[t][c] - coords[j][c]; d += dd * dd; }
+      d = Math.sqrt(d);
+      dists.push(d); dsum += d; dcnt++;
+    }
+    const dbar = dcnt > 0 ? dsum / dcnt : 1;
+    const X: number[][] = [], y: number[] = [], w: number[] = [];
+    let idx = 0;
+    for (let j = libStart; j < predStart; j++) {
+      const wj = Math.exp(-theta * dists[idx++] / (dbar || 1e-10));
+      w.push(wj);
+      X.push([1, ...coords[j]]);
+      y.push(v0[j + 1]);
+    }
+    const beta = solveWLS(X, y, w);
+    if (!beta) continue;
+    let pred = beta[0];
+    for (let c = 0; c < dimC; c++) pred += beta[c + 1] * coords[t][c];
+    actual.push(v0[t + 1]); predicted.push(pred);
+  }
+  return pearson(actual, predicted);
+}
+
+export interface PhaseSmapResult {
+  ok: boolean;
+  message?: string;
+  thetas: number[];
+  rhoBase: number[]; // 埋め込みのみ
+  rhoAug: number[]; // 埋め込み+週次位相
+  bestThetaBase: number;
+  rhoLinearBase: number; // θ=0
+  rhoBestBase: number;
+  nonlinear: boolean; // θ>0 で予測改善 = 非線形
+  phaseHelps: boolean; // 位相つきがベースライン最大を上回る
+}
+
+export function computePhaseAugmentedSmap(
+  prices: PricePoint[],
+  seriesMode: SeriesMode,
+  opts: { tau: number; dim: 2 | 3; phaseMode: PhaseMode; phaseWeight?: number }
+): PhaseSmapResult {
+  const phaseWeight = opts.phaseWeight ?? 1;
+  const thetas = [0, 0.1, 0.3, 0.5, 1, 2, 4, 8];
+  const empty: PhaseSmapResult = {
+    ok: false, thetas, rhoBase: [], rhoAug: [],
+    bestThetaBase: 0, rhoLinearBase: 0, rhoBestBase: 0, nonlinear: false, phaseHelps: false,
+  };
+  const { V, P, m } = buildVPT(prices, seriesMode, opts.tau, opts.dim, opts.phaseMode);
+  const n = V.length;
+  if (n < 120) return { ...empty, message: "S-mapに必要なデータが不足(120点以上)" };
+
+  const mean = new Array(m).fill(0);
+  for (const v of V) for (let j = 0; j < m; j++) mean[j] += v[j];
+  for (let j = 0; j < m; j++) mean[j] /= n;
+  const std = new Array(m).fill(0);
+  for (const v of V) for (let j = 0; j < m; j++) std[j] += (v[j] - mean[j]) ** 2;
+  for (let j = 0; j < m; j++) std[j] = Math.sqrt(std[j] / n) || 1;
+  const baseCoords = V.map((v) => v.map((x, j) => (x - mean[j]) / std[j]));
+  const augCoords = baseCoords.map((c, i) => [
+    ...c,
+    phaseWeight * Math.cos((2 * Math.PI * P[i]) / K),
+    phaseWeight * Math.sin((2 * Math.PI * P[i]) / K),
+  ]);
+  const v0 = V.map((v) => v[0]);
+
+  const rhoBase = thetas.map((th) => smapCore(baseCoords, v0, th));
+  const rhoAug = thetas.map((th) => smapCore(augCoords, v0, th));
+
+  let bestIdx = 0;
+  for (let i = 1; i < rhoBase.length; i++) if (rhoBase[i] > rhoBase[bestIdx]) bestIdx = i;
+  const rhoBestBase = rhoBase[bestIdx];
+  const rhoLinearBase = rhoBase[0];
+  const nonlinear = thetas[bestIdx] > 0 && rhoBestBase > rhoLinearBase + 0.02;
+  const phaseHelps = Math.max(...rhoAug) > rhoBestBase + 0.005;
+
+  return {
+    ok: true, thetas, rhoBase, rhoAug,
+    bestThetaBase: thetas[bestIdx], rhoLinearBase, rhoBestBase, nonlinear, phaseHelps,
+  };
+}
+
+// ============================================================================
+// B1. レジーム層別 位相ロック (週内構造はどのボラ状態で出るか)
+// ============================================================================
+
+export interface RegimeStratifiedResult {
+  ok: boolean;
+  message?: string;
+  volThreshold: number; // ローリングσの中央値
+  high: { PL: number; pValue: number; q95: number; n: number };
+  low: { PL: number; pValue: number; q95: number; n: number };
+  all: { PL: number; pValue: number; q95: number; n: number };
+}
+
+function plWithSurrogate(V: number[][], P: number[], m: number, B = 299): { PL: number; pValue: number; q95: number } {
+  const f = fRatio(V, P, m);
+  const surr: number[] = [];
+  const Pw = P.slice();
+  for (let b = 0; b < B; b++) {
+    shuffleInPlace(Pw);
+    surr.push(fRatio(V, Pw, m).PL);
+  }
+  surr.sort((a, b) => a - b);
+  const q95 = surr[Math.min(B - 1, Math.floor(0.95 * B))];
+  let ge = 0;
+  for (const s of surr) if (s >= f.PL) ge++;
+  return { PL: f.PL, pValue: (1 + ge) / (B + 1), q95 };
+}
+
+export function computeRegimeStratifiedPL(
+  prices: PricePoint[],
+  seriesMode: SeriesMode,
+  opts: { tau: number; dim: 2 | 3; phaseMode: PhaseMode; volWindow?: number }
+): RegimeStratifiedResult {
+  const volWindow = opts.volWindow ?? 21;
+  const empty: RegimeStratifiedResult = {
+    ok: false, volThreshold: 0,
+    high: { PL: 0, pValue: 1, q95: 0, n: 0 },
+    low: { PL: 0, pValue: 1, q95: 0, n: 0 },
+    all: { PL: 0, pValue: 1, q95: 0, n: 0 },
+  };
+  const { V, P, T, m } = buildVPT(prices, seriesMode, opts.tau, opts.dim, opts.phaseMode);
+  const n = V.length;
+  if (n < 120) return { ...empty, message: "層別に必要なデータが不足" };
+
+  // 日次対数リターンのローリングσを date→vol で引く
+  const closes = prices.map((p) => p.close);
+  const times = prices.map((p) => p.time);
+  const r: number[] = [], rt: string[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0 && closes[i] > 0) { r.push(Math.log(closes[i] / closes[i - 1])); rt.push(times[i]); }
+  }
+  const volMap = new Map<string, number>();
+  for (let i = volWindow - 1; i < r.length; i++) {
+    let s = 0, mu = 0;
+    for (let j = i - volWindow + 1; j <= i; j++) mu += r[j];
+    mu /= volWindow;
+    for (let j = i - volWindow + 1; j <= i; j++) s += (r[j] - mu) ** 2;
+    volMap.set(rt[i], Math.sqrt(s / volWindow));
+  }
+
+  const vols: number[] = [];
+  const idxVol: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = volMap.get(T[i]);
+    idxVol.push(v ?? NaN);
+    if (v !== undefined && !isNaN(v)) vols.push(v);
+  }
+  if (vols.length < 80) return { ...empty, message: "ボラ算出に必要なデータが不足" };
+  const sortedVol = vols.slice().sort((a, b) => a - b);
+  const volThreshold = sortedVol[Math.floor(sortedVol.length / 2)];
+
+  const Vh: number[][] = [], Ph: number[] = [], Vl: number[][] = [], Pl: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = idxVol[i];
+    if (isNaN(v)) continue;
+    if (v >= volThreshold) { Vh.push(V[i]); Ph.push(P[i]); }
+    else { Vl.push(V[i]); Pl.push(P[i]); }
+  }
+  if (Vh.length < 40 || Vl.length < 40) return { ...empty, message: "各レジームの点数が不足" };
+
+  const all = { ...plWithSurrogate(V, P, m), n };
+  const high = { ...plWithSurrogate(Vh, Ph, m), n: Vh.length };
+  const low = { ...plWithSurrogate(Vl, Pl, m), n: Vl.length };
+
+  return { ok: true, volThreshold, high, low, all };
+}
+
+// ============================================================================
+// B3. 適応的位相 (Hilbert): 固定5でなくデータ駆動の瞬時位相で位相ロック検証
+// ============================================================================
+
+function meanPeriod(data: number[]): number {
+  let mean = 0;
+  for (const v of data) mean += v;
+  mean /= data.length;
+  let crossings = 0;
+  for (let i = 1; i < data.length; i++) if ((data[i - 1] - mean) * (data[i] - mean) < 0) crossings++;
+  return crossings >= 4 ? (2 * data.length) / crossings : Infinity;
+}
+
+export interface AdaptivePhaseResult {
+  ok: boolean;
+  message?: string;
+  selectedImf: string;
+  selectedPeriod: number; // 採用IMFの平均周期(営業日)
+  nGroups: number;
+  adaptive: { PL: number; pValue: number; q95: number };
+  calendar: { PL: number; pValue: number; q95: number };
+  n: number;
+}
+
+export function computeAdaptivePhaseAttractor(
+  prices: PricePoint[],
+  seriesMode: SeriesMode,
+  opts: { tau: number; dim: 2 | 3; targetPeriod?: number; nGroups?: number }
+): AdaptivePhaseResult {
+  const targetPeriod = opts.targetPeriod ?? 5;
+  const nGroups = opts.nGroups ?? 5;
+  const empty: AdaptivePhaseResult = {
+    ok: false, selectedImf: "", selectedPeriod: 0, nGroups,
+    adaptive: { PL: 0, pValue: 1, q95: 0 },
+    calendar: { PL: 0, pValue: 1, q95: 0 }, n: 0,
+  };
+
+  const { values, times } = extractSeries(prices, seriesMode);
+  if (values.length < 150) return { ...empty, message: "適応的位相に必要なデータが不足" };
+
+  const { imfs } = computeEMD(values, 6);
+  if (imfs.length === 0) return { ...empty, message: "IMFが抽出できませんでした" };
+  // 目標周期(週)に最も近いIMFを選ぶ
+  let best = -1, bestDiff = Infinity, bestPeriod = 0;
+  imfs.forEach((imf, i) => {
+    const per = meanPeriod(imf.data);
+    if (!isFinite(per)) return;
+    const diff = Math.abs(per - targetPeriod);
+    if (diff < bestDiff) { bestDiff = diff; best = i; bestPeriod = per; }
+  });
+  if (best < 0) return { ...empty, message: "週次近傍のIMFがありません" };
+
+  const { phase } = hilbertTransform(imfs[best].data);
+
+  // 埋め込みと位相を整列 (最も新しい座標の時刻に対応する位相)
+  const emb = takensEmbedding(values, times, opts.tau, opts.dim);
+  const start = (opts.dim - 1) * opts.tau;
+  const V: number[][] = [];
+  const Pa: number[] = []; // 適応的位相のビン
+  const T: string[] = [];
+  emb.forEach((p, i) => {
+    const srcIdx = start + i;
+    const ph = phase[srcIdx];
+    if (ph === undefined) return;
+    const bin = Math.min(nGroups - 1, Math.max(0, Math.floor(((ph + Math.PI) / (2 * Math.PI)) * nGroups)));
+    V.push(opts.dim >= 3 ? [p.x, p.y, p.z ?? 0] : [p.x, p.y]);
+    Pa.push(bin);
+    T.push(p.time);
+  });
+  const m = opts.dim;
+  const n = V.length;
+  if (n < 100) return { ...empty, message: "整列後の点数が不足" };
+
+  // 適応的位相のPL (nGroups群)
+  const surrA = (Pin: number[]) => {
+    const f = fRatio(V, Pin, m, nGroups);
+    const B = 299;
+    const surr: number[] = [];
+    const Pw = Pin.slice();
+    for (let b = 0; b < B; b++) { shuffleInPlace(Pw); surr.push(fRatio(V, Pw, m, nGroups).PL); }
+    surr.sort((a, b) => a - b);
+    const q95 = surr[Math.min(B - 1, Math.floor(0.95 * B))];
+    let ge = 0; for (const s of surr) if (s >= f.PL) ge++;
+    return { PL: f.PL, pValue: (1 + ge) / (B + 1), q95 };
+  };
+  const adaptive = surrA(Pa);
+
+  // 比較用カレンダー位相 (同じVに対し曜日)
+  const Pc = T.map(weekdayIndex);
+  const Vc: number[][] = [], Pcf: number[] = [];
+  for (let i = 0; i < V.length; i++) if (Pc[i] >= 0) { Vc.push(V[i]); Pcf.push(Pc[i]); }
+  const fc = fRatio(Vc, Pcf, m, 5);
+  const Bc = 299; const surrc: number[] = []; const Pcw = Pcf.slice();
+  for (let b = 0; b < Bc; b++) { shuffleInPlace(Pcw); surrc.push(fRatio(Vc, Pcw, m, 5).PL); }
+  surrc.sort((a, b) => a - b);
+  const q95c = surrc[Math.min(Bc - 1, Math.floor(0.95 * Bc))];
+  let gec = 0; for (const s of surrc) if (s >= fc.PL) gec++;
+  const calendar = { PL: fc.PL, pValue: (1 + gec) / (Bc + 1), q95: q95c };
+
+  return {
+    ok: true,
+    selectedImf: imfs[best].label,
+    selectedPeriod: bestPeriod,
+    nGroups,
+    adaptive,
+    calendar,
+    n,
+  };
+}
+
+// ============================================================================
+// B4. 一般周期アトラクタ (月内=21 / 四半期内=63 へ拡張)
+// ============================================================================
+
+export interface PeriodicPhaseResult {
+  ok: boolean;
+  message?: string;
+  period: number;
+  n: number;
+  points: { x: number; y: number; phase: number; time: string }[];
+  centroids2d: { x: number; y: number }[];
+  groupStats: { phase: number; count: number; dispersionRatio: number }[];
+  PL: number;
+  surrogateQ95: number;
+  pValue: number;
+}
+
+export function computePeriodicPhaseAttractor(
+  prices: PricePoint[],
+  seriesMode: SeriesMode,
+  opts: { tau: number; dim: 2 | 3; period: number; surrogateCount?: number }
+): PeriodicPhaseResult {
+  const { period } = opts;
+  const B = opts.surrogateCount ?? 299;
+  const empty: PeriodicPhaseResult = {
+    ok: false, period, n: 0, points: [], centroids2d: [], groupStats: [],
+    PL: 0, surrogateQ95: 0, pValue: 1,
+  };
+  const { values, times } = extractSeries(prices, seriesMode);
+  const emb = takensEmbedding(values, times, opts.tau, opts.dim);
+  if (emb.length < period * 10 + 50) return { ...empty, message: "この周期に必要なデータが不足" };
+
+  const m = opts.dim;
+  const V = emb.map((p) => (opts.dim >= 3 ? [p.x, p.y, p.z ?? 0] : [p.x, p.y]));
+  const T = emb.map((p) => p.time);
+  // 営業日位相: 埋め込み点のインデックス mod period
+  const P = emb.map((_, i) => i % period);
+  const n = V.length;
+
+  const f = fRatio(V, P, m, period);
+  if (f.groupsPresent < 2) return { ...empty, message: "周期グループが不足" };
+
+  // 全体平均分散(分散比の基準)
+  const overall = new Array(m).fill(0);
+  for (const v of V) for (let j = 0; j < m; j++) overall[j] += v[j];
+  for (let j = 0; j < m; j++) overall[j] /= n;
+  let overallSS = 0;
+  for (const v of V) { let d = 0; for (let j = 0; j < m; j++) { const dd = v[j] - overall[j]; d += dd * dd; } overallSS += d; }
+  const overallMeanVar = overallSS / n;
+
+  const groupStats = [];
+  const centroids2d = [];
+  for (let k = 0; k < period; k++) {
+    const cnt = f.counts[k];
+    const cent = f.centroids[k];
+    const meanVar = cnt > 0 ? f.groupSpread[k] / cnt : 0;
+    groupStats.push({
+      phase: k,
+      count: cnt,
+      dispersionRatio: overallMeanVar > 0 && cnt > 0 ? meanVar / overallMeanVar : NaN,
+    });
+    centroids2d.push(cnt > 0 ? { x: cent[0], y: cent[1] } : { x: NaN, y: NaN });
+  }
+
+  const surr: number[] = [];
+  const Pw = P.slice();
+  for (let b = 0; b < B; b++) { shuffleInPlace(Pw); surr.push(fRatio(V, Pw, m, period).PL); }
+  surr.sort((a, b) => a - b);
+  const surrogateQ95 = surr[Math.min(B - 1, Math.floor(0.95 * B))];
+  let ge = 0; for (const s of surr) if (s >= f.PL) ge++;
+  const pValue = (1 + ge) / (B + 1);
+
+  const points = V.map((v, i) => ({ x: v[0], y: v[1], phase: P[i], time: T[i] }));
+
+  return { ok: true, period, n, points, centroids2d, groupStats, PL: f.PL, surrogateQ95, pValue };
+}
+
+// ============================================================================
+// B2. 週次位相同期 (Kuramoto): 複数銘柄の選好曜日が揃うか
+// ============================================================================
+
+export interface PhaseSyncItem {
+  ticker: string;
+  preferredPhaseRad: number; // 第1高調波の位相角
+  amplitude: number; // 高調波振幅 (週次パターンの強さ)
+  peakPhase: number; // ドリフト最大の曜日 0..4
+  ok: boolean;
+}
+
+export interface PhaseSyncResult {
+  ok: boolean;
+  message?: string;
+  items: PhaseSyncItem[];
+  orderParameter: number; // r = |(1/N)Σ exp(iθ)| (無加重)
+  weightedOrder: number; // 振幅加重
+  meanPhaseRad: number;
+}
+
+// 1銘柄の週次選好位相を計算
+function weeklyPreferredPhase(prices: PricePoint[], phaseMode: PhaseMode): PhaseSyncItem | null {
+  const km = computeWeeklyPhaseKM(prices, phaseMode);
+  if (!km.ok) return null;
+  let a = 0, b = 0;
+  for (let k = 0; k < K; k++) {
+    a += km.drift[k] * Math.cos((2 * Math.PI * k) / K);
+    b += km.drift[k] * Math.sin((2 * Math.PI * k) / K);
+  }
+  return {
+    ticker: "",
+    preferredPhaseRad: Math.atan2(b, a),
+    amplitude: Math.sqrt(a * a + b * b),
+    peakPhase: km.drift.reduce((bi, v, i) => (v > km.drift[bi] ? i : bi), 0),
+    ok: true,
+  };
+}
+
+export function computeWeeklyPhaseSync(
+  series: { ticker: string; prices: PricePoint[] }[],
+  phaseMode: PhaseMode
+): PhaseSyncResult {
+  const items: PhaseSyncItem[] = [];
+  for (const s of series) {
+    const it = weeklyPreferredPhase(s.prices, phaseMode);
+    if (it) items.push({ ...it, ticker: s.ticker });
+  }
+  if (items.length < 2) {
+    return { ok: false, message: "2銘柄以上必要", items, orderParameter: 0, weightedOrder: 0, meanPhaseRad: 0 };
+  }
+  let cx = 0, cy = 0, wcx = 0, wcy = 0, wsum = 0;
+  for (const it of items) {
+    cx += Math.cos(it.preferredPhaseRad);
+    cy += Math.sin(it.preferredPhaseRad);
+    wcx += it.amplitude * Math.cos(it.preferredPhaseRad);
+    wcy += it.amplitude * Math.sin(it.preferredPhaseRad);
+    wsum += it.amplitude;
+  }
+  const N = items.length;
+  const orderParameter = Math.sqrt(cx * cx + cy * cy) / N;
+  const weightedOrder = wsum > 0 ? Math.sqrt(wcx * wcx + wcy * wcy) / wsum : 0;
+  const meanPhaseRad = Math.atan2(cy, cx);
+  return { ok: true, items, orderParameter, weightedOrder, meanPhaseRad };
 }
