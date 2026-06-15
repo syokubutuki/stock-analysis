@@ -14,6 +14,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import {
   GROUPS,
+  GROUP_DETAIL,
   SERIES,
   DEFAULT_ENABLED,
   PRESETS,
@@ -28,6 +29,8 @@ import type { PeriodKey } from "../../hooks/useAnalysisData";
 interface Props {
   prices: PricePoint[];
   period?: PeriodKey;
+  /** 系列グループから対応する詳細分析セクションへ遷移する（タブ切替＋スクロール） */
+  onNavigate?: (section: string, anchor?: string) => void;
 }
 
 interface LegendEntry {
@@ -92,7 +95,7 @@ function useIsMobile(breakpoint = 768) {
   return mobile;
 }
 
-export default function UnifiedChart({ prices, period }: Props) {
+export default function UnifiedChart({ prices, period, onNavigate }: Props) {
   const fullscreenRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -586,6 +589,29 @@ export default function UnifiedChart({ prices, period }: Props) {
                 {isExpanded ? "▼" : "▶"}
               </span>
               <span>{group.label}</span>
+              {GROUP_DETAIL[group.id] && onNavigate && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation(); // グループの開閉トグルを誘発しない
+                    const d = GROUP_DETAIL[group.id];
+                    onNavigate(d.section, d.anchor);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      const d = GROUP_DETAIL[group.id];
+                      onNavigate(d.section, d.anchor);
+                    }
+                  }}
+                  className="ml-1 text-[10px] font-normal text-blue-500 hover:text-blue-700 hover:underline cursor-pointer"
+                  title={`「${GROUP_DETAIL[group.id].label}」タブで詳細を見る`}
+                >
+                  詳細 →
+                </span>
+              )}
               {activeCount > 0 && (
                 <span className="text-[10px] bg-blue-100 text-blue-600 px-1 rounded-full ml-auto">
                   {activeCount}

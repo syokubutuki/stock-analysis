@@ -145,6 +145,39 @@ export const GROUPS: SeriesGroup[] = [
   { id: "network", label: "ネットワーク" },
 ];
 
+// 系列グループ → 詳細分析セクション（ジャンプ導線用）。
+// 基本分析の Series Explorer で系列を見たあと「この数字の意味」を深掘りする際、
+// 対応するセクションタブ＋該当コンポーネントへ直接飛べるようにするためのマップ。
+// section: page.tsx の SectionKey、anchor: スクロール先 DOM id（page.tsx で付与）、
+// label: リンク tooltip に出すタブ名。価格/移動平均/バンド/出来高/行動ファイナンスは
+// 基本分析内で完結するため対象外（導線を出さない）。
+export const GROUP_DETAIL: Record<
+  string,
+  { section: string; anchor: string; label: string }
+> = {
+  oscillator: { section: "technical", anchor: "sa-technical", label: "テクニカル" },
+  macd: { section: "technical", anchor: "sa-technical", label: "テクニカル" },
+  diff: { section: "transform", anchor: "sa-transform", label: "スケール変換" },
+  return: { section: "transform", anchor: "sa-transform", label: "スケール変換" },
+  transform: { section: "transform", anchor: "sa-transform", label: "スケール変換" },
+  volatility: { section: "volatility", anchor: "sa-volatility", label: "ボラティリティ" },
+  gap: { section: "ohlc", anchor: "sa-ohlc-gap", label: "OHLC分析" },
+  risk: { section: "risk", anchor: "sa-risk", label: "リスク指標" },
+  candle_m: { section: "ohlc", anchor: "sa-ohlc", label: "OHLC分析" },
+  range: { section: "ohlc", anchor: "sa-ohlc-range", label: "OHLC分析" },
+  nonlinear: { section: "nonlinear", anchor: "sa-nonlinear", label: "非線形動力学" },
+  tda: { section: "nonlinear", anchor: "sa-nonlinear-tda", label: "非線形動力学" },
+  regime: { section: "regime", anchor: "sa-regime", label: "レジーム分析" },
+  decomp: { section: "frequency", anchor: "sa-frequency-ssa", label: "周波数領域" },
+  entropy: { section: "entropy", anchor: "sa-entropy", label: "情報理論" },
+  complexity: { section: "entropy", anchor: "sa-entropy", label: "情報理論" },
+  meanrev: { section: "simulation", anchor: "sa-sim-meanrev", label: "シミュレーション" },
+  break: { section: "regime", anchor: "sa-regime-break", label: "レジーム分析" },
+  micro: { section: "ohlc", anchor: "sa-ohlc-micro", label: "OHLC分析" },
+  arima: { section: "simulation", anchor: "sa-sim-arima", label: "シミュレーション" },
+  network: { section: "network", anchor: "sa-network", label: "ネットワーク" },
+};
+
 // 計算が重いグループ（Worker への依頼を「軽い系列を先」「重い系列を後」の
 // 2段階に分け、価格やSMA等を先に描画して体感速度を上げるために使用）
 export const HEAVY_GROUPS = new Set<string>([

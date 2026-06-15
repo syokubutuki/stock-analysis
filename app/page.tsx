@@ -624,6 +624,32 @@ export default function AnalysisPage() {
     [fetchStock, tickerInput]
   );
 
+  // Series Explorer の系列グループから対応する詳細分析セクションへジャンプする。
+  // タブを切り替えた後、保留中のアンカー DOM を探してスクロール＆ハイライトする。
+  const pendingScrollRef = useRef<string | null>(null);
+  const navigateToSection = useCallback((section: string, anchor?: string) => {
+    pendingScrollRef.current = anchor ?? null;
+    setActiveSection(section as SectionKey);
+  }, []);
+  useEffect(() => {
+    const id = pendingScrollRef.current;
+    if (!id) return;
+    pendingScrollRef.current = null;
+    // セクション切替→再レンダリング→要素出現のタイミング差を rAF リトライで吸収する
+    let tries = 0;
+    const tick = () => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.add("sa-flash");
+        setTimeout(() => el.classList.remove("sa-flash"), 1200);
+        return;
+      }
+      if (tries++ < 10) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [activeSection]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-4">
@@ -746,7 +772,7 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
-                  <UnifiedChart prices={allPrices} period={period} />
+                  <UnifiedChart prices={allPrices} period={period} onNavigate={navigateToSection} />
                   <StructureScorecardChart prices={filteredPrices} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <DiffSeriesChart prices={allPrices} period={period} />
@@ -763,7 +789,9 @@ export default function AnalysisPage() {
 
               {activeSection === "technical" && (
                 <>
-                  <TechnicalIndicators prices={allPrices} period={period} />
+                  <div id="sa-technical" className="scroll-mt-20">
+                    <TechnicalIndicators prices={allPrices} period={period} />
+                  </div>
                   <ADXChart prices={allPrices} period={period} />
                   <StochasticsChart prices={allPrices} period={period} />
                   <OBVVWAPChart prices={allPrices} period={period} />
@@ -774,23 +802,33 @@ export default function AnalysisPage() {
 
               {activeSection === "ohlc" && (
                 <>
-                  <CandleStructureChart prices={allPrices} period={period} />
+                  <div id="sa-ohlc" className="scroll-mt-20">
+                    <CandleStructureChart prices={allPrices} period={period} />
+                  </div>
                   <CrashSurgeStreakChart prices={filteredPrices} />
                   <CandlestickPatternChart prices={filteredPrices} />
                   <IntradayPathChart prices={filteredPrices} />
                   <ClosePositionChart prices={filteredPrices} />
                   <TrueRangeDecompChart prices={filteredPrices} />
                   <MFEMAEChart prices={allPrices} period={period} />
-                  <GapScatterChart prices={allPrices} period={period} />
-                  <IntradayRangeChart prices={allPrices} period={period} />
+                  <div id="sa-ohlc-gap" className="scroll-mt-20">
+                    <GapScatterChart prices={allPrices} period={period} />
+                  </div>
+                  <div id="sa-ohlc-range" className="scroll-mt-20">
+                    <IntradayRangeChart prices={allPrices} period={period} />
+                  </div>
                   <RangeVolatilityChart prices={allPrices} period={period} />
-                  <MicrostructureChart prices={filteredPrices} />
+                  <div id="sa-ohlc-micro" className="scroll-mt-20">
+                    <MicrostructureChart prices={filteredPrices} />
+                  </div>
                 </>
               )}
 
               {activeSection === "risk" && (
                 <>
-                  <RiskMetricsPanel prices={allPrices} period={period} />
+                  <div id="sa-risk" className="scroll-mt-20">
+                    <RiskMetricsPanel prices={allPrices} period={period} />
+                  </div>
                   <DrawdownChart prices={allPrices} period={period} />
                   <GarchVarChart prices={filteredPrices} />
                   <CornishFisherChart prices={filteredPrices} />
@@ -800,7 +838,9 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "transform" && (
-                <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
+                <div id="sa-transform" className="scroll-mt-20">
+                  <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
+                </div>
               )}
 
               {activeSection === "distribution" && (
@@ -825,7 +865,9 @@ export default function AnalysisPage() {
 
               {activeSection === "volatility" && (
                 <>
-                  <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-volatility" className="scroll-mt-20">
+                    <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <GarchChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ATRChart prices={filteredPrices} />
                   <VolTermStructureChart prices={filteredPrices} />
@@ -843,13 +885,17 @@ export default function AnalysisPage() {
                   <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} />
                   <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LombScargleChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <SSAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-frequency-ssa" className="scroll-mt-20">
+                    <SSAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                 </>
               )}
 
               {activeSection === "nonlinear" && (
                 <>
-                  <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-nonlinear" className="scroll-mt-20">
+                    <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} />
                   <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
                   <WeeklyPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} />
@@ -861,14 +907,18 @@ export default function AnalysisPage() {
                   <SimplexPredictionChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
                   <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-nonlinear-tda" className="scroll-mt-20">
+                    <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <RollingTDAChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
 
               {activeSection === "entropy" && (
                 <>
-                  <EntropyDisplay prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-entropy" className="scroll-mt-20">
+                    <EntropyDisplay prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <EntropyExtendedChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ConditionalEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
                   <MultiscaleEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
@@ -890,7 +940,9 @@ export default function AnalysisPage() {
 
               {activeSection === "network" && (
                 <>
-                  <VisibilityGraphChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-network" className="scroll-mt-20">
+                    <VisibilityGraphChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <HVGChart prices={filteredPrices} seriesMode={seriesMode} />
                   <OrdinalNetwork prices={filteredPrices} seriesMode={seriesMode} />
                   <RecurrenceNetworkChart prices={filteredPrices} seriesMode={seriesMode} />
@@ -899,12 +951,16 @@ export default function AnalysisPage() {
 
               {activeSection === "regime" && (
                 <>
-                  <MarketStateDashboard prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-regime" className="scroll-mt-20">
+                    <MarketStateDashboard prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RegimeTechnicalChart prices={filteredPrices} />
                   <RegimeDistributionChart prices={filteredPrices} />
                   <RegimeTransitionChart prices={filteredPrices} />
-                  <StructuralBreakChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-regime-break" className="scroll-mt-20">
+                    <StructuralBreakChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <BOCPDChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
@@ -935,8 +991,12 @@ export default function AnalysisPage() {
                   <MonteCarloChart prices={filteredPrices} />
                   <CustomReturnChart prices={allPrices} />
                   <SimpleBacktestChart prices={filteredPrices} />
-                  <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ArimaChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-sim-meanrev" className="scroll-mt-20">
+                    <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
+                  <div id="sa-sim-arima" className="scroll-mt-20">
+                    <ArimaChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <JumpDiffusionChart prices={filteredPrices} />
                   <OptimalStoppingChart prices={filteredPrices} />
                   <VarianceGammaChart prices={filteredPrices} />
