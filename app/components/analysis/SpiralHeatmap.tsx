@@ -2037,63 +2037,11 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       )}
 
-      <AnalysisGuide title="カレンダー分析 全体リファレンス（各図の個別解説は、上の各図の直下「解説:」を開いてください）">
-        <p><span className="font-medium">リターン種別（タブ切替）:</span></p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">変化率タブ:</span> 前C→当C = (Close_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日終値）、当O→当C = (Close_t - Open_t) / Open_t（当日始値→当日終値＝日中リターン）、前C→当O = (Open_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日始値＝夜間リターン）</li>
-          <li><span className="font-medium">OHLCタブ:</span> 前C→当C に加え、前O→当O = (Open_t - Open_&#123;t-1&#125;) / Open_&#123;t-1&#125;、前H→当H = (High_t - High_&#123;t-1&#125;) / High_&#123;t-1&#125;、前L→当L = (Low_t - Low_&#123;t-1&#125;) / Low_&#123;t-1&#125;。OHLC各価格の前日比を比較し、寄付・高値・安値それぞれの曜日/月パターンを把握。</li>
-          <li><span className="font-medium">対数タブ:</span> ln 前C→当C = ln(Close_t / Close_&#123;t-1&#125;)、ln 当O→当C = ln(Close_t / Open_t)、ln 前C→当O = ln(Open_t / Close_&#123;t-1&#125;)。対数リターンは加法性を持ち、複利計算・長期累積に適する。</li>
-        </ul>
-        <p className="mt-2"><span className="font-medium">曜日別リターン分布エクスプローラ:</span></p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">何を見るか:</span> 平均や中央値といった「代表値」だけでは、リターンの<span className="font-medium">分布の形（裾の厚さ・非対称性・二峰性）</span>はわかりません。本ツールは曜日とリターン種別を選ぶと、その組み合わせの実データの分布を即座に描画します。例えば「金曜の夜間リターン（前C→当O）」だけを抜き出して、暴落側に裾が伸びているか等を直接確認できます。</li>
-          <li><span className="font-medium">ヒストグラム:</span> リターンを40区間に分け、各区間の出現頻度を「密度（縦軸 = 頻度 / (総数 × 区間幅)）」に正規化した棒グラフ。面積の合計が1になるため、後述の密度曲線・正規分布と直接重ねて比較できます。</li>
-          <li><span className="font-medium">KDE（カーネル密度推定）曲線:</span> ヒストグラムの区切り位置に依存しない、滑らかな確率密度の推定。各データ点に正規カーネル（小さな釣鐘）を置いて足し合わせます。式は f(x) = (1 / (n·h)) Σ&#123;i=1..n&#125; K((x − x_i) / h)。ここで K は標準正規の確率密度、h は平滑化の幅（バンド幅）で、Silvermanの目安 h = 0.9 × min(σ, IQR/1.349) × n^(−1/5) を用います（σ=標準偏差、IQR=四分位範囲）。複数曜日を選ぶと各曜日の曲線が色分けで重なり、<span className="font-medium">分布の形そのものを比較</span>できます。</li>
-          <li><span className="font-medium">正規分布の重ね描き（黒破線）:</span> 同じ平均・標準偏差を持つ正規分布 N(μ, σ²) を重ねます。実データの密度がこの破線より<span className="font-medium">中央で高く尖り、両裾で厚い</span>場合、リターンは正規分布よりも「ファットテール（裾が厚い）」＝暴落・急騰が理論より起こりやすいことを意味します。</li>
-          <li><span className="font-medium">歪度（わいど, skewness）:</span> 分布の左右の非対称性。式は g₁ = (n / ((n−1)(n−2))) Σ((x_i − μ)/σ)³。<span className="font-medium">正なら右に裾が長い（小さな下落が多く稀に大きな上昇）</span>、負なら左に裾が長い（小さな上昇が多く稀に大きな暴落）。株式の日次リターンは負の歪度を持ちやすい傾向があります。</li>
-          <li><span className="font-medium">尖度（せんど, excess kurtosis）:</span> 裾の厚さ・中心の尖り具合。正規分布を0とした「超過尖度」で表示。<span className="font-medium">正なら正規分布より裾が厚く中心が尖る（=テールリスク大）</span>。値が3〜5を超えると極端な値が頻発する「レプトカーティック」な分布です。</li>
-          <li><span className="font-medium">三角マーカー:</span> 横軸上の各色の三角は、その曜日の平均リターンの位置を示します。0%（灰色の縦破線）からの左右のズレで、曜日ごとの方向性バイアスを一目で把握できます。</li>
-          <li><span className="font-medium">投資判断への活用:</span> ①平均が正でも歪度が大きく負なら「普段は小さく勝つが稀に大きく負ける」戦略で、損切り設計が重要。②特定曜日の夜間リターン（前C→当O）の裾が厚ければ、オーバーナイト保有のギャップリスクが高いと判断。③曜日間で分布形が大きく異なれば、エントリー/エグジット曜日の使い分けに根拠を与えます。</li>
-          <li><span className="font-medium">注意点:</span> サンプル数Nが小さい曜日（特に「全営業日」以外）では裾の推定が不安定です。KDEのバンド幅は自動設定のため、過度に滑らかに見えることがあります。過去の分布形が将来も続く保証はなく、レジーム変化（市場構造の変化）で崩れる点に留意してください。</li>
-        </ul>
-
-        <p className="mt-2"><span className="font-medium">曜日別統計:</span></p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">平均リターン (μ_dow):</span> 各曜日に属する全営業日のリターンの算術平均。</li>
-          <li><span className="font-medium">中央値:</span> 外れ値に頑健な代表値。平均と中央値の乖離が大きい場合、分布の非対称性（歪度）を示唆します。</li>
-          <li><span className="font-medium">標準偏差 (σ_dow):</span> 不偏分散の平方根 σ = √(Σ(r_i - μ)² / (N-1))。曜日ごとのボラティリティの違いを捉えます。</li>
-          <li><span className="font-medium">勝率:</span> r_t &gt; 0 の日数 / 全日数 × 100。50%からの乖離が大きいほど方向性バイアスが強い。</li>
-          <li><span className="font-medium">p値:</span> 帰無仮説「当該曜日の平均リターン = 0」に対するt検定の有意確率。t = μ × √N / σ。p &lt; 0.05 で統計的に有意なアノマリーと判定します。</li>
-        </ul>
-        <p className="mt-2"><span className="font-medium">月別統計:</span> 同様にr_tを月ごとに集計。「Sell in May」「1月効果」などのカレンダーアノマリーを定量的に検証します。</p>
-        <p><span className="font-medium">月内週番号別リターン:</span> 各月の営業日を週番号（第1週〜第5週）に分類。月末・月初のリバランス効果（Turn of Month効果）を検出します。</p>
-        <p><span className="font-medium">曜日×月 ヒートマップ:</span> 曜日と月の2次元クロス集計で平均リターンを色分け表示。特定の曜日×月の組み合わせに偏ったアノマリーを発見できます。</p>
-        <p><span className="font-medium">年×月 リターンヒートマップ:</span> 年と月の2次元で月間合計リターン Σr_t を表示。特定年の異常月（暴落・急騰）の特定や、季節性の時間的安定性を確認します。</p>
-        <p><span className="font-medium">前日騰落との関係:</span> 前日上昇(r_&#123;t-1&#125; &gt; 0)・下落(r_&#123;t-1&#125; ≤ 0)で条件分けし、翌日リターンの平均・勝率・p値を算出。自己相関（モメンタムまたはリバーサル）の有無を簡易的に検証します。</p>
-        <p><span className="font-medium">月内日別平均リターン:</span> 月の第1営業日〜第31営業日ごとの平均リターン。Turn of Month効果（月末最終2日+月初3日がプラス傾向）の視覚的確認に使います。</p>
-        <p><span className="font-medium">累積リターン（曜日別・月別）:</span> 特定の曜日/月にのみ投資した場合の累積リターン Σr_t の推移。右肩上がりなら当該期間は歴史的にプラスの期待値を持つことを意味します。</p>
-        <p><span className="font-medium">年間シーズナリティ曲線:</span> 各年について年初からの営業日番号でr_tを並べ、全年の平均累積リターン曲線を描画。年間を通じた典型的な値動きパターンを把握できます。</p>
-        <p><span className="font-medium">連騰・連落分析:</span> 連続して上昇/下落した日数（ストリーク）の最長・平均・回数を集計。ランダムウォーク仮説下での理論的連続日数（幾何分布 E[streak] = 1/p）と比較することで、トレンド継続性を評価します。</p>
-
-        <p className="mt-2 font-medium text-gray-700">週内パターン（月→金→翌月）</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">何を見るか:</span> 各週を月曜起点でそろえ、月→火→水→木→金 と<span className="font-medium">週内で累積した平均リターン</span>の推移を描きます。さらに金曜の累積に<span className="font-medium">週末ギャップ（金曜終値→翌週月曜終値 = 翌週月曜のリターン）</span>を足した「翌月（橙破線）」を追加し、週をまたぐ動きまで連続して把握できます。</li>
-          <li><span className="font-medium">計算:</span> 位置 w（月=1..金=5）の値は各週について Σ&#123;d=1..w&#125; r_d（r_d = その曜日の前日比終値リターン）を全週平均したもの。翌月の点は各週の Σ&#123;d=1..5&#125; r_d に翌週月曜の r を加えて平均します。</li>
-          <li><span className="font-medium">読み方:</span> 金→翌月の橙破線が<span className="font-medium">下向きなら「週末持ち越しでギャップダウンしやすい（Weekend/Monday効果）」</span>、上向きなら週明けに買われやすい傾向。平日区間（青実線）の傾きの差から、週の前半・後半どちらに上昇が偏るかを読み取ります。</li>
-          <li><span className="font-medium">注意:</span> 平均累積は「典型的な週」の姿であり、個々の週のばらつき（分散）は表現しません。祝日で欠落した曜日はその週ではスキップして累積するため、位置ごとにサンプル数が異なります。</li>
-        </ul>
-
-        <p className="mt-2 font-medium text-gray-700">曜日トレード・シミュレータ</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">何をするか:</span> 「月曜の終値で買い、火曜の終値で売る」のように、<span className="font-medium">任意のエントリー曜日・エグジット曜日と注文タイミング（始値/終値）</span>を指定して、毎週そのトレードを繰り返した場合の累積リターンを実データで再現し、バイ&ホールド（B&H）と比較します。複数戦略を重ねて描画できます。</li>
-          <li><span className="font-medium">トレード判定:</span> 各営業日に始値=2i・終値=2i+1 という時刻順序を割り当て、エントリー時刻より<span className="font-medium">後</span>に来る最初のエグジット曜日でポジションを解消します。これにより「月始値→月終値（日中）」「金終値→翌週月終値（持ち越し）」も一貫して扱えます。1トレード解消後の翌営業日から次のエントリーを探すため、原則<span className="font-medium">週1回</span>のトレードになります。</li>
-          <li><span className="font-medium">ロング/ショート:</span> ロングは r = P_exit/P_entry − 1、ショートはその符号反転 r = −(P_exit/P_entry − 1)。「木→金は下がりやすい」のような下落区間をショートで取れます。</li>
-          <li><span className="font-medium">累積方式:</span> <span className="font-medium">複利</span> Π(1+r_k)−1 は実際の資産推移に忠実でB&Hと同じ土俵。<span className="font-medium">単純合計</span> Σr_k は符号や寄与の比較に向きます（チェックボックスで切替）。</li>
-          <li><span className="font-medium">指標:</span> 総リターン／年率（複利は (1+総)^(252/N日)−1）／Sharpe（トレード単位の平均/標準偏差を年間トレード回数で年率化）／最大DD（資産曲線のピークからの最大下落率）／勝率／平均リターン/回／<span className="font-medium">滞在率（exposure）</span>＝ポジション保有日数 / 全営業日。</li>
-          <li><span className="font-medium">滞在率の意味:</span> 曜日トレードは市場にいる時間がB&Hより短いため、総リターンが小さくても<span className="font-medium">滞在率20%でB&H並み</span>なら「リスクに晒す時間あたりの効率は高い」と解釈できます。単純な総リターン比較だけで優劣を決めないこと。</li>
-          <li><span className="font-medium">全組合せヒートマップ:</span> エントリー曜日×エグジット曜日の25通りを、現在の注文タイミング・方向で一括計算し、総リターン/Sharpe/勝率を色分け表示。<span className="font-medium">手動で試さずに最良の曜日ペアを発見</span>できます（緑=プラス/勝ち越し、赤=マイナス/負け越し、トレード数3未満は「-」）。</li>
-          <li><span className="font-medium">注意点:</span> ①取引コスト・スリッページ・税は未考慮で、頻繁な売買では実効リターンが大きく削れます。②過去の曜日アノマリーは将来も続く保証がなく、発見後に消滅（アルファの裁定消滅）することが多い。③多数の組合せを試すと偶然有意に見える組合せが出る<span className="font-medium">多重比較</span>の罠に注意。④始値約定は寄付の流動性・ギャップの影響を受け、実約定が乖離する場合があります。</li>
-        </ul>
+      <AnalysisGuide title="カレンダー分析の概要（各図の詳しい解説は、各図の直下「解説:」を開いてください）">
+        <p>リターンを<span className="font-medium">曜日・月・月内日・週番号・年</span>などの時間区分で集計し、特定タイミングへの偏り（カレンダーアノマリー）の有無を検証するセクションです。各図の数式・使う数字・読み方の詳細は、それぞれの図の直下にある折りたたみ「解説:」にまとめています。</p>
+        <p><span className="font-medium">共通の前提（リターン種別タブ）:</span> 既定は前C→当C = (Close_t − Close_&#123;t-1&#125;)/Close_&#123;t-1&#125;。タブで「変化率／OHLC／対数(ln)」を切替できます。日中=当O→当C、夜間=前C→当O。対数リターンは加法性があり累積・複利向きです。</p>
+        <p><span className="font-medium">共通の読み方:</span> 棒・ヒートマップは緑=プラス/赤=マイナス、濃さ=相対的な強さ。表のp値はt検定 t = μ·√N/σ の有意確率で、p &lt; 0.05（青字）なら平均が0と統計的に有意に異なります。</p>
+        <p><span className="font-medium">共通の注意:</span> ①過去のアノマリーは将来も続く保証がなく、発見後に裁定で消えやすい（「曜日別 平均リターンの年次推移」で持続性を確認）。②区分を細かく割るほどサンプルNが減り偶然の偏りが出ます。③多数の組合せを試すと偶然有意に見える「多重比較」に注意。④取引コスト・スリッページ・税は未考慮です。</p>
       </AnalysisGuide>
     </div>
   );
