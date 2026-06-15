@@ -561,6 +561,16 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
+// 入力系列(seriesMode)を実際に消費するセクション。これ以外のセクション
+// (基礎・テクニカル・OHLC・リスク・カレンダー)はチャートが OHLC ベースで
+// 系列変換が効かないため、SeriesModeSelector をグレーアウト表示にする。
+// 将来コンポーネントを seriesMode 対応化した際は、ここにキーを追加すること。
+const SERIES_AWARE_SECTIONS = new Set<SectionKey>([
+  "transform", "distribution", "volatility", "frequency", "nonlinear",
+  "entropy", "fractal", "network", "regime", "causal", "tailrisk",
+  "simulation", "quantum",
+]);
+
 export default function AnalysisPage() {
   const { data, allPrices, filteredPrices, loading, error, fetchStock, period, setPeriod } =
     useAnalysisData();
@@ -703,7 +713,11 @@ export default function AnalysisPage() {
                 {data.name}
               </span>
               <PeriodSelector current={period} onChange={setPeriod} />
-              <SeriesModeSelector current={seriesMode} onChange={setSeriesMode} />
+              <SeriesModeSelector
+                current={seriesMode}
+                onChange={setSeriesMode}
+                disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
+              />
             </>
           )}
         </div>

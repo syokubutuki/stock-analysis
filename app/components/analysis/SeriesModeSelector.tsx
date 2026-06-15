@@ -14,18 +14,27 @@ const MODES: { key: SeriesMode; label: string }[] = [
 interface Props {
   current: SeriesMode;
   onChange: (mode: SeriesMode) => void;
+  /** 現在のセクションが系列変換を消費しない場合に true。グレーアウトして操作不可にする */
+  disabled?: boolean;
 }
 
-export default function SeriesModeSelector({ current, onChange }: Props) {
+export default function SeriesModeSelector({ current, onChange, disabled = false }: Props) {
   return (
     <div className="flex items-center gap-1">
-      <span className="text-xs text-gray-500 mr-1">入力系列:</span>
+      <span className={`text-xs mr-1 ${disabled ? "text-gray-400" : "text-gray-500"}`}>
+        入力系列:
+      </span>
       {MODES.map(({ key, label }) => (
         <button
           key={key}
           onClick={() => onChange(key)}
+          disabled={disabled}
           className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-            current === key
+            disabled
+              ? `cursor-not-allowed opacity-40 ${
+                  current === key ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"
+                }`
+              : current === key
               ? "bg-emerald-600 text-white"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
@@ -33,6 +42,9 @@ export default function SeriesModeSelector({ current, onChange }: Props) {
           {label}
         </button>
       ))}
+      {disabled && (
+        <span className="text-xs text-gray-400 ml-1">（このセクションには適用されません）</span>
+      )}
     </div>
   );
 }
