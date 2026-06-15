@@ -245,6 +245,10 @@ const BenchmarkChart = dynamic(
   () => import("./components/analysis/BenchmarkChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const EventStudyChart = dynamic(
+  () => import("./components/analysis/EventStudyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const ADXChart = dynamic(
   () => import("./components/analysis/ADXChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -550,7 +554,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
-  { key: "causal", label: "因果・情報", description: "Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
+  { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
   { key: "simulation", label: "シミュレーション", description: "株価予測・モンテカルロ・カスタム売買・バックテスト・分数BM・VG過程・最適停止" },
@@ -907,6 +911,7 @@ export default function AnalysisPage() {
 
               {activeSection === "causal" && (
                 <>
+                  <EventStudyChart prices={allPrices} />
                   <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
                   <CCMChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>

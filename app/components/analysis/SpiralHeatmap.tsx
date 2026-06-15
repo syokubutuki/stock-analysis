@@ -33,6 +33,13 @@ const MONTH_LABELS = [
 // 曜日トレード戦略の重ね描き用カラーパレット
 const STRAT_COLORS = ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
 const TIMING_LABEL: Record<Timing, string> = { open: "始値", close: "終値" };
+// 注文タイミングの全組み合わせ（エントリー × エグジット）
+const TIMING_COMBOS: [Timing, Timing][] = [
+  ["open", "open"],
+  ["open", "close"],
+  ["close", "open"],
+  ["close", "close"],
+];
 function specLabel(s: TradeSpec): string {
   const dow = ["", "月", "火", "水", "木", "金"];
   return `${dow[s.entryDow]}${TIMING_LABEL[s.entryTiming]}→${dow[s.exitDow]}${TIMING_LABEL[s.exitTiming]}${s.side === "short" ? " [売]" : ""}`;
@@ -512,9 +519,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   );
   const bhEquity = useMemo<EquityPoint[]>(() => buyHoldEquity(prices, tradeCompound), [prices, tradeCompound]);
   const bhMetrics = useMemo(() => buyHoldMetrics(prices, tradeCompound), [prices, tradeCompound]);
-  const tradeMatrix = useMemo(
-    () => weekdayMatrix(prices, builder.entryTiming, builder.exitTiming, builder.side, tradeCompound, matrixMetric),
-    [prices, builder.entryTiming, builder.exitTiming, builder.side, tradeCompound, matrixMetric],
+  // 注文タイミングの全4通り（始値/終値 × 始値/終値）のヒートマップを一括計算
+  const tradeMatrices = useMemo(
+    () => TIMING_COMBOS.map(([entryTiming, exitTiming]) => ({
+      entryTiming,
+      exitTiming,
+      grid: weekdayMatrix(prices, entryTiming, exitTiming, builder.side, tradeCompound, matrixMetric),
+    })),
+    [prices, builder.side, tradeCompound, matrixMetric],
   );
 
   // === year x month returns ===
@@ -1123,58 +1135,77 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
   }, []);
 
-  // 曜日トレード: 全組合せ(エントリー曜日 × エグジット曜日)ヒートマップ
-  const drawWeekdayMatrix = useCallback((
+  // 曜日トレード: 注文タイミング全4通り(始値/終値 × 始値/終値)の
+  // (エントリー曜日 × エグジット曜日)ヒートマップを2×2グリッドで描画
+  const drawTimingMatrices = useCallback((
     canvas: HTMLCanvasElement,
-    grid: (number | null)[][],
+    matrices: { entryTiming: Timing; exitTiming: Timing; grid: (number | null)[][] }[],
     metric: MatrixMetric,
   ) => {
     const dow = ["月", "火", "水", "木", "金"];
-    const cellW = 56, cellH = 30, labelW = 60, headerH = 34;
-    const totalH = headerH + 5 * cellH + 5;
+    const cellW = 44, cellH = 24, rowLabelW = 20, titleH = 16, headerH = 14;
+    const subW = rowLabelW + 5 * cellW;        // サブ行列1つの横幅
+    const subH = titleH + headerH + 5 * cellH;  // サブ行列1つの縦幅
+    const rowGap = 26, topPad = 6;
+    const totalH = topPad + 2 * subH + rowGap;
     const r = initCanvas(canvas, totalH); if (!r) return;
-    const { ctx } = r;
+    const { ctx, width } = r;
+
+    // 色の基準は全4行列で共有し、タイミング間の比較を可能にする
     let maxAbs = 0;
-    for (const row of grid) for (const v of row) if (v !== null) maxAbs = Math.max(maxAbs, Math.abs(v));
+    for (const m of matrices) for (const row of m.grid) for (const v of row) if (v !== null) maxAbs = Math.max(maxAbs, Math.abs(v));
     const fmt = (v: number) => metric === "winRate" ? (v * 100).toFixed(0) + "%" : metric === "sharpe" ? v.toFixed(2) : (v * 100).toFixed(1) + "%";
 
-    // headers
-    ctx.fillStyle = "#666"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("エグジット曜日 →", labelW + 5 * cellW / 2, 12);
-    for (let j = 0; j < 5; j++) ctx.fillText(dow[j], labelW + j * cellW + cellW / 2, headerH - 6);
-    // row label (vertical-ish, just text)
-    ctx.save();
-    ctx.translate(10, headerH + 5 * cellH / 2); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#666"; ctx.textAlign = "center"; ctx.fillText("エントリー曜日", 0, 0);
-    ctx.restore();
+    const colHalf = width / 2; // 各列を画面半分に割り当て、右側の余白を埋める
 
-    for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = "#666"; ctx.textAlign = "right"; ctx.font = "10px sans-serif";
-      ctx.fillText(dow[i], labelW - 6, headerH + i * cellH + cellH / 2 + 3);
-      for (let j = 0; j < 5; j++) {
-        const v = grid[i][j];
-        const x = labelW + j * cellW, y = headerH + i * cellH;
-        let bg = "#f9fafb";
-        if (v !== null) {
-          if (metric === "winRate") {
-            const t = Math.min(1, Math.abs(v - 0.5) / 0.25);
-            bg = v >= 0.5 ? `rgba(22,163,74,${0.15 + 0.7 * t})` : `rgba(220,38,38,${0.15 + 0.7 * t})`;
+    matrices.forEach((m, idx) => {
+      const col = idx % 2, rowBlock = Math.floor(idx / 2);
+      const subLeft = col * colHalf + (colHalf - subW) / 2;
+      const subTop = topPad + rowBlock * (subH + rowGap);
+      const gridLeft = subLeft + rowLabelW;
+      const gridTop = subTop + titleH + headerH;
+
+      // サブタイトル（注文タイミング）
+      ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(`${TIMING_LABEL[m.entryTiming]}→${TIMING_LABEL[m.exitTiming]}`, subLeft + subW / 2, subTop + 12);
+
+      // エグジット曜日ヘッダー
+      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+      for (let j = 0; j < 5; j++) ctx.fillText(dow[j], gridLeft + j * cellW + cellW / 2, gridTop - 4);
+
+      for (let i = 0; i < 5; i++) {
+        // エントリー曜日（行ラベル）
+        ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right"; ctx.font = "9px sans-serif";
+        ctx.fillText(dow[i], gridLeft - 4, gridTop + i * cellH + cellH / 2 + 3);
+        for (let j = 0; j < 5; j++) {
+          const v = m.grid[i][j];
+          const x = gridLeft + j * cellW, y = gridTop + i * cellH;
+          let bg = "#f9fafb";
+          if (v !== null) {
+            if (metric === "winRate") {
+              const t = Math.min(1, Math.abs(v - 0.5) / 0.25);
+              bg = v >= 0.5 ? `rgba(22,163,74,${0.15 + 0.7 * t})` : `rgba(220,38,38,${0.15 + 0.7 * t})`;
+            } else {
+              bg = returnColor(v, maxAbs);
+            }
+          }
+          ctx.fillStyle = bg; ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
+          if (v !== null) {
+            const strong = metric === "winRate" ? Math.abs(v - 0.5) > 0.18 : Math.abs(v) > maxAbs * 0.6;
+            ctx.fillStyle = strong ? "#fff" : "#333";
+            ctx.textAlign = "center"; ctx.font = "8px sans-serif";
+            ctx.fillText(fmt(v), x + cellW / 2, y + cellH / 2 + 3);
           } else {
-            bg = returnColor(v, maxAbs);
+            ctx.fillStyle = "#d1d5db"; ctx.textAlign = "center"; ctx.font = "8px sans-serif";
+            ctx.fillText("-", x + cellW / 2, y + cellH / 2 + 3);
           }
         }
-        ctx.fillStyle = bg; ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
-        if (v !== null) {
-          const strong = metric === "winRate" ? Math.abs(v - 0.5) > 0.18 : Math.abs(v) > maxAbs * 0.6;
-          ctx.fillStyle = strong ? "#fff" : "#333";
-          ctx.textAlign = "center"; ctx.font = "9px sans-serif";
-          ctx.fillText(fmt(v), x + cellW / 2, y + cellH / 2 + 3);
-        } else {
-          ctx.fillStyle = "#d1d5db"; ctx.textAlign = "center"; ctx.font = "9px sans-serif";
-          ctx.fillText("-", x + cellW / 2, y + cellH / 2 + 3);
-        }
       }
-    }
+    });
+
+    // 軸の説明（左下）
+    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText("行=エントリー曜日 / 列=エグジット曜日", 2, totalH - 3);
   }, []);
 
   // === helper to get bar data from raw buckets for current tab ===
@@ -1276,8 +1307,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       }));
       drawEquityCurves(tradeEquityRef.current, bhEquity, strategies);
     }
-    if (tradeMatrixRef.current) drawWeekdayMatrix(tradeMatrixRef.current, tradeMatrix, matrixMetric);
-  }, [tradeResults, specs, bhEquity, tradeMatrix, matrixMetric, drawEquityCurves, drawWeekdayMatrix]);
+    if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
+  }, [tradeResults, specs, bhEquity, tradeMatrices, matrixMetric, drawEquityCurves, drawTimingMatrices]);
 
   if (days.length === 0) {
     return (
@@ -1664,8 +1695,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         {/* all-combinations matrix */}
         <div className="mt-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs text-gray-500">全組合せヒートマップ</span>
-            <span className="text-[11px] text-gray-400">（現在の注文タイミング {TIMING_LABEL[builder.entryTiming]}→{TIMING_LABEL[builder.exitTiming]} / {builder.side === "long" ? "ロング" : "ショート"}で計算）</span>
+            <span className="text-xs text-gray-500">全組合せヒートマップ（注文タイミング4通り）</span>
+            <span className="text-[11px] text-gray-400">（始値/終値の全4通り × エントリー曜日×エグジット曜日 / {builder.side === "long" ? "ロング" : "ショート"}）</span>
             <div className="flex gap-1 ml-auto">
               {([["total", "総リターン"], ["sharpe", "Sharpe"], ["winRate", "勝率"]] as [MatrixMetric, string][]).map(([k, l]) => (
                 <button key={k} onClick={() => setMatrixMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${matrixMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{l}</button>
