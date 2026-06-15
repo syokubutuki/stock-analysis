@@ -237,6 +237,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const womBarRef = useRef<HTMLCanvasElement>(null);
   const dowCumulRef = useRef<HTMLCanvasElement>(null);
   const monthCumulRef = useRef<HTMLCanvasElement>(null);
+  const yearlyDowRef = useRef<HTMLCanvasElement>(null);
   const domBarRef = useRef<HTMLCanvasElement>(null);
   const seasonRef = useRef<HTMLCanvasElement>(null);
   const distRef = useRef<HTMLCanvasElement>(null);
@@ -474,6 +475,24 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     for (let m = 0; m < 12; m++) { s[m] = []; ct[m] = 0; cr[m] = 0; }
     for (const d of days) { cr[d.month] += d.closeReturn; ct[d.month]++; s[d.month].push({ idx: ct[d.month], cumRet: cr[d.month] }); }
     return s;
+  }, [days]);
+
+  // === 曜日別 平均リターンの年次推移 (アノマリーの持続/減衰を見る) ===
+  const yearlyDowTrend = useMemo(() => {
+    const map: Record<number, Record<number, number[]>> = {};
+    for (const dow of DOW_TRADING) map[dow] = {};
+    for (const d of days) {
+      if (!(d.dayOfWeek in map)) continue;
+      (map[d.dayOfWeek][d.year] ||= []).push(d.closeReturn);
+    }
+    const years = Array.from(new Set(days.map(d => d.year))).sort((a, b) => a - b);
+    const series: Record<number, { year: number; mean: number; n: number }[]> = {};
+    for (const dow of DOW_TRADING) {
+      series[dow] = years
+        .filter(y => map[dow][y]?.length)
+        .map(y => ({ year: y, mean: mean(map[dow][y]), n: map[dow][y].length }));
+    }
+    return { years, series };
   }, [days]);
 
   // === intraweek pattern (月→金 + 翌月: 週末ギャップを含む) ===
@@ -880,6 +899,55 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     for (const k of keys) { const pts = seriesData[k]; if (pts.length < 2) continue; ctx.strokeStyle = colors[k]; ctx.lineWidth = 1.5; ctx.beginPath(); for (let i = 0; i < pts.length; i++) { const x = pad.left + (pts[i].idx / allMaxIdx) * plotW; const y = pad.top + plotH * (1 - (pts[i].cumRet - allMin) / range); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke(); }
     ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
     for (const k of keys) { if (!seriesData[k] || seriesData[k].length === 0) continue; ctx.fillStyle = colors[k]; ctx.fillRect(lx, height - 12, 12, 3); ctx.fillStyle = "#666"; ctx.fillText(labels[k], lx + 15, height - 7); lx += ctx.measureText(labels[k]).width + 25; }
+  }, []);
+
+  // 年次推移ライン (x=年, y=平均リターン, 系列=曜日)
+  const drawYearlyTrend = useCallback((
+    canvas: HTMLCanvasElement,
+    series: Record<number, { year: number; mean: number; n: number }[]>,
+    years: number[],
+    colors: string[], labels: string[], keys: number[],
+  ) => {
+    const r = initCanvas(canvas, 220); if (!r) return;
+    const { ctx, width, height } = r;
+    if (years.length < 2) return;
+    const pad = { top: 15, bottom: 28, left: 52, right: 15 };
+    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
+    let minV = 0, maxV = 0;
+    for (const k of keys) for (const pt of series[k]) { minV = Math.min(minV, pt.mean); maxV = Math.max(maxV, pt.mean); }
+    const range = maxV - minV || 0.01;
+    const y0 = years[0], y1 = years[years.length - 1], yr = y1 - y0 || 1;
+    const toX = (y: number) => pad.left + ((y - y0) / yr) * plotW;
+    const toY = (v: number) => pad.top + plotH * (1 - (v - minV) / range);
+
+    // zero line + y grid
+    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const val = minV + (range * i) / 4, y = pad.top + plotH * (1 - i / 4);
+      ctx.fillText((val * 100).toFixed(2) + "%", pad.left - 5, y + 3);
+      ctx.strokeStyle = Math.abs(val) < 1e-9 ? "#d1d5db" : "#f0f0f0"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+    }
+    const zeroY = toY(0);
+    if (minV < 0 && maxV > 0) { ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke(); }
+
+    // x labels (years)
+    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    const step = Math.max(1, Math.ceil(years.length / 8));
+    for (let i = 0; i < years.length; i += step) { const x = toX(years[i]); ctx.fillText(String(years[i]), x, height - 14); }
+
+    // lines per weekday
+    for (const k of keys) {
+      const pts = series[k]; if (!pts || pts.length < 2) continue;
+      ctx.strokeStyle = colors[k]; ctx.lineWidth = 1.5; ctx.beginPath();
+      pts.forEach((p, i) => { const x = toX(p.year), y = toY(p.mean); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+      ctx.stroke();
+      for (const p of pts) { ctx.fillStyle = colors[k]; ctx.beginPath(); ctx.arc(toX(p.year), toY(p.mean), 2, 0, Math.PI * 2); ctx.fill(); }
+    }
+
+    // legend
+    ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
+    for (const k of keys) { ctx.fillStyle = colors[k]; ctx.fillRect(lx, height - 6, 12, 3); ctx.fillStyle = "#666"; ctx.fillText(labels[k], lx + 15, height - 3); lx += ctx.measureText(labels[k]).width + 24; }
   }, []);
 
   // Day-of-month bar chart
@@ -1290,7 +1358,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
     if (domBarRef.current) drawDomBar(domBarRef.current, domStats);
     if (seasonRef.current) drawSeasonality(seasonRef.current, seasonality);
-  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, intraweekData, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawIntraweek, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, getBarData, getBoxData]);
+    if (yearlyDowRef.current) drawYearlyTrend(yearlyDowRef.current, yearlyDowTrend.series, yearlyDowTrend.years, DOW_COLORS, DOW_LABELS, DOW_TRADING);
+  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, intraweekData, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, yearlyDowTrend, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawIntraweek, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, drawYearlyTrend, getBarData, getBoxData]);
 
   // === Draw interactive distribution explorer ===
   useEffect(() => {
@@ -1349,12 +1418,23 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       <div>
         <div className="text-xs text-gray-500 mb-1">曜日別 平均リターン比較 ({tabDef.barDefs.map(d => d.label).join(" / ")})</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={dowBarRef} /></div>
+        <AnalysisGuide title="解説: 曜日別 平均リターン比較">
+          <p><span className="font-medium">何を明らかにするか:</span> 各曜日(月〜金)に、選択中のリターン種別の平均がプラスかマイナスか、どの曜日が強い/弱いかを比較します。曜日アノマリー(例: 月曜が弱い、金曜が強い)の有無を一目で把握する出発点です。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各曜日に属する全営業日のリターン r を集め、算術平均 μ = (1/N)Σr を棒の高さにします。棒のグループ=曜日、棒の色=リターン種別(前C→当C / 当O→当C(日中) / 前C→当O(夜間) 等。タブで切替)。縦軸は%。</p>
+          <p><span className="font-medium">読み方:</span> 0(中央の横線)より上=平均プラス、下=マイナス。夜間(前C→当O)と日中(当O→当C)を比べると、その曜日の値動きが「持ち越し」と「場中」のどちらで生じているかが分かります。</p>
+          <p><span className="font-medium">注意:</span> 平均は外れ値に弱く、サンプルが少ない期間では偶然の偏りが出ます。有意性は下の「曜日別リターン詳細」のp値で確認してください。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== 2. Weekday box plot ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">曜日別 リターン分布 (箱ひげ図 - {tabDef.barDefs.map(d => d.label).join(" / ")})</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={dowBoxRef} /></div>
+        <AnalysisGuide title="解説: 曜日別 リターン分布 (箱ひげ図)">
+          <p><span className="font-medium">何を明らかにするか:</span> 平均だけでは見えない「ばらつき(リスク)」と「分布の偏り」を曜日ごとに比較します。同じ平均でも箱が縦長ならハイリスクな曜日です。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各曜日のリターンを昇順に並べ、四分位数を計算。箱の上端=第3四分位 Q3(上位25%境界)、下端=第1四分位 Q1(下位25%境界)、箱内の太線=中央値、箱の高さ=四分位範囲 IQR = Q3−Q1。ひげは Q1−1.5×IQR 〜 Q3+1.5×IQR の範囲、それを超える点=外れ値(丸)。</p>
+          <p><span className="font-medium">読み方:</span> 箱の縦幅=その曜日のボラティリティ。中央線が箱の中で上/下に寄る=分布の歪み。外れ値の数や位置で「稀な大変動」がどちらの方向に多いかを把握します。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Interactive distribution explorer ===== */}
@@ -1463,6 +1543,15 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             </table>
           </div>
         )}
+
+        <AnalysisGuide title="解説: 曜日別リターン分布エクスプローラ">
+          <p><span className="font-medium">何を明らかにするか:</span> 代表値(平均・中央値)では見えない<span className="font-medium">分布の形そのもの</span>(裾の厚さ・左右非対称・二峰性)を、曜日×リターン種別を自由に選んで確認します。例:「金曜の夜間リターンは暴落側に裾が伸びているか」を直接見る。</p>
+          <p><span className="font-medium">ヒストグラム:</span> リターンを40区間に分け、各区間の頻度を密度(縦軸=頻度 /(総数×区間幅))に正規化。面積合計=1なので密度曲線・正規分布と重ねて比較できます(曜日1つ選択時に表示)。</p>
+          <p><span className="font-medium">KDE(カーネル密度推定)曲線:</span> 区切り位置に依存しない滑らかな密度推定。f(x) = (1/(n·h)) Σ K((x − x_i)/h)、K=標準正規、バンド幅 h = 0.9 × min(σ, IQR/1.349) × n^(−1/5)(Silverman)。複数曜日を選ぶと形を重ね比較できます。</p>
+          <p><span className="font-medium">正規分布の重ね描き(黒破線):</span> 同じ平均・標準偏差の正規分布 N(μ,σ²)。実データが中央で尖り両裾で厚い=ファットテール(急騰急落が理論より起きやすい)。</p>
+          <p><span className="font-medium">歪度・尖度(表):</span> 歪度 g₁ = (n/((n−1)(n−2)))Σ((x_i−μ)/σ)³(正=右裾が長い/負=左裾が長い)。超過尖度(正規=0)が正=裾が厚い(テールリスク大)。三角マーカー=平均位置、灰破線=0%。</p>
+          <p><span className="font-medium">活用:</span> ①平均が正でも歪度が大きく負なら「普段は小勝ち・稀に大負け」で損切り設計が重要。②夜間リターンの裾が厚い曜日は持ち越しギャップリスクが高い。<span className="font-medium">注意:</span> N が小さい曜日は裾の推定が不安定。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Weekday detailed stats table ===== */}
@@ -1513,10 +1602,40 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       </div>
 
+      <div>
+        <AnalysisGuide title="解説: 曜日別リターン詳細 (統計量とp値)">
+          <p><span className="font-medium">何を明らかにするか:</span> 各曜日の代表値・ばらつき・勝率・統計的有意性を数値で精査します。図で見えた偏りが「偶然か、意味のあるアノマリーか」を判定する中核の表です。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 平均 μ=(1/N)Σr、中央値(外れ値に頑健)、標準偏差 σ=√(Σ(r−μ)²/(N−1))、勝率=(r&gt;0 の日数)/N。<span className="font-medium">p値</span>=帰無仮説「平均=0」のt検定 t = μ·√N/σ の有意確率。</p>
+          <p><span className="font-medium">読み方:</span> p &lt; 0.05(青字)で「平均が0と有意に異なる」=偶然では説明しにくいアノマリー。平均と中央値の乖離は分布の歪みを示唆。σが大きい曜日は同じ平均でもリスクが高い。</p>
+          <p><span className="font-medium">注意:</span> 5曜日×複数指標を一度に見ると、偶然どれかが有意に見える<span className="font-medium">多重比較</span>の罠があります。単独のp値を過信しないこと。</p>
+        </AnalysisGuide>
+      </div>
+
+
+      {/* ===== 曜日別 平均リターンの年次推移 (新規: アノマリーの持続/減衰) ===== */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">
+          曜日別 平均リターンの年次推移
+          <span className="text-gray-400 ml-1">※各年・各曜日の前C→当C平均。アノマリーが続いているか減衰したかを見る</span>
+        </div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={yearlyDowRef} /></div>
+        <AnalysisGuide title="解説: 曜日別 平均リターンの年次推移">
+          <p><span className="font-medium">何を明らかにするか:</span> 他の図は全期間を1つに集計するため「いつ効いていたか」が消えます。本図は<span className="font-medium">曜日効果が時間とともに持続しているか/減衰・反転したか</span>を年単位で可視化します。アノマリーは発見後に裁定で消えることが多く、その兆候を掴むためのものです。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各年 y・各曜日 d について、その年のその曜日の前C→当C リターンの平均 μ(d,y) = (1/N) Σ r を折れ線にします。横軸=年、縦軸=平均リターン(%)、線の色=曜日。</p>
+          <p><span className="font-medium">読み方:</span> ある曜日の線が一貫して0より上(下)=その効果が長期的に持続。年々0へ近づく=アノマリーの減衰(裁定消滅)。プラスとマイナスを行き来=不安定で再現性が低い。直近数年の符号が過去と逆=レジーム変化の疑い。</p>
+          <p><span className="font-medium">注意:</span> 1年=約50サンプルなので単年の値はばらつきます。点の上下動より「複数年の傾き・水準」を見てください。</p>
+        </AnalysisGuide>
+      </div>
+
       {/* ===== 3. Monthly grouped bar ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">月別 平均リターン比較 ({tabDef.barDefs.map(d => d.label).join(" / ")})</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={monthBarRef} /></div>
+        <AnalysisGuide title="解説: 月別 平均リターン比較">
+          <p><span className="font-medium">何を明らかにするか:</span> 12か月それぞれの平均リターンを比較し、「Sell in May(5月以降軟調)」「年末高」などの季節性(カレンダーアノマリー)を検証します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各月に属する全営業日のリターンを集め平均 μ = (1/N)Σr を棒の高さに。棒の色=リターン種別(タブ切替)。縦軸%。</p>
+          <p><span className="font-medium">読み方:</span> 0より上の月=歴史的に上昇しやすい月。連続する月の傾向(例: 11〜翌1月が強い)に注目。<span className="font-medium">注意:</span> 月次は1年に1サンプルしか増えず、10年でもN≈10年分。下の月別詳細のp値・標準偏差で確からしさを確認。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Monthly stats table ===== */}
@@ -1571,6 +1690,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       </div>
 
+      <div>
+        <AnalysisGuide title="解説: 月別リターン詳細 (統計量とp値)">
+          <p><span className="font-medium">何を明らかにするか:</span> 月別の平均・標準偏差・勝率・p値を精査し、季節性が統計的に有意かを判定します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各月のリターンについて 平均 μ=(1/N)Σr、標準偏差 σ=√(Σ(r−μ)²/(N−1))、勝率=(r&gt;0)/N、p値=t検定(t=μ·√N/σ)の有意確率。</p>
+          <p><span className="font-medium">読み方:</span> p &lt; 0.05(青字)の月は平均が0と有意に異なる。<span className="font-medium">注意:</span> 月効果は年に1回しか観測が増えず、10年でもN≈10。p値は参考程度に、複数年の安定性(下の年×月ヒートマップ)と併せて判断してください。</p>
+        </AnalysisGuide>
+      </div>
+
       {/* ===== 4. Intraweek pattern ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">
@@ -1578,6 +1705,12 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           <span className="text-amber-600 ml-1">※金→月の橙破線＝週末ギャップ</span>
         </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={intraweekRef} /></div>
+        <AnalysisGuide title="解説: 週内パターン (月→金→翌月 累積推移)">
+          <p><span className="font-medium">何を明らかにするか:</span> 1週間の中で上昇が前半/後半どちらに偏るか、週末の持ち越しでギャップが出やすいか(Weekend/Monday効果)を、月曜起点でそろえた平均累積で可視化します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 位置 w(月=1..金=5)の値=各週の Σ&#123;d=1..w&#125; r_d(r_d=その曜日の前C→当C)を全週平均。「翌月(橙破線)」=各週の Σ&#123;d=1..5&#125; r_d に翌週月曜の r を足して平均(=金曜終値→翌週月曜終値の週末ギャップを含む)。</p>
+          <p><span className="font-medium">読み方:</span> 青実線(平日)の傾き=週内の上昇の偏り。金→翌月の橙破線が<span className="font-medium">下向き=週末持ち越しでギャップダウンしやすい</span>、上向き=週明けに買われやすい。</p>
+          <p><span className="font-medium">注意:</span> 「典型的な週」の平均像で、個々の週のばらつきは表しません。祝日欠落日はその週でスキップするため位置ごとにNが異なります。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== 曜日トレード・シミュレータ ===== */}
@@ -1707,10 +1840,25 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       </div>
 
+      <div>
+        <AnalysisGuide title="解説: 曜日トレード・シミュレータ">
+          <p><span className="font-medium">何をするか:</span> 「月曜終値で買い→火曜終値で売る」のように、エントリー/エグジット曜日と注文タイミング(始値/終値)・方向(買/売)を指定し、毎週そのトレードを繰り返した累積リターンをバイ&ホールド(B&H)と比較します。</p>
+          <p><span className="font-medium">トレード判定・数式:</span> 各営業日に始値=2i・終値=2i+1 の時刻順序を与え、エントリー時刻より<span className="font-medium">後</span>の最初のエグジット曜日で解消。ロング r = P_exit/P_entry − 1、ショート r = −(P_exit/P_entry − 1)。累積は複利 Π(1+r)−1 か単純合計 Σr(切替)。</p>
+          <p><span className="font-medium">指標:</span> 年率(複利は (1+総)^(252/N日)−1)/Sharpe(平均÷標準偏差を年間トレード回数で年率化)/最大DD(資産曲線のピークからの最大下落)/<span className="font-medium">滞在率</span>=保有日数/全営業日。</p>
+          <p><span className="font-medium">読み方:</span> 滞在率が低いのにB&H並みなら「市場にいる時間あたりの効率」は高い。<span className="font-medium">全組合せヒートマップ</span>は5×5曜日ペア×注文4通りを一括計算し最良ペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。</p>
+          <p><span className="font-medium">注意:</span> 取引コスト・スリッページ・税は未考慮。過去アノマリーは発見後に消えやすく、多数の組合せを試すと偶然有意に見える<span className="font-medium">多重比較</span>に注意。</p>
+        </AnalysisGuide>
+      </div>
+
       {/* ===== 5. Week-of-month bar ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">月内週番号別 平均リターン</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={womBarRef} /></div>
+        <AnalysisGuide title="解説: 月内週番号別 平均リターン">
+          <p><span className="font-medium">何を明らかにするか:</span> 月の前半/後半どの週が強いか(月末・月初のリバランス資金流入=Turn of Month効果など)を検証します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各営業日を週番号 weekOfMonth = ⌈日付/7⌉(第1〜第5週)に分類し、各週の前C→当C リターンの平均を棒に。</p>
+          <p><span className="font-medium">読み方:</span> 第1週・第5週(月初・月末)が高い=Turn of Month効果の示唆。詳細表のp値で有意性を確認。<span className="font-medium">注意:</span> 第5週は日数が少なくNが小さめです。</p>
+        </AnalysisGuide>
       </div>
 
       {/* Week-of-month table */}
@@ -1743,10 +1891,22 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       </div>
 
+      <div>
+        <AnalysisGuide title="解説: 月内週番号別リターン詳細">
+          <p><span className="font-medium">使う数字・数式:</span> 第1〜第5週ごとに 平均 μ、標準偏差 σ、勝率、p値(t=μ·√N/σ のt検定)。p &lt; 0.05(青字)で平均が0と有意に異なる。</p>
+          <p><span className="font-medium">読み方:</span> 棒グラフで目立った週が、Nとp値からも支持されるかを確認する数値版です。</p>
+        </AnalysisGuide>
+      </div>
+
       {/* ===== 6. Cross heatmap ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">曜日 x 月 ヒートマップ (前C→当C 平均)</div>
         <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={crossHeatRef} /></div>
+        <AnalysisGuide title="解説: 曜日 × 月 ヒートマップ">
+          <p><span className="font-medium">何を明らかにするか:</span> 「曜日」と「月」を掛け合わせた2次元のアノマリー(例: 12月の金曜だけ強い)を発見します。単独では平凡でも組合せで偏る効果を捉えます。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各セル=その(曜日,月)に該当する全営業日の前C→当C リターンの平均。色=緑(プラス)/赤(マイナス)、濃さ=全セル中の最大絶対値に対する相対強度。セル内の数値は平均%。</p>
+          <p><span className="font-medium">読み方:</span> 濃い緑/赤のセルが偏った組合せ。<span className="font-medium">注意:</span> 5×12=60セルに分割するためセルあたりのNが小さく、偶然の偏りが出やすい。強い色でもサンプル数の少なさに留意。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Previous day conditional ===== */}
@@ -1784,34 +1944,67 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
       )}
 
+      <div>
+        <AnalysisGuide title="解説: 前日騰落との関係">
+          <p><span className="font-medium">何を明らかにするか:</span> 前日が上がった/下がった後の翌日リターンを比べ、<span className="font-medium">モメンタム(順張り)かリバーサル(逆張り)か</span>という日次の自己相関の性質を簡易検証します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 前日上昇(r_&#123;t-1&#125;&gt;0)・下落(r_&#123;t-1&#125;≤0)で翌日 r_t を条件分けし、平均・勝率・p値(t検定)を算出。</p>
+          <p><span className="font-medium">読み方:</span> 前日下落後の平均が高い=リバーサル(押し目買いが効く)、前日上昇後が高い=モメンタム(順張り)。p &lt; 0.05(青字)で有意。</p>
+        </AnalysisGuide>
+      </div>
+
       {/* ===== Day-of-month bar chart ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">月内日別 平均リターン (Turn of Month効果)</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={domBarRef} /></div>
+        <AnalysisGuide title="解説: 月内日別 平均リターン (Turn of Month効果)">
+          <p><span className="font-medium">何を明らかにするか:</span> 暦日(1日〜31日)ごとの平均リターン。月末最終数日+月初数日がプラスに偏る「Turn of Month効果」(機関投資家の月次リバランス・年金資金流入が一因とされる)を視覚的に確認します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各暦日 dayOfMonth に該当する全営業日の前C→当C リターンの平均を棒に(緑=プラス/赤=マイナス)。N&lt;2 の日は非表示。</p>
+          <p><span className="font-medium">読み方:</span> 月末〜月初(右端と左端)が緑に偏れば Turn of Month効果。<span className="font-medium">注意:</span> 29〜31日は月により存在せずNが小さい。暦日は祝日でずれるため、厳密には営業日ベースの月内週番号図も併用してください。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Cumulative by weekday ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">曜日別 累積リターン</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={dowCumulRef} /></div>
+        <AnalysisGuide title="解説: 曜日別 累積リターン">
+          <p><span className="font-medium">何を明らかにするか:</span> 「その曜日だけに投資し続けたら資産はどう増減したか」を累積で見て、曜日効果の方向と一貫性(右肩上がりか)を把握します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各曜日について出現順に並べ、累積 Σr_t(前C→当C の単純合計)を折れ線に。横軸=その曜日の出現回数(時間の代理)、縦軸=累積%。</p>
+          <p><span className="font-medium">読み方:</span> 一貫して右肩上がりの曜日=歴史的にプラス期待値。途中で傾きが変わる=効果が時間で変化(年次推移の図と併読)。<span className="font-medium">注意:</span> 横軸は回数で実時間と等間隔ではありません。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Cumulative by month ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">月別 累積リターン</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={monthCumulRef} /></div>
+        <AnalysisGuide title="解説: 月別 累積リターン">
+          <p><span className="font-medium">何を明らかにするか:</span> 「特定の月だけに毎年投資し続けたら」の累積推移。各月の長期的な寄与とその安定性を比較します。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各月について出現順(年ごと)に累積 Σr_t を折れ線に。横軸=その月の出現年数、縦軸=累積%。色=月。</p>
+          <p><span className="font-medium">読み方:</span> 一貫して上昇する月=季節的に強い。途中で下落に転じる月=効果の減衰や特定年の暴落の影響。<span className="font-medium">注意:</span> 月次は年1回しか増えず線が短く、単年の暴落に大きく振られます。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== 7. Year x Month heatmap ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">年 x 月 リターンヒートマップ (月間合計リターン)</div>
         <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={yearMonthRef} /></div>
+        <AnalysisGuide title="解説: 年 × 月 リターンヒートマップ">
+          <p><span className="font-medium">何を明らかにするか:</span> 各年・各月の月間リターンを一覧し、季節性が<span className="font-medium">毎年安定して効いているか</span>、暴落・急騰の月がいつだったかを俯瞰します。月別平均(集計値)が一部の年に依存していないかの検証に最適です。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各セル=その年その月の前C→当C リターンの合計 Σr_t。色=緑(プラス)/赤(マイナス)、濃さ=全セル最大絶対値に対する相対。</p>
+          <p><span className="font-medium">読み方:</span> 縦に同じ月の列を見て、毎年同じ色なら安定した季節性。1年だけ極端=その年固有のイベント(月別平均がそれに引っ張られている可能性)。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Seasonality ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">年間シーズナリティ曲線 (年平均 累積リターン推移)</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={seasonRef} /></div>
+        <AnalysisGuide title="解説: 年間シーズナリティ曲線">
+          <p><span className="font-medium">何を明らかにするか:</span> 1年を通じた「典型的な値動きの形」。年初から年末までの平均的な累積リターン曲線で、年央の谷(夏枯れ)・年末ラリーなどの季節パターンを掴みます。</p>
+          <p><span className="font-medium">使う数字・数式:</span> 各年について年初からの営業日番号 i にリターンを並べ、その年の累積 C_y(i)=Σ&#123;k≤i&#125; r を作り、全年で平均 (1/Y)Σ_y C_y(i) を曲線に。横軸=年初からの営業日(月目盛)、縦軸=平均累積%。</p>
+          <p><span className="font-medium">読み方:</span> 曲線が上る区間=歴史的に上昇しやすい時期、平坦/下降=軟調な時期。傾きの変化で「いつ買い場/手仕舞いが多かったか」を読みます。<span className="font-medium">注意:</span> 年により営業日数が異なり、年末側はサンプルが減ります。</p>
+        </AnalysisGuide>
       </div>
 
       {/* ===== Streak analysis ===== */}
@@ -1836,10 +2029,15 @@ export default function SpiralHeatmap({ prices, period }: Props) {
               <div className="font-mono text-gray-700 text-sm">{streakStats.avgDown.toFixed(1)}日 ({streakStats.downCount}回)</div>
             </div>
           </div>
+          <AnalysisGuide title="解説: 連騰・連落分析">
+            <p><span className="font-medium">何を明らかにするか:</span> 連続して上昇/下落した日数(ストリーク)の長さから、値動きに<span className="font-medium">トレンド継続性(クラスタリング)があるか</span>を見ます。ランダムウォークより連続が長ければ順張りが効きやすい地合いです。</p>
+            <p><span className="font-medium">使う数字・数式:</span> 前C→当C の符号が同じ向きに続いた日数を1ストリークとして集計。最長・平均・回数を表示。比較基準: 勝率pのランダムウォーク下の平均連続日数は幾何分布で E[連騰]=1/(1−p)、E[連落]=1/p。</p>
+            <p><span className="font-medium">読み方:</span> 平均連騰/連落が理論値より明確に長い=トレンドが持続しやすい(モメンタム有利)。理論値並み=ほぼランダム。<span className="font-medium">注意:</span> 最長記録は1回の偶然でも伸びるため、平均と回数を重視してください。</p>
+          </AnalysisGuide>
         </div>
       )}
 
-      <AnalysisGuide title="カレンダー分析の読み方">
+      <AnalysisGuide title="カレンダー分析 全体リファレンス（各図の個別解説は、上の各図の直下「解説:」を開いてください）">
         <p><span className="font-medium">リターン種別（タブ切替）:</span></p>
         <ul className="list-disc pl-4 space-y-1">
           <li><span className="font-medium">変化率タブ:</span> 前C→当C = (Close_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日終値）、当O→当C = (Close_t - Open_t) / Open_t（当日始値→当日終値＝日中リターン）、前C→当O = (Open_t - Close_&#123;t-1&#125;) / Close_&#123;t-1&#125;（前日終値→当日始値＝夜間リターン）</li>
