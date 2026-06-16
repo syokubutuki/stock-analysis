@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 const isFundCode = (ticker: string) => /^\d{7,8}$/.test(ticker);
 
+// 東証の証券コード判定。
+// 旧来の4桁数字（例: 7203）に加え、2024年以降の英数字混在コード（例: 285A）に対応。
+// 新コード体系: 1桁目・3桁目は数字、2桁目・4桁目は数字または英字。
+// 1文字目が英字の米国株（AAPL等）とは1・3桁目が数字である点で区別できる。
+const isTseCode = (ticker: string) => /^\d[0-9A-Za-z]\d[0-9A-Za-z]$/.test(ticker);
+
 async function fetchFundData(ticker: string, range: string) {
   const now = new Date();
   const toDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -97,8 +103,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data);
     }
 
-    // 4桁数字なら東証銘柄として .T を付与
-    const symbol = /^\d{4}$/.test(ticker) ? `${ticker}.T` : ticker;
+    // 東証コード（4桁数字 or 285A等の英数字混在）なら .T を付与
+    // 英字は大文字に正規化（Yahooは大文字サフィックスを期待）
+    const symbol = isTseCode(ticker) ? `${ticker.toUpperCase()}.T` : ticker;
 
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${safeRange}&interval=1d`;
     const res = await fetch(url, {
