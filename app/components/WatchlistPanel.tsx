@@ -88,7 +88,7 @@ export default function WatchlistPanel({
 
       {/* Dropdown */}
       {dropdownOpen && (
-        <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg right-0 top-full mt-1 w-56 max-h-64 overflow-y-auto">
+        <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg left-0 sm:left-auto sm:right-0 top-full mt-1 w-56 max-w-[calc(100vw-2rem)] max-h-64 overflow-y-auto">
           {watchlist.length === 0 ? (
             <p className="px-3 py-3 text-sm text-gray-400 text-center">
               お気に入りなし
