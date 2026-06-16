@@ -433,6 +433,10 @@ const CornishFisherChart = dynamic(
   () => import("./components/analysis/CornishFisherChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const ForecastRangeChart = dynamic(
+  () => import("./components/analysis/ForecastRangeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const VolConeChart = dynamic(
   () => import("./components/analysis/VolConeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
@@ -843,6 +847,7 @@ export default function AnalysisPage() {
                   <div id="sa-risk" className="scroll-mt-20">
                     <RiskMetricsPanel prices={allPrices} period={period} />
                   </div>
+                  <ForecastRangeChart prices={filteredPrices} />
                   <DrawdownChart prices={allPrices} period={period} />
                   <GarchVarChart prices={filteredPrices} />
                   <CornishFisherChart prices={filteredPrices} />
