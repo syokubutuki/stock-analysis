@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { PricePoint } from "../../lib/types";
 import { GBDT, type GBDTParams, DEFAULT_GBDT_PARAMS } from "../../lib/ml/gbdt";
 import {
@@ -494,127 +494,6 @@ function ProgressStat({ label, value, color }: { label: string; value: string; c
   );
 }
 
-// ── 日次予測 色分けストリップ ──────────────────────
-// 各テスト日について「モデルが上がると予測したか/下がると予測したか」を色で表示し、
-// 直下に実際の結果と的中/外れを並べて視覚的に照合できるようにする。
-
-function DailyPredictionStrip({ daily }: { daily: DailyPrediction[] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current || daily.length === 0) return;
-    const canvas = canvasRef.current;
-    const parent = canvas.parentElement;
-    if (!parent) return;
-    const width = parent.clientWidth;
-    const H = 130;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr; canvas.height = H * dpr;
-    canvas.style.width = `${width}px`; canvas.style.height = `${H}px`;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, width, H);
-
-    const ml = 52, mr = 8, mt = 8;
-    const plotW = width - ml - mr;
-    const n = daily.length;
-    const bw = plotW / n;
-
-    const rowH = 26, gap = 6;
-    const yPred = mt;
-    const yActual = yPred + rowH + gap;
-    const yHit = yActual + rowH + gap;
-    const hitH = 10;
-
-    // 行ラベル
-    ctx.textAlign = "right"; ctx.font = "10px sans-serif"; ctx.fillStyle = "#6b7280";
-    ctx.fillText("予測", ml - 6, yPred + rowH / 2 + 3);
-    ctx.fillText("実際", ml - 6, yActual + rowH / 2 + 3);
-    ctx.fillText("的中", ml - 6, yHit + hitH / 2 + 3);
-
-    for (let i = 0; i < n; i++) {
-      const x = ml + i * bw;
-      const w = Math.max(1, bw - (bw > 3 ? 0.5 : 0));
-      const d = daily[i];
-
-      // 予測: 上昇予測=緑 / 下落予測=赤。確信度 |proba-0.5| で濃淡。
-      const conf = Math.min(1, Math.abs(d.proba - 0.5) * 2);
-      const alpha = 0.35 + 0.6 * conf;
-      ctx.fillStyle = d.predicted === 1
-        ? `rgba(22, 163, 74, ${alpha})`
-        : `rgba(220, 38, 38, ${alpha})`;
-      ctx.fillRect(x, yPred, w, rowH);
-
-      // 実際: 上昇=緑 / 下落=赤 (確定値なので濃く)
-      ctx.fillStyle = d.actual === 1 ? "rgba(22, 163, 74, 0.85)" : "rgba(220, 38, 38, 0.85)";
-      ctx.fillRect(x, yActual, w, rowH);
-
-      // 的中: 一致=緑 / 不一致=赤
-      const hit = d.predicted === d.actual;
-      ctx.fillStyle = hit ? "#34d399" : "#f87171";
-      ctx.fillRect(x, yHit, w, hitH);
-    }
-
-    // 枠
-    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-    ctx.strokeRect(ml, yPred, plotW, rowH);
-    ctx.strokeRect(ml, yActual, plotW, rowH);
-    ctx.strokeRect(ml, yHit, plotW, hitH);
-
-    // 日付軸 (疎に)
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
-    const step = Math.max(1, Math.floor(n / 6));
-    for (let i = 0; i < n; i += step) {
-      ctx.fillText(daily[i].time.slice(2), ml + i * bw + bw / 2, H - 5);
-    }
-    ctx.textAlign = "right";
-    ctx.fillText(daily[n - 1].time.slice(2), width - mr, H - 5);
-  }, [daily]);
-
-  if (daily.length === 0) return null;
-
-  const hits = daily.filter((d) => d.predicted === d.actual).length;
-  const upPreds = daily.filter((d) => d.predicted === 1).length;
-  const last = daily[daily.length - 1];
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="text-xs font-medium text-gray-600">日次予測（上昇=緑 / 下落=赤）</div>
-        <div className="text-[11px] text-gray-400">
-          的中 {hits}/{daily.length}（{((hits / daily.length) * 100).toFixed(1)}%）・上昇予測 {upPreds}日
-        </div>
-      </div>
-
-      {/* 直近の予測を強調表示 */}
-      <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-        last.predicted === 1 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-      }`}>
-        <span className={`text-lg leading-none ${last.predicted === 1 ? "text-green-600" : "text-red-600"}`}>
-          {last.predicted === 1 ? "▲" : "▼"}
-        </span>
-        <span className="font-medium text-gray-700">
-          直近 {last.time}: モデルは{last.predicted === 1 ? "上昇" : "下落"}と予測
-        </span>
-        <span className="text-gray-500 font-mono text-xs">
-          （上昇確率 {(last.proba * 100).toFixed(1)}%）
-        </span>
-      </div>
-
-      <div className="relative w-full"><canvas ref={canvasRef} /></div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(22,163,74,0.8)" }} /> 上昇</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(220,38,38,0.8)" }} /> 下落</span>
-        <span className="text-gray-400">予測行の色の濃さ = 確信度（確率が0.5から離れるほど濃い）</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-400" /> 的中</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-400" /> 外れ</span>
-      </div>
-    </div>
-  );
-}
-
 // ── Walk-Forward 分割スキームの図解 ─────────────────
 // 学習窓・Embargo・テスト窓が時間方向にどう転がるかを模式図で示す。
 // 実際のスライダー値に連動するので設定の理解にも使える。
@@ -1013,8 +892,9 @@ export default function PredictiveStrategyPanel({
       {/* 結果 */}
       {!isRunning && result && (
         <div className="space-y-3">
-          {/* 日次の上昇/下落予測 (色分け) */}
-          <DailyPredictionStrip daily={result.daily} />
+          <div className="text-[11px] text-gray-400">
+            日次の上昇/下落予測は、上の累積リターンチャート直下に同一時間軸で色分け表示しています。
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
             <MetricCell label="正答率" value={pct(result.metrics.accuracy)} />
@@ -1119,7 +999,7 @@ export default function PredictiveStrategyPanel({
           <li><span className="font-medium">AUC:</span> 確率の順位付け能力。0.5でランダム、0.55を超えれば金融データでは有意な部類、0.6超は良好。1.0が完璧。</li>
           <li><span className="font-medium">LogLoss:</span> 確率の正確さ(小さいほど良い)。較正を入れると改善しやすい。</li>
           <li><span className="font-medium">特徴量重要度:</span> 各特徴が分割でどれだけ損失を減らしたかの割合。どの情報が効いているかの目安。</li>
-          <li><span className="font-medium">日次予測ストリップ:</span> 「予測」行はモデルがその日に上昇(緑)/下落(赤)どちらを予測したか、色の濃さは確信度。「実際」行は実現方向、「的中」行は予測と実際が一致したか。緑と赤の縦位置が揃っているほど当たっています。先頭の強調カードは直近日の予測です。</li>
+          <li><span className="font-medium">日次予測ストリップ:</span> 上の累積リターンチャート直下に同一時間軸で表示。「予測」行はモデルがその日に上昇(緑)/下落(赤)どちらを予測したか、色の濃さは確信度。「実際」行は実現方向、「的中」行は予測と実際が一致したか。緑と赤の縦位置が揃っているほど当たっています。累積リターン曲線と日付を突き合わせて、どの局面で当たり/外れだったかを確認できます。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>

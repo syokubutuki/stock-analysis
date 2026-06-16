@@ -115,6 +115,7 @@ function pctFmt(v: number, d = 2): string {
 export default function CustomReturnChart({ prices }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartApiRef = useRef<IChartApi | null>(null);
+  const stripRef = useRef<HTMLCanvasElement>(null);
 
   const [entry, setEntry] = useState<PriceSelector>("prevClose");
   const [exit, setExit] = useState<PriceSelector>("open");
@@ -271,12 +272,70 @@ export default function CustomReturnChart({ prices }: Props) {
     );
 
     chart.timeScale().fitContent();
+
+    // ── GBDT日次予測ストリップを累積リターンと同一時間軸に整列描画 ──
+    const daily = predResult?.daily ?? [];
+    const ts = chart.timeScale();
+    const drawStrip = () => {
+      const canvas = stripRef.current;
+      const cont = chartRef.current;
+      if (!canvas || !cont) return;
+      const width = cont.clientWidth;
+      const rowH = 16, gap = 3, hitH = 7;
+      const H = rowH * 2 + gap * 2 + hitH;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr; canvas.height = H * dpr;
+      canvas.style.width = `${width}px`; canvas.style.height = `${H}px`;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, H);
+
+      const yPred = 0, yActual = rowH + gap, yHit = yActual + rowH + gap;
+      // 枠
+      ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, yPred + 0.5, width - 1, rowH);
+      ctx.strokeRect(0.5, yActual + 0.5, width - 1, rowH);
+      ctx.strokeRect(0.5, yHit + 0.5, width - 1, hitH);
+      if (daily.length === 0) return;
+
+      // 各テスト日の時間軸座標 (チャートと完全一致)
+      const coords = daily.map((d) => ts.timeToCoordinate(d.time as Time));
+      for (let i = 0; i < daily.length; i++) {
+        const x = coords[i];
+        if (x == null) continue;
+        const next = coords[i + 1];
+        const prev = coords[i - 1];
+        const w = Math.max(
+          1,
+          Math.abs(next != null ? next - x : prev != null ? x - prev : 3),
+        );
+        const x0 = x - w / 2; // 座標はバー中心なのでセルも中心揃え
+        const d = daily[i];
+        // 予測: 上昇=緑/下落=赤、濃淡=確信度
+        const conf = Math.min(1, Math.abs(d.proba - 0.5) * 2);
+        const a = 0.35 + 0.6 * conf;
+        ctx.fillStyle = d.predicted === 1 ? `rgba(22,163,74,${a})` : `rgba(220,38,38,${a})`;
+        ctx.fillRect(x0, yPred, w, rowH);
+        // 実際
+        ctx.fillStyle = d.actual === 1 ? "rgba(22,163,74,0.85)" : "rgba(220,38,38,0.85)";
+        ctx.fillRect(x0, yActual, w, rowH);
+        // 的中
+        ctx.fillStyle = d.predicted === d.actual ? "#34d399" : "#f87171";
+        ctx.fillRect(x0, yHit, w, hitH);
+      }
+    };
+    drawStrip();
+    ts.subscribeVisibleLogicalRangeChange(drawStrip);
+
     const h = () => {
       if (chartRef.current) chart.applyOptions({ width: chartRef.current.clientWidth });
+      drawStrip();
     };
     window.addEventListener("resize", h);
     return () => {
       window.removeEventListener("resize", h);
+      ts.unsubscribeVisibleLogicalRangeChange(drawStrip);
       chart.remove();
       chartApiRef.current = null;
     };
@@ -379,6 +438,37 @@ export default function CustomReturnChart({ prices }: Props) {
         <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-gray-400 border-dashed border-t border-gray-400" /> バイ&ホールド</span>
         {predResult && <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-amber-500" /> GBDT予測</span>}
       </div>
+
+      {/* GBDT日次予測ストリップ (上のチャートと同一時間軸に整列) */}
+      {predResult && predResult.daily.length > 0 && (() => {
+        const dl = predResult.daily;
+        const hits = dl.filter((d) => d.predicted === d.actual).length;
+        const up = dl.filter((d) => d.predicted === 1).length;
+        const last = dl[dl.length - 1];
+        return (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="text-xs font-medium text-gray-600">
+                GBDT日次予測（上のチャートと同一時間軸 ／ 上段=予測・中段=実際・下段=的中）
+              </div>
+              <div className="text-[11px] text-gray-400">
+                的中 {hits}/{dl.length}（{((hits / dl.length) * 100).toFixed(1)}%）・上昇予測 {up}日
+              </div>
+            </div>
+            <canvas ref={stripRef} className="w-full" />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(22,163,74,0.85)" }} /> 上昇</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(220,38,38,0.85)" }} /> 下落</span>
+              <span className="text-gray-400">予測行の色の濃さ＝確信度</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-400" /> 的中</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-400" /> 外れ</span>
+              <span className={`ml-auto font-medium ${last.predicted === 1 ? "text-green-600" : "text-red-600"}`}>
+                直近 {last.time}: {last.predicted === 1 ? "▲上昇" : "▼下落"}予測（{(last.proba * 100).toFixed(1)}%）
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 統計 */}
       {stats && (

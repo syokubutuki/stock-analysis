@@ -18,7 +18,6 @@ import {
   HORIZONS,
   SignalDigest,
   Position,
-  computeDigest,
   evaluateHeld,
   evaluateTarget,
   HeldEval,
@@ -34,6 +33,13 @@ import {
   diffAgainstSnapshot,
 } from "../lib/portfolio-snapshot";
 import { usePortfolioData } from "../hooks/usePortfolioData";
+import { usePortfolioDigests } from "../hooks/usePortfolioDigests";
+import dynamic from "next/dynamic";
+
+const PortfolioRiskPanel = dynamic(
+  () => import("../components/analysis/PortfolioRiskPanel"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -73,16 +79,15 @@ export default function PortfolioPage() {
 
   const tickers = useMemo(() => watchlist.map((w) => w.ticker), [watchlist]);
   const { data, loading, progress, reload } = usePortfolioData(tickers);
+  const { digests, computing } = usePortfolioDigests(data, horizon);
 
-  // 蒸留 + 判定 + 差分
+  // 判定 + 差分(蒸留は Worker 済み。ここは軽い評価のみ)
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const item of watchlist) {
-      const fetched = data[item.ticker];
-      if (!fetched || fetched.prices.length === 0) continue;
-      const name = fetched.name || item.name;
+      const digest = digests[item.ticker];
+      if (!digest) continue; // まだ Worker から届いていない
       const kind = effectiveKind(item);
-      const digest = computeDigest(fetched.prices, item.ticker, name, horizon);
       let row: Row;
       if (!digest.ok) {
         out.push({
@@ -116,7 +121,7 @@ export default function PortfolioPage() {
       return a.kind === b.kind ? 0 : a.kind === "held" ? -1 : 1;
     });
     return out;
-  }, [watchlist, data, horizon, snapshot]);
+  }, [watchlist, digests, snapshot]);
 
   const visibleRows = useMemo(() => {
     switch (view) {
@@ -259,11 +264,15 @@ export default function PortfolioPage() {
           >
             追加
           </button>
-          {loading && (
+          {loading ? (
             <span className="text-xs text-gray-400">
               取得中… {progress.done}/{progress.total}
             </span>
-          )}
+          ) : computing ? (
+            <span className="text-xs text-gray-400">
+              シグナル計算中… {Object.keys(digests).length}/{tickers.length}
+            </span>
+          ) : null}
         </div>
 
         {watchlist.length === 0 ? (
@@ -271,6 +280,10 @@ export default function PortfolioPage() {
             ウォッチリストが空です。上の入力欄か、個別分析画面の ★ で銘柄を追加してください。
           </div>
         ) : (
+          <>
+          {Object.keys(data).length >= 2 && (
+            <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} />
+          )}
           <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
             <table className="w-full text-sm">
               <thead>
@@ -312,6 +325,7 @@ export default function PortfolioPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         <p className="text-xs text-gray-400">
