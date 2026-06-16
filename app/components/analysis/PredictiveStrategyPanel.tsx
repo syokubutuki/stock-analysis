@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { PricePoint } from "../../lib/types";
 import { GBDT, type GBDTParams, DEFAULT_GBDT_PARAMS } from "../../lib/ml/gbdt";
 import {
@@ -45,8 +45,20 @@ export interface PredictionReturn {
   cumReturn: number;
 }
 
+/** 各テスト日のモデル予測 (色分け表示用) */
+export interface DailyPrediction {
+  time: string;
+  proba: number; // 上昇確率 (較正後)
+  predicted: 0 | 1; // proba ≧ longThr で 1 (上昇予測)
+  actual: 0 | 1; // 実際に上昇したか
+  position: -1 | 0 | 1; // 建玉 (ロング/現金/ショート)
+  ret: number; // その日の実現リターン (戦略リターン)
+  windowIdx: number; // 何番目のWalk-Forward窓のテストか
+}
+
 export interface PredictionResult {
   returns: PredictionReturn[];
+  daily: DailyPrediction[];
   metrics: {
     accuracy: number;
     precision: number;
@@ -201,7 +213,7 @@ async function runWalkForwardAsync(
 
   const predictions: {
     time: string; actual: number; ret: number; proba: number;
-    longThr: number; shortThr: number;
+    longThr: number; shortThr: number; windowIdx: number;
   }[] = [];
   const totalImportance = new Array<number>(featureList.length).fill(0);
   let nModels = 0;
@@ -295,7 +307,7 @@ async function runWalkForwardAsync(
 
     for (let j = wStart; j < wEnd; j++) {
       const proba = calibrate(model.predictProba(allX[j]));
-      predictions.push({ time: allTimes[j], actual: allY[j], ret: allReturns[j], proba, longThr, shortThr });
+      predictions.push({ time: allTimes[j], actual: allY[j], ret: allReturns[j], proba, longThr, shortThr, windowIdx: wi });
 
       // ポジション判定 (進捗用)
       let position = 0;
@@ -327,17 +339,18 @@ async function runWalkForwardAsync(
   let cumReturn = 0, bhReturn = 0;
   let longCount = 0, shortCount = 0, cashCount = 0;
   const returns: PredictionReturn[] = [];
+  const daily: DailyPrediction[] = [];
   const probaArr: number[] = [];
   const predArr: number[] = [];
   const actualArr: number[] = [];
 
   for (const p of predictions) {
-    let position = 0;
+    let position: -1 | 0 | 1 = 0;
     if (p.proba >= p.longThr) { position = 1; longCount++; }
     else if (cfg.positionMode === "longShort" && p.proba <= p.shortThr) { position = -1; shortCount++; }
     else { cashCount++; }
 
-    const predicted = p.proba >= p.longThr ? 1 : 0;
+    const predicted: 0 | 1 = p.proba >= p.longThr ? 1 : 0;
     if (predicted === 1 && p.actual === 1) tp++;
     else if (predicted === 1 && p.actual === 0) fp++;
     else if (predicted === 0 && p.actual === 1) fn++;
@@ -350,6 +363,10 @@ async function runWalkForwardAsync(
     cumReturn += position * p.ret;
     bhReturn += p.ret;
     returns.push({ time: p.time, cumReturn });
+    daily.push({
+      time: p.time, proba: p.proba, predicted,
+      actual: (p.actual === 1 ? 1 : 0), position, ret: p.ret, windowIdx: p.windowIdx,
+    });
   }
 
   const total = predictions.length;
@@ -369,6 +386,7 @@ async function runWalkForwardAsync(
 
   return {
     returns,
+    daily,
     metrics: {
       accuracy, precision, recall, f1, auc, balancedAcc, logLoss: ll, baseRate,
       totalReturn: cumReturn, bhReturn, longCount, shortCount, cashCount, totalDays: total,
@@ -476,6 +494,188 @@ function ProgressStat({ label, value, color }: { label: string; value: string; c
   );
 }
 
+// ── 日次予測 色分けストリップ ──────────────────────
+// 各テスト日について「モデルが上がると予測したか/下がると予測したか」を色で表示し、
+// 直下に実際の結果と的中/外れを並べて視覚的に照合できるようにする。
+
+function DailyPredictionStrip({ daily }: { daily: DailyPrediction[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || daily.length === 0) return;
+    const canvas = canvasRef.current;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const width = parent.clientWidth;
+    const H = 130;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr; canvas.height = H * dpr;
+    canvas.style.width = `${width}px`; canvas.style.height = `${H}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, H);
+
+    const ml = 52, mr = 8, mt = 8;
+    const plotW = width - ml - mr;
+    const n = daily.length;
+    const bw = plotW / n;
+
+    const rowH = 26, gap = 6;
+    const yPred = mt;
+    const yActual = yPred + rowH + gap;
+    const yHit = yActual + rowH + gap;
+    const hitH = 10;
+
+    // 行ラベル
+    ctx.textAlign = "right"; ctx.font = "10px sans-serif"; ctx.fillStyle = "#6b7280";
+    ctx.fillText("予測", ml - 6, yPred + rowH / 2 + 3);
+    ctx.fillText("実際", ml - 6, yActual + rowH / 2 + 3);
+    ctx.fillText("的中", ml - 6, yHit + hitH / 2 + 3);
+
+    for (let i = 0; i < n; i++) {
+      const x = ml + i * bw;
+      const w = Math.max(1, bw - (bw > 3 ? 0.5 : 0));
+      const d = daily[i];
+
+      // 予測: 上昇予測=緑 / 下落予測=赤。確信度 |proba-0.5| で濃淡。
+      const conf = Math.min(1, Math.abs(d.proba - 0.5) * 2);
+      const alpha = 0.35 + 0.6 * conf;
+      ctx.fillStyle = d.predicted === 1
+        ? `rgba(22, 163, 74, ${alpha})`
+        : `rgba(220, 38, 38, ${alpha})`;
+      ctx.fillRect(x, yPred, w, rowH);
+
+      // 実際: 上昇=緑 / 下落=赤 (確定値なので濃く)
+      ctx.fillStyle = d.actual === 1 ? "rgba(22, 163, 74, 0.85)" : "rgba(220, 38, 38, 0.85)";
+      ctx.fillRect(x, yActual, w, rowH);
+
+      // 的中: 一致=緑 / 不一致=赤
+      const hit = d.predicted === d.actual;
+      ctx.fillStyle = hit ? "#34d399" : "#f87171";
+      ctx.fillRect(x, yHit, w, hitH);
+    }
+
+    // 枠
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.strokeRect(ml, yPred, plotW, rowH);
+    ctx.strokeRect(ml, yActual, plotW, rowH);
+    ctx.strokeRect(ml, yHit, plotW, hitH);
+
+    // 日付軸 (疎に)
+    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    const step = Math.max(1, Math.floor(n / 6));
+    for (let i = 0; i < n; i += step) {
+      ctx.fillText(daily[i].time.slice(2), ml + i * bw + bw / 2, H - 5);
+    }
+    ctx.textAlign = "right";
+    ctx.fillText(daily[n - 1].time.slice(2), width - mr, H - 5);
+  }, [daily]);
+
+  if (daily.length === 0) return null;
+
+  const hits = daily.filter((d) => d.predicted === d.actual).length;
+  const upPreds = daily.filter((d) => d.predicted === 1).length;
+  const last = daily[daily.length - 1];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-xs font-medium text-gray-600">日次予測（上昇=緑 / 下落=赤）</div>
+        <div className="text-[11px] text-gray-400">
+          的中 {hits}/{daily.length}（{((hits / daily.length) * 100).toFixed(1)}%）・上昇予測 {upPreds}日
+        </div>
+      </div>
+
+      {/* 直近の予測を強調表示 */}
+      <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+        last.predicted === 1 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+      }`}>
+        <span className={`text-lg leading-none ${last.predicted === 1 ? "text-green-600" : "text-red-600"}`}>
+          {last.predicted === 1 ? "▲" : "▼"}
+        </span>
+        <span className="font-medium text-gray-700">
+          直近 {last.time}: モデルは{last.predicted === 1 ? "上昇" : "下落"}と予測
+        </span>
+        <span className="text-gray-500 font-mono text-xs">
+          （上昇確率 {(last.proba * 100).toFixed(1)}%）
+        </span>
+      </div>
+
+      <div className="relative w-full"><canvas ref={canvasRef} /></div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(22,163,74,0.8)" }} /> 上昇</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(220,38,38,0.8)" }} /> 下落</span>
+        <span className="text-gray-400">予測行の色の濃さ = 確信度（確率が0.5から離れるほど濃い）</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-400" /> 的中</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-400" /> 外れ</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Walk-Forward 分割スキームの図解 ─────────────────
+// 学習窓・Embargo・テスト窓が時間方向にどう転がるかを模式図で示す。
+// 実際のスライダー値に連動するので設定の理解にも使える。
+
+function WalkForwardDiagram({
+  trainWindow, testWindow, embargo,
+}: { trainWindow: number; testWindow: number; embargo: number }) {
+  const rows = 4;
+  const total = trainWindow + embargo + testWindow + (rows - 1) * testWindow;
+  const W = 560, H = 150;
+  const ml = 8, mr = 8, mt = 8, mb = 22;
+  const plotW = W - ml - mr;
+  const rowH = (H - mt - mb) / rows;
+  const barH = rowH * 0.62;
+  const sx = (v: number) => ml + (v / total) * plotW;
+
+  const blocks: { row: number; x0: number; x1: number; kind: "train" | "embargo" | "test" }[] = [];
+  for (let k = 0; k < rows; k++) {
+    const testStart = trainWindow + embargo + k * testWindow;
+    const trainEnd = testStart - embargo;
+    const trainStart = trainEnd - trainWindow;
+    blocks.push({ row: k, x0: trainStart, x1: trainEnd, kind: "train" });
+    if (embargo > 0) blocks.push({ row: k, x0: trainEnd, x1: testStart, kind: "embargo" });
+    blocks.push({ row: k, x0: testStart, x1: testStart + testWindow, kind: "test" });
+  }
+
+  const colors: Record<string, string> = {
+    train: "#34d399", embargo: "#94a3b8", test: "#fbbf24",
+  };
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 170 }}>
+      {/* 時間軸 */}
+      <line x1={ml} y1={H - mb + 4} x2={W - mr} y2={H - mb + 4} stroke="#cbd5e1" strokeWidth={1} />
+      <text x={ml} y={H - 6} fontSize={10} fill="#94a3b8">過去</text>
+      <text x={W - mr} y={H - 6} fontSize={10} fill="#94a3b8" textAnchor="end">時間 →（直近）</text>
+
+      {blocks.map((b, i) => {
+        const y = mt + b.row * rowH + (rowH - barH) / 2;
+        const x = sx(b.x0);
+        const w = sx(b.x1) - sx(b.x0);
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={Math.max(1, w)} height={barH} rx={2}
+              fill={colors[b.kind]} opacity={b.kind === "embargo" ? 0.5 : 0.85} />
+            {b.kind === "train" && w > 50 && (
+              <text x={x + w / 2} y={y + barH / 2 + 3} fontSize={9} fill="#065f46" textAnchor="middle">学習 {trainWindow}日</text>
+            )}
+            {b.kind === "test" && w > 30 && (
+              <text x={x + w / 2} y={y + barH / 2 + 3} fontSize={9} fill="#92400e" textAnchor="middle">テスト{testWindow}</text>
+            )}
+          </g>
+        );
+      })}
+      {Array.from({ length: rows }).map((_, k) => (
+        <text key={`r${k}`} x={ml} y={mt + k * rowH + 9} fontSize={8} fill="#64748b">窓{k + 1}</text>
+      ))}
+    </svg>
+  );
+}
+
 // ── メインコンポーネント ──────────────────────────
 
 export default function PredictiveStrategyPanel({
@@ -517,6 +717,7 @@ export default function PredictiveStrategyPanel({
   const [showFeatures, setShowFeatures] = useState(false);
   const [showModelParams, setShowModelParams] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
@@ -608,6 +809,54 @@ export default function PredictiveStrategyPanel({
           : " → 確率≧ロング閾値で買い、確率≦ショート閾値で売り、中間は現金保持"}
       </div>
 
+      {/* 学習・予測期間の設定 (任意に指定可能) */}
+      <div className="rounded-lg border border-indigo-200 bg-white/60 p-3 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <span className="text-xs font-semibold text-indigo-800">学習・予測期間の設定</span>
+          <button onClick={() => setShowSplit((v) => !v)}
+            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+            {showSplit ? "▾ 分割方法を隠す" : "▸ 分割方法を図解で見る"}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <ParamInput label="学習に使う期間 (日)" value={trainWindow} min={60} max={1500} step={10}
+            onChange={setTrainWindow} />
+          <ParamInput label="予測(テスト)窓 (日)" value={testWindow} min={5} max={252} step={1}
+            onChange={setTestWindow} />
+          <ParamInput label="Embargo (日)" value={embargo} min={0} max={21} step={1}
+            onChange={setEmbargo} />
+          <div>
+            <div className="text-gray-500 mb-0.5">予測対象期間</div>
+            <div className="px-2 py-1 border border-gray-200 rounded bg-gray-50 text-gray-600 truncate"
+              title={`${effectiveStart} 〜 ${effectiveEnd}`}>
+              {effectiveStart?.slice(2)} 〜 {effectiveEnd?.slice(2)}
+            </div>
+          </div>
+        </div>
+        <div className="text-[11px] text-gray-400">
+          予測対象期間は上の「開始日／終了日」で指定します。この区間を「予測窓 {testWindow}日」ずつに区切り、各区切りの直前
+          {trainWindow}日（Embargo {embargo}日を除く）で学習する Walk-Forward 方式です。
+        </div>
+        {showSplit && (
+          <div className="space-y-2 pt-1">
+            <WalkForwardDiagram trainWindow={trainWindow} testWindow={testWindow} embargo={embargo} />
+            <div className="text-[11px] text-gray-500 space-y-1">
+              <p>
+                <span className="text-emerald-600 font-medium">緑=学習期間</span>・
+                <span className="text-slate-500 font-medium">灰=Embargo</span>・
+                <span className="text-amber-600 font-medium">黄=テスト(予測)期間</span>。
+                時間を右に進めながら、学習窓とテスト窓を「テスト窓の幅」ずつスライドさせて繰り返します。
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>各窓では <span className="font-medium">必ず過去だけで学習し、その直後の未来でテスト</span>します（未来情報のリークなし）。</li>
+                <li>Embargo は学習終端とテスト開始の間に空ける日数。特徴量の参照窓の重なりによる漏れを防ぎます。</li>
+                <li>テスト窓を全期間つなぎ合わせたものが、下の「日次予測」と各種スコアになります。</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* 特徴量選択 */}
       <div>
         <button onClick={() => setShowFeatures((v) => !v)}
@@ -668,10 +917,6 @@ export default function PredictiveStrategyPanel({
               onChange={(v) => updateModelParam("scalePosWeight", v)} />
             <ParamInput label="乱数シード" value={modelParams.seed} min={0} max={9999} step={1}
               onChange={(v) => updateModelParam("seed", v)} />
-            <ParamInput label="学習窓 (日)" value={trainWindow} min={60} max={1000} step={10}
-              onChange={setTrainWindow} />
-            <ParamInput label="テスト窓 (日)" value={testWindow} min={5} max={63} step={1}
-              onChange={setTestWindow} />
           </div>
         )}
       </div>
@@ -685,8 +930,6 @@ export default function PredictiveStrategyPanel({
         {showAdvanced && (
           <div className="mt-2 space-y-2 text-xs">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <ParamInput label="Embargo (日)" value={embargo} min={0} max={21} step={1}
-                onChange={setEmbargo} />
               <div>
                 <div className="text-gray-500 mb-0.5">確率較正</div>
                 <select value={calibration} onChange={(e) => setCalibration(e.target.value as CalibrationMode)}
@@ -769,7 +1012,10 @@ export default function PredictiveStrategyPanel({
 
       {/* 結果 */}
       {!isRunning && result && (
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {/* 日次の上昇/下落予測 (色分け) */}
+          <DailyPredictionStrip daily={result.daily} />
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
             <MetricCell label="正答率" value={pct(result.metrics.accuracy)} />
             <MetricCell label="バランス正答率" value={pct(result.metrics.balancedAcc)}
@@ -873,6 +1119,7 @@ export default function PredictiveStrategyPanel({
           <li><span className="font-medium">AUC:</span> 確率の順位付け能力。0.5でランダム、0.55を超えれば金融データでは有意な部類、0.6超は良好。1.0が完璧。</li>
           <li><span className="font-medium">LogLoss:</span> 確率の正確さ(小さいほど良い)。較正を入れると改善しやすい。</li>
           <li><span className="font-medium">特徴量重要度:</span> 各特徴が分割でどれだけ損失を減らしたかの割合。どの情報が効いているかの目安。</li>
+          <li><span className="font-medium">日次予測ストリップ:</span> 「予測」行はモデルがその日に上昇(緑)/下落(赤)どちらを予測したか、色の濃さは確信度。「実際」行は実現方向、「的中」行は予測と実際が一致したか。緑と赤の縦位置が揃っているほど当たっています。先頭の強調カードは直近日の予測です。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>

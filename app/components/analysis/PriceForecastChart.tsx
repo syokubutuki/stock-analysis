@@ -16,6 +16,8 @@ const HORIZON_OPTIONS = [
   { value: 250, label: "1年" },
 ];
 
+type DisplayMode = "price" | "return";
+
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
   const parent = canvas.parentElement;
   if (!parent) return null;
@@ -38,9 +40,14 @@ function formatPrice(v: number): string {
   return v.toFixed(4);
 }
 
+function formatPct(v: number): string {
+  return (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+}
+
 export default function PriceForecastChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [horizon, setHorizon] = useState(60);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("price");
 
   const result = useMemo(() => computePriceForecast(prices, horizon), [prices, horizon]);
 
@@ -50,25 +57,36 @@ export default function PriceForecastChart({ prices }: Props) {
     const init = initCanvas(canvasRef.current, H);
     if (!init) return;
     const { ctx, width, height } = init;
-    const ml = 65, mr = 55, mt = 35, mb = 40;
+    const ml = 65, mr = 60, mt = 35, mb = 40;
     const plotW = width - ml - mr, plotH = height - mt - mb;
 
     const hist = result.history;
     const totalLen = hist.length + result.horizon;
     const histEnd = hist.length; // index where forecast starts
+    const lastPrice = result.lastPrice;
 
-    // Collect all values for Y range
-    const allVals = [
-      ...hist.map(h => h.price),
-      ...result.percentiles.p5,
-      ...result.percentiles.p95,
+    // 表示値への変換 (価格 or 基準価格からの累積リターン%)
+    const isReturn = displayMode === "return";
+    const disp = (v: number) => (isReturn ? (v / lastPrice - 1) * 100 : v);
+    const fmtAxis = (v: number) => (isReturn ? formatPct(v) : formatPrice(v));
+    const fmtVal = (rawV: number) => fmtAxis(disp(rawV));
+
+    // Collect all values for Y range (表示空間)
+    const allDisp = [
+      ...hist.map(h => disp(h.price)),
+      ...result.percentiles.p5.map(disp),
+      ...result.percentiles.p95.map(disp),
     ];
-    const minV = Math.min(...allVals) * 0.98;
-    const maxV = Math.max(...allVals) * 1.02;
-    const rangeV = maxV - minV || 1;
+    let minD = Math.min(...allDisp);
+    let maxD = Math.max(...allDisp);
+    // 余白
+    const pad = (maxD - minD) * 0.04 || 1;
+    minD -= pad; maxD += pad;
+    const rangeD = maxD - minD || 1;
 
     const xFrom = (i: number) => ml + (i / totalLen) * plotW;
-    const yFrom = (v: number) => mt + plotH - ((v - minV) / rangeV) * plotH;
+    const yFromD = (d: number) => mt + plotH - ((d - minD) / rangeD) * plotH;
+    const yFrom = (rawV: number) => yFromD(disp(rawV));
 
     // Background for forecast area
     ctx.fillStyle = "rgba(239, 246, 255, 0.5)";
@@ -80,9 +98,18 @@ export default function PriceForecastChart({ prices }: Props) {
     for (let i = 0; i <= nGridY; i++) {
       const y = mt + (plotH * i) / nGridY;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
-      const val = maxV - (rangeV * i) / nGridY;
+      const val = maxD - (rangeD * i) / nGridY;
       ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
-      ctx.fillText(formatPrice(val), ml - 4, y + 3);
+      ctx.fillText(fmtAxis(val), ml - 4, y + 3);
+    }
+
+    // ゼロ(基準)ライン: リターン表示なら 0%、価格表示なら現在価格
+    const baseDisp = isReturn ? 0 : lastPrice;
+    if (baseDisp >= minD && baseDisp <= maxD) {
+      const yb = yFromD(baseDisp);
+      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(ml, yb); ctx.lineTo(width - mr, yb); ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // "Today" vertical line
@@ -150,11 +177,11 @@ export default function PriceForecastChart({ prices }: Props) {
     const labelX = xFrom(totalLen) + 4;
     ctx.font = "9px sans-serif"; ctx.textAlign = "left";
     const lastIdx = result.horizon;
-    ctx.fillStyle = "#ef4444"; ctx.fillText(`5% ${formatPrice(p.p5[lastIdx])}`, labelX, yFrom(p.p5[lastIdx]) + 3);
-    ctx.fillStyle = "#f59e0b"; ctx.fillText(`25% ${formatPrice(p.p25[lastIdx])}`, labelX, yFrom(p.p25[lastIdx]) + 3);
-    ctx.fillStyle = "#3b82f6"; ctx.fillText(`50% ${formatPrice(p.p50[lastIdx])}`, labelX, yFrom(p.p50[lastIdx]) + 3);
-    ctx.fillStyle = "#f59e0b"; ctx.fillText(`75% ${formatPrice(p.p75[lastIdx])}`, labelX, yFrom(p.p75[lastIdx]) + 3);
-    ctx.fillStyle = "#ef4444"; ctx.fillText(`95% ${formatPrice(p.p95[lastIdx])}`, labelX, yFrom(p.p95[lastIdx]) + 3);
+    ctx.fillStyle = "#ef4444"; ctx.fillText(`5% ${fmtVal(p.p5[lastIdx])}`, labelX, yFrom(p.p5[lastIdx]) + 3);
+    ctx.fillStyle = "#f59e0b"; ctx.fillText(`25% ${fmtVal(p.p25[lastIdx])}`, labelX, yFrom(p.p25[lastIdx]) + 3);
+    ctx.fillStyle = "#3b82f6"; ctx.fillText(`50% ${fmtVal(p.p50[lastIdx])}`, labelX, yFrom(p.p50[lastIdx]) + 3);
+    ctx.fillStyle = "#f59e0b"; ctx.fillText(`75% ${fmtVal(p.p75[lastIdx])}`, labelX, yFrom(p.p75[lastIdx]) + 3);
+    ctx.fillStyle = "#ef4444"; ctx.fillText(`95% ${fmtVal(p.p95[lastIdx])}`, labelX, yFrom(p.p95[lastIdx]) + 3);
 
     // X-axis date labels
     ctx.fillStyle = "#6b7280"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
@@ -175,7 +202,8 @@ export default function PriceForecastChart({ prices }: Props) {
     // Title
     ctx.fillStyle = "#374151"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
     const horizonLabel = HORIZON_OPTIONS.find(o => o.value === horizon)?.label ?? `${horizon}日`;
-    ctx.fillText(`株価予測シミュレーション (${horizonLabel}, 2000パス)`, ml, mt - 12);
+    const modeLabel = isReturn ? "累積リターン%" : "価格水準";
+    ctx.fillText(`モンテカルロ予測ファンチャート (${modeLabel}, ${horizonLabel}, 2000パス)`, ml, mt - 12);
 
     // Legend
     const legX = ml + plotW - 200;
@@ -184,7 +212,7 @@ export default function PriceForecastChart({ prices }: Props) {
     ctx.fillStyle = "#3b82f6"; ctx.fillText("━ 予測中央値", legX + 50, mt + 14);
     ctx.fillStyle = "#f59e0b"; ctx.fillText("--- 25/75%", legX + 115, mt + 14);
     ctx.fillStyle = "#ef4444"; ctx.fillText("--- 5/95%", legX + 165, mt + 14);
-  }, [result, horizon]);
+  }, [result, horizon, displayMode]);
 
   if (result.paths.length === 0) return null;
 
@@ -196,21 +224,43 @@ export default function PriceForecastChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="font-bold text-gray-800">株価予測シミュレーター</h3>
-        <div className="flex gap-1">
-          {HORIZON_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setHorizon(opt.value)}
-              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                horizon === opt.value
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <h3 className="font-bold text-gray-800">株価予測シミュレーター（モンテカルロ）</h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* 表示モード切替 */}
+          <div className="flex gap-1">
+            {([
+              { value: "price", label: "価格" },
+              { value: "return", label: "リターン%" },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setDisplayMode(opt.value)}
+                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                  displayMode === opt.value
+                    ? "bg-gray-800 text-white border-gray-800"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {/* 期間切替 */}
+          <div className="flex gap-1">
+            {HORIZON_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setHorizon(opt.value)}
+                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                  horizon === opt.value
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -247,9 +297,9 @@ export default function PriceForecastChart({ prices }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="株価予測シミュレーターの詳細理論">
+      <AnalysisGuide title="株価予測シミュレーター（モンテカルロ）の詳細理論">
         <p className="font-medium text-gray-700">1. 概要</p>
-        <p>過去の日次リターン分布からブートストラップ法で将来の株価パスを2000本生成し、実際の価格水準でファンチャートを描画します。モンテカルロ・シミュレーションの応用で、「現在の株価からどの範囲に動きうるか」を視覚的に把握できます。</p>
+        <p>過去の日次リターン分布からブートストラップ法（ヒストリカル・モンテカルロ）で将来の株価パスを2000本生成し、ファンチャートを描画します。「価格」表示では実際の株価水準で、「リターン%」表示では現在価格を基準(0%)とした累積リターンで同じシミュレーションを見られます。後者は従来の「モンテカルロ・シミュレーション」と同一の内容です。</p>
 
         <p className="font-medium text-gray-700 mt-3">2. 手法</p>
         <ul className="list-disc pl-4 space-y-1">
@@ -261,11 +311,12 @@ export default function PriceForecastChart({ prices }: Props) {
 
         <p className="font-medium text-gray-700 mt-3">3. チャートの読み方</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>黒線（左側）: 過去60日間の実績株価</li>
+          <li>黒線（左側）: 過去60日間の実績</li>
           <li>点線「現在」: 予測の起点（直近終値）</li>
           <li>青線（中央値）: 最も可能性の高い予測パス</li>
           <li>濃い帯（25-75%）: 半数のシナリオがこの範囲に収まる</li>
           <li>薄い帯（5-95%）: 90%のシナリオがこの範囲。扇が広がるほど不確実性が大きい</li>
+          <li>「価格」⇄「リターン%」ボタンで縦軸の単位を切り替え（同一シミュレーション）</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">4. 投資判断への活用</p>

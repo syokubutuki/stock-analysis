@@ -377,10 +377,6 @@ const PriceForecastChart = dynamic(
   () => import("./components/analysis/PriceForecastChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
 );
-const MonteCarloChart = dynamic(
-  () => import("./components/analysis/MonteCarloChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
-);
 const GarchVarChart = dynamic(
   () => import("./components/analysis/GarchVarChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
@@ -561,7 +557,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
-  { key: "simulation", label: "シミュレーション", description: "株価予測・モンテカルロ・カスタム売買・バックテスト・分数BM・VG過程・最適停止" },
+  { key: "simulation", label: "シミュレーション", description: "カスタム売買・GBDT予測・株価予測(モンテカルロ)・バックテスト・分数BM・VG過程・最適停止" },
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
@@ -1006,9 +1002,8 @@ export default function AnalysisPage() {
 
               {activeSection === "simulation" && (
                 <>
-                  <PriceForecastChart prices={filteredPrices} />
-                  <MonteCarloChart prices={filteredPrices} />
                   <CustomReturnChart prices={allPrices} />
+                  <PriceForecastChart prices={filteredPrices} />
                   <SimpleBacktestChart prices={filteredPrices} />
                   <div id="sa-sim-meanrev" className="scroll-mt-20">
                     <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
