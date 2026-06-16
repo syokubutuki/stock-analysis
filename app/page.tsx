@@ -670,12 +670,20 @@ export default function AnalysisPage() {
               市場の隠れた構造をデータから抽出する
             </p>
           </div>
-          <Link
-            href="/feedback"
-            className="shrink-0 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
-          >
-            ご意見・ご要望
-          </Link>
+          <div className="shrink-0 flex items-center gap-2">
+            <Link
+              href="/portfolio"
+              className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+            >
+              ポートフォリオ
+            </Link>
+            <Link
+              href="/feedback"
+              className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+            >
+              ご意見・ご要望
+            </Link>
+          </div>
         </div>
       </header>
 
