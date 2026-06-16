@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { SeriesMode } from "../../lib/series-mode";
 import {
@@ -25,14 +25,47 @@ interface Props {
   seriesMode: SeriesMode;
 }
 
+interface Vec3 { x: number; y: number; z: number }
+
+function rotateY(p: Vec3, a: number): Vec3 {
+  const c = Math.cos(a), s = Math.sin(a);
+  return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
+}
+function rotateX(p: Vec3, a: number): Vec3 {
+  const c = Math.cos(a), s = Math.sin(a);
+  return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
+}
+
+// 視点プリセット (各平面に正対する回転角)
+type View3D = "free" | "xy" | "xz" | "yz";
+const VIEW_ANGLES: Record<Exclude<View3D, "free">, { rx: number; ry: number }> = {
+  xy: { rx: 0, ry: 0 },              // X横・Y縦 (Z方向から)
+  xz: { rx: -Math.PI / 2, ry: 0 },   // X横・Z縦 (Y方向から)
+  yz: { rx: 0, ry: Math.PI / 2 },    // Z横・Y縦 (X方向から)
+};
+const FREE_ANGLE = { rx: 0.5, ry: 0.7 };
+
 export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props) {
   const [tau, setTau] = useState(2);
   const [dim, setDim] = useState<2 | 3>(2);
   const [phaseMode, setPhaseMode] = useState<PhaseMode>("calendar");
   const [phaseWeight, setPhaseWeight] = useState(1);
   const [seed, setSeed] = useState(0); // サロゲート再抽選トリガ
+  const [view, setView] = useState<View3D>("free"); // 3D視点プリセット
 
   const scatterRef = useRef<HTMLCanvasElement>(null);
+  // 3D散布図のカメラ状態 (再描画を避けるため ref)
+  const angleRef = useRef({ ...FREE_ANGLE });
+  const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
+  const dragRef = useRef<{ active: boolean; button: number; lastX: number; lastY: number }>({
+    active: false, button: 0, lastX: 0, lastY: 0,
+  });
+  const animRef = useRef<number>(0);
+  // 3面まとめ (小窓: XY / XZ / YZ 正射影)
+  const planeXYRef = useRef<HTMLCanvasElement>(null);
+  const planeXZRef = useRef<HTMLCanvasElement>(null);
+  const planeYZRef = useRef<HTMLCanvasElement>(null);
   const surroRef = useRef<HTMLCanvasElement>(null);
   const lagRef = useRef<HTMLCanvasElement>(null);
   const specRef = useRef<HTMLCanvasElement>(null);
@@ -47,6 +80,32 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
   );
 
   const significant = result.ok && result.PL > result.surrogateQ95;
+  const is3D = dim === 3;
+
+  // 3D散布図/3面まとめ用に点群・重心を共有レンジで [-1,1] 正規化
+  const cloud3d = useMemo(() => {
+    if (!result.ok || !is3D || result.points.length === 0) {
+      return { points: [] as { x: number; y: number; z: number; phase: number }[],
+        centroids: [] as { x: number; y: number; z: number; k: number }[] };
+    }
+    const xs = result.points.map((p) => p.x);
+    const ys = result.points.map((p) => p.y);
+    const zs = result.points.map((p) => p.z);
+    const stat = (arr: number[]) => {
+      const mn = Math.min(...arr), mx = Math.max(...arr);
+      return { mn, r: mx - mn || 1 };
+    };
+    const sx = stat(xs), sy = stat(ys), sz = stat(zs);
+    const nx = (v: number) => ((v - sx.mn) / sx.r - 0.5) * 2;
+    const ny = (v: number) => ((v - sy.mn) / sy.r - 0.5) * 2;
+    const nz = (v: number) => ((v - sz.mn) / sz.r - 0.5) * 2;
+    const points = result.points.map((p) => ({ x: nx(p.x), y: ny(p.y), z: nz(p.z), phase: p.phase }));
+    const centroids = result.centroids3d
+      .map((c, k) => ({ c, k }))
+      .filter((o) => !isNaN(o.c.x))
+      .map((o) => ({ x: nx(o.c.x), y: ny(o.c.y), z: nz(o.c.z), k: o.k }));
+    return { points, centroids };
+  }, [result, is3D]);
 
   // フェーズ2: 裏取り
   const lagResult = useMemo(
@@ -106,8 +165,9 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     [prices, seriesMode, tau, dim, phaseMode, phaseWeight, seed]
   );
 
-  // 散布図 + 重心巡回パス
+  // 散布図 + 重心巡回パス (2Dモード: 従来の固定平面投影)
   useEffect(() => {
+    if (is3D) return; // 3Dはインタラクティブ描画(別effect)
     const canvas = scatterRef.current;
     if (!canvas || !result.ok) return;
     const parent = canvas.parentElement;
@@ -192,7 +252,268 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
     }
-  }, [result, tau]);
+  }, [result, tau, is3D]);
+
+  // 3D散布図: 1点を回転+透視投影してスクリーン座標へ
+  const projectPoint = useCallback((p: Vec3, size: number) => {
+    const margin = 50;
+    const plot = (size - margin * 2) * zoomRef.current;
+    const cx = size / 2 + panRef.current.x;
+    const cy = size / 2 + panRef.current.y;
+    let v: Vec3 = { x: p.x, y: p.y, z: p.z };
+    v = rotateX(v, angleRef.current.rx);
+    v = rotateY(v, angleRef.current.ry);
+    const depthScale = 1 / (1 + v.z * 0.15);
+    return { sx: cx + v.x * depthScale * plot / 2, sy: cy - v.y * depthScale * plot / 2, depth: v.z };
+  }, []);
+
+  // 3D散布図 (インタラクティブ): 曜日色点群 + 重心ノード + 巡回パス
+  const draw3D = useCallback(() => {
+    const canvas = scatterRef.current;
+    if (!canvas || !is3D || cloud3d.points.length === 0) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const size = Math.min(parent.clientWidth - 16, 560);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+
+    // 全点を投影し、奥のものから描画 (簡易デプスソート)
+    const proj = cloud3d.points.map((p) => ({ ...projectPoint(p, size), phase: p.phase }));
+    const order = proj.map((_, i) => i).sort((a, b) => proj[b].depth - proj[a].depth);
+    for (const i of order) {
+      const pr = proj[i];
+      ctx.fillStyle = WEEKDAY_COLORS[pr.phase] + "55";
+      ctx.beginPath();
+      ctx.arc(pr.sx, pr.sy, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 重心巡回パス (月→火→…→金→月)
+    const cen = cloud3d.centroids
+      .map((c) => ({ ...projectPoint(c, size), k: c.k }))
+      .sort((a, b) => a.k - b.k);
+    if (cen.length >= 2) {
+      ctx.strokeStyle = "#374151";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      cen.forEach((c, idx) => (idx === 0 ? ctx.moveTo(c.sx, c.sy) : ctx.lineTo(c.sx, c.sy)));
+      ctx.lineTo(cen[0].sx, cen[0].sy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // 重心ノード (奥から)
+    for (const c of cen.slice().sort((a, b) => b.depth - a.depth)) {
+      ctx.fillStyle = WEEKDAY_COLORS[c.k];
+      ctx.beginPath();
+      ctx.arc(c.sx, c.sy, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(WEEKDAY_LABELS[c.k], c.sx, c.sy);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+    }
+
+    // 3軸ガイド (右下)
+    const ox = 40, oy = size - 40;
+    const axes = [
+      { dx: 0.3, dy: 0, dz: 0, label: "r(t)", color: "#dc2626" },
+      { dx: 0, dy: 0.3, dz: 0, label: `r(t-${tau})`, color: "#16a34a" },
+      { dx: 0, dy: 0, dz: 0.3, label: `r(t-${2 * tau})`, color: "#2563eb" },
+    ];
+    for (const ax of axes) {
+      let v: Vec3 = { x: ax.dx, y: ax.dy, z: ax.dz };
+      v = rotateX(v, angleRef.current.rx);
+      v = rotateY(v, angleRef.current.ry);
+      const ex = ox + v.x * 50, ey = oy - v.y * 50;
+      ctx.strokeStyle = ax.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.fillStyle = ax.color;
+      ctx.font = "10px sans-serif";
+      ctx.fillText(ax.label, ex + 4, ey - 4);
+    }
+  }, [cloud3d, is3D, tau, projectPoint]);
+
+  // 3D描画ループ (ドラッグ反映のため継続描画)
+  useEffect(() => {
+    if (!is3D) return;
+    let running = true;
+    const loop = () => {
+      if (!running) return;
+      draw3D();
+      animRef.current = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => { running = false; cancelAnimationFrame(animRef.current); };
+  }, [draw3D, is3D]);
+
+  // 3D散布図のマウス/タッチ操作: 左ドラッグ=回転 / 右ドラッグ=移動 / ホイール=ズーム
+  useEffect(() => {
+    const canvas = scatterRef.current;
+    if (!canvas || !is3D) return;
+
+    const onDown = (x: number, y: number, button: number) => {
+      dragRef.current = { active: true, button, lastX: x, lastY: y };
+    };
+    const onMove = (x: number, y: number) => {
+      const d = dragRef.current;
+      if (!d.active) return;
+      const dx = x - d.lastX, dy = y - d.lastY;
+      if (d.button === 0) {
+        angleRef.current.ry -= dx * 0.008;
+        angleRef.current.rx -= dy * 0.008;
+        setView((v) => (v === "free" ? v : "free")); // 手動回転で自由視点に
+      } else {
+        panRef.current.x += dx;
+        panRef.current.y += dy;
+      }
+      d.lastX = x; d.lastY = y;
+    };
+    const onUp = () => { dragRef.current.active = false; };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 0.92 : 1.08;
+      zoomRef.current = Math.max(0.3, Math.min(10, zoomRef.current * factor));
+    };
+    const onContext = (e: MouseEvent) => e.preventDefault();
+    const md = (e: MouseEvent) => onDown(e.clientX, e.clientY, e.button);
+    const mm = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const ts = (e: TouchEvent) => {
+      if (e.touches.length === 1) { e.preventDefault(); onDown(e.touches[0].clientX, e.touches[0].clientY, 0); }
+    };
+    const tm = (e: TouchEvent) => {
+      if (e.touches.length === 1) { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); }
+    };
+
+    canvas.addEventListener("mousedown", md);
+    window.addEventListener("mousemove", mm);
+    window.addEventListener("mouseup", onUp);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("contextmenu", onContext);
+    canvas.addEventListener("touchstart", ts, { passive: false });
+    canvas.addEventListener("touchmove", tm, { passive: false });
+    canvas.addEventListener("touchend", onUp);
+    return () => {
+      canvas.removeEventListener("mousedown", md);
+      window.removeEventListener("mousemove", mm);
+      window.removeEventListener("mouseup", onUp);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("contextmenu", onContext);
+      canvas.removeEventListener("touchstart", ts);
+      canvas.removeEventListener("touchmove", tm);
+      canvas.removeEventListener("touchend", onUp);
+    };
+  }, [is3D]);
+
+  // 3面まとめ (小窓): XY / XZ / YZ への固定正射影
+  useEffect(() => {
+    if (!is3D || cloud3d.points.length === 0) return;
+    const planes: {
+      ref: RefObject<HTMLCanvasElement | null>;
+      hx: (p: { x: number; y: number; z: number }) => number;
+      vy: (p: { x: number; y: number; z: number }) => number;
+      hLabel: string; vLabel: string;
+    }[] = [
+      { ref: planeXYRef, hx: (p) => p.x, vy: (p) => p.y, hLabel: "r(t)", vLabel: `r(t-${tau})` },
+      { ref: planeXZRef, hx: (p) => p.x, vy: (p) => p.z, hLabel: "r(t)", vLabel: `r(t-${2 * tau})` },
+      { ref: planeYZRef, hx: (p) => p.y, vy: (p) => p.z, hLabel: `r(t-${tau})`, vLabel: `r(t-${2 * tau})` },
+    ];
+    for (const pl of planes) {
+      const canvas = pl.ref.current;
+      if (!canvas) continue;
+      const parent = canvas.parentElement;
+      if (!parent) continue;
+      const size = Math.max(120, Math.min(parent.clientWidth - 4, 200));
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      ctx.scale(dpr, dpr);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, size, size);
+
+      const m = 18;
+      // 正規化済み [-1,1] を描画域へ
+      const sx = (h: number) => m + ((h + 1) / 2) * (size - m * 2);
+      const sy = (v: number) => size - m - ((v + 1) / 2) * (size - m * 2);
+      ctx.strokeStyle = "#f3f4f6";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(m, m, size - m * 2, size - m * 2);
+
+      for (const p of cloud3d.points) {
+        ctx.fillStyle = WEEKDAY_COLORS[p.phase] + "55";
+        ctx.beginPath();
+        ctx.arc(sx(pl.hx(p)), sy(pl.vy(p)), 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const cen = cloud3d.centroids.slice().sort((a, b) => a.k - b.k);
+      if (cen.length >= 2) {
+        ctx.strokeStyle = "#374151";
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath();
+        cen.forEach((c, i) => (i === 0
+          ? ctx.moveTo(sx(pl.hx(c)), sy(pl.vy(c)))
+          : ctx.lineTo(sx(pl.hx(c)), sy(pl.vy(c)))));
+        ctx.lineTo(sx(pl.hx(cen[0])), sy(pl.vy(cen[0])));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      for (const c of cen) {
+        ctx.fillStyle = WEEKDAY_COLORS[c.k];
+        ctx.beginPath();
+        ctx.arc(sx(pl.hx(c)), sy(pl.vy(c)), 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "9px sans-serif";
+      ctx.fillText(pl.hLabel, size - m - ctx.measureText(pl.hLabel).width, size - 5);
+      ctx.save();
+      ctx.translate(11, m + ctx.measureText(pl.vLabel).width);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(pl.vLabel, 0, 0);
+      ctx.restore();
+    }
+  }, [cloud3d, is3D, tau]);
+
+  // 視点プリセット適用 / リセット
+  const applyView = useCallback((v: View3D) => {
+    setView(v);
+    if (v !== "free") angleRef.current = { ...VIEW_ANGLES[v] };
+    else angleRef.current = { ...FREE_ANGLE };
+    zoomRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+  }, []);
+
+  // データ・設定変更時にズーム/パンをリセット
+  useEffect(() => {
+    zoomRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+  }, [result.points.length, tau, dim, phaseMode]);
 
   // サロゲート帰無分布ヒストグラム
   useEffect(() => {
@@ -565,6 +886,27 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
         </button>
       </div>
 
+      {/* 3D視点プリセット (3Dモードのみ) */}
+      {is3D && result.ok && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+          <span className="text-xs text-gray-500">視点</span>
+          {([
+            { v: "free", label: "自由回転" },
+            { v: "xy", label: "X-Y面" },
+            { v: "xz", label: "X-Z面" },
+            { v: "yz", label: "Y-Z面" },
+          ] as const).map((o) => (
+            <button key={o.v} onClick={() => applyView(o.v)}
+              className={`px-3 py-1 rounded text-xs font-medium ${view === o.v ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              {o.label}
+            </button>
+          ))}
+          <span className="text-[10px] text-gray-400">
+            X=r(t) / Y=r(t-{tau}) / Z=r(t-{2 * tau})
+          </span>
+        </div>
+      )}
+
       {!result.ok ? (
         <div className="text-sm text-gray-500 py-8 text-center">
           {result.message ?? "計算できませんでした"}
@@ -593,8 +935,33 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
 
           {/* 散布図 */}
           <div className="flex justify-center">
-            <canvas ref={scatterRef} className="rounded border border-gray-200" />
+            <canvas ref={scatterRef}
+              className={`rounded border border-gray-200 ${is3D ? "cursor-grab active:cursor-grabbing" : ""}`} />
           </div>
+          {is3D && (
+            <div className="mt-1 text-center text-[10px] text-gray-400">
+              左ドラッグ: 回転 / 右ドラッグ: 移動 / ホイール: ズーム（視点ボタンで各面に正対）
+            </div>
+          )}
+
+          {/* 3面まとめ (3Dモードのみ): XY / XZ / YZ への正射影 */}
+          {is3D && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 mb-1">3面投影まとめ (各方向から見た形)</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { ref: planeXYRef, title: "X-Y面 (r(t) × r(t-" + tau + "))" },
+                  { ref: planeXZRef, title: "X-Z面 (r(t) × r(t-" + 2 * tau + "))" },
+                  { ref: planeYZRef, title: "Y-Z面 (r(t-" + tau + ") × r(t-" + 2 * tau + "))" },
+                ] as const).map((p, i) => (
+                  <div key={i} className="flex flex-col items-center">
+                    <span className="text-[10px] text-gray-400 mb-0.5">{p.title}</span>
+                    <canvas ref={p.ref} className="rounded border border-gray-200 w-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {/* 凡例 */}
           <div className="mt-2 flex items-center justify-center gap-3 text-xs text-gray-600">
             {WEEKDAY_LABELS.map((l, k) => (

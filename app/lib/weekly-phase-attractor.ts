@@ -54,9 +54,10 @@ export interface WeeklyPhaseResult {
   tau: number;
   phaseMode: PhaseMode;
   n: number; // 解析に使った点数
-  // 2D散布用の射影座標(埋め込み第1・第2成分)
-  points: { x: number; y: number; phase: number; time: string }[];
-  centroids2d: { x: number; y: number }[]; // [5] 巡回パス用
+  // 散布用の射影座標(埋め込み第1〜第3成分)。z は dim=2 のとき 0
+  points: { x: number; y: number; z: number; phase: number; time: string }[];
+  centroids2d: { x: number; y: number }[]; // [5] 巡回パス用(後方互換)
+  centroids3d: { x: number; y: number; z: number }[]; // [5] 3D巡回パス用
   weekdayStats: WeekdayStat[];
   // 位相ロック検定
   PL: number; // 観測F比
@@ -197,6 +198,7 @@ export function computeWeeklyPhaseAttractor(
     n: 0,
     points: [],
     centroids2d: [],
+    centroids3d: [],
     weekdayStats: [],
     PL: 0,
     surrogatePL: [],
@@ -235,6 +237,7 @@ export function computeWeeklyPhaseAttractor(
 
   const weekdayStats: WeekdayStat[] = [];
   const centroids2d: { x: number; y: number }[] = [];
+  const centroids3d: { x: number; y: number; z: number }[] = [];
   for (let k = 0; k < K; k++) {
     const cnt = obs.counts[k];
     const cent = obs.centroids[k];
@@ -247,6 +250,9 @@ export function computeWeeklyPhaseAttractor(
       dispersionRatio: overallMeanVar > 0 && cnt > 0 ? meanVar / overallMeanVar : NaN,
     });
     centroids2d.push(cnt > 0 ? { x: cent[0], y: cent[1] } : { x: NaN, y: NaN });
+    centroids3d.push(
+      cnt > 0 ? { x: cent[0], y: cent[1], z: cent[2] ?? 0 } : { x: NaN, y: NaN, z: NaN }
+    );
   }
 
   // サロゲート: 曜日ラベルをシャッフルしてF比を再計算 (埋め込み幾何・自己相関は保持)
@@ -267,8 +273,8 @@ export function computeWeeklyPhaseAttractor(
   for (const s of surrogatePL) if (s >= obs.PL) ge++;
   const pValue = (1 + ge) / (B + 1);
 
-  // 2D散布点(全曜日)
-  const points = V.map((v, i) => ({ x: v[0], y: v[1], phase: P[i], time: T[i] }));
+  // 散布点(全曜日)。z は dim=2 のとき 0
+  const points = V.map((v, i) => ({ x: v[0], y: v[1], z: v[2] ?? 0, phase: P[i], time: T[i] }));
 
   return {
     ok: true,
@@ -278,6 +284,7 @@ export function computeWeeklyPhaseAttractor(
     n: N,
     points,
     centroids2d,
+    centroids3d,
     weekdayStats,
     PL: obs.PL,
     surrogatePL,
