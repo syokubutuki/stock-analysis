@@ -53,6 +53,8 @@ interface Row {
   badgeColor: string;
   priority: number;
   diff: DiffResult;
+  urgent: boolean; // 要対応(損切り警告 / エントリー好機 / 変化あり)
+  sparkCloses: number[]; // 直近終値(ミニチャート用)
 }
 
 const COLOR_CLASS: Record<string, string> = {
@@ -61,6 +63,44 @@ const COLOR_CLASS: Record<string, string> = {
   green: "bg-green-100 text-green-700 border-green-200",
   gray: "bg-gray-100 text-gray-600 border-gray-200",
 };
+
+// 左端の太線(判定色)
+const BORDER_CLASS: Record<string, string> = {
+  red: "border-l-red-400",
+  amber: "border-l-amber-400",
+  green: "border-l-green-400",
+  gray: "border-l-gray-300",
+};
+
+type Tone = "good" | "warn" | "bad" | "neutral";
+const TONE_DOT: Record<Tone, string> = {
+  good: "bg-green-500",
+  warn: "bg-amber-500",
+  bad: "bg-red-500",
+  neutral: "bg-gray-300",
+};
+
+interface SignalDot {
+  label: string;
+  value: string;
+  tone: Tone;
+}
+
+// 判定の根拠を「色付きドット」に蒸留する。数字の壁を色のスキャンに置き換える。
+function signalDots(d: SignalDigest): SignalDot[] {
+  const dir: Tone = d.highVol ? "bad" : d.direction === "up" ? "good" : d.direction === "down" ? "bad" : "neutral";
+  const hurstTone: Tone = d.hurst > 0.55 ? "good" : d.hurst < 0.45 ? "warn" : "neutral";
+  const zTone: Tone = Math.abs(d.meanRevZ) > 2 ? "warn" : "neutral";
+  const volTone: Tone = d.volSpike ? "bad" : "neutral";
+  const cpTone: Tone = d.changePoint ? "bad" : "good";
+  return [
+    { label: "方向", value: `${d.direction} (${d.regimeScore.toFixed(0)})${d.highVol ? " 高ボラ" : ""}`, tone: dir },
+    { label: "Hurst", value: `${d.hurst.toFixed(2)} ${d.hurst < 0.5 ? "回帰寄り" : "トレンド"}`, tone: hurstTone },
+    { label: "z", value: d.meanRevZ.toFixed(2), tone: zTone },
+    { label: "予測σ", value: `${d.volForecastPct.toFixed(1)}%${d.volSpike ? " 急拡大" : ""}`, tone: volTone },
+    { label: "変化点", value: d.changePoint ? `あり p=${d.changePointProb.toFixed(2)}` : "なし", tone: cpTone },
+  ];
+}
 
 export default function PortfolioPage() {
   const router = useRouter();
@@ -88,6 +128,9 @@ export default function PortfolioPage() {
       const digest = digests[item.ticker];
       if (!digest) continue; // まだ Worker から届いていない
       const kind = effectiveKind(item);
+      const sparkCloses = (data[item.ticker]?.prices ?? [])
+        .slice(-40)
+        .map((p) => p.close);
       let row: Row;
       if (!digest.ok) {
         out.push({
@@ -98,6 +141,8 @@ export default function PortfolioPage() {
           badgeColor: "gray",
           priority: 9,
           diff: { changed: false, reasons: [], isNew: false },
+          urgent: false,
+          sparkCloses,
         });
         continue;
       }
@@ -105,12 +150,14 @@ export default function PortfolioPage() {
         const held = evaluateHeld(digest, item.position);
         const meta = HELD_BADGE_META[held.badge];
         const diff = diffAgainstSnapshot(digest, meta.label, snapshot);
-        row = { item, kind, digest, held, badge: meta.label, badgeColor: meta.color, priority: meta.priority, diff };
+        const urgent = diff.changed || held.badge === "stop";
+        row = { item, kind, digest, held, badge: meta.label, badgeColor: meta.color, priority: meta.priority, diff, urgent, sparkCloses };
       } else {
         const target = evaluateTarget(digest, item.position);
         const meta = TARGET_BADGE_META[target.badge];
         const diff = diffAgainstSnapshot(digest, meta.label, snapshot);
-        row = { item, kind, digest, target, badge: meta.label, badgeColor: meta.color, priority: meta.priority, diff };
+        const urgent = diff.changed || target.badge === "entry";
+        row = { item, kind, digest, target, badge: meta.label, badgeColor: meta.color, priority: meta.priority, diff, urgent, sparkCloses };
       }
       out.push(row);
     }
@@ -121,7 +168,7 @@ export default function PortfolioPage() {
       return a.kind === b.kind ? 0 : a.kind === "held" ? -1 : 1;
     });
     return out;
-  }, [watchlist, digests, snapshot]);
+  }, [watchlist, digests, snapshot, data]);
 
   const visibleRows = useMemo(() => {
     switch (view) {
@@ -137,6 +184,14 @@ export default function PortfolioPage() {
   }, [rows, view]);
 
   const changedCount = rows.filter((r) => r.diff.changed).length;
+
+  // グループ化: 要対応(上部に浮上)/ 保有 / 狙い。要対応に入った行は各群から除外。
+  const groups = useMemo(() => {
+    const urgent = visibleRows.filter((r) => r.urgent);
+    const held = visibleRows.filter((r) => !r.urgent && r.kind === "held");
+    const target = visibleRows.filter((r) => !r.urgent && r.kind === "target");
+    return { urgent, held, target };
+  }, [visibleRows]);
 
   const refreshWatchlist = useCallback(() => setWatchlist(getWatchlist()), []);
 
@@ -284,47 +339,58 @@ export default function PortfolioPage() {
           {Object.keys(data).length >= 2 && (
             <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} />
           )}
-          <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
-                  <th className="px-3 py-2 font-medium">判定</th>
-                  <th className="px-3 py-2 font-medium">銘柄</th>
-                  <th className="px-3 py-2 font-medium text-right">現在値</th>
-                  <th className="px-3 py-2 font-medium text-right">損益/距離</th>
-                  <th className="px-3 py-2 font-medium">レジーム</th>
-                  <th className="px-3 py-2 font-medium text-right">Hurst</th>
-                  <th className="px-3 py-2 font-medium text-right">z</th>
-                  <th className="px-3 py-2 font-medium text-right">予測σ</th>
-                  <th className="px-3 py-2 font-medium text-right">DD</th>
-                  <th className="px-3 py-2 font-medium">変化</th>
-                  <th className="px-3 py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.map((row) => (
-                  <RowView
-                    key={row.item.ticker}
-                    row={row}
-                    expanded={expanded === row.item.ticker}
-                    editing={editing === row.item.ticker}
-                    onToggleExpand={() =>
-                      setExpanded(expanded === row.item.ticker ? null : row.item.ticker)
-                    }
-                    onToggleEdit={() =>
-                      setEditing(editing === row.item.ticker ? null : row.item.ticker)
-                    }
-                    onSaved={() => {
-                      refreshWatchlist();
-                      setEditing(null);
-                    }}
-                    onRemove={() => handleRemove(row.item.ticker)}
-                    onOpenAnalysis={() => openAnalysis(row.item.ticker)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+          {(() => {
+            const renderRow = (row: Row) => (
+              <ListRow
+                key={row.item.ticker}
+                row={row}
+                expanded={expanded === row.item.ticker}
+                editing={editing === row.item.ticker}
+                onToggleExpand={() =>
+                  setExpanded(expanded === row.item.ticker ? null : row.item.ticker)
+                }
+                onToggleEdit={() =>
+                  setEditing(editing === row.item.ticker ? null : row.item.ticker)
+                }
+                onSaved={() => {
+                  refreshWatchlist();
+                  setEditing(null);
+                }}
+                onRemove={() => handleRemove(row.item.ticker)}
+                onOpenAnalysis={() => openAnalysis(row.item.ticker)}
+              />
+            );
+            const section = (
+              title: string,
+              count: number,
+              rows: Row[],
+              accent: string
+            ) =>
+              rows.length === 0 ? null : (
+                <div key={title}>
+                  <div className="flex items-center gap-2 mb-1.5 mt-1">
+                    <span className={`text-sm font-semibold ${accent}`}>{title}</span>
+                    <span className="text-xs text-gray-400">{count}</span>
+                  </div>
+                  <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+                    {rows.map(renderRow)}
+                  </div>
+                </div>
+              );
+            return (
+              <div className="space-y-4">
+                {section("要対応", groups.urgent.length, groups.urgent, "text-red-600")}
+                {section("保有", groups.held.length, groups.held, "text-gray-700")}
+                {section("狙い", groups.target.length, groups.target, "text-gray-700")}
+                {groups.urgent.length + groups.held.length + groups.target.length === 0 && (
+                  <div className="py-10 text-center text-gray-400 text-sm">
+                    該当する銘柄がありません。
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           </>
         )}
 
@@ -338,7 +404,7 @@ export default function PortfolioPage() {
 
 // ===================== 行 =====================
 
-function RowView({
+function ListRow({
   row,
   expanded,
   editing,
@@ -360,111 +426,121 @@ function RowView({
   const d = row.digest;
   const pnl = row.held?.pnlPct ?? null;
   const dist = row.target?.distanceToEntryPct ?? null;
+  const dots = d.ok ? signalDots(d) : [];
+  const reason =
+    (row.held?.reasons ?? row.target?.reasons ?? []).join(" / ") || "—";
 
   return (
-    <>
-      <tr className="border-b border-gray-100 hover:bg-blue-50/40">
-        <td className="px-3 py-2">
-          <span
-            className={`inline-block px-2 py-0.5 rounded border text-xs font-medium ${COLOR_CLASS[row.badgeColor]}`}
-          >
-            {row.badge}
-          </span>
-        </td>
-        <td className="px-3 py-2">
-          <button onClick={onOpenAnalysis} className="text-left hover:underline">
-            <span className="font-medium text-gray-800">{d.ticker}</span>
-            <span className="block text-xs text-gray-400 truncate max-w-[10rem]">{d.name}</span>
-          </button>
-          <span className="text-[10px] text-gray-400">{row.kind === "held" ? "保有" : "狙い"}</span>
-        </td>
-        <td className="px-3 py-2 text-right tabular-nums">{d.close.toLocaleString()}</td>
-        <td className="px-3 py-2 text-right tabular-nums">
+    <div className={`border-l-4 ${BORDER_CLASS[row.badgeColor] ?? "border-l-gray-300"} hover:bg-blue-50/30`}>
+      {/* 1行目 */}
+      <div className="flex items-center gap-3 px-3 py-2">
+        <span
+          className={`shrink-0 w-[4.5rem] text-center px-1.5 py-0.5 rounded border text-xs font-medium ${COLOR_CLASS[row.badgeColor]}`}
+        >
+          {row.badge}
+        </span>
+
+        <button onClick={onOpenAnalysis} className="text-left min-w-0 flex-1 hover:underline">
+          <span className="font-medium text-gray-800">{d.ticker}</span>
+          <span className="ml-2 text-xs text-gray-400 truncate">{d.name}</span>
+        </button>
+
+        <PriceSpark closes={row.sparkCloses} />
+
+        <span className="shrink-0 w-20 text-right tabular-nums text-sm text-gray-700">
+          {d.close.toLocaleString()}
+        </span>
+
+        <span className="shrink-0 w-20 text-right tabular-nums text-sm">
           {pnl !== null ? (
             <span className={pnl >= 0 ? "text-green-600" : "text-red-600"}>
               {pnl >= 0 ? "+" : ""}
               {pnl.toFixed(1)}%
             </span>
           ) : dist !== null ? (
-            <span className="text-gray-500">
+            <span className="text-gray-500 text-xs">
               指値{dist >= 0 ? "+" : ""}
               {dist.toFixed(1)}%
             </span>
           ) : (
             <span className="text-gray-300">—</span>
           )}
-        </td>
-        <td className="px-3 py-2">
-          <DirChip direction={d.direction} score={d.regimeScore} highVol={d.highVol} />
-        </td>
-        <td className="px-3 py-2 text-right tabular-nums">
-          <span className={d.hurst < 0.45 ? "text-amber-600" : d.hurst > 0.55 ? "text-blue-600" : "text-gray-600"}>
-            {d.hurst.toFixed(2)}
+        </span>
+
+        <button
+          onClick={onToggleExpand}
+          className="shrink-0 text-gray-300 hover:text-gray-500 text-xs w-4"
+          title="根拠"
+        >
+          {expanded ? "▾" : "▸"}
+        </button>
+      </div>
+
+      {/* 2行目: 要約 + シグナル帯 */}
+      <div className="flex items-center gap-2 px-3 pb-2 pl-[5.75rem]">
+        {row.diff.changed && (
+          <span
+            className="shrink-0 text-[10px] text-orange-600 font-medium"
+            title={row.diff.reasons.join(" / ")}
+          >
+            ● 変化
           </span>
-        </td>
-        <td className="px-3 py-2 text-right tabular-nums">
-          <span className={Math.abs(d.meanRevZ) > 2 ? "font-medium text-gray-900" : "text-gray-500"}>
-            {d.meanRevZ >= 0 ? "+" : ""}
-            {d.meanRevZ.toFixed(1)}
-          </span>
-        </td>
-        <td className="px-3 py-2 text-right tabular-nums">
-          <span className={d.volSpike ? "text-red-600 font-medium" : "text-gray-500"}>
-            {d.volForecastPct.toFixed(1)}%
-          </span>
-        </td>
-        <td className="px-3 py-2 text-right tabular-nums text-gray-500">{d.drawdownPct.toFixed(1)}%</td>
-        <td className="px-3 py-2">
-          {row.diff.changed ? (
-            <span
-              className="inline-block w-2 h-2 rounded-full bg-orange-500"
-              title={row.diff.reasons.join(" / ")}
-            />
-          ) : null}
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap text-xs">
-          <button onClick={onToggleExpand} className="text-blue-600 hover:underline mr-2">
-            {expanded ? "閉じる" : "根拠"}
-          </button>
-          <button onClick={onToggleEdit} className="text-gray-500 hover:underline mr-2">
-            編集
-          </button>
-          <button onClick={onRemove} className="text-gray-300 hover:text-red-400">
-            ×
-          </button>
-        </td>
-      </tr>
+        )}
+        <span className="min-w-0 flex-1 truncate text-xs text-gray-500">{reason}</span>
+        <SignalDots dots={dots} />
+        <button onClick={onToggleEdit} className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600">
+          編集
+        </button>
+        <button onClick={onRemove} className="shrink-0 text-gray-300 hover:text-red-400 text-xs leading-none">
+          ×
+        </button>
+      </div>
+
       {expanded && (
-        <tr className="bg-gray-50">
-          <td colSpan={11} className="px-4 py-3">
-            <EvidencePanel row={row} />
-          </td>
-        </tr>
+        <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
+          <EvidencePanel row={row} />
+        </div>
       )}
       {editing && (
-        <tr className="bg-amber-50/50">
-          <td colSpan={11} className="px-4 py-3">
-            <PositionEditor item={row.item} onSaved={onSaved} />
-          </td>
-        </tr>
+        <div className="bg-amber-50/50 px-4 py-3 border-t border-gray-100">
+          <PositionEditor item={row.item} onSaved={onSaved} />
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
-function DirChip({ direction, score, highVol }: { direction: string; score: number; highVol: boolean }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    up: { label: "上昇", cls: "text-green-600" },
-    down: { label: "下落", cls: "text-red-600" },
-    flat: { label: "横ばい", cls: "text-gray-500" },
-  };
-  const m = map[direction] ?? map.flat;
+function SignalDots({ dots }: { dots: SignalDot[] }) {
+  if (dots.length === 0) return <span className="w-[4.5rem]" />;
   return (
-    <span className="text-xs">
-      <span className={m.cls}>{m.label}</span>
-      <span className="text-gray-400"> {score.toFixed(0)}</span>
-      {highVol && <span className="ml-1 text-red-500">高ボラ</span>}
+    <span className="shrink-0 flex items-center gap-1">
+      {dots.map((dot) => (
+        <span
+          key={dot.label}
+          className={`w-2.5 h-2.5 rounded-full ${TONE_DOT[dot.tone]}`}
+          title={`${dot.label}: ${dot.value}`}
+        />
+      ))}
     </span>
+  );
+}
+
+// 直近終値のミニ折れ線。上昇=緑、下落=赤。
+function PriceSpark({ closes }: { closes: number[] }) {
+  if (closes.length < 2) return <span className="shrink-0 w-20" />;
+  const W = 80;
+  const H = 22;
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const x = (i: number) => (i / (closes.length - 1)) * W;
+  const y = (v: number) => H - ((v - min) / range) * (H - 2) - 1;
+  const path = closes.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const up = closes[closes.length - 1] >= closes[0];
+  return (
+    <svg width={W} height={H} className="shrink-0" viewBox={`0 0 ${W} ${H}`}>
+      <path d={path} fill="none" stroke={up ? "#16a34a" : "#dc2626"} strokeWidth="1.5" />
+    </svg>
   );
 }
 
