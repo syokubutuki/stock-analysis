@@ -7,6 +7,7 @@ import { useAnalysisData, PeriodKey } from "./hooks/useAnalysisData";
 import PeriodSelector from "./components/analysis/PeriodSelector";
 import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
 import WatchlistPanel from "./components/WatchlistPanel";
+import TickerSearchInput from "./components/TickerSearchInput";
 import { SeriesMode } from "./lib/series-mode";
 
 const DiffSeriesChart = dynamic(
@@ -624,16 +625,6 @@ export default function AnalysisPage() {
     } catch {}
   }, [period]);
 
-  const handleSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (tickerInput.trim()) {
-        fetchStock(tickerInput.trim());
-      }
-    },
-    [fetchStock, tickerInput]
-  );
-
   // Series Explorer の系列グループから対応する詳細分析セクションへジャンプする。
   // タブを切り替えた後、保留中のアンカー DOM を探してスクロール＆ハイライトする。
   const pendingScrollRef = useRef<string | null>(null);
@@ -690,23 +681,12 @@ export default function AnalysisPage() {
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
         {/* 入力エリア */}
         <div className="flex items-center gap-3 flex-wrap">
-          <form onSubmit={handleSubmit} className="flex items-center gap-3">
-            <input
-              name="ticker"
-              type="text"
-              value={tickerInput}
-              onChange={(e) => setTickerInput(e.target.value)}
-              placeholder="銘柄コード (例: 9984, 8306)"
-              className="px-4 py-2 border border-gray-300 rounded-lg text-base w-56 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "取得中..." : "分析開始"}
-            </button>
-          </form>
+          <TickerSearchInput
+            value={tickerInput}
+            onChange={setTickerInput}
+            onSubmit={fetchStock}
+            loading={loading}
+          />
           <WatchlistPanel
             currentTicker={data?.ticker ?? null}
             currentName={data?.name ?? null}

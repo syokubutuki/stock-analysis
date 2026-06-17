@@ -16,11 +16,22 @@ interface Props {
   onChange: (mode: SeriesMode) => void;
   /** 現在のセクションが系列変換を消費しない場合に true。グレーアウトして操作不可にする */
   disabled?: boolean;
+  /** disabled 時にツールチップ表示する理由文。なぜ操作できないかをユーザーに示す。 */
+  disabledReason?: string;
 }
 
-export default function SeriesModeSelector({ current, onChange, disabled = false }: Props) {
+const DEFAULT_DISABLED_REASON =
+  "このセクションの分析はOHLC（4本値）ベースのため、入力系列の変換は適用されません。";
+
+export default function SeriesModeSelector({
+  current,
+  onChange,
+  disabled = false,
+  disabledReason = DEFAULT_DISABLED_REASON,
+}: Props) {
+  const tooltip = disabled ? disabledReason : undefined;
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" title={tooltip}>
       <span className={`text-xs mr-1 ${disabled ? "text-gray-400" : "text-gray-500"}`}>
         入力系列:
       </span>
@@ -29,6 +40,7 @@ export default function SeriesModeSelector({ current, onChange, disabled = false
           key={key}
           onClick={() => onChange(key)}
           disabled={disabled}
+          title={tooltip}
           className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
             disabled
               ? `cursor-not-allowed opacity-40 ${
