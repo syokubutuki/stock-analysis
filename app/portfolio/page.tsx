@@ -115,8 +115,17 @@ export default function PortfolioPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [horizon, setHorizon] = useState<Horizon>("swing");
   const [view, setView] = useState<ViewFilter>("all");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set()); // 複数同時に開ける
   const [editing, setEditing] = useState<string | null>(null);
+
+  const toggleExpand = useCallback((ticker: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticker)) next.delete(ticker);
+      else next.add(ticker);
+      return next;
+    });
+  }, []);
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [addInput, setAddInput] = useState("");
 
@@ -353,11 +362,9 @@ export default function PortfolioPage() {
               <ListRow
                 key={row.item.ticker}
                 row={row}
-                expanded={expanded === row.item.ticker}
+                expanded={expanded.has(row.item.ticker)}
                 editing={editing === row.item.ticker}
-                onToggleExpand={() =>
-                  setExpanded(expanded === row.item.ticker ? null : row.item.ticker)
-                }
+                onToggleExpand={() => toggleExpand(row.item.ticker)}
                 onToggleEdit={() =>
                   setEditing(editing === row.item.ticker ? null : row.item.ticker)
                 }
