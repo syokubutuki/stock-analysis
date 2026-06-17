@@ -213,6 +213,55 @@ export function portfolioRisk(
   };
 }
 
+// 任意の相関行列 R とボラ σ から、建玉ウェイトでのパラメトリック日次リスクを出す。
+// DCC現在/下落日相関などを差し込んで「相関だけが変わったらVaRがどう動くか」を比較する用途。
+// R/vols は aligned.tickers と同じ並び・長さ。
+export interface StressRisk {
+  ok: boolean;
+  volDaily: number;
+  volAnnual: number;
+  var95Pct: number; // 正規パラメトリック日次VaR95(正の損失率, %)
+  cvar95Pct: number; // 正規パラメトリックES95(%)
+}
+
+const Z95 = 1.6448536;
+const ES95_FACTOR = 2.0627128; // φ(z95)/0.05
+
+export function stressRiskFromCorr(
+  aligned: AlignedReturns,
+  rawWeights: Record<string, number>,
+  R: number[][],
+  vols: number[]
+): StressRisk {
+  const empty: StressRisk = { ok: false, volDaily: 0, volAnnual: 0, var95Pct: 0, cvar95Pct: 0 };
+  const idx: number[] = [];
+  for (let i = 0; i < aligned.tickers.length; i++) {
+    const mv = rawWeights[aligned.tickers[i]];
+    if (mv && mv > 0) idx.push(i);
+  }
+  if (idx.length < 1 || R.length !== aligned.tickers.length) return empty;
+  const total = idx.reduce((a, i) => a + rawWeights[aligned.tickers[i]], 0);
+  if (total <= 0) return empty;
+  const w = idx.map((i) => rawWeights[aligned.tickers[i]] / total);
+
+  let varSum = 0;
+  for (let a = 0; a < idx.length; a++) {
+    for (let b = 0; b < idx.length; b++) {
+      const ia = idx[a];
+      const ib = idx[b];
+      varSum += w[a] * w[b] * R[ia][ib] * vols[ia] * vols[ib];
+    }
+  }
+  const volDaily = Math.sqrt(Math.max(varSum, 0));
+  return {
+    ok: true,
+    volDaily,
+    volAnnual: volDaily * Math.sqrt(252),
+    var95Pct: Z95 * volDaily * 100,
+    cvar95Pct: ES95_FACTOR * volDaily * 100,
+  };
+}
+
 // ---- 数値ユーティリティ ----
 
 function mean(a: number[]): number {

@@ -8,7 +8,9 @@ import {
   alignReturns,
   correlationMatrix,
   portfolioRisk,
+  stressRiskFromCorr,
 } from "../../lib/portfolio-risk";
+import { computeDCC, downsideCorrelation } from "../../lib/dcc";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -26,7 +28,7 @@ function corrColor(c: number): string {
 export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) {
   const [open, setOpen] = useState(true);
 
-  const { corr, risk, names } = useMemo(() => {
+  const { corr, risk, names, aligned, rawWeights } = useMemo(() => {
     const series = Object.entries(data)
       .filter(([, v]) => v.prices.length > 2)
       .map(([ticker, v]) => ({ ticker, prices: v.prices }));
@@ -47,8 +49,25 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
       }
     }
     const risk = portfolioRisk(aligned, rawWeights);
-    return { corr, risk, names };
+    return { corr, risk, names, aligned, rawWeights };
   }, [data, watchlist, horizon]);
+
+  // DCC・危機時相関は重い(銘柄ごとGARCH)ので展開時のみ計算する。
+  const [dccOpen, setDccOpen] = useState(false);
+  const dcc = useMemo(() => {
+    if (!dccOpen || aligned.tickers.length < 2) return null;
+    const d = computeDCC(aligned);
+    if (!d.ok) return null;
+    const down = downsideCorrelation(aligned, 0.25);
+    // 相関だけを差し替えてVaRを比較(ボラは現在の条件付きσで固定)
+    const calm = stressRiskFromCorr(aligned, rawWeights, d.uncondR, d.condVols);
+    const now = stressRiskFromCorr(aligned, rawWeights, d.currentR, d.condVols);
+    const crash =
+      down.ok && down.matrix.length === aligned.tickers.length
+        ? stressRiskFromCorr(aligned, rawWeights, down.matrix, d.condVols)
+        : null;
+    return { d, down, calm, now, crash };
+  }, [dccOpen, aligned, rawWeights]);
 
   const yen = (v: number) => `¥${Math.round(v).toLocaleString()}`;
   const highCorrWarning =
@@ -206,6 +225,112 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
             )}
           </div>
 
+          {/* 危機時相関(DCC) */}
+          <div className="border-t border-gray-100 pt-4">
+            <button
+              onClick={() => setDccOpen((v) => !v)}
+              className="flex items-center gap-2 text-sm font-medium text-gray-700"
+            >
+              <span className="inline-block transition-transform" style={{ transform: dccOpen ? "rotate(90deg)" : "rotate(0deg)" }}>
+                ▶
+              </span>
+              危機時相関(DCC・動的条件付き相関)
+              {!dccOpen && <span className="text-xs text-gray-400 font-normal">クリックで計算</span>}
+            </button>
+
+            {dccOpen && (
+              dcc ? (
+                <div className="mt-3 space-y-4">
+                  {/* 平時 → 現在 → ピーク */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <Card label="平時の平均相関" value={dcc.d.uncondAvgCorr.toFixed(2)} />
+                    <Card
+                      label="現在の平均相関"
+                      value={dcc.d.currentAvgCorr.toFixed(2)}
+                      color={dcc.d.currentAvgCorr > dcc.d.uncondAvgCorr + 0.1 ? "text-red-600" : "text-gray-800"}
+                      sub={`平時比 ${dcc.d.currentAvgCorr >= dcc.d.uncondAvgCorr ? "+" : ""}${(dcc.d.currentAvgCorr - dcc.d.uncondAvgCorr).toFixed(2)}`}
+                    />
+                    <Card label="期間ピーク相関" value={dcc.d.peakAvgCorr.toFixed(2)} />
+                    <Card label="下落日の平均相関" value={dcc.down.ok ? dcc.down.avg.toFixed(2) : "—"} sub={dcc.down.ok ? `下位25%・${dcc.down.nDays}日` : "データ不足"} color="text-red-600" />
+                  </div>
+
+                  {/* 平均相関の推移 */}
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-1">平均相関の推移(DCC, a={dcc.d.a.toFixed(2)} b={dcc.d.b.toFixed(2)})</p>
+                    <Sparkline values={dcc.d.avgCorrSeries} baseline={dcc.d.uncondAvgCorr} />
+                  </div>
+
+                  {/* ストレスVaR比較 */}
+                  {dcc.now.ok && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">
+                        相関シナリオ別の日次VaR95(ボラは現在水準で固定、相関のみ差し替え)
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <ScenarioCard label="平時相関" risk={dcc.calm} totalMV={risk.totalMarketValue} yen={yen} />
+                        <ScenarioCard label="現在(DCC)" risk={dcc.now} totalMV={risk.totalMarketValue} yen={yen} highlight />
+                        <ScenarioCard label="下落日相関(危機)" risk={dcc.crash} totalMV={risk.totalMarketValue} yen={yen} danger />
+                      </div>
+                      {dcc.crash?.ok && dcc.calm.ok && dcc.calm.var95Pct > 0 && (
+                        <p className="text-[10px] text-gray-500 mt-2">
+                          危機時は相関上昇で分散効果が消え、VaRが平時比 約
+                          {(dcc.crash.var95Pct / dcc.calm.var95Pct).toFixed(2)}倍に拡大。
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {!dcc.now.ok && (
+                    <p className="text-xs text-gray-400">建玉(株数)を入力するとストレスVaR比較を表示します。</p>
+                  )}
+
+                  <AnalysisGuide title="DCC・危機時相関の詳細理論">
+                    <p className="font-medium text-gray-700">1. なぜ動的相関が必要か</p>
+                    <p>
+                      相関は一定ではありません。とくに<strong>暴落時には多くの銘柄が一斉に下げ、相関が1へ近づく</strong>(危機時相関)。
+                      平時の静的相関で計算した分散効果やVaRは、肝心の急落局面で過小評価になります。DCCは相関の時間変化を推定します。
+                    </p>
+                    <p className="font-medium text-gray-700 mt-3">2. 数式(Engle 2002)</p>
+                    <p>
+                      各銘柄をGARCH(1,1)の条件付きボラ σ_i,t で標準化:{" z_i,t = r_i,t / σ_i,t "}。
+                      無条件相関 Q̄ を基準に、{" Q_t = (1-a-b)Q̄ + a·z_{t-1}z_{t-1}ᵀ + b·Q_{t-1} "}。
+                      これを正規化して相関行列 {" R_t = diag(Q_t)^{-1/2} Q_t diag(Q_t)^{-1/2} "}。
+                      a は直近ショックへの反応、b は相関の粘り(persistence)。本実装は多変量の行列計算を避け、
+                      ペアワイズ複合尤度(2変量正規)で a,b を推定。
+                    </p>
+                    <p className="font-medium text-gray-700 mt-3">3. 用語</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li><strong>標準化残差 z</strong>: リターンをその時々のボラで割り、ボラ変動の影響を除いた「純粋な連動成分」。</li>
+                      <li><strong>下落日相関</strong>: バスケットが下位25%下落した日だけで測った相関。危機時相関の簡便な代理。</li>
+                      <li><strong>ストレスVaR</strong>: ボラを現在水準に固定し、相関だけを各シナリオに差し替えて計算したVaR。相関上昇の影響だけを取り出す。</li>
+                    </ul>
+                    <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>「現在の平均相関」が「平時」を大きく上回る=既に連動が高まり、分散が効きにくい局面。</li>
+                      <li>推移グラフのスパイク=過去に相関が急騰した(危機が起きた)時点。</li>
+                      <li>危機シナリオVaRが平時の何倍か=暴落時にどれだけリスクが膨らむかの目安。</li>
+                    </ul>
+                    <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>危機VaRが許容を超えるなら、平時に見えている分散は「見せかけ」。ヘッジや銘柄入れ替えを検討。</li>
+                      <li>相関が既に上昇中なら、新規の同方向ポジションは上乗せリスクが大きい。</li>
+                    </ul>
+                    <p className="font-medium text-gray-700 mt-3">6. 注意点</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>a,bはペアワイズ複合尤度の粗いグリッド推定。厳密な多変量MLEではない。</li>
+                      <li>下落日相関は標本が少ないと不安定(最低10日必要)。</li>
+                      <li>ストレスVaRは正規パラメトリック(ファットテール未考慮)。履歴VaRは上の合算リスク欄を参照。</li>
+                    </ul>
+                  </AnalysisGuide>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-gray-400">
+                  DCC計算には2銘柄以上・各50本以上のリターンが必要です。
+                </p>
+              )
+            )}
+          </div>
+
           <AnalysisGuide title="ポートフォリオ関係性・合算リスクの詳細理論">
             <p className="font-medium text-gray-700">1. 何を見ているか</p>
             <p>
@@ -281,5 +406,56 @@ function Card({
       <div className={`text-base font-bold ${color || "text-gray-800"}`}>{value}</div>
       {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
     </div>
+  );
+}
+
+function ScenarioCard({
+  label,
+  risk,
+  totalMV,
+  yen,
+  highlight,
+  danger,
+}: {
+  label: string;
+  risk: { ok: boolean; var95Pct: number } | null;
+  totalMV: number;
+  yen: (v: number) => string;
+  highlight?: boolean;
+  danger?: boolean;
+}) {
+  const border = danger
+    ? "border-red-300 bg-red-50"
+    : highlight
+    ? "border-blue-300 bg-blue-50"
+    : "border-gray-200 bg-gray-50";
+  return (
+    <div className={`rounded-lg border p-2.5 ${border}`}>
+      <div className="text-[10px] text-gray-500">{label}</div>
+      <div className={`text-base font-bold ${danger ? "text-red-600" : "text-gray-800"}`}>
+        {risk?.ok ? `${risk.var95Pct.toFixed(2)}%` : "—"}
+      </div>
+      {risk?.ok && <div className="text-[10px] text-gray-400">{yen((risk.var95Pct / 100) * totalMV)}</div>}
+    </div>
+  );
+}
+
+// 平均相関の推移を小さな折れ線で。baseline(無条件相関)を点線で示す。
+function Sparkline({ values, baseline }: { values: number[]; baseline: number }) {
+  if (values.length < 2) return null;
+  const W = 600;
+  const H = 60;
+  const min = Math.min(...values, baseline);
+  const max = Math.max(...values, baseline);
+  const range = max - min || 1;
+  const x = (i: number) => (i / (values.length - 1)) * W;
+  const y = (v: number) => H - ((v - min) / range) * (H - 4) - 2;
+  const path = values.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const baseY = y(baseline).toFixed(1);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" preserveAspectRatio="none">
+      <line x1="0" y1={baseY} x2={W} y2={baseY} stroke="#9ca3af" strokeWidth="1" strokeDasharray="4 3" />
+      <path d={path} fill="none" stroke="#dc2626" strokeWidth="1.5" />
+    </svg>
   );
 }
