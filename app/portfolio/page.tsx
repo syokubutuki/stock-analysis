@@ -73,32 +73,40 @@ const BORDER_CLASS: Record<string, string> = {
 };
 
 type Tone = "good" | "warn" | "bad" | "neutral";
-const TONE_DOT: Record<Tone, string> = {
-  good: "bg-green-500",
-  warn: "bg-amber-500",
-  bad: "bg-red-500",
-  neutral: "bg-gray-300",
+// 値は常に表示し、色は「注意・警戒」だけを浮かせる(平常はグレー)。
+const TONE_TEXT: Record<Tone, string> = {
+  good: "text-emerald-600",
+  warn: "text-amber-600 font-medium",
+  bad: "text-red-600 font-semibold",
+  neutral: "text-gray-600",
 };
 
-interface SignalDot {
-  label: string;
-  value: string;
+interface SignalStat {
+  label: string; // 指標名(短縮)
+  display: string; // 表示する実数値
   tone: Tone;
+  title: string; // ホバー時の補足
 }
 
-// 判定の根拠を「色付きドット」に蒸留する。数字の壁を色のスキャンに置き換える。
-function signalDots(d: SignalDigest): SignalDot[] {
-  const dir: Tone = d.highVol ? "bad" : d.direction === "up" ? "good" : d.direction === "down" ? "bad" : "neutral";
-  const hurstTone: Tone = d.hurst > 0.55 ? "good" : d.hurst < 0.45 ? "warn" : "neutral";
+// 判定の根拠となる実数値。色は注意/警戒を浮かせるための補助で、数値そのものを見せる。
+function signalStats(d: SignalDigest): SignalStat[] {
+  const dirArrow = d.direction === "up" ? "↑" : d.direction === "down" ? "↓" : "→";
+  const dirTone: Tone = d.highVol ? "bad" : d.direction === "up" ? "good" : d.direction === "down" ? "bad" : "neutral";
+  const hurstTone: Tone = d.hurst < 0.45 ? "warn" : "neutral";
   const zTone: Tone = Math.abs(d.meanRevZ) > 2 ? "warn" : "neutral";
   const volTone: Tone = d.volSpike ? "bad" : "neutral";
-  const cpTone: Tone = d.changePoint ? "bad" : "good";
+  const ddTone: Tone = d.drawdownPct < -15 ? "warn" : "neutral";
   return [
-    { label: "方向", value: `${d.direction} (${d.regimeScore.toFixed(0)})${d.highVol ? " 高ボラ" : ""}`, tone: dir },
-    { label: "Hurst", value: `${d.hurst.toFixed(2)} ${d.hurst < 0.5 ? "回帰寄り" : "トレンド"}`, tone: hurstTone },
-    { label: "z", value: d.meanRevZ.toFixed(2), tone: zTone },
-    { label: "予測σ", value: `${d.volForecastPct.toFixed(1)}%${d.volSpike ? " 急拡大" : ""}`, tone: volTone },
-    { label: "変化点", value: d.changePoint ? `あり p=${d.changePointProb.toFixed(2)}` : "なし", tone: cpTone },
+    {
+      label: "方向",
+      display: `${dirArrow}${d.regimeScore >= 0 ? "+" : ""}${d.regimeScore.toFixed(0)}`,
+      tone: dirTone,
+      title: `レジーム ${d.regime} / スコア${d.regimeScore.toFixed(0)}${d.highVol ? " / 高ボラ" : ""}`,
+    },
+    { label: "H", display: d.hurst.toFixed(2), tone: hurstTone, title: `Hurst指数 ${d.hurst.toFixed(2)}(<0.5で平均回帰寄り)` },
+    { label: "z", display: `${d.meanRevZ >= 0 ? "+" : ""}${d.meanRevZ.toFixed(1)}`, tone: zTone, title: `平均回帰z ${d.meanRevZ.toFixed(2)}` },
+    { label: "σ", display: `${d.volForecastPct.toFixed(1)}%`, tone: volTone, title: `GARCH予測σ ${d.volForecastPct.toFixed(2)}%${d.volSpike ? "(急拡大)" : ""}` },
+    { label: "DD", display: `${d.drawdownPct.toFixed(0)}%`, tone: ddTone, title: `直近ドローダウン ${d.drawdownPct.toFixed(1)}%` },
   ];
 }
 
@@ -426,7 +434,7 @@ function ListRow({
   const d = row.digest;
   const pnl = row.held?.pnlPct ?? null;
   const dist = row.target?.distanceToEntryPct ?? null;
-  const dots = d.ok ? signalDots(d) : [];
+  const stats = d.ok ? signalStats(d) : [];
   const reason =
     (row.held?.reasons ?? row.target?.reasons ?? []).join(" / ") || "—";
 
@@ -487,7 +495,7 @@ function ListRow({
           </span>
         )}
         <span className="min-w-0 flex-1 truncate text-xs text-gray-500">{reason}</span>
-        <SignalDots dots={dots} />
+        <SignalStats stats={stats} />
         <button onClick={onToggleEdit} className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600">
           編集
         </button>
@@ -510,16 +518,15 @@ function ListRow({
   );
 }
 
-function SignalDots({ dots }: { dots: SignalDot[] }) {
-  if (dots.length === 0) return <span className="w-[4.5rem]" />;
+function SignalStats({ stats }: { stats: SignalStat[] }) {
+  if (stats.length === 0) return null;
   return (
-    <span className="shrink-0 flex items-center gap-1">
-      {dots.map((dot) => (
-        <span
-          key={dot.label}
-          className={`w-2.5 h-2.5 rounded-full ${TONE_DOT[dot.tone]}`}
-          title={`${dot.label}: ${dot.value}`}
-        />
+    <span className="shrink-0 flex items-center gap-2.5 text-[11px] tabular-nums">
+      {stats.map((s) => (
+        <span key={s.label} title={s.title} className="whitespace-nowrap">
+          <span className="text-gray-400">{s.label}</span>{" "}
+          <span className={TONE_TEXT[s.tone]}>{s.display}</span>
+        </span>
       ))}
     </span>
   );
