@@ -74,6 +74,10 @@ const WaveletChart = dynamic(
   () => import("./components/analysis/WaveletChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
 );
+const WaveletCoherenceChart = dynamic(
+  () => import("./components/analysis/WaveletCoherenceChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={280} /> }
+);
 const EMDChart = dynamic(
   () => import("./components/analysis/EMDChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
@@ -189,6 +193,10 @@ const CausalChart = dynamic(
 const FractalExtChart = dynamic(
   () => import("./components/analysis/FractalExtChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
+);
+const RollingHurstChart = dynamic(
+  () => import("./components/analysis/RollingHurstChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={240} /> }
 );
 const HVGChart = dynamic(
   () => import("./components/analysis/HVGChart"),
@@ -549,10 +557,10 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化・累積リターン・差分・Box-Cox・ドローダウン・Zスコア" },
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF・分散比検定" },
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
-  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・EMD・解析信号・HHS・STFT・SSA・Lomb-Scargle" },
+  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・コヒーレンス・EMD・解析信号・HHS・STFT・SSA・Lomb-Scargle" },
   { key: "nonlinear", label: "非線形動力学", description: "アトラクタ・RQA・Lyapunov・位相空間予測・KM係数・TDA・投資シグナル" },
   { key: "entropy", label: "情報理論", description: "エントロピー拡張・複雑度・情報フロー・レジーム検出・予測可能性" },
-  { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・MF-DFA・R/S・DCCA・相関次元" },
+  { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・ローリングHurst+サロゲート帯・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
   { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
@@ -848,7 +856,9 @@ export default function AnalysisPage() {
 
               {activeSection === "distribution" && (
                 <>
-                  <ReturnDistribution prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-distribution" className="scroll-mt-20">
+                    <ReturnDistribution prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <DistributionShapeChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ACFChart prices={filteredPrices} seriesMode={seriesMode} />
                   <ACFExtendedChart prices={filteredPrices} seriesMode={seriesMode} />
@@ -884,6 +894,9 @@ export default function AnalysisPage() {
                 <>
                   <PowerSpectrum prices={filteredPrices} seriesMode={seriesMode} />
                   <WaveletChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-frequency-coherence" className="scroll-mt-20">
+                    <WaveletCoherenceChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <EMDChart prices={filteredPrices} seriesMode={seriesMode} />
                   <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} />
                   <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} />
@@ -936,7 +949,10 @@ export default function AnalysisPage() {
 
               {activeSection === "fractal" && (
                 <>
-                  <DFAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-fractal" className="scroll-mt-20">
+                    <DFAChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
+                  <RollingHurstChart prices={filteredPrices} seriesMode={seriesMode} />
                   <FractalExtChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}
@@ -971,7 +987,9 @@ export default function AnalysisPage() {
               {activeSection === "causal" && (
                 <>
                   <EventStudyChart prices={allPrices} />
-                  <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <div id="sa-causal" className="scroll-mt-20">
+                    <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
                   <CCMChart prices={filteredPrices} seriesMode={seriesMode} />
                 </>
               )}

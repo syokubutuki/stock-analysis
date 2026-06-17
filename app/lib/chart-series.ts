@@ -57,6 +57,12 @@ import { fitSarima, SarimaFit } from "./sarima";
 import { computeVisibilityGraph } from "./visibility-graph";
 import { computeRecurrenceNetwork } from "./recurrence-network";
 import { rollingSpectralEntropy } from "./hilbert-huang-spectrum";
+import { rollingMoments, rollingACF1 } from "./distribution-extended";
+import { rollingHurstSeries } from "./rolling-hurst";
+import { priceVolumeCoherenceSeries } from "./wavelet-coherence";
+import { rollingTransferEntropy, rollingMutualInformation } from "./information-flow";
+import { rollingKaplanYorke } from "./lyapunov-spectrum";
+import { extraTechnical } from "./extra-technical";
 
 // ---- Types ----
 
@@ -143,6 +149,10 @@ export const GROUPS: SeriesGroup[] = [
   { id: "behavioral", label: "行動ファイナンス" },
   { id: "arima", label: "ARIMA" },
   { id: "network", label: "ネットワーク" },
+  { id: "dist", label: "分布・相関" },
+  { id: "fractal", label: "フラクタル" },
+  { id: "coherence", label: "コヒーレンス" },
+  { id: "causal", label: "因果・情報流" },
 ];
 
 // 系列グループ → 詳細分析セクション（ジャンプ導線用）。
@@ -176,6 +186,10 @@ export const GROUP_DETAIL: Record<
   micro: { section: "ohlc", anchor: "sa-ohlc-micro", label: "OHLC分析" },
   arima: { section: "simulation", anchor: "sa-sim-arima", label: "シミュレーション" },
   network: { section: "network", anchor: "sa-network", label: "ネットワーク" },
+  dist: { section: "distribution", anchor: "sa-distribution", label: "分布・相関" },
+  fractal: { section: "fractal", anchor: "sa-fractal", label: "フラクタル" },
+  coherence: { section: "frequency", anchor: "sa-frequency-coherence", label: "周波数領域" },
+  causal: { section: "causal", anchor: "sa-causal", label: "因果分析" },
 };
 
 // 計算が重いグループ（Worker への依頼を「軽い系列を先」「重い系列を後」の
@@ -191,6 +205,9 @@ export const HEAVY_GROUPS = new Set<string>([
   "break",
   "arima",
   "meanrev",
+  "fractal",
+  "coherence",
+  "causal",
 ]);
 
 // ---- Helpers ----
@@ -293,6 +310,44 @@ const mBestMa = memoBy((p: PricePoint[]) => {
   const lr = logReturns(p.map((x) => x.close));
   return lr.length < 50 ? null : bestMaFit(lr);
 });
+// 追加系列(総ざらい)用ヘルパー
+const mRollMoments = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  const times = p.slice(1).map((x) => x.time);
+  return lr.length < 70 ? null : rollingMoments(lr, times, 60);
+});
+const mRollACF1 = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  const times = p.slice(1).map((x) => x.time);
+  return lr.length < 70 ? null : rollingACF1(lr, times, 60);
+});
+const mRollHurst = memoBy((p: PricePoint[]) => {
+  const lr = logReturns(p.map((x) => x.close));
+  const times = p.slice(1).map((x) => x.time);
+  return lr.length < 140 ? null : rollingHurstSeries(lr, times, 120);
+});
+const mPVCoherence = memoBy((p: PricePoint[]) =>
+  p.length < 32 ? null : priceVolumeCoherenceSeries(p, 5, 20)
+);
+// 出来高変化(x) → 価格リターン(y) の情報フロー
+const mVolPriceFlow = memoBy((p: PricePoint[]) => {
+  const closes = p.map((x) => x.close);
+  const vols = p.map((x) => x.volume);
+  const times = p.slice(1).map((x) => x.time);
+  const ret: number[] = [];
+  const dv: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    ret.push(closes[i] > 0 && closes[i - 1] > 0 ? Math.log(closes[i] / closes[i - 1]) : 0);
+    dv.push(vols[i] > 0 && vols[i - 1] > 0 ? Math.log(vols[i] / vols[i - 1]) : 0);
+  }
+  return ret.length < 130 ? null : { dv, ret, times };
+});
+const mKaplanYorke = memoBy((p: PricePoint[]) => {
+  const vals = p.map((x) => x.close);
+  const times = p.map((x) => x.time);
+  return vals.length < 160 ? null : rollingKaplanYorke(vals, times);
+});
+const mExtraTech = memoBy(extraTechnical);
 
 // ---- Series Catalog ----
 
@@ -1938,6 +1993,162 @@ export const SERIES: SeriesDef[] = [
       const r = mRecurNet(p);
       if (!r) return [];
       return r.net.localClustering.map((v, i) => tv(r.recent[i].time, v));
+    },
+  },
+
+  // ====== 追加オシレーター (ExtraTechnical) ======
+  {
+    id: "cci",
+    label: "CCI(20)",
+    group: "oscillator",
+    color: "#0d9488",
+    scaleId: "cci",
+    type: "line",
+    compute: (p) => mExtraTech(p).cci.values.map((x) => tv(x.time, x.value)),
+  },
+  {
+    id: "williams_r",
+    label: "Williams %R(14)",
+    group: "oscillator",
+    color: "#db2777",
+    scaleId: "williams",
+    type: "line",
+    compute: (p) => mExtraTech(p).williamsR.values.map((x) => tv(x.time, x.value)),
+  },
+  {
+    id: "psar",
+    label: "パラボリックSAR",
+    group: "price",
+    color: "#f59e0b",
+    scaleId: "price",
+    type: "line",
+    lineStyle: 3,
+    compute: (p) => mExtraTech(p).sar.points.map((x) => tv(x.time, x.value)),
+  },
+
+  // ====== 分布・相関 (ローリング) ======
+  {
+    id: "roll_skew",
+    label: "ローリング歪度(60)",
+    group: "dist",
+    color: "#8b5cf6",
+    scaleId: "skew",
+    type: "line",
+    compute: (p) => {
+      const r = mRollMoments(p);
+      return r ? r.map((d) => tv(d.time, d.skewness)) : [];
+    },
+  },
+  {
+    id: "roll_kurt",
+    label: "ローリング超過尖度(60)",
+    group: "dist",
+    color: "#ef4444",
+    scaleId: "kurt",
+    type: "line",
+    compute: (p) => {
+      const r = mRollMoments(p);
+      return r ? r.map((d) => tv(d.time, d.kurtosis)) : [];
+    },
+  },
+  {
+    id: "roll_acf1",
+    label: "ローリングACF(1) (60)",
+    group: "dist",
+    color: "#2563eb",
+    scaleId: "acf1",
+    type: "line",
+    compute: (p) => {
+      const r = mRollACF1(p);
+      return r ? r.map((d) => tv(d.time, d.acf1)) : [];
+    },
+  },
+
+  // ====== フラクタル (ローリング) ======
+  {
+    id: "roll_hurst",
+    label: "ローリングHurst(120)",
+    group: "fractal",
+    color: "#0f766e",
+    scaleId: "hurst",
+    type: "line",
+    compute: (p) => {
+      const r = mRollHurst(p);
+      return r ? r.map((d) => tv(d.time, d.hurst)) : [];
+    },
+  },
+
+  // ====== コヒーレンス ======
+  {
+    id: "pv_coherence",
+    label: "価格-出来高コヒーレンス(5-20d)",
+    group: "coherence",
+    color: "#ea580c",
+    scaleId: "coherence",
+    type: "line",
+    compute: (p) => {
+      const r = mPVCoherence(p);
+      return r ? r.map((d) => tv(d.time, d.value)) : [];
+    },
+  },
+
+  // ====== 因果・情報流 (ローリング) ======
+  {
+    id: "te_vol_price",
+    label: "移転エントロピー 出来高→価格",
+    group: "causal",
+    color: "#c026d3",
+    scaleId: "te",
+    type: "line",
+    compute: (p) => {
+      const r = mVolPriceFlow(p);
+      if (!r) return [];
+      return rollingTransferEntropy(r.dv, r.ret, r.times, 120, 1, 5).map((d) =>
+        tv(d.time, d.value)
+      );
+    },
+  },
+  {
+    id: "mi_vol_price",
+    label: "相互情報量 出来高×価格",
+    group: "causal",
+    color: "#0891b2",
+    scaleId: "mi",
+    type: "line",
+    compute: (p) => {
+      const r = mVolPriceFlow(p);
+      if (!r) return [];
+      return rollingMutualInformation(r.dv, r.ret, r.times, 60).map((d) =>
+        tv(d.time, d.value)
+      );
+    },
+  },
+
+  // ====== 非線形 (Lyapunovスペクトル拡張) ======
+  {
+    id: "kaplan_yorke",
+    label: "Kaplan-Yorke次元",
+    group: "nonlinear",
+    color: "#9333ea",
+    scaleId: "ky_dim",
+    type: "line",
+    compute: (p) => {
+      const r = mKaplanYorke(p);
+      if (!r) return [];
+      return r.times.map((t, i) => tv(t, r.kyDimension[i]));
+    },
+  },
+  {
+    id: "ks_entropy",
+    label: "Kolmogorov-Sinaiエントロピー",
+    group: "nonlinear",
+    color: "#e11d48",
+    scaleId: "ks_ent",
+    type: "line",
+    compute: (p) => {
+      const r = mKaplanYorke(p);
+      if (!r) return [];
+      return r.times.map((t, i) => tv(t, r.entropy[i]));
     },
   },
 ];
