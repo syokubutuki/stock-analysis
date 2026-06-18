@@ -34,10 +34,17 @@ import {
 } from "../lib/portfolio-snapshot";
 import { usePortfolioData } from "../hooks/usePortfolioData";
 import { usePortfolioDigests } from "../hooks/usePortfolioDigests";
+import { useBadgeBacktest } from "../hooks/useBadgeBacktest";
+import { classifySignalEvent, SIGNAL_EVENT_META } from "../lib/signal-digest";
+import { BacktestResult } from "../lib/badge-backtest";
 import dynamic from "next/dynamic";
 
 const PortfolioRiskPanel = dynamic(
   () => import("../components/analysis/PortfolioRiskPanel"),
+  { ssr: false }
+);
+const BadgeTrackRecordPanel = dynamic(
+  () => import("../components/analysis/BadgeTrackRecordPanel"),
   { ssr: false }
 );
 
@@ -137,6 +144,8 @@ export default function PortfolioPage() {
   const tickers = useMemo(() => watchlist.map((w) => w.ticker), [watchlist]);
   const { data, loading, progress, reload } = usePortfolioData(tickers);
   const { digests, computing } = usePortfolioDigests(data, horizon);
+  const { result: backtest, running: btRunning, progress: btProgress, run: runBacktest } =
+    useBadgeBacktest(data, horizon);
 
   // 判定 + 差分(蒸留は Worker 済み。ここは軽い評価のみ)
   const rows = useMemo<Row[]>(() => {
@@ -357,11 +366,20 @@ export default function PortfolioPage() {
             <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} />
           )}
 
+          <BadgeTrackRecordPanel
+            result={backtest}
+            running={btRunning}
+            progress={btProgress}
+            onRun={runBacktest}
+            horizon={horizon}
+          />
+
           {(() => {
             const renderRow = (row: Row) => (
               <ListRow
                 key={row.item.ticker}
                 row={row}
+                backtest={backtest}
                 expanded={expanded.has(row.item.ticker)}
                 editing={editing === row.item.ticker}
                 onToggleExpand={() => toggleExpand(row.item.ticker)}
@@ -421,6 +439,7 @@ export default function PortfolioPage() {
 
 function ListRow({
   row,
+  backtest,
   expanded,
   editing,
   onToggleExpand,
@@ -430,6 +449,7 @@ function ListRow({
   onOpenAnalysis,
 }: {
   row: Row;
+  backtest: BacktestResult | null;
   expanded: boolean;
   editing: boolean;
   onToggleExpand: () => void;
@@ -513,7 +533,7 @@ function ListRow({
 
       {expanded && (
         <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
-          <EvidencePanel row={row} />
+          <EvidencePanel row={row} backtest={backtest} />
         </div>
       )}
       {editing && (
@@ -558,9 +578,10 @@ function PriceSpark({ closes }: { closes: number[] }) {
   );
 }
 
-function EvidencePanel({ row }: { row: Row }) {
+function EvidencePanel({ row, backtest }: { row: Row; backtest: BacktestResult | null }) {
   const d = row.digest;
   const reasons = row.held?.reasons ?? row.target?.reasons ?? [];
+  const activeEvents = d.ok ? classifySignalEvent(d) : [];
   const items: [string, string][] = [
     ["レジーム", `${d.regime} (score ${d.regimeScore.toFixed(0)})`],
     ["Hurst", `${d.hurst.toFixed(2)} (${d.hurst < 0.5 ? "平均回帰寄り" : "トレンド持続"})`],
@@ -588,6 +609,38 @@ function EvidencePanel({ row }: { row: Row }) {
           </div>
         ))}
       </div>
+
+      {/* このシグナルの実績(バックテスト済みの場合) */}
+      {backtest?.ok && activeEvents.length > 0 && (
+        <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 space-y-0.5">
+          <span className="text-gray-400">点灯中シグナルの実績(5日後・横断プール):</span>
+          {activeEvents.map((ev) => {
+            const s = backtest.byEvent[ev]?.find((x) => x.horizon === 5);
+            const base = backtest.baseRate.find((x) => x.horizon === 5)?.median ?? 0;
+            if (!s || s.n === 0) return null;
+            const lift = s.median - base;
+            return (
+              <div key={ev}>
+                <span className="font-medium" style={{ color: "#374151" }}>
+                  {SIGNAL_EVENT_META[ev].label}
+                </span>
+                : 中央値{" "}
+                <b className={s.median < 0 ? "text-red-600" : "text-emerald-600"}>
+                  {s.median >= 0 ? "+" : ""}
+                  {s.median.toFixed(1)}%
+                </b>{" "}
+                / 続落{(s.pDown * 100).toFixed(0)}% / 地合い比 {lift >= 0 ? "+" : ""}
+                {lift.toFixed(1)}pt(n={s.n})
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!backtest?.ok && activeEvents.length > 0 && (
+        <p className="text-[10px] text-gray-400 border-t border-gray-200 pt-2">
+          上の「判定の実績」で計算すると、このシグナルの過去実績がここに表示されます。
+        </p>
+      )}
     </div>
   );
 }

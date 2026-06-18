@@ -325,3 +325,35 @@ export function evaluateTarget(d: SignalDigest, pos?: Position): TargetEval {
   );
   return { badge: "wait", reasons, distanceToEntryPct, appeal: 0 };
 }
+
+// =====================================================================
+// シグナル事象(建玉ゲートを外した「純粋なシグナル」)
+// 実績化(バックテスト)とライブ判定で同じ閾値を共有し、ロジックのズレを防ぐ。
+// バッジ(evaluateHeld/Target)はこれに建玉条件を足したもの。
+// =====================================================================
+
+export type SignalEvent = "deterioration" | "exhaustion" | "pullbackUp" | "entryTurn";
+
+export const SIGNAL_EVENT_META: Record<SignalEvent, { label: string; color: string }> = {
+  deterioration: { label: "悪化(損切り警告)", color: "red" },
+  exhaustion: { label: "過熱(利確検討)", color: "amber" },
+  pullbackUp: { label: "押し目(増し玉)", color: "green" },
+  entryTurn: { label: "転換(エントリー)", color: "green" },
+};
+
+export const SIGNAL_EVENTS: SignalEvent[] = ["deterioration", "exhaustion", "pullbackUp", "entryTurn"];
+
+// digest から現在アクティブなシグナル事象を返す(複数同時に成立しうる)。
+export function classifySignalEvent(d: SignalDigest): SignalEvent[] {
+  if (!d.ok) return [];
+  const ev: SignalEvent[] = [];
+  // 悪化: 下方反転 or 変化点(= 損切り警告のシグナル部分)
+  if (d.direction === "down" || d.changePoint) ev.push("deterioration");
+  // 過熱: Hurst低下 or 買われすぎ or ボラ急拡大(= 利確検討のシグナル部分)
+  if (d.hurst < HURST_MEAN_REVERT || d.meanRevZ > Z_EXTREME || d.volSpike) ev.push("exhaustion");
+  // 押し目: 上昇トレンド内の売られすぎ(= 増し玉のシグナル部分)
+  if (d.direction === "up" && d.meanRevZ < Z_OVERSOLD && !d.volSpike) ev.push("pullbackUp");
+  // 転換: 下落終息+売られすぎ反発(= エントリー好機のシグナル部分)
+  if (d.direction !== "down" && d.changePoint && d.meanRevZ < Z_OVERSOLD) ev.push("entryTurn");
+  return ev;
+}
