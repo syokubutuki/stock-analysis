@@ -35,6 +35,7 @@ import {
 import { usePortfolioData } from "../hooks/usePortfolioData";
 import { usePortfolioDigests } from "../hooks/usePortfolioDigests";
 import { useBadgeBacktest } from "../hooks/useBadgeBacktest";
+import { useStopCompare } from "../hooks/useStopCompare";
 import { classifySignalEvent, SIGNAL_EVENT_META } from "../lib/signal-digest";
 import { BacktestResult } from "../lib/badge-backtest";
 import dynamic from "next/dynamic";
@@ -45,6 +46,10 @@ const PortfolioRiskPanel = dynamic(
 );
 const BadgeTrackRecordPanel = dynamic(
   () => import("../components/analysis/BadgeTrackRecordPanel"),
+  { ssr: false }
+);
+const StopComparePanel = dynamic(
+  () => import("../components/analysis/StopComparePanel"),
   { ssr: false }
 );
 
@@ -146,6 +151,8 @@ export default function PortfolioPage() {
   const { digests, computing } = usePortfolioDigests(data, horizon);
   const { result: backtest, running: btRunning, progress: btProgress, run: runBacktest } =
     useBadgeBacktest(data, horizon);
+  const { result: stopCmp, running: scRunning, progress: scProgress, run: runStopCompare } =
+    useStopCompare(data, horizon);
 
   // 判定 + 差分(蒸留は Worker 済み。ここは軽い評価のみ)
   const rows = useMemo<Row[]>(() => {
@@ -371,6 +378,14 @@ export default function PortfolioPage() {
             running={btRunning}
             progress={btProgress}
             onRun={runBacktest}
+            horizon={horizon}
+          />
+
+          <StopComparePanel
+            result={stopCmp}
+            running={scRunning}
+            progress={scProgress}
+            onRun={runStopCompare}
             horizon={horizon}
           />
 
