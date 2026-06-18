@@ -46,6 +46,28 @@ const CHANGEPOINT_PROB = 0.3; // BOCPD 変化確率がこれ以上で警戒
 const DIR_UP = 20; // レジーム総合スコアがこれ以上で「上方向」
 const DIR_DOWN = -20; // これ以下で「下方向」
 
+// 戦略ラボで可変化するための閾値束。デフォルトは上の定数と一致。
+// 生の特徴量系列に対してこの束を当ててシグナル事象を導出する(strategy-sim.ts)。
+export interface SignalThresholds {
+  hurstMeanRevert: number;
+  zExtreme: number;
+  zOversold: number;
+  volSpikeRatio: number;
+  changePointProb: number;
+  dirUp: number;
+  dirDown: number;
+}
+
+export const DEFAULT_THRESHOLDS: SignalThresholds = {
+  hurstMeanRevert: HURST_MEAN_REVERT,
+  zExtreme: Z_EXTREME,
+  zOversold: Z_OVERSOLD,
+  volSpikeRatio: VOL_SPIKE_RATIO,
+  changePointProb: CHANGEPOINT_PROB,
+  dirUp: DIR_UP,
+  dirDown: DIR_DOWN,
+};
+
 // ---- 蒸留結果 ----
 
 export type Direction = "up" | "down" | "flat";

@@ -264,12 +264,20 @@ export default function PortfolioPage() {
               ウォッチリストを横断し、今すべき判断を一覧する
             </p>
           </div>
-          <Link
-            href="/"
-            className="shrink-0 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
-          >
-            ← 個別分析へ
-          </Link>
+          <div className="shrink-0 flex items-center gap-2">
+            <Link
+              href="/strategy"
+              className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+            >
+              戦略ラボ
+            </Link>
+            <Link
+              href="/"
+              className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+            >
+              ← 個別分析へ
+            </Link>
+          </div>
         </div>
       </header>
 
