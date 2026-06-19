@@ -6,6 +6,7 @@ import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
 import {
   computeStrategy,
+  computePlan,
   buyHoldEquity,
   buyHoldMetrics,
   weekdayMatrix,
@@ -15,6 +16,8 @@ import {
   type MatrixMetric,
   type EquityPoint,
   type StrategyResult,
+  type PlanGapFill,
+  type PlanResult,
 } from "../../lib/weekday-trade";
 
 interface Props {
@@ -266,6 +269,10 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   ]);
   const [tradeCompound, setTradeCompound] = useState(true);
   const [matrixMetric, setMatrixMetric] = useState<MatrixMetric>("total");
+  // 週内プラン(複数レグ連結)モード
+  const [planMode, setPlanMode] = useState(false);
+  const [gapFill, setGapFill] = useState<PlanGapFill>("cash");
+  const [costBps, setCostBps] = useState(0);
   const addSpec = useCallback(() => {
     setSpecs(prev => prev.length >= 6 ? prev : [...prev, builder]);
   }, [builder]);
@@ -538,6 +545,11 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   );
   const bhEquity = useMemo<EquityPoint[]>(() => buyHoldEquity(prices, tradeCompound), [prices, tradeCompound]);
   const bhMetrics = useMemo(() => buyHoldMetrics(prices, tradeCompound), [prices, tradeCompound]);
+  // 週内プラン: specs を1本の資金ストリームに連結
+  const planResult = useMemo<PlanResult>(
+    () => computePlan(prices, specs, gapFill, costBps, tradeCompound),
+    [prices, specs, gapFill, costBps, tradeCompound],
+  );
   // 注文タイミングの全4通り（始値/終値 × 始値/終値）のヒートマップを一括計算
   const tradeMatrices = useMemo(
     () => TIMING_COMBOS.map(([entryTiming, exitTiming]) => ({
@@ -1369,15 +1381,17 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   // === Draw 曜日トレード・シミュレータ ===
   useEffect(() => {
     if (tradeEquityRef.current) {
-      const strategies = tradeResults.map((res, i) => ({
-        label: specLabel(specs[i]),
-        color: STRAT_COLORS[i % STRAT_COLORS.length],
-        points: res.equity,
-      }));
+      const strategies = planMode
+        ? [{ label: "週内プラン(連結)", color: "#059669", points: planResult.equity }]
+        : tradeResults.map((res, i) => ({
+            label: specLabel(specs[i]),
+            color: STRAT_COLORS[i % STRAT_COLORS.length],
+            points: res.equity,
+          }));
       drawEquityCurves(tradeEquityRef.current, bhEquity, strategies);
     }
     if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
-  }, [tradeResults, specs, bhEquity, tradeMatrices, matrixMetric, drawEquityCurves, drawTimingMatrices]);
+  }, [tradeResults, specs, bhEquity, tradeMatrices, matrixMetric, planMode, planResult, drawEquityCurves, drawTimingMatrices]);
 
   if (days.length === 0) {
     return (
@@ -1717,7 +1731,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       <div className="border border-emerald-100 rounded-lg p-3 bg-emerald-50/30">
         <div className="text-sm font-medium text-gray-700 mb-2">
           曜日トレード・シミュレータ
-          <span className="text-xs font-normal text-gray-400">（任意の曜日・注文タイミングで売買した累積リターンをバイ&ホールドと比較）</span>
+          <span className="text-xs font-normal text-gray-400">（任意の曜日・注文タイミングで売買。連結モードで週内の複数レグを1本に繋ぎ、滞在率を上げてB&Hと公平比較）</span>
         </div>
 
         {/* builder */}
@@ -1775,6 +1789,31 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           {specs.length === 0 && <span className="text-[11px] text-gray-400">戦略を「比較に追加」してください</span>}
         </div>
 
+        {/* 週内プラン(連結)モード コントロール */}
+        <div className="flex flex-wrap items-center gap-3 mb-2 text-[11px] border-t border-emerald-100 pt-2">
+          <label className="flex items-center gap-1 cursor-pointer text-gray-600">
+            <input type="checkbox" checked={planMode} onChange={e => setPlanMode(e.target.checked)} className="accent-emerald-600" />
+            <span className="font-medium">連結モード</span>（上の戦略を週内レグとして1本に連結）
+          </label>
+          {planMode && (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-gray-400">レグ間の隙間:</span>
+                {(["cash", "hold"] as PlanGapFill[]).map(g => (
+                  <button key={g} onClick={() => setGapFill(g)} className={`px-2 py-0.5 rounded transition-colors ${gapFill === g ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>
+                    {g === "cash" ? "現金(ノーポジ)" : "ロング保有"}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1 text-gray-500">
+                取引コスト
+                <input type="number" min={0} max={50} step={1} value={costBps} onChange={e => setCostBps(Math.max(0, Number(e.target.value) || 0))} className="w-12 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />
+                bps/片道
+              </label>
+            </>
+          )}
+        </div>
+
         {/* equity curve */}
         <div className="w-full rounded border border-gray-100 bg-white overflow-hidden"><canvas ref={tradeEquityRef} /></div>
 
@@ -1793,9 +1832,24 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                   <th className="py-1 px-2 text-center text-gray-500 font-medium">勝率</th>
                   <th className="py-1 px-2 text-center text-gray-500 font-medium">平均/回</th>
                   <th className="py-1 px-2 text-center text-gray-500 font-medium">滞在率</th>
+                  <th className="py-1 px-2 text-center text-gray-500 font-medium" title="総リターン÷滞在率: 市場にいる時間あたりの効率">効率</th>
                 </tr>
               </thead>
               <tbody>
+                {planMode && (
+                  <tr className="border-b border-gray-200 bg-emerald-50">
+                    <td className="py-1 px-2 font-medium" style={{ color: "#059669" }}>週内プラン(連結){gapFill === "hold" ? "・隙間ロング" : ""}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600" title="ポジション変更回数">{planResult.nTurnovers}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.totalReturn)}`}>{pct2(planResult.totalReturn)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.annualized)}`}>{pct2(planResult.annualized)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{planResult.sharpe.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(planResult.maxDD)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(planResult.exposure)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.exposure > 0 ? planResult.totalReturn / planResult.exposure : 0)}`}>{planResult.exposure > 0 ? pct2(planResult.totalReturn / planResult.exposure) : "-"}</td>
+                  </tr>
+                )}
                 {tradeResults.map((res, i) => (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium" style={{ color: STRAT_COLORS[i % STRAT_COLORS.length] }}>{specLabel(specs[i])}</td>
@@ -1807,6 +1861,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(res.winRate)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${colorClass(res.avgTrade)}`}>{pct(res.avgTrade)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(res.exposure)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.exposure > 0 ? res.totalReturn / res.exposure : 0)}`}>{res.exposure > 0 ? pct2(res.totalReturn / res.exposure) : "-"}</td>
                   </tr>
                 ))}
                 <tr className="border-b border-gray-100 bg-gray-50">
@@ -1819,9 +1874,18 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                   <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">100%</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}>{pct2(bhMetrics.totalReturn)}</td>
                 </tr>
               </tbody>
             </table>
+            {planMode && (
+              <div className="text-[11px] text-gray-500 mt-1">
+                グロス(コスト前) {pct2(planResult.grossReturn)} − コスト {pct2(planResult.totalCost)} = 純 {pct2(planResult.totalReturn)}（回転 {planResult.nTurnovers} 回 @ {costBps}bps/片道）。
+                {gapFill === "cash"
+                  ? "「現金」: レグ外は市場から退出。滞在率が低いほどB&Hに累積で勝ちにくい。"
+                  : "「ロング保有」: レグ外は常時ロング(B&Hを土台にレグで上書き)。滞在率≈100%でB&Hと公平に比較できる。"}
+              </div>
+            )}
           </div>
         )}
 
@@ -1844,9 +1908,29 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         <AnalysisGuide title="解説: 曜日トレード・シミュレータ">
           <p><span className="font-medium">何をするか:</span> 「月曜終値で買い→火曜終値で売る」のように、エントリー/エグジット曜日と注文タイミング(始値/終値)・方向(買/売)を指定し、毎週そのトレードを繰り返した累積リターンをバイ&ホールド(B&H)と比較します。</p>
           <p><span className="font-medium">トレード判定・数式:</span> 各営業日に始値=2i・終値=2i+1 の時刻順序を与え、エントリー時刻より<span className="font-medium">後</span>の最初のエグジット曜日で解消。ロング r = P_exit/P_entry − 1、ショート r = −(P_exit/P_entry − 1)。累積は複利 Π(1+r)−1 か単純合計 Σr(切替)。</p>
-          <p><span className="font-medium">指標:</span> 年率(複利は (1+総)^(252/N日)−1)/Sharpe(平均÷標準偏差を年間トレード回数で年率化)/最大DD(資産曲線のピークからの最大下落)/<span className="font-medium">滞在率</span>=保有日数/全営業日。</p>
-          <p><span className="font-medium">読み方:</span> 滞在率が低いのにB&H並みなら「市場にいる時間あたりの効率」は高い。<span className="font-medium">全組合せヒートマップ</span>は5×5曜日ペア×注文4通りを一括計算し最良ペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。</p>
-          <p><span className="font-medium">注意:</span> 取引コスト・スリッページ・税は未考慮。過去アノマリーは発見後に消えやすく、多数の組合せを試すと偶然有意に見える<span className="font-medium">多重比較</span>に注意。</p>
+
+          <p className="font-medium text-gray-700 mt-3">なぜ単独の戦略はB&Hに累積で負けやすいか（重要）</p>
+          <p>1本の戦略(例: 月終→火終で1日保有)は、エグジット後〜次のエントリーまで<span className="font-medium">現金で待機</span>します。複利の世界ではリターンの源泉は「市場にいる時間」なので、週5営業日中1日しか持たない＝<span className="font-medium">滞在率(exposure)≈0.2</span>の戦略が、常時フル投資(滞在率1.0)のB&Hに累積で勝つのは構造的にほぼ不可能です。これは戦略が悪いのではなく<span className="font-medium">土俵が違う比較</span>であることが原因です。表の<span className="font-medium">効率=総リターン÷滞在率</span>(市場にいる時間あたりの質)を見れば、滞在率を揃えた本来の優位がわかります。</p>
+
+          <p className="font-medium text-gray-700 mt-3">連結モード（複数レグを週内で1本に繋ぐ）</p>
+          <p>B&Hに累積で勝つには滞在率を上げる必要があります。連結モードは登録した戦略を<span className="font-medium">週内のレグ</span>とみなし、1本の資金ストリームに連結します。内部実装は<span className="font-medium">セグメント×ポジションベクトル方式</span>:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li><span className="font-medium">区間分解:</span> 価格を日中(open_i→close_i, 区間index 2i)とオーバーナイト(close_i→open_(i+1), 2i+1)に分解。各区間に目標ポジション pos∈{"{−1,0,+1}"} を割り当てる。</li>
+            <li><span className="font-medium">エクイティ:</span> 富 W = Π(1 + pos_s · r_s)。pos が変わる境界で取引コスト(片道 bps)を W から差し引く。<span className="font-medium">B&Hは「全区間 pos=+1」の特殊ケース</span>なので、戦略と完全に同一基盤で公平に比較できる。</li>
+            <li><span className="font-medium">レグ間の隙間:</span> 「現金」=レグ外は pos=0(退出)。「ロング保有」=既定 pos=+1(常時ロング)をレグが上書き ⇒ 滞在率≈100%でB&Hを土台に「悪い曜日だけ売り/見送り」を重ねるオーバーレイになる。</li>
+            <li><span className="font-medium">滞在率</span> = 非ゼロ区間の割合。<span className="font-medium">回転</span> = pos変更回数(コスト計算の基礎)。</li>
+          </ul>
+
+          <p className="font-medium text-gray-700 mt-3">B&Hを超えるレグの探し方</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>まず<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で総リターン/Sharpe/勝率の良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。</li>
+            <li>良いロングのレグを複数(例: 月終→火終 と 水終→木終)登録し、連結モード「現金」で滞在率を積み上げる。隙間の弱い曜日を避けつつ強い区間だけ拾えればB&H超えが狙える。</li>
+            <li>あるいは「ロング保有」で土台をB&Hにし、ヒートマップで<span className="font-medium">マイナスが濃い曜日だけショート</span>のレグを重ねて差を上乗せする(滞在率≈1.0のまま改善余地を探す最短ルート)。</li>
+            <li><span className="font-medium">効率</span>と<span className="font-medium">コスト後の純リターン</span>の両方でB&Hを上回って初めて実戦的な優位です。</li>
+          </ul>
+
+          <p><span className="font-medium">指標:</span> 年率(複利は (1+総)^(252/N日)−1)/Sharpe(日次リターンの平均÷標準偏差×√252)/最大DD(資産曲線のピークからの最大下落)。</p>
+          <p><span className="font-medium">注意:</span> コストは片道bpsの線形近似で税・スリッページの非線形性や約定不成立は未考慮。滞在率は区間数ベースで日中/オーバーナイトの時間差は等価扱い(近似)。過去アノマリーは発見後に消えやすく、多数の組合せを試すと偶然有意に見える<span className="font-medium">多重比較</span>に注意。</p>
         </AnalysisGuide>
       </div>
 

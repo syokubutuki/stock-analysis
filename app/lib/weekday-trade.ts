@@ -193,6 +193,160 @@ export function buyHoldMetrics(prices: PricePoint[], compound: boolean): BHMetri
   return { totalReturn: total, annualized, maxDD, sharpe };
 }
 
+// =============================================================
+// 週内プラン（複数レグ連結）: セグメント×ポジションベクトル方式
+// -------------------------------------------------------------
+// すべてを「価格イベント間の区間(segment)」に分解し、各区間に目標ポジション
+// (+1 long / -1 short / 0 flat)を割り当てて全区間の積で1本のエクイティを作る。
+//   ・日中(intraday) :  open_i → close_i        return = close_i/open_i − 1
+//   ・オーバーナイト   :  close_i → open_{i+1}    return = open_{i+1}/close_i − 1
+// 区間index:  intraday_i = 2i,  overnight_i = 2i+1  （総数 2n−1）
+// これによりバイ&ホールドは「全区間 pos=+1」の特殊ケースとなり、戦略と同一基盤で
+// 公平に比較できる。複数レグを並べれば exposure を 1.0 に近づけられる。
+// =============================================================
+
+export type PlanGapFill = "cash" | "hold";
+
+export interface PlanResult {
+  equity: EquityPoint[]; // 日次。v = 累積リターン(0始まり)
+  totalReturn: number;
+  grossReturn: number; // コスト控除前
+  annualized: number;
+  sharpe: number;
+  maxDD: number;
+  exposure: number; // 非ゼロ区間の割合(0..1)
+  nTurnovers: number; // ポジション変更回数(往復で2)
+  totalCost: number; // コストで失った富の割合(近似, 富比)
+  nSegments: number;
+}
+
+interface Segment {
+  ret: number;
+  t: number;
+  isClose: boolean; // 日中区間(=その日の終値で確定)か
+}
+
+function buildSegments(pts: DayPt[]): Segment[] {
+  const segs: Segment[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    // intraday_i
+    const o = pts[i].open, c = pts[i].close;
+    segs.push({ ret: o > 0 ? c / o - 1 : 0, t: pts[i].t, isClose: true });
+    // overnight_i (最終日には存在しない)
+    if (i < pts.length - 1) {
+      const c2 = pts[i + 1].open;
+      segs.push({ ret: c > 0 ? c2 / c - 1 : 0, t: pts[i + 1].t, isClose: false });
+    }
+  }
+  return segs;
+}
+
+// 1レグを「毎週」スキャンし、覆うセグメント区間 [first,last] を pos に書き込む。
+// gapFill==="hold" は置換(overlay)、"cash" は加算(複数ロングで exposure を積む)。
+function applyLeg(pts: DayPt[], pos: number[], leg: TradeSpec, gapFill: PlanGapFill): void {
+  const n = pts.length;
+  const sgn = leg.side === "long" ? 1 : -1;
+  let i = 0;
+  while (i < n) {
+    if (pts[i].dow !== leg.entryDow) { i++; continue; }
+    const entryOrd = 2 * i + (leg.entryTiming === "open" ? 0 : 1);
+    let j = -1;
+    for (let k = i; k < n; k++) {
+      if (pts[k].dow !== leg.exitDow) continue;
+      const exitOrd = 2 * k + (leg.exitTiming === "open" ? 0 : 1);
+      if (exitOrd > entryOrd) { j = k; break; }
+    }
+    if (j < 0) break;
+    const first = 2 * i + (leg.entryTiming === "open" ? 0 : 1);
+    const last = leg.exitTiming === "open" ? 2 * j - 1 : 2 * j;
+    const lo = Math.max(0, first), hi = Math.min(pos.length - 1, last);
+    for (let s = lo; s <= hi; s++) {
+      pos[s] = gapFill === "hold" ? sgn : pos[s] + sgn;
+    }
+    i = j + 1;
+  }
+}
+
+export function computePlan(
+  prices: PricePoint[],
+  legs: TradeSpec[],
+  gapFill: PlanGapFill,
+  costBps: number,
+  compound: boolean,
+): PlanResult {
+  const pts = toDayPts(prices);
+  const n = pts.length;
+  const segs = buildSegments(pts);
+  const nSeg = segs.length;
+  const empty: PlanResult = {
+    equity: [], totalReturn: 0, grossReturn: 0, annualized: 0, sharpe: 0,
+    maxDD: 0, exposure: 0, nTurnovers: 0, totalCost: 0, nSegments: nSeg,
+  };
+  if (n < 2 || nSeg < 1) return empty;
+
+  // ポジションベクトル: hold は既定+1(常時ロング)を legs が置換、cash は既定0を加算
+  const pos = new Array(nSeg).fill(gapFill === "hold" ? 1 : 0);
+  for (const leg of legs) applyLeg(pts, pos, leg, gapFill);
+  // 加算モードはレバレッジを避けるため [-1,1] にクランプ
+  for (let s = 0; s < nSeg; s++) pos[s] = Math.max(-1, Math.min(1, pos[s]));
+
+  const costRate = costBps / 10000;
+  let W = 1, Wg = 1; // 純資産 / グロス(コスト控除前)
+  let prevPos = 0, nTurn = 0, inMarket = 0;
+  const dailyW: number[] = [];
+  for (let s = 0; s < nSeg; s++) {
+    const p = pos[s];
+    if (p !== prevPos) {
+      const turn = Math.abs(p - prevPos);
+      W *= 1 - costRate * turn;
+      nTurn++;
+      prevPos = p;
+    }
+    if (p !== 0) inMarket++;
+    const m = 1 + p * segs[s].ret;
+    W *= m; Wg *= m;
+    if (segs[s].isClose) dailyW.push(W); // その日の終値時点の富
+  }
+  // 最終ポジションを手仕舞う際のコスト
+  if (prevPos !== 0) { W *= 1 - costRate * Math.abs(prevPos); nTurn++; }
+
+  // 日次リターン → エクイティ
+  const dailyRet: number[] = [];
+  for (let i = 0; i < dailyW.length; i++) dailyRet.push(dailyW[i] / (i > 0 ? dailyW[i - 1] : 1) - 1);
+  const equity: EquityPoint[] = [];
+  let cum = 1, sum = 0;
+  // 日次の時刻は intraday 区間の時刻(=その営業日)
+  for (let i = 0; i < dailyW.length; i++) {
+    if (compound) { cum *= 1 + dailyRet[i]; equity.push({ t: pts[i].t, v: cum - 1 }); }
+    else { sum += dailyRet[i]; equity.push({ t: pts[i].t, v: sum }); }
+  }
+
+  const total = equity.length ? equity[equity.length - 1].v : 0;
+  const gross = Wg - 1;
+  const years = n / 252 || 1;
+  const annualized = compound ? Math.pow(1 + total, 1 / years) - 1 : total / years;
+  const avg = dailyRet.length ? dailyRet.reduce((a, b) => a + b, 0) / dailyRet.length : 0;
+  const variance = dailyRet.length > 1 ? dailyRet.reduce((a, v) => a + (v - avg) ** 2, 0) / (dailyRet.length - 1) : 0;
+  const sd = Math.sqrt(variance);
+  const sharpe = sd > 0 ? (avg / sd) * Math.sqrt(252) : 0;
+
+  let peak = -Infinity, maxDD = 0;
+  for (const e of equity) {
+    const w = 1 + e.v;
+    peak = Math.max(peak, w);
+    const dd = (w - peak) / peak;
+    if (dd < maxDD) maxDD = dd;
+  }
+
+  return {
+    equity, totalReturn: total, grossReturn: gross, annualized, sharpe, maxDD,
+    exposure: nSeg ? inMarket / nSeg : 0,
+    nTurnovers: nTurn,
+    totalCost: gross - total,
+    nSegments: nSeg,
+  };
+}
+
 export type MatrixMetric = "total" | "sharpe" | "winRate";
 
 // 全25通り(エントリー曜日 × エグジット曜日)の指標グリッド。row=エントリー, col=エグジット (0=月..4=金)
