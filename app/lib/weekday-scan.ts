@@ -112,11 +112,19 @@ export interface AtomStat {
 
 const DOW_KANJI = ["", "月", "火", "水", "木", "金"];
 
+// 素片×年: 各素片の年別平均リターン(エッジの持続/減衰を見る)
+export interface AtomYearGrid {
+  years: number[];                   // 昇順の年
+  grid: (number | null)[][];         // grid[atomIdx][yearIdx] = その年その素片の平均(N<2はnull)
+  maxAbs: number;                    // 色濃度の基準(全セル最大絶対値)
+}
+
 export interface AtomAnalysis {
   atoms: AtomStat[];                 // 長さ10、週内の時間順
   cumulative: number[];             // 長さ11、累積平均(0始まり)。週内クロック
   bestLong: { from: number; to: number; sum: number; spec: TradeSpec } | null;  // 最大部分和 → 買い好機窓
   bestShort: { from: number; to: number; sum: number; spec: TradeSpec } | null; // 最小部分和 → 売り好機窓
+  yearly: AtomYearGrid;             // 素片×年ヒートマップ用
 }
 
 // 素片 index → TradeSpec の境界変換。
@@ -158,17 +166,25 @@ function bestSubarray(means: number[], sign: 1 | -1): { from: number; to: number
 }
 
 export function analyzeAtoms(prices: PricePoint[]): AtomAnalysis {
-  // 10素片のリターン配列
+  // 10素片のリターン配列(全期間 / 年別)
   const buckets: number[][] = Array.from({ length: 10 }, () => []);
+  const byYear: Map<number, number[][]> = new Map(); // year → 10素片の配列
   for (let i = 1; i < prices.length; i++) {
     const p = prices[i], prev = prices[i - 1];
-    const d = new Date(p.time).getDay();
+    const dt = new Date(p.time);
+    const d = dt.getDay();
     if (d < 1 || d > 5) continue;
     const pc = prev.close, o = p.open, c = p.close;
     if (!(pc > 0) || !(o > 0) || !(c > 0)) continue;
+    const on = Math.log(o / pc), id = Math.log(c / o);
     const k0 = (d - 1) * 2; // overnight
-    buckets[k0].push(Math.log(o / pc));
-    buckets[k0 + 1].push(Math.log(c / o)); // intraday
+    buckets[k0].push(on);
+    buckets[k0 + 1].push(id); // intraday
+    const y = dt.getFullYear();
+    let yb = byYear.get(y);
+    if (!yb) { yb = Array.from({ length: 10 }, () => []); byYear.set(y, yb); }
+    yb[k0].push(on);
+    yb[k0 + 1].push(id);
   }
   const atoms: AtomStat[] = buckets.map((arr, k) => {
     const dow = Math.floor(k / 2) + 1;
@@ -190,9 +206,26 @@ export function analyzeAtoms(prices: PricePoint[]): AtomAnalysis {
 
   const maxSub = bestSubarray(means, 1);
   const minSub = bestSubarray(means, -1);
+
+  // 素片×年グリッド
+  const years = Array.from(byYear.keys()).sort((a, b) => a - b);
+  const grid: (number | null)[][] = Array.from({ length: 10 }, () => []);
+  let yMaxAbs = 0;
+  for (let k = 0; k < 10; k++) {
+    for (const y of years) {
+      const arr = byYear.get(y)![k];
+      if (arr.length < 2) { grid[k].push(null); continue; }
+      const m = mean(arr);
+      grid[k].push(m);
+      yMaxAbs = Math.max(yMaxAbs, Math.abs(m));
+    }
+  }
+  const yearly: AtomYearGrid = { years, grid, maxAbs: yMaxAbs };
+
   return {
     atoms,
     cumulative,
+    yearly,
     bestLong: maxSub ? { ...maxSub, spec: windowToSpec(maxSub.from, maxSub.to, "long") } : null,
     bestShort: minSub ? { ...minSub, spec: windowToSpec(minSub.from, minSub.to, "short") } : null,
   };

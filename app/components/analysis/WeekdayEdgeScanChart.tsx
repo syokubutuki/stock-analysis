@@ -7,6 +7,7 @@ import {
   analyzeAtoms,
   scanWeekdayEdges,
   type AtomStat,
+  type AtomYearGrid,
   type ScanSort,
 } from "../../lib/weekday-scan";
 
@@ -46,6 +47,7 @@ const SORT_LABELS: Record<ScanSort, string> = {
 export default function WeekdayEdgeScanChart({ prices }: Props) {
   const spectrumRef = useRef<HTMLCanvasElement>(null);
   const clockRef = useRef<HTMLCanvasElement>(null);
+  const atomYearRef = useRef<HTMLCanvasElement>(null);
 
   const [compound, setCompound] = useState(true);
   const [minTrades, setMinTrades] = useState(12);
@@ -188,10 +190,49 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     });
   }, []);
 
+  // === 素片×年ヒートマップ(エッジの持続/減衰) ===
+  const drawAtomYear = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[], yearly: AtomYearGrid) => {
+    const { years, grid, maxAbs } = yearly;
+    const labelW = 56, headerH = 18, cellH = 20;
+    const nRows = atoms.length, nCols = years.length;
+    const totalH = headerH + nRows * cellH + 8;
+    const r = initCanvas(canvas, totalH); if (!r) return;
+    const { ctx, width } = r;
+    const cellW = Math.max(18, (width - labelW - 6) / Math.max(nCols, 1));
+
+    // ヘッダー(年)
+    ctx.fillStyle = "#666"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    for (let j = 0; j < nCols; j++) {
+      const ylabel = `'${String(years[j]).slice(2)}`;
+      ctx.fillText(ylabel, labelW + j * cellW + cellW / 2, headerH - 5);
+    }
+    // 行
+    for (let i = 0; i < nRows; i++) {
+      const a = atoms[i];
+      ctx.fillStyle = a.kind === "overnight" ? "#7c3aed" : "#0891b2";
+      ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(a.label, labelW - 4, headerH + i * cellH + cellH / 2 + 3);
+      for (let j = 0; j < nCols; j++) {
+        const v = grid[i][j];
+        const x = labelW + j * cellW, y = headerH + i * cellH;
+        if (v === null) {
+          ctx.fillStyle = "#f3f4f6";
+        } else {
+          const tnorm = Math.min(1, Math.abs(v) / (maxAbs || 0.001));
+          ctx.fillStyle = v > 0
+            ? `rgba(22,163,74,${0.12 + 0.78 * tnorm})`
+            : `rgba(220,38,38,${0.12 + 0.78 * tnorm})`;
+        }
+        ctx.fillRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (spectrumRef.current) drawSpectrum(spectrumRef.current, atomAnalysis.atoms);
     if (clockRef.current) drawClock(clockRef.current, atomAnalysis.cumulative, atomAnalysis.atoms, atomAnalysis.bestLong);
-  }, [atomAnalysis, drawSpectrum, drawClock]);
+    if (atomYearRef.current) drawAtomYear(atomYearRef.current, atomAnalysis.atoms, atomAnalysis.yearly);
+  }, [atomAnalysis, drawSpectrum, drawClock, drawAtomYear]);
 
   if (prices.length < 60) {
     return <div className="text-xs text-gray-400 p-3">データが不足しています(60営業日以上必要)。</div>;
@@ -242,6 +283,13 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ===== (A) 素片×年ヒートマップ ===== */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">素片 × 年 ヒートマップ: 各素片の平均リターンの年次推移(エッジの持続/減衰)</div>
+        <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={atomYearRef} /></div>
+        <p className="text-[10px] text-gray-400 mt-1">緑=プラス/赤=マイナス、濃さ=全セル最大絶対値に対する相対。横に同色が続く素片=持続的なエッジ。1年だけ極端=見かけ倒し。N&lt;2の年は灰色。</p>
       </div>
 
       {/* ===== (B) 戦略ランキング ===== */}
@@ -345,6 +393,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><span className="font-medium">エッジ・スペクトル:</span> 濃い緑/赤+★が付いた素片に、週内リターンの偏りが集中している。</li>
+          <li><span className="font-medium">素片×年ヒートマップ:</span> 横に同色が続く素片=毎年効く持続的なエッジ。1年だけ極端な色=その年固有の偶然で、平均がそれに引っ張られている疑い。色が左右で反転していればアノマリーの減衰・消滅。</li>
           <li><span className="font-medium">ランキング表:</span> p_adj&lt;0.05(青ハイライト) かつ 年次勝率が高く 前後半✓ かつ ブートCIが0をまたがない——この4条件を満たす行が、最も信頼に足る好機。</li>
         </ul>
 
