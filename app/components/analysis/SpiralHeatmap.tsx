@@ -48,6 +48,36 @@ function specLabel(s: TradeSpec): string {
   return `${dow[s.entryDow]}${TIMING_LABEL[s.entryTiming]}→${dow[s.exitDow]}${TIMING_LABEL[s.exitTiming]}${s.side === "short" ? " [売]" : ""}`;
 }
 
+// 注文タイミング・ヒートマップ(4サブ行列)のレイアウト幾何。描画とクリック判定で共有する。
+const TM_LAYOUT = { cellW: 44, cellH: 24, rowLabelW: 20, titleH: 16, headerH: 14, rowGap: 26, topPad: 6 };
+function timingMatrixGeom(width: number) {
+  const L = TM_LAYOUT;
+  const subW = L.rowLabelW + 5 * L.cellW;       // サブ行列1つの横幅
+  const subH = L.titleH + L.headerH + 5 * L.cellH; // サブ行列1つの縦幅
+  const totalH = L.topPad + 2 * subH + L.rowGap;
+  const colHalf = width / 2;                      // 各列を画面半分に割り当て
+  const subAt = (idx: number) => {
+    const col = idx % 2, rowBlock = Math.floor(idx / 2);
+    const subLeft = col * colHalf + (colHalf - subW) / 2;
+    const subTop = L.topPad + rowBlock * (subH + L.rowGap);
+    return { subLeft, subTop, gridLeft: subLeft + L.rowLabelW, gridTop: subTop + L.titleH + L.headerH };
+  };
+  return { ...L, subW, subH, totalH, colHalf, subAt };
+}
+// クリック座標(CSS px) → どのセル(idx=タイミング, 行=エントリー曜日, 列=エグジット曜日)か
+function hitTestTimingMatrix(width: number, x: number, y: number): { idx: number; entryDow: number; exitDow: number } | null {
+  const g = timingMatrixGeom(width);
+  for (let idx = 0; idx < 4; idx++) {
+    const s = g.subAt(idx);
+    const j = Math.floor((x - s.gridLeft) / g.cellW);
+    const i = Math.floor((y - s.gridTop) / g.cellH);
+    if (x >= s.gridLeft && y >= s.gridTop && i >= 0 && i < 5 && j >= 0 && j < 5) {
+      return { idx, entryDow: i + 1, exitDow: j + 1 };
+    }
+  }
+  return null;
+}
+
 interface DayData {
   date: string;
   dayOfWeek: number;
@@ -559,6 +589,23 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     })),
     [prices, builder.side, tradeCompound, matrixMetric],
   );
+  // ヒートマップのセルをクリック → その(曜日ペア×注文タイミング×方向)をレグとして連結プランに追加
+  const addSpecFromMatrix = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = e.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const hit = hitTestTimingMatrix(canvas.clientWidth, e.clientX - rect.left, e.clientY - rect.top);
+    if (!hit) return;
+    const grid = tradeMatrices[hit.idx]?.grid;
+    if (!grid || grid[hit.entryDow - 1][hit.exitDow - 1] === null) return; // 成立しないセルは無視
+    const [entryTiming, exitTiming] = TIMING_COMBOS[hit.idx];
+    const spec: TradeSpec = { entryDow: hit.entryDow, entryTiming, exitDow: hit.exitDow, exitTiming, side: builder.side };
+    setSpecs(prev => {
+      if (prev.length >= 6) return prev;
+      if (prev.some(s => s.entryDow === spec.entryDow && s.exitDow === spec.exitDow && s.entryTiming === spec.entryTiming && s.exitTiming === spec.exitTiming && s.side === spec.side)) return prev;
+      return [...prev, spec];
+    });
+    setPlanMode(true); // 連結プランへ追加する操作なのでモードを有効化
+  }, [tradeMatrices, builder.side]);
 
   // === year x month returns ===
   const yearMonthData = useMemo(() => {
@@ -1223,27 +1270,21 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     metric: MatrixMetric,
   ) => {
     const dow = ["月", "火", "水", "木", "金"];
-    const cellW = 44, cellH = 24, rowLabelW = 20, titleH = 16, headerH = 14;
-    const subW = rowLabelW + 5 * cellW;        // サブ行列1つの横幅
-    const subH = titleH + headerH + 5 * cellH;  // サブ行列1つの縦幅
-    const rowGap = 26, topPad = 6;
-    const totalH = topPad + 2 * subH + rowGap;
+    // 幾何はクリック判定と共有(timingMatrixGeom)
+    // initCanvas に渡す高さを得るため、まず暫定幅でレイアウトを求める
+    const parentW = canvas.parentElement?.clientWidth || 600;
+    const { cellW, cellH, subW, totalH } = timingMatrixGeom(parentW);
     const r = initCanvas(canvas, totalH); if (!r) return;
     const { ctx, width } = r;
+    const geom = timingMatrixGeom(width);
 
     // 色の基準は全4行列で共有し、タイミング間の比較を可能にする
     let maxAbs = 0;
     for (const m of matrices) for (const row of m.grid) for (const v of row) if (v !== null) maxAbs = Math.max(maxAbs, Math.abs(v));
     const fmt = (v: number) => metric === "winRate" ? (v * 100).toFixed(0) + "%" : metric === "sharpe" ? v.toFixed(2) : (v * 100).toFixed(1) + "%";
 
-    const colHalf = width / 2; // 各列を画面半分に割り当て、右側の余白を埋める
-
     matrices.forEach((m, idx) => {
-      const col = idx % 2, rowBlock = Math.floor(idx / 2);
-      const subLeft = col * colHalf + (colHalf - subW) / 2;
-      const subTop = topPad + rowBlock * (subH + rowGap);
-      const gridLeft = subLeft + rowLabelW;
-      const gridTop = subTop + titleH + headerH;
+      const { subLeft, subTop, gridLeft, gridTop } = geom.subAt(idx);
 
       // サブタイトル（注文タイミング）
       ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
@@ -1893,14 +1934,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         <div className="mt-3">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs text-gray-500">全組合せヒートマップ（注文タイミング4通り）</span>
-            <span className="text-[11px] text-gray-400">（始値/終値の全4通り × エントリー曜日×エグジット曜日 / {builder.side === "long" ? "ロング" : "ショート"}）</span>
+            <span className="text-[11px] text-emerald-700">セルをクリックで{builder.side === "long" ? "ロング" : "ショート"}レグを連結プランに追加</span>
             <div className="flex gap-1 ml-auto">
               {([["total", "総リターン"], ["sharpe", "Sharpe"], ["winRate", "勝率"]] as [MatrixMetric, string][]).map(([k, l]) => (
                 <button key={k} onClick={() => setMatrixMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${matrixMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{l}</button>
               ))}
             </div>
           </div>
-          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><canvas ref={tradeMatrixRef} /></div>
+          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><canvas ref={tradeMatrixRef} onClick={addSpecFromMatrix} className="cursor-pointer" /></div>
         </div>
       </div>
 
@@ -1923,8 +1964,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
           <p className="font-medium text-gray-700 mt-3">B&Hを超えるレグの探し方</p>
           <ul className="list-disc pl-4 space-y-1">
-            <li>まず<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で総リターン/Sharpe/勝率の良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。</li>
-            <li>良いロングのレグを複数(例: 月終→火終 と 水終→木終)登録し、連結モード「現金」で滞在率を積み上げる。隙間の弱い曜日を避けつつ強い区間だけ拾えればB&H超えが狙える。</li>
+            <li>まず<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で総リターン/Sharpe/勝率の良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。<span className="font-medium">良いセルをクリック</span>すると、その曜日ペア×注文タイミング×方向がそのまま連結プランのレグに追加される(任意のタイミング組合せを自由に拾える)。</li>
+            <li>良いロングのレグを複数(例: 月終→火終 と 水終→木終)拾い、連結モード「現金」で滞在率を積み上げる。隙間の弱い曜日を避けつつ強い区間だけ拾えればB&H超えが狙える。</li>
             <li>あるいは「ロング保有」で土台をB&Hにし、ヒートマップで<span className="font-medium">マイナスが濃い曜日だけショート</span>のレグを重ねて差を上乗せする(滞在率≈1.0のまま改善余地を探す最短ルート)。</li>
             <li><span className="font-medium">効率</span>と<span className="font-medium">コスト後の純リターン</span>の両方でB&Hを上回って初めて実戦的な優位です。</li>
           </ul>
