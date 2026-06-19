@@ -170,6 +170,10 @@ const SpiralHeatmap = dynamic(
   () => import("./components/analysis/SpiralHeatmap"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const WeekdayEdgeScanChart = dynamic(
+  () => import("./components/analysis/WeekdayEdgeScanChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const VolatilityChart = dynamic(
   () => import("./components/analysis/VolatilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
@@ -518,6 +522,10 @@ const CCMChart = dynamic(
   () => import("./components/analysis/CCMChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const HighLowTimingChart = dynamic(
+  () => import("./components/analysis/HighLowTimingChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -565,7 +573,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
   { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
-  { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ" },
+  { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ・高値/安値の時間帯分布(日中足)" },
   { key: "simulation", label: "シミュレーション", description: "カスタム売買・GBDT予測・株価予測(モンテカルロ)・バックテスト・分数BM・VG過程・最適停止" },
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
@@ -1003,7 +1011,11 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "calendar" && (
-                <SpiralHeatmap prices={filteredPrices} period={period} />
+                <>
+                  <SpiralHeatmap prices={filteredPrices} period={period} />
+                  <WeekdayEdgeScanChart prices={filteredPrices} />
+                  <HighLowTimingChart ticker={data.ticker} />
+                </>
               )}
 
               {activeSection === "simulation" && (
