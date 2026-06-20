@@ -44,7 +44,11 @@ export interface ForwardOptions {
 // ============================================================
 export type StateAxis =
   | "rsi" | "vol" | "maDist" | "trend"
-  | "rsi2" | "downStreak" | "pctFromHigh";
+  | "rsi2" | "downStreak" | "pctFromHigh"
+  | "candleRun"
+  | "tsMom" | "dist52w" | "maAlign" | "momCrash"
+  | "bbPercentB" | "prevRet"
+  | "monthPhase" | "season" | "sqWeek";
 
 export const STATE_AXES: { value: StateAxis; label: string }[] = [
   { value: "rsi", label: "RSI(14)帯" },
@@ -53,11 +57,33 @@ export const STATE_AXES: { value: StateAxis; label: string }[] = [
   { value: "trend", label: "トレンド状態" },
 ];
 
-// 5.1 短期リバーサル用の状態軸
+// 5.1/5.2/5.3 短期リバーサル用の状態軸
 export const REVERSAL_AXES: { value: StateAxis; label: string }[] = [
   { value: "rsi2", label: "RSI(2)帯" },
   { value: "downStreak", label: "連続下落日数" },
   { value: "pctFromHigh", label: "直近高値からの下落" },
+  { value: "bbPercentB", label: "ボリンジャー%b" },
+  { value: "prevRet", label: "前日リターン分位" },
+];
+
+// 1.4 連続ローソク
+export const CANDLE_RUN_AXES: { value: StateAxis; label: string }[] = [
+  { value: "candleRun", label: "陽連/陰連の長さ" },
+];
+
+// 4.1/4.2/4.4/4.5 トレンド・モメンタム
+export const TREND_AXES: { value: StateAxis; label: string }[] = [
+  { value: "tsMom", label: "12-1ヶ月モメンタム" },
+  { value: "dist52w", label: "52週高値からの距離" },
+  { value: "maAlign", label: "移動平均配列" },
+  { value: "momCrash", label: "モメンタム×ボラ(過熱)" },
+];
+
+// 10.1/10.4/10.2 カレンダー効果
+export const CALENDAR_AXES: { value: StateAxis; label: string }[] = [
+  { value: "monthPhase", label: "月末/月初(ターン)" },
+  { value: "season", label: "季節(Sell in May)" },
+  { value: "sqWeek", label: "SQ週" },
 ];
 
 export interface StateFn {
@@ -95,6 +121,21 @@ function trailingSMA(prices: PricePoint[], period: number): number[] {
     sum += prices[i].close;
     if (i >= period) sum -= prices[i - period].close;
     if (i >= period - 1) out[i] = sum / period;
+  }
+  return out;
+}
+
+// 直近 period 日の終値の標準偏差（ボリンジャーバンド用）
+function trailingStd(prices: PricePoint[], period: number): number[] {
+  const n = prices.length;
+  const out = new Array(n).fill(NaN);
+  for (let i = period - 1; i < n; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += prices[j].close;
+    const m = sum / period;
+    let v = 0;
+    for (let j = i - period + 1; j <= i; j++) v += (prices[j].close - m) ** 2;
+    out[i] = Math.sqrt(v / period);
   }
   return out;
 }
@@ -237,6 +278,166 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis): StateFn {
         if (d <= -0.07) return order[1];
         if (d <= -0.02) return order[2];
         return order[3];
+      },
+    };
+  }
+  if (axis === "candleRun") {
+    const order = ["陰3連以上", "陰2連", "直近陰線", "直近陽線", "陽2連", "陽3連以上"];
+    const bull = prices.map((p) => p.close > p.open);
+    const streak = new Array(prices.length).fill(0); // 符号付き連続数
+    for (let i = 0; i < prices.length; i++) {
+      if (i === 0) { streak[i] = bull[i] ? 1 : -1; continue; }
+      const dir = bull[i] ? 1 : -1;
+      const prevDir = streak[i - 1] > 0 ? 1 : -1;
+      streak[i] = dir === prevDir ? streak[i - 1] + dir : dir;
+    }
+    return {
+      order,
+      stateOf: (i) => {
+        const s = streak[i];
+        if (s <= -3) return order[0];
+        if (s === -2) return order[1];
+        if (s === -1) return order[2];
+        if (s === 1) return order[3];
+        if (s === 2) return order[4];
+        return order[5];
+      },
+    };
+  }
+  if (axis === "tsMom") {
+    const order = ["強い下降(<-10%)", "弱い下降(-10〜0%)", "弱い上昇(0〜+10%)", "強い上昇(>+10%)"];
+    return {
+      order,
+      stateOf: (i) => {
+        if (i < 252) return null;
+        const m = prices[i - 21].close / prices[i - 252].close - 1; // 12-1ヶ月
+        if (m < -0.1) return order[0];
+        if (m < 0) return order[1];
+        if (m < 0.1) return order[2];
+        return order[3];
+      },
+    };
+  }
+  if (axis === "dist52w") {
+    const order = ["高値圏(0〜-2%)", "やや下(-2〜-10%)", "中位(-10〜-25%)", "安値圏(<-25%)"];
+    const win = 252;
+    const rollMax = new Array(prices.length).fill(NaN);
+    for (let i = 0; i < prices.length; i++) {
+      let m = -Infinity;
+      for (let j = Math.max(0, i - win + 1); j <= i; j++) m = Math.max(m, prices[j].high);
+      if (i >= win - 1) rollMax[i] = m;
+    }
+    return {
+      order,
+      stateOf: (i) => {
+        const m = rollMax[i];
+        if (isNaN(m) || m <= 0) return null;
+        const d = (prices[i].close - m) / m;
+        if (d >= -0.02) return order[0];
+        if (d >= -0.1) return order[1];
+        if (d >= -0.25) return order[2];
+        return order[3];
+      },
+    };
+  }
+  if (axis === "maAlign") {
+    const order = ["完全弱気配列", "混在", "完全強気配列"];
+    const s5 = trailingSMA(prices, 5), s25 = trailingSMA(prices, 25), s75 = trailingSMA(prices, 75);
+    return {
+      order,
+      stateOf: (i) => {
+        const a = s5[i], b = s25[i], c = s75[i];
+        if (isNaN(a) || isNaN(b) || isNaN(c)) return null;
+        if (a > b && b > c) return order[2];
+        if (a < b && b < c) return order[0];
+        return order[1];
+      },
+    };
+  }
+  if (axis === "momCrash") {
+    const order = ["下落局面", "低ボラ上昇", "高ボラ上昇(過熱)"];
+    const rv = rollingRealizedVol(prices, 20);
+    const [, t2] = terciles(rv);
+    return {
+      order,
+      stateOf: (i) => {
+        if (i < 252 || isNaN(rv[i]) || isNaN(t2)) return null;
+        const m = prices[i - 21].close / prices[i - 252].close - 1;
+        if (m <= 0) return order[0];
+        return rv[i] >= t2 ? order[2] : order[1];
+      },
+    };
+  }
+  if (axis === "bbPercentB") {
+    const order = ["下限割れ(<0)", "下部(0-0.2)", "中央(0.2-0.8)", "上部(0.8-1)", "上限超え(>1)"];
+    const sma = trailingSMA(prices, 20);
+    const sd = trailingStd(prices, 20);
+    return {
+      order,
+      stateOf: (i) => {
+        if (isNaN(sma[i]) || isNaN(sd[i]) || sd[i] === 0) return null;
+        const upper = sma[i] + 2 * sd[i], lower = sma[i] - 2 * sd[i];
+        const pb = (prices[i].close - lower) / (upper - lower);
+        if (pb < 0) return order[0];
+        if (pb < 0.2) return order[1];
+        if (pb < 0.8) return order[2];
+        if (pb <= 1) return order[3];
+        return order[4];
+      },
+    };
+  }
+  if (axis === "prevRet") {
+    const order = ["前日下位(大幅安)", "前日中位", "前日上位(大幅高)"];
+    const rets: number[] = [];
+    for (let i = 1; i < prices.length; i++) if (prices[i - 1].close > 0) rets.push(prices[i].close / prices[i - 1].close - 1);
+    const [t1, t2] = terciles(rets);
+    return {
+      order,
+      stateOf: (i) => {
+        if (i < 1 || prices[i - 1].close <= 0 || isNaN(t1)) return null;
+        const r = prices[i].close / prices[i - 1].close - 1;
+        if (r < t1) return order[0];
+        if (r < t2) return order[1];
+        return order[2];
+      },
+    };
+  }
+  if (axis === "monthPhase") {
+    const order = ["月初(最初3営業日)", "月中", "月末(最後3営業日)"];
+    const n2 = prices.length;
+    const month = prices.map((p) => { const d = new Date(p.time); return d.getFullYear() * 12 + d.getMonth(); });
+    const fromStart = new Array(n2).fill(99);
+    const toEnd = new Array(n2).fill(99);
+    let cnt = 0;
+    for (let i = 0; i < n2; i++) { cnt = i > 0 && month[i] === month[i - 1] ? cnt + 1 : 0; fromStart[i] = cnt; }
+    let cnt2 = 0;
+    for (let i = n2 - 1; i >= 0; i--) { cnt2 = i < n2 - 1 && month[i] === month[i + 1] ? cnt2 + 1 : 0; toEnd[i] = cnt2; }
+    return {
+      order,
+      stateOf: (i) => {
+        if (toEnd[i] <= 2) return order[2];
+        if (fromStart[i] <= 2) return order[0];
+        return order[1];
+      },
+    };
+  }
+  if (axis === "season") {
+    const order = ["5-10月(Sell in May)", "11-4月(Halloween)"];
+    return {
+      order,
+      stateOf: (i) => {
+        const m = new Date(prices[i].time).getMonth(); // 0..11
+        return m >= 4 && m <= 9 ? order[0] : order[1];
+      },
+    };
+  }
+  if (axis === "sqWeek") {
+    const order = ["通常週", "SQ週(第2金曜週)"];
+    return {
+      order,
+      stateOf: (i) => {
+        const dom = new Date(prices[i].time).getDate();
+        return dom >= 8 && dom <= 14 ? order[1] : order[0];
       },
     };
   }

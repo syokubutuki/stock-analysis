@@ -598,6 +598,18 @@ const CandlePatternEdgeChart = dynamic(
   () => import("./components/analysis/CandlePatternEdgeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const GapClassificationChart = dynamic(
+  () => import("./components/analysis/GapClassificationChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const CandleRunChart = dynamic(
+  () => import("./components/analysis/CandleRunChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const WickPressureChart = dynamic(
+  () => import("./components/analysis/WickPressureChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -901,6 +913,8 @@ export default function AnalysisPage() {
                   <CrashSurgeStreakChart prices={filteredPrices} />
                   <CandlestickPatternChart prices={filteredPrices} />
                   <CandlePatternEdgeChart prices={filteredPrices} />
+                  <CandleRunChart prices={filteredPrices} />
+                  <WickPressureChart prices={filteredPrices} />
                   <IntradayPathChart prices={filteredPrices} />
                   <ClosePositionChart prices={filteredPrices} />
                   <TrueRangeDecompChart prices={filteredPrices} />
@@ -909,6 +923,7 @@ export default function AnalysisPage() {
                   <div id="sa-ohlc-gap" className="scroll-mt-20">
                     <GapScatterChart prices={allPrices} period={period} />
                   </div>
+                  <GapClassificationChart prices={filteredPrices} />
                   <div id="sa-ohlc-range" className="scroll-mt-20">
                     <IntradayRangeChart prices={allPrices} period={period} />
                   </div>
