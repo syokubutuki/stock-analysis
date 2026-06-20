@@ -694,6 +694,14 @@ const BenchmarkDCCChart = dynamic(
   () => import("./components/analysis/BenchmarkDCCChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const RegimeClusteringChart = dynamic(
+  () => import("./components/analysis/RegimeClusteringChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const MultivarSimplexChart = dynamic(
+  () => import("./components/analysis/MultivarSimplexChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -1240,6 +1248,8 @@ export default function AnalysisPage() {
                 <>
                   <CustomReturnChart prices={allPrices} />
                   <HistoricalAnalogChart prices={filteredPrices} />
+                  <RegimeClusteringChart prices={filteredPrices} />
+                  <MultivarSimplexChart prices={filteredPrices} />
                   <PriceForecastChart prices={filteredPrices} />
                   <SimpleBacktestChart prices={filteredPrices} />
                   <div id="sa-sim-meanrev" className="scroll-mt-20">
