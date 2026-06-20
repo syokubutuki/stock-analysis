@@ -26,6 +26,45 @@ export interface DecompStats {
 function mean(a: number[]): number {
   return a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
 }
+
+// 8.2 曜日別の夜間/日中リターン分解。各曜日の平均夜間・日中リターンと累積を返す。
+export interface WeekdayDecomp {
+  weekday: number;
+  label: string;
+  n: number;
+  meanOvernight: number;
+  meanIntraday: number;
+  cumOvernight: number; // 複利累積
+  cumIntraday: number;
+}
+const WD = ["日", "月", "火", "水", "木", "金", "土"];
+
+export function decomposeByWeekday(prices: PricePoint[]): WeekdayDecomp[] {
+  const onByWd: number[][] = Array.from({ length: 7 }, () => []);
+  const idByWd: number[][] = Array.from({ length: 7 }, () => []);
+  for (let i = 1; i < prices.length; i++) {
+    const prevC = prices[i - 1].close, o = prices[i].open, c = prices[i].close;
+    if (!(prevC > 0) || !(o > 0) || !(c > 0)) continue;
+    const wd = new Date(prices[i].time).getDay();
+    onByWd[wd].push((o - prevC) / prevC);
+    idByWd[wd].push((c - o) / o);
+  }
+  const out: WeekdayDecomp[] = [];
+  for (let wd = 1; wd <= 5; wd++) {
+    const on = onByWd[wd], id = idByWd[wd];
+    if (on.length === 0) continue;
+    out.push({
+      weekday: wd,
+      label: WD[wd],
+      n: on.length,
+      meanOvernight: mean(on),
+      meanIntraday: mean(id),
+      cumOvernight: on.reduce((e, r) => e * (1 + r), 1) - 1,
+      cumIntraday: id.reduce((e, r) => e * (1 + r), 1) - 1,
+    });
+  }
+  return out;
+}
 function variance(a: number[]): number {
   if (a.length < 2) return 0;
   const m = mean(a);

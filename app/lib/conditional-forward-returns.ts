@@ -457,6 +457,54 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis): StateFn {
 }
 
 // ============================================================
+// 9.2 2変数コンディショニング
+// ============================================================
+export interface TwoFactorCell {
+  xLabel: string; yLabel: string; n: number; meanFwd: number; winRate: number;
+}
+export interface TwoFactorResult {
+  cells: TwoFactorCell[];
+  xOrder: string[]; yOrder: string[];
+  nowX: string | null; nowY: string | null;
+  maxAbs: number;
+}
+
+export function twoFactorForward(
+  prices: PricePoint[],
+  sx: StateFn,
+  sy: StateFn,
+  horizon: number
+): TwoFactorResult {
+  const n = prices.length;
+  const map = new Map<string, number[]>();
+  for (let i = 0; i <= n - horizon - 1; i++) {
+    const lx = sx.stateOf(i), ly = sy.stateOf(i);
+    if (lx === null || ly === null) continue;
+    const entryPx = prices[i].close, exitPx = prices[i + horizon].close;
+    if (!(entryPx > 0) || !(exitPx > 0)) continue;
+    const r = (exitPx - entryPx) / entryPx;
+    const key = `${lx}||${ly}`;
+    const arr = map.get(key) ?? [];
+    arr.push(r);
+    map.set(key, arr);
+  }
+  const cells: TwoFactorCell[] = [];
+  let maxAbs = 1e-9;
+  for (const xLabel of sx.order) for (const yLabel of sy.order) {
+    const arr = map.get(`${xLabel}||${yLabel}`);
+    if (!arr || arr.length === 0) continue;
+    const m = mean(arr);
+    maxAbs = Math.max(maxAbs, Math.abs(m));
+    cells.push({ xLabel, yLabel, n: arr.length, meanFwd: m, winRate: arr.filter((r) => r > 0).length / arr.length });
+  }
+  const lastLabel = (s: StateFn) => {
+    for (let i = n - 1; i >= 0; i--) { const l = s.stateOf(i); if (l !== null) return l; }
+    return null;
+  };
+  return { cells, xOrder: sx.order, yOrder: sy.order, nowX: lastLabel(sx), nowY: lastLabel(sy), maxAbs };
+}
+
+// ============================================================
 // 集計本体
 // ============================================================
 export function conditionalForwardReturns(

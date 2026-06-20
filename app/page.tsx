@@ -670,6 +670,18 @@ const ConditionalBetaChart = dynamic(
   () => import("./components/analysis/ConditionalBetaChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const WeekdayDecompChart = dynamic(
+  () => import("./components/analysis/WeekdayDecompChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const TwoFactorHeatmapChart = dynamic(
+  () => import("./components/analysis/TwoFactorHeatmapChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const StatePredictabilityChart = dynamic(
+  () => import("./components/analysis/StatePredictabilityChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -1026,6 +1038,7 @@ export default function AnalysisPage() {
                     <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
                   </div>
                   <OvernightIntradayChart prices={filteredPrices} />
+                  <WeekdayDecompChart prices={filteredPrices} />
                 </>
               )}
 
@@ -1187,6 +1200,8 @@ export default function AnalysisPage() {
                   <ConditionalForwardChart prices={filteredPrices} />
                   <TrendMomentumChart prices={filteredPrices} />
                   <ShortTermReversalChart prices={filteredPrices} />
+                  <TwoFactorHeatmapChart prices={filteredPrices} />
+                  <StatePredictabilityChart prices={filteredPrices} />
                 </>
               )}
 
