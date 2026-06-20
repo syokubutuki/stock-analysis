@@ -650,6 +650,26 @@ const BreakoutStatsChart = dynamic(
   () => import("./components/analysis/BreakoutStatsChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const RiskRatiosChart = dynamic(
+  () => import("./components/analysis/RiskRatiosChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RollingVaRChart = dynamic(
+  () => import("./components/analysis/RollingVaRChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const DrawdownDistChart = dynamic(
+  () => import("./components/analysis/DrawdownDistChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const DownsideDecompChart = dynamic(
+  () => import("./components/analysis/DownsideDecompChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ConditionalBetaChart = dynamic(
+  () => import("./components/analysis/ConditionalBetaChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -992,6 +1012,11 @@ export default function AnalysisPage() {
                   <FinanceTheoryChart prices={filteredPrices} />
                   <VolSmileChart prices={filteredPrices} />
                   <SpreadEstimatorChart prices={filteredPrices} />
+                  <DrawdownDistChart prices={filteredPrices} />
+                  <RiskRatiosChart prices={filteredPrices} />
+                  <RollingVaRChart prices={filteredPrices} />
+                  <DownsideDecompChart prices={filteredPrices} />
+                  <ConditionalBetaChart prices={filteredPrices} />
                 </>
               )}
 
