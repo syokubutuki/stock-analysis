@@ -718,6 +718,18 @@ const KellyChart = dynamic(
   () => import("./components/analysis/KellyChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const PersistenceChart = dynamic(
+  () => import("./components/analysis/PersistenceChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RollingAnimationChart = dynamic(
+  () => import("./components/analysis/RollingAnimationChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ConsolidatedScorecardChart = dynamic(
+  () => import("./components/analysis/ConsolidatedScorecardChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -986,6 +998,8 @@ export default function AnalysisPage() {
                 <>
                   <UnifiedChart prices={allPrices} period={period} onNavigate={navigateToSection} />
                   <StructureScorecardChart prices={filteredPrices} />
+                  <ConsolidatedScorecardChart prices={filteredPrices} />
+                  <RollingAnimationChart prices={filteredPrices} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <RelativeStrengthChart prices={filteredPrices} />
                   <RelativeStrengthExtChart prices={filteredPrices} />
@@ -1240,6 +1254,7 @@ export default function AnalysisPage() {
                   <ShortTermReversalChart prices={filteredPrices} />
                   <TwoFactorHeatmapChart prices={filteredPrices} />
                   <StatePredictabilityChart prices={filteredPrices} />
+                  <PersistenceChart prices={filteredPrices} />
                 </>
               )}
 
