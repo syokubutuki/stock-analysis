@@ -702,6 +702,22 @@ const MultivarSimplexChart = dynamic(
   () => import("./components/analysis/MultivarSimplexChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const StopComparisonChart = dynamic(
+  () => import("./components/analysis/StopComparisonChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RMultipleChart = dynamic(
+  () => import("./components/analysis/RMultipleChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const BlockBootstrapChart = dynamic(
+  () => import("./components/analysis/BlockBootstrapChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const KellyChart = dynamic(
+  () => import("./components/analysis/KellyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -1258,6 +1274,10 @@ export default function AnalysisPage() {
                   <div id="sa-sim-arima" className="scroll-mt-20">
                     <ArimaChart prices={filteredPrices} seriesMode={seriesMode} />
                   </div>
+                  <StopComparisonChart prices={filteredPrices} />
+                  <RMultipleChart prices={filteredPrices} />
+                  <BlockBootstrapChart prices={filteredPrices} />
+                  <KellyChart prices={filteredPrices} />
                   <JumpDiffusionChart prices={filteredPrices} />
                   <OptimalStoppingChart prices={filteredPrices} />
                   <VarianceGammaChart prices={filteredPrices} />
