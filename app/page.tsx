@@ -638,6 +638,14 @@ const WickPressureChart = dynamic(
   () => import("./components/analysis/WickPressureChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const TrendMomentumChart = dynamic(
+  () => import("./components/analysis/TrendMomentumChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RollingVarianceRatioChart = dynamic(
+  () => import("./components/analysis/RollingVarianceRatioChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -1010,6 +1018,7 @@ export default function AnalysisPage() {
                   <UnitRootChart prices={filteredPrices} seriesMode={seriesMode} />
                   <StylizedFactsChart prices={filteredPrices} seriesMode={seriesMode} />
                   <VarianceRatioChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <RollingVarianceRatioChart prices={filteredPrices} />
                 </>
               )}
 
@@ -1146,6 +1155,7 @@ export default function AnalysisPage() {
               {activeSection === "conditional" && (
                 <>
                   <ConditionalForwardChart prices={filteredPrices} />
+                  <TrendMomentumChart prices={filteredPrices} />
                   <ShortTermReversalChart prices={filteredPrices} />
                 </>
               )}
