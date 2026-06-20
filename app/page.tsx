@@ -682,6 +682,10 @@ const StatePredictabilityChart = dynamic(
   () => import("./components/analysis/StatePredictabilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const CalendarEffectChart = dynamic(
+  () => import("./components/analysis/CalendarEffectChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -1209,6 +1213,7 @@ export default function AnalysisPage() {
                 <>
                   <SpiralHeatmap prices={filteredPrices} period={period} />
                   <CandleSeasonalityChart prices={filteredPrices} />
+                  <CalendarEffectChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <HighLowTimingChart ticker={data.ticker} />
                   <IntradayProfileChart ticker={data.ticker} />

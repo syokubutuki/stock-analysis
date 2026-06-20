@@ -48,7 +48,7 @@ export type StateAxis =
   | "candleRun"
   | "tsMom" | "dist52w" | "maAlign" | "momCrash"
   | "bbPercentB" | "prevRet"
-  | "monthPhase" | "season" | "sqWeek";
+  | "monthPhase" | "season" | "sqWeek" | "preHoliday";
 
 export const STATE_AXES: { value: StateAxis; label: string }[] = [
   { value: "rsi", label: "RSI(14)帯" },
@@ -79,11 +79,12 @@ export const TREND_AXES: { value: StateAxis; label: string }[] = [
   { value: "momCrash", label: "モメンタム×ボラ(過熱)" },
 ];
 
-// 10.1/10.4/10.2 カレンダー効果
+// 10.1/10.4/10.2/10.3 カレンダー効果
 export const CALENDAR_AXES: { value: StateAxis; label: string }[] = [
   { value: "monthPhase", label: "月末/月初(ターン)" },
   { value: "season", label: "季節(Sell in May)" },
   { value: "sqWeek", label: "SQ週" },
+  { value: "preHoliday", label: "連休前後" },
 ];
 
 export interface StateFn {
@@ -438,6 +439,21 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis): StateFn {
       stateOf: (i) => {
         const dom = new Date(prices[i].time).getDate();
         return dom >= 8 && dom <= 14 ? order[1] : order[0];
+      },
+    };
+  }
+  if (axis === "preHoliday") {
+    const order = ["連休明け", "通常日", "連休前"];
+    const dayMs = 86400000;
+    const t = prices.map((p) => new Date(p.time).getTime());
+    return {
+      order,
+      stateOf: (i) => {
+        const gapNext = i < prices.length - 1 ? (t[i + 1] - t[i]) / dayMs : 1;
+        const gapPrev = i > 0 ? (t[i] - t[i - 1]) / dayMs : 1;
+        if (gapNext >= 3) return order[2]; // 翌営業日まで3日以上＝連休前
+        if (gapPrev >= 3) return order[0]; // 前営業日から3日以上＝連休明け
+        return order[1];
       },
     };
   }
