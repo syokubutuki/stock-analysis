@@ -222,6 +222,10 @@ const KramersMoyalChart = dynamic(
   () => import("./components/analysis/KramersMoyalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const OHLCVolatilityChart = dynamic(
+  () => import("./components/analysis/OHLCVolatilityChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const RangeVolatilityChart = dynamic(
   () => import("./components/analysis/RangeVolatilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
@@ -526,6 +530,74 @@ const HighLowTimingChart = dynamic(
   () => import("./components/analysis/HighLowTimingChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const CandleSeasonalityChart = dynamic(
+  () => import("./components/analysis/CandleSeasonalityChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const IntradayProfileChart = dynamic(
+  () => import("./components/analysis/IntradayProfileChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const VwapDeviationChart = dynamic(
+  () => import("./components/analysis/VwapDeviationChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const IntradayRegimeChart = dynamic(
+  () => import("./components/analysis/IntradayRegimeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const IntradayExcursionChart = dynamic(
+  () => import("./components/analysis/IntradayExcursionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RealizedVolChart = dynamic(
+  () => import("./components/analysis/RealizedVolChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const GapIntradayChart = dynamic(
+  () => import("./components/analysis/GapIntradayChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SignalIntradayChart = dynamic(
+  () => import("./components/analysis/SignalIntradayChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ConditionalForwardChart = dynamic(
+  () => import("./components/analysis/ConditionalForwardChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ShortTermReversalChart = dynamic(
+  () => import("./components/analysis/ShortTermReversalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const OvernightIntradayChart = dynamic(
+  () => import("./components/analysis/OvernightIntradayChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SpreadEstimatorChart = dynamic(
+  () => import("./components/analysis/SpreadEstimatorChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RangeContractionChart = dynamic(
+  () => import("./components/analysis/RangeContractionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RelativeStrengthChart = dynamic(
+  () => import("./components/analysis/RelativeStrengthChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const HistoricalAnalogChart = dynamic(
+  () => import("./components/analysis/HistoricalAnalogChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const TpSlOptimizerChart = dynamic(
+  () => import("./components/analysis/TpSlOptimizerChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const CandlePatternEdgeChart = dynamic(
+  () => import("./components/analysis/CandlePatternEdgeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -550,6 +622,7 @@ type SectionKey =
   | "entropy"
   | "fractal"
   | "network"
+  | "conditional"
   | "calendar"
   | "regime"
   | "causal"
@@ -570,10 +643,11 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "entropy", label: "情報理論", description: "エントロピー拡張・複雑度・情報フロー・レジーム検出・予測可能性" },
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・ローリングHurst+サロゲート帯・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
+  { key: "conditional", label: "条件付き分析", description: "状態→先行きリターン表（RSI/ボラ/トレンド別の条件付き期待値・有意性・年次持続性）" },
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
   { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
-  { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ・高値/安値の時間帯分布(日中足)" },
+  { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ・ローソク足の季節性・高値/安値の時間帯分布(日中足)" },
   { key: "simulation", label: "シミュレーション", description: "カスタム売買・GBDT予測・株価予測(モンテカルロ)・バックテスト・分数BM・VG過程・最適停止" },
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
@@ -793,6 +867,7 @@ export default function AnalysisPage() {
                   <UnifiedChart prices={allPrices} period={period} onNavigate={navigateToSection} />
                   <StructureScorecardChart prices={filteredPrices} />
                   <BenchmarkChart prices={allPrices} period={period} />
+                  <RelativeStrengthChart prices={filteredPrices} />
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
                   <VolumeProfileChart prices={filteredPrices} />
@@ -825,10 +900,12 @@ export default function AnalysisPage() {
                   </div>
                   <CrashSurgeStreakChart prices={filteredPrices} />
                   <CandlestickPatternChart prices={filteredPrices} />
+                  <CandlePatternEdgeChart prices={filteredPrices} />
                   <IntradayPathChart prices={filteredPrices} />
                   <ClosePositionChart prices={filteredPrices} />
                   <TrueRangeDecompChart prices={filteredPrices} />
                   <MFEMAEChart prices={allPrices} period={period} />
+                  <TpSlOptimizerChart prices={filteredPrices} />
                   <div id="sa-ohlc-gap" className="scroll-mt-20">
                     <GapScatterChart prices={allPrices} period={period} />
                   </div>
@@ -836,6 +913,7 @@ export default function AnalysisPage() {
                     <IntradayRangeChart prices={allPrices} period={period} />
                   </div>
                   <RangeVolatilityChart prices={allPrices} period={period} />
+                  <OHLCVolatilityChart prices={filteredPrices} />
                   <div id="sa-ohlc-micro" className="scroll-mt-20">
                     <MicrostructureChart prices={filteredPrices} />
                   </div>
@@ -853,13 +931,17 @@ export default function AnalysisPage() {
                   <CornishFisherChart prices={filteredPrices} />
                   <FinanceTheoryChart prices={filteredPrices} />
                   <VolSmileChart prices={filteredPrices} />
+                  <SpreadEstimatorChart prices={filteredPrices} />
                 </>
               )}
 
               {activeSection === "transform" && (
-                <div id="sa-transform" className="scroll-mt-20">
-                  <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
-                </div>
+                <>
+                  <div id="sa-transform" className="scroll-mt-20">
+                    <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
+                  </div>
+                  <OvernightIntradayChart prices={filteredPrices} />
+                </>
               )}
 
               {activeSection === "distribution" && (
@@ -895,6 +977,7 @@ export default function AnalysisPage() {
                   <AsymmetricGarchChart prices={filteredPrices} seriesMode={seriesMode} />
                   <VolConeChart prices={filteredPrices} />
                   <HestonChart prices={filteredPrices} />
+                  <RangeContractionChart prices={filteredPrices} />
                 </>
               )}
 
@@ -1010,17 +1093,33 @@ export default function AnalysisPage() {
                 </>
               )}
 
+              {activeSection === "conditional" && (
+                <>
+                  <ConditionalForwardChart prices={filteredPrices} />
+                  <ShortTermReversalChart prices={filteredPrices} />
+                </>
+              )}
+
               {activeSection === "calendar" && (
                 <>
                   <SpiralHeatmap prices={filteredPrices} period={period} />
+                  <CandleSeasonalityChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <HighLowTimingChart ticker={data.ticker} />
+                  <IntradayProfileChart ticker={data.ticker} />
+                  <VwapDeviationChart ticker={data.ticker} />
+                  <IntradayRegimeChart ticker={data.ticker} />
+                  <IntradayExcursionChart ticker={data.ticker} />
+                  <RealizedVolChart ticker={data.ticker} />
+                  <GapIntradayChart ticker={data.ticker} />
+                  <SignalIntradayChart ticker={data.ticker} />
                 </>
               )}
 
               {activeSection === "simulation" && (
                 <>
                   <CustomReturnChart prices={allPrices} />
+                  <HistoricalAnalogChart prices={filteredPrices} />
                   <PriceForecastChart prices={filteredPrices} />
                   <SimpleBacktestChart prices={filteredPrices} />
                   <div id="sa-sim-meanrev" className="scroll-mt-20">
