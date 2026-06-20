@@ -614,6 +614,22 @@ const RangeVolConeChart = dynamic(
   () => import("./components/analysis/RangeVolConeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const RelativeVolumeChart = dynamic(
+  () => import("./components/analysis/RelativeVolumeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const VolumeIndicatorsChart = dynamic(
+  () => import("./components/analysis/VolumeIndicatorsChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SignedVolumeChart = dynamic(
+  () => import("./components/analysis/SignedVolumeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const VolumeProfileExtChart = dynamic(
+  () => import("./components/analysis/VolumeProfileExtChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const CandleRunChart = dynamic(
   () => import("./components/analysis/CandleRunChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -894,7 +910,11 @@ export default function AnalysisPage() {
                   <RelativeStrengthChart prices={filteredPrices} />
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
+                  <RelativeVolumeChart prices={filteredPrices} />
+                  <VolumeIndicatorsChart prices={filteredPrices} />
+                  <SignedVolumeChart prices={filteredPrices} />
                   <VolumeProfileChart prices={filteredPrices} />
+                  <VolumeProfileExtChart prices={filteredPrices} />
                   <VolumeReturnChart prices={filteredPrices} />
                   <VolumeLeadChart prices={filteredPrices} />
                   <GapAnalysisChart prices={allPrices} period={period} />
