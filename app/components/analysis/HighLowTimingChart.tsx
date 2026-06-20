@@ -5,12 +5,16 @@ import {
   analyzeIntraday,
   conditionalTiming,
   computeDayPaths,
+  computeActivityProfile,
+  computeWeekdayHLProb,
   minuteToLabel,
   IntradayAnalysis,
   IntradayBar,
   ConditionKey,
   ConditionalTiming,
   WeekdayOverlay,
+  ActivityPoint,
+  WeekdayHLProb,
 } from "../../lib/highlow-timing";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -34,7 +38,7 @@ const INTERVALS = [
   { value: "60m", label: "60分足", note: "直近約2年" },
 ] as const;
 
-type View = "dist" | "hazard" | "path" | "cond" | "profile" | "weekday" | "breakout";
+type View = "dist" | "hazard" | "path" | "cond" | "profile" | "weekday" | "wdhl" | "activity" | "breakout";
 const VIEWS: { value: View; label: string }[] = [
   { value: "dist", label: "時間帯分布" },
   { value: "hazard", label: "到達確率" },
@@ -42,9 +46,11 @@ const VIEWS: { value: View; label: string }[] = [
   { value: "cond", label: "条件別" },
   { value: "profile", label: "平均形状" },
   { value: "weekday", label: "曜日別軌跡" },
+  { value: "wdhl", label: "曜日別 高安時刻" },
+  { value: "activity", label: "出来高・ボラ" },
   { value: "breakout", label: "ブレイク" },
 ];
-const CANVAS_VIEWS = new Set<View>(["dist", "hazard", "cond", "profile", "weekday"]);
+const CANVAS_VIEWS = new Set<View>(["dist", "hazard", "cond", "profile", "weekday", "wdhl", "activity"]);
 
 // 月〜金の色（曜日別軌跡で使用）
 const WD_COLORS: Record<number, string> = {
@@ -257,7 +263,9 @@ function drawProfile(ctx: CanvasRenderingContext2D, W: number, H: number, a: Int
 
 function drawWeekday(
   ctx: CanvasRenderingContext2D, W: number, H: number,
-  a: IntradayAnalysis, ov: WeekdayOverlay, showSpaghetti: boolean, wdFilter: number | null
+  a: IntradayAnalysis, ov: WeekdayOverlay,
+  showSpaghetti: boolean, wdFilter: number | null,
+  colorMode: "weekday" | "direction", yZoom: number
 ) {
   const ml = 44, mr = 16, mt = 28, mb = 28;
   const plotW = W - ml - mr, plotH = H - mt - mb;
@@ -277,11 +285,16 @@ function drawWeekday(
     if (wm.count === 0) continue;
     for (const v of wm.mean) { if (v > vmax) vmax = v; if (v < vmin) vmin = v; }
   }
+  // ズーム: 0を固定したまま縦軸の振幅を拡大/縮小
+  vmax /= yZoom; vmin /= yZoom;
   const ys = (v: number) => mt + plotH - ((v - vmin) / (vmax - vmin)) * plotH;
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("曜日別 日中軌跡（始値からの変化率%）", ml, mt - 12);
+  ctx.fillText(
+    colorMode === "weekday" ? "曜日別 日中軌跡（始値からの変化率%）" : "日中軌跡 当日方向別（始値からの変化率%）",
+    ml, mt - 12
+  );
 
   // 0ライン・y目盛
   const y0 = ys(0);
@@ -292,7 +305,7 @@ function drawWeekday(
   ctx.fillText(vmax.toFixed(2), ml - 4, mt + 9);
   ctx.fillText(vmin.toFixed(2), ml - 4, mt + plotH);
 
-  // プロット領域でクリップ（個別日の外れ値をはみ出させない）
+  // プロット領域でクリップ（個別日の外れ値・ズームによるはみ出しを抑える）
   ctx.save();
   ctx.beginPath(); ctx.rect(ml, mt, plotW, plotH); ctx.clip();
 
@@ -302,17 +315,97 @@ function drawWeekday(
     ctx.stroke();
   };
 
-  if (showSpaghetti) {
-    for (const p of considered) drawPath(p.values, WD_COLORS[p.weekday] + "22", 0.6);
-  }
-  for (const wm of ov.weekdayMean) {
-    if (wdFilter != null && wm.weekday !== wdFilter) continue;
-    if (wm.count === 0) continue;
-    drawPath(wm.mean, WD_COLORS[wm.weekday], 2.2);
+  if (colorMode === "weekday") {
+    if (showSpaghetti) for (const p of considered) drawPath(p.values, WD_COLORS[p.weekday] + "22", 0.6);
+    for (const wm of ov.weekdayMean) {
+      if (wdFilter != null && wm.weekday !== wdFilter) continue;
+      if (wm.count === 0) continue;
+      drawPath(wm.mean, WD_COLORS[wm.weekday], 2.2);
+    }
+  } else {
+    // 当日方向別: 陽線日=緑 / 陰線日=赤。太線はそれぞれの平均軌跡
+    const up = considered.filter((p) => p.endPct > 0);
+    const dn = considered.filter((p) => p.endPct <= 0);
+    if (showSpaghetti) {
+      for (const p of up) drawPath(p.values, "#22c55e22", 0.6);
+      for (const p of dn) drawPath(p.values, "#ef444422", 0.6);
+    }
+    const meanOf = (ps: typeof considered) => {
+      const m = new Array(n).fill(0);
+      for (let i = 0; i < n; i++) m[i] = ps.length ? ps.reduce((s, p) => s + p.values[i], 0) / ps.length : 0;
+      return m;
+    };
+    if (up.length) drawPath(meanOf(up), "#16a34a", 2.4);
+    if (dn.length) drawPath(meanOf(dn), "#dc2626", 2.4);
   }
   ctx.restore();
 
   drawTimeAxis(ctx, a, ml, slot, mt + plotH + 14);
+}
+
+// 時間帯別 出来高・ボラ プロファイル（上: 出来高シェア / 下: 平均値幅%）
+function drawActivity(ctx: CanvasRenderingContext2D, W: number, H: number, a: IntradayAnalysis, act: ActivityPoint[]) {
+  const ml = 44, mr = 16, mt = 24, gap = 36;
+  const plotW = W - ml - mr;
+  const paneH = (H - mt - gap - 24) / 2;
+  const n = act.length;
+  const slot = plotW / n;
+  const barW = Math.max(2, slot * 0.7);
+
+  const pane = (vals: number[], top: number, color: string, title: string, fmt: (v: number) => string) => {
+    const maxV = Math.max(1e-9, ...vals);
+    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, top, plotW, paneH);
+    ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(title, ml, top - 7);
+    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText("0", ml - 5, top + paneH); ctx.fillText(fmt(maxV), ml - 5, top + 9);
+    for (let i = 0; i < n; i++) {
+      const h = (vals[i] / maxV) * (paneH - 6);
+      const x = ml + i * slot + (slot - barW) / 2;
+      ctx.fillStyle = color; ctx.fillRect(x, top + paneH - h, barW, h);
+    }
+  };
+  pane(act.map((p) => p.volumeShare), mt, "#0ea5e9cc", "出来高プロファイル（1日出来高に占める割合）", (v) => `${(v * 100).toFixed(0)}%`);
+  pane(act.map((p) => p.meanRangePct), mt + paneH + gap, "#f43f5ecc", "時間帯別ボラティリティ（平均値幅 (高-安)/価格 %）", (v) => `${v.toFixed(2)}%`);
+  drawTimeAxis(ctx, a, ml, slot, mt + paneH + gap + paneH + 12);
+}
+
+// 曜日 × 時刻 の高安出現確率ヒートマップ（上: 高値 / 下: 安値）。行内最大で正規化し各曜日のピーク時刻を強調
+function drawWeekdayHL(ctx: CanvasRenderingContext2D, W: number, H: number, a: IntradayAnalysis, data: WeekdayHLProb[]) {
+  const ml = 30, mr = 16, mt = 24, gap = 30;
+  const plotW = W - ml - mr;
+  const blockH = (H - mt - gap - 22) / 2;
+  const rowH = blockH / 5;
+  const n = a.bins.length;
+  const cellW = plotW / n;
+
+  const block = (top: number, key: "highProb" | "lowProb", peakKey: "highPeakMinute" | "lowPeakMinute", title: string, hue: (t: number) => string) => {
+    ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(title, ml, top - 6);
+    data.forEach((wd, r) => {
+      const y = top + r * rowH;
+      const probs = wd[key];
+      const rowMax = Math.max(1e-9, ...probs);
+      for (let i = 0; i < n; i++) {
+        const t = probs[i] / rowMax; // 行内正規化
+        ctx.fillStyle = hue(t);
+        ctx.fillRect(ml + i * cellW, y, cellW + 0.5, rowH - 1);
+      }
+      // ピーク時刻にマーカー
+      const peakIdx = (wd[peakKey] - a.bins[0].startMinute) / a.binMinutes;
+      if (wd.count > 0 && peakIdx >= 0) {
+        ctx.strokeStyle = "#111827"; ctx.lineWidth = 1;
+        ctx.strokeRect(ml + peakIdx * cellW, y + 0.5, cellW, rowH - 2);
+      }
+      ctx.fillStyle = "#374151"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(WD_NAMES[wd.weekday], ml - 3, y + rowH / 2 + 3);
+    });
+    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, top, plotW, blockH);
+  };
+
+  block(mt, "highProb", "highPeakMinute", "高値の出現確率（曜日×時刻・行内で正規化／枠=ピーク）", (t) => `rgba(239,68,68,${0.12 + t * 0.85})`);
+  block(mt + blockH + gap, "lowProb", "lowPeakMinute", "安値の出現確率（曜日×時刻・行内で正規化／枠=ピーク）", (t) => `rgba(59,130,246,${0.12 + t * 0.85})`);
+  drawTimeAxis(ctx, a, ml, cellW, mt + blockH + gap + blockH + 12);
 }
 
 // ───────────────────────── コンポーネント ─────────────────────────
@@ -324,6 +417,8 @@ export default function HighLowTimingChart({ ticker }: Props) {
   const [condKey, setCondKey] = useState<ConditionKey>("gapUp");
   const [showSpaghetti, setShowSpaghetti] = useState(true);
   const [wdFilter, setWdFilter] = useState<number | null>(null);
+  const [colorMode, setColorMode] = useState<"weekday" | "direction">("weekday");
+  const [yZoom, setYZoom] = useState(1);
   const [resp, setResp] = useState<IntradayResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -361,6 +456,16 @@ export default function HighLowTimingChart({ ticker }: Props) {
     return computeDayPaths(analysis);
   }, [analysis]);
 
+  const activity: ActivityPoint[] | null = useMemo(() => {
+    if (!analysis) return null;
+    return computeActivityProfile(analysis);
+  }, [analysis]);
+
+  const wdhl: WeekdayHLProb[] | null = useMemo(() => {
+    if (!analysis) return null;
+    return computeWeekdayHLProb(analysis);
+  }, [analysis]);
+
   useEffect(() => {
     if (!canvasRef.current || !analysis || !CANVAS_VIEWS.has(view)) return;
     const H = 360;
@@ -371,8 +476,10 @@ export default function HighLowTimingChart({ ticker }: Props) {
     else if (view === "hazard") drawHazard(ctx, width, H, analysis);
     else if (view === "profile") drawProfile(ctx, width, H, analysis);
     else if (view === "cond" && cond) drawConditional(ctx, width, H, analysis, cond);
-    else if (view === "weekday" && overlay) drawWeekday(ctx, width, H, analysis, overlay, showSpaghetti, wdFilter);
-  }, [analysis, view, cond, overlay, showSpaghetti, wdFilter]);
+    else if (view === "weekday" && overlay) drawWeekday(ctx, width, H, analysis, overlay, showSpaghetti, wdFilter, colorMode, yZoom);
+    else if (view === "activity" && activity) drawActivity(ctx, width, H, analysis, activity);
+    else if (view === "wdhl" && wdhl) drawWeekdayHL(ctx, width, H, analysis, wdhl);
+  }, [analysis, view, cond, overlay, showSpaghetti, wdFilter, colorMode, yZoom, activity, wdhl]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -464,6 +571,24 @@ export default function HighLowTimingChart({ ticker }: Props) {
                 onClick={() => setShowSpaghetti((s) => !s)}
                 className={`px-2 py-0.5 text-xs rounded ${showSpaghetti ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >個別日 {showSpaghetti ? "表示" : "非表示"}</button>
+              {/* 色分けモード */}
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setColorMode("weekday")}
+                  className={`px-2 py-0.5 text-xs rounded ${colorMode === "weekday" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >曜日色</button>
+                <button
+                  onClick={() => setColorMode("direction")}
+                  className={`px-2 py-0.5 text-xs rounded ${colorMode === "direction" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >当日方向</button>
+              </div>
+              {/* 縦軸ズーム */}
+              <div className="flex items-center gap-1 ml-1">
+                <button onClick={() => setYZoom((z) => Math.max(0.5, +(z / 1.4).toFixed(3)))} className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 hover:bg-gray-200">－</button>
+                <span className="text-xs text-gray-500 w-10 text-center">×{yZoom.toFixed(1)}</span>
+                <button onClick={() => setYZoom((z) => Math.min(20, +(z * 1.4).toFixed(3)))} className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 hover:bg-gray-200">＋</button>
+                <button onClick={() => setYZoom(1)} className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 hover:bg-gray-200">リセット</button>
+              </div>
             </div>
           )}
 
@@ -472,8 +597,8 @@ export default function HighLowTimingChart({ ticker }: Props) {
             <div className="relative"><canvas ref={canvasRef} /></div>
           )}
 
-          {/* 曜日別の凡例・引け平均 */}
-          {view === "weekday" && overlay && (
+          {/* 曜日別の凡例・引け平均（曜日色モードのみ） */}
+          {view === "weekday" && overlay && colorMode === "weekday" && (
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs">
               {overlay.weekdayMean.map((wm) => (
                 <div key={wm.weekday} className="bg-gray-50 rounded p-2">
@@ -490,8 +615,35 @@ export default function HighLowTimingChart({ ticker }: Props) {
           )}
           {view === "weekday" && (
             <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">
-              {"太線=曜日ごとの平均軌跡、細線=各営業日の実際の軌跡（始値からの変化率）。曜日ボタンで1曜日だけ抽出できる。特定曜日が右肩上がり/下がりに偏るなら曜日アノマリーの執行時間帯まで踏み込んで判断できる（例: 月曜は寄り安後場高 → 月曜寄り買い）。"}
+              {colorMode === "weekday"
+                ? "太線=曜日ごとの平均軌跡、細線=各営業日の実際の軌跡（始値比%）。曜日ボタンで1曜日だけ抽出、＋/－で縦軸を拡大縮小できる。特定曜日が右肩上がり/下がりに偏れば曜日アノマリーの執行時間帯まで判断できる（例: 月曜は寄り安後場高 → 月曜寄り買い）。"
+                : "緑=陽線で引けた日、赤=陰線で引けた日。太線は各々の平均軌跡。上昇日と下落日で日中の形が違えば（例: 上昇日は寄り後すぐ伸びる／下落日はじり安）、早い時間の値動きから当日の方向を見極めるヒントになる。"}
             </p>
+          )}
+
+          {/* 出来高・ボラ の所見 */}
+          {view === "activity" && activity && (
+            <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">
+              {"上=時間帯ごとの平均出来高シェア、下=平均値幅(高-安)/価格。出来高と値幅が膨らむ時間帯ほど約定しやすく動きやすい。高安がこの活況時間帯に出ているほど『出来高を伴う本物の高安』と読め、薄商いの時間に付いた極値はだましの可能性が高い。"}
+            </p>
+          )}
+
+          {/* 曜日別 高安時刻 の所見・ピーク表 */}
+          {view === "wdhl" && wdhl && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                {wdhl.map((wd) => (
+                  <div key={wd.weekday} className="bg-gray-50 rounded p-2">
+                    <div className="text-gray-600">{WD_NAMES[wd.weekday]}曜（{wd.count}日）</div>
+                    <div className="text-red-600 font-bold">高値 {minuteToLabel(wd.highPeakMinute)}</div>
+                    <div className="text-blue-600 font-bold">安値 {minuteToLabel(wd.lowPeakMinute)}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">
+                {"各曜日で高値（上段・赤）／安値（下段・青）が最も出やすい時刻を色の濃さで示す（行ごとに最大=1で正規化、黒枠=ピーク時刻）。曜日によってピークがずれるなら、その曜日に合わせて押し目買い・利確の時刻を変える根拠になる。"}
+              </p>
+            </>
           )}
 
           {/* 分布ビューの統計 */}
@@ -595,7 +747,9 @@ export default function HighLowTimingChart({ ticker }: Props) {
           <li><strong>日中パス</strong>: 高安の順序(highFirst = t_H&lt;t_L)と引け方向(sign(close−open))で4類型に分け、各類型の当日リターンと翌日リターン・勝率を集計。順序は日中の方向と勢いを表す。</li>
           <li><strong>条件別</strong>: ギャップ g=(open−prevClose)/prevClose の符号、前日の陽陰、20日移動平均との上下で日を二分し、時間帯分布を群内シェアで比較。</li>
           <li><strong>平均形状</strong>: 時間帯ごとに (price−open)/open の平均(%)を取り±1σ帯と陽線日/陰線日の平均を重ねる。典型的な「1日の形」(U字・右肩上がり等)。</li>
-          <li><strong>曜日別軌跡</strong>: 各営業日の始値比軌跡を曜日色で重ね描き(細線)、曜日ごとの平均軌跡(太線)を上に置く。平均では消える「実際の値動きの散らばり」と曜日固有の形状を同時に見る。</li>
+          <li><strong>曜日別軌跡</strong>: 各営業日の始値比軌跡を曜日色で重ね描き(細線)、曜日ごとの平均軌跡(太線)を上に置く。平均では消える「実際の値動きの散らばり」と曜日固有の形状を同時に見る。色分けを「当日方向」に切替えると陽線日/陰線日で軌跡形状を比較でき、縦軸ズームで微細な差も拡大できる。</li>
+          <li><strong>曜日別 高安時刻</strong>: 各曜日について高値/安値がどの時間帯に付くかの確率を行ごとに正規化したヒートマップで表示。曜日によるピーク時刻のズレを可視化する。</li>
+          <li><strong>出来高・ボラ</strong>: 時間帯ごとの平均出来高シェアと平均値幅(高-安)/価格。活況な時間帯を特定し、高安がそこで付いたか(本物か薄商いか)の裏取りに使う。</li>
           <li><strong>ブレイク</strong>: 寄り後N分のオープニングレンジ(OR)と前日高安を基準に、突破後に引けまで追随した割合(=だましでない割合)を集計。</li>
         </ul>
 

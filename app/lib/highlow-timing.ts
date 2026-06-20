@@ -565,6 +565,75 @@ export function computeDayPaths(analysis: IntradayAnalysis): WeekdayOverlay {
   return { bins: grid.bins, paths, weekdayMean };
 }
 
+// ───────────── 時間帯別 出来高・ボラティリティ プロファイル ─────────────
+
+export interface ActivityPoint {
+  startMinute: number;
+  label: string;
+  meanVolume: number; // 1日のそのビンの平均出来高
+  volumeShare: number; // 1日出来高に占める割合
+  meanRangePct: number; // バーの平均値幅 (high-low)/price (%)
+}
+
+export function computeActivityProfile(a: IntradayAnalysis): ActivityPoint[] {
+  const grid = a._grid;
+  const n = grid.bins.length;
+  const dayVol: number[][] = Array.from({ length: n }, () => []);
+  const barRange: number[][] = Array.from({ length: n }, () => []);
+
+  for (const r of a.records) {
+    const v = new Array(n).fill(0);
+    const has = new Array(n).fill(false);
+    for (const b of r.bars) {
+      const idx = binIndexOf(localMinute(b.ts, a.gmtoffset), grid);
+      v[idx] += b.volume;
+      has[idx] = true;
+      const base = b.open > 0 ? b.open : b.close;
+      if (base > 0) barRange[idx].push(((b.high - b.low) / base) * 100);
+    }
+    for (let i = 0; i < n; i++) if (has[i]) dayVol[i].push(v[i]);
+  }
+
+  const meanVol = dayVol.map((arr) => mean(arr));
+  const totalVol = meanVol.reduce((s, v) => s + v, 0) || 1;
+  return grid.bins.map((bin, i) => ({
+    startMinute: bin.startMinute,
+    label: bin.label,
+    meanVolume: meanVol[i],
+    volumeShare: meanVol[i] / totalVol,
+    meanRangePct: mean(barRange[i]),
+  }));
+}
+
+// ───────────── 曜日 × 時刻 の 高値/安値 出現確率 ─────────────
+
+export interface WeekdayHLProb {
+  weekday: number;
+  count: number;
+  highProb: number[]; // bins と同長。その曜日で高値がそのビンに付く確率
+  lowProb: number[];
+  highPeakMinute: number;
+  lowPeakMinute: number;
+}
+
+export function computeWeekdayHLProb(a: IntradayAnalysis): WeekdayHLProb[] {
+  const grid = a._grid;
+  return [1, 2, 3, 4, 5].map((wd) => {
+    const recs = a.records.filter((r) => r.weekday === wd);
+    const count = recs.length;
+    const hCounts = histogram(recs.map((r) => r.tH), grid);
+    const lCounts = histogram(recs.map((r) => r.tL), grid);
+    const highProb = hCounts.map((c) => (count ? c / count : 0));
+    const lowProb = lCounts.map((c) => (count ? c / count : 0));
+    const argmax = (arr: number[]) => arr.reduce((bi, v, i, a2) => (v > a2[bi] ? i : bi), 0);
+    return {
+      weekday: wd, count, highProb, lowProb,
+      highPeakMinute: count ? grid.bins[argmax(hCounts)].startMinute : 0,
+      lowPeakMinute: count ? grid.bins[argmax(lCounts)].startMinute : 0,
+    };
+  });
+}
+
 // ───────────────────── 旧API（後方互換） ─────────────────────
 
 export interface HighLowTimingResult {
