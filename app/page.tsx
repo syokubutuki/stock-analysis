@@ -646,6 +646,10 @@ const RollingVarianceRatioChart = dynamic(
   () => import("./components/analysis/RollingVarianceRatioChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const BreakoutStatsChart = dynamic(
+  () => import("./components/analysis/BreakoutStatsChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -942,6 +946,7 @@ export default function AnalysisPage() {
                   <OBVVWAPChart prices={allPrices} period={period} />
                   <VolumeWeightedTechChart prices={filteredPrices} />
                   <ExtraTechnicalChart prices={filteredPrices} />
+                  <BreakoutStatsChart prices={filteredPrices} />
                 </>
               )}
 
