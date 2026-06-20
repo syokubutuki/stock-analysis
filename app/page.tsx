@@ -602,6 +602,18 @@ const GapClassificationChart = dynamic(
   () => import("./components/analysis/GapClassificationChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const HARChart = dynamic(
+  () => import("./components/analysis/HARChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const VolLeverageChart = dynamic(
+  () => import("./components/analysis/VolLeverageChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RangeVolConeChart = dynamic(
+  () => import("./components/analysis/RangeVolConeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const CandleRunChart = dynamic(
   () => import("./components/analysis/CandleRunChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -991,8 +1003,11 @@ export default function AnalysisPage() {
                   <VolTermStructureChart prices={filteredPrices} />
                   <AsymmetricGarchChart prices={filteredPrices} seriesMode={seriesMode} />
                   <VolConeChart prices={filteredPrices} />
+                  <RangeVolConeChart prices={filteredPrices} />
                   <HestonChart prices={filteredPrices} />
                   <RangeContractionChart prices={filteredPrices} />
+                  <HARChart prices={filteredPrices} />
+                  <VolLeverageChart prices={filteredPrices} />
                 </>
               )}
 
