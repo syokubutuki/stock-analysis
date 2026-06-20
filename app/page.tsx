@@ -686,6 +686,14 @@ const CalendarEffectChart = dynamic(
   () => import("./components/analysis/CalendarEffectChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const RelativeStrengthExtChart = dynamic(
+  () => import("./components/analysis/RelativeStrengthExtChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const BenchmarkDCCChart = dynamic(
+  () => import("./components/analysis/BenchmarkDCCChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
@@ -956,6 +964,8 @@ export default function AnalysisPage() {
                   <StructureScorecardChart prices={filteredPrices} />
                   <BenchmarkChart prices={allPrices} period={period} />
                   <RelativeStrengthChart prices={filteredPrices} />
+                  <RelativeStrengthExtChart prices={filteredPrices} />
+                  <BenchmarkDCCChart prices={filteredPrices} ticker={data.ticker} />
                   <DiffSeriesChart prices={allPrices} period={period} />
                   <VolumeAnalysis prices={allPrices} period={period} />
                   <RelativeVolumeChart prices={filteredPrices} />
