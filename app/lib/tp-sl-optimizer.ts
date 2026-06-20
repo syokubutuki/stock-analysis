@@ -109,6 +109,7 @@ export function optimizeTpSl(prices: PricePoint[], opts: TpSlOptions = {}): TpSl
           if (hitSL) { ret = (slPx - e) / e; break; }
           if (hitTP) { ret = (tpPx - e) / e; break; }
         }
+        ret -= cost; // 取引コスト（往復）控除
         sumRet += ret;
         if (ret > 0) wins++;
         c++;

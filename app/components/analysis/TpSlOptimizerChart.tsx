@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { optimizeTpSl, TpSlResult } from "../../lib/tp-sl-optimizer";
+import { TpSlResult } from "../../lib/tp-sl-optimizer";
+import type { TpSlWorkerRequest, TpSlWorkerResponse } from "../../lib/tp-sl-optimizer.worker";
+import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -100,11 +102,43 @@ export default function TpSlOptimizerChart({ prices }: Props) {
   const mfeRef = useRef<HTMLCanvasElement>(null);
   const [unit, setUnit] = useState<"atr" | "pct">("atr");
   const [maxHold, setMaxHold] = useState(20);
+  const [deductCost, setDeductCost] = useState(false);
+  const [result, setResult] = useState<TpSlResult | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const result = useMemo(() => {
-    if (prices.length < 260) return null;
-    return optimizeTpSl(prices, { unit, maxHold, entryStep: 1 });
-  }, [prices, unit, maxHold]);
+  const spread = useMemo(() => representativeSpread(prices), [prices]);
+
+  const workerRef = useRef<Worker | null>(null);
+  const reqIdRef = useRef(0);
+
+  // Worker 起動
+  useEffect(() => {
+    const worker = new Worker(new URL("../../lib/tp-sl-optimizer.worker.ts", import.meta.url));
+    workerRef.current = worker;
+    worker.onmessage = (ev: MessageEvent<TpSlWorkerResponse>) => {
+      if (ev.data.reqId !== reqIdRef.current) return;
+      setResult(ev.data.result);
+      setLoading(false);
+    };
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []);
+
+  // 計算リクエスト
+  useEffect(() => {
+    const worker = workerRef.current;
+    if (!worker || prices.length < 260) return;
+    const reqId = ++reqIdRef.current;
+    setLoading(true);
+    const req: TpSlWorkerRequest = {
+      reqId,
+      prices,
+      opts: { unit, maxHold, entryStep: 1, costPerTrade: deductCost ? spread : 0 },
+    };
+    worker.postMessage(req);
+  }, [prices, unit, maxHold, deductCost, spread]);
 
   const unitLabel = (v: number) => (unit === "atr" ? `${v}×ATR` : `${(v * 100).toFixed(0)}%`);
 
@@ -123,7 +157,6 @@ export default function TpSlOptimizerChart({ prices }: Props) {
   }, [result]);
 
   if (prices.length < 260) return null;
-  if (!result) return null;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
@@ -139,15 +172,24 @@ export default function TpSlOptimizerChart({ prices }: Props) {
           {[10, 20, 40].map((h) => (
             <button key={h} onClick={() => setMaxHold(h)} className={`px-2 py-0.5 rounded ${maxHold === h ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{h}日</button>
           ))}
+          <button
+            onClick={() => setDeductCost((v) => !v)}
+            className={`ml-2 px-2 py-0.5 rounded ${deductCost ? "bg-amber-500 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+            title={`往復コスト ${(spread * 100).toFixed(3)}% を控除`}
+          >
+            コスト控除{deductCost ? `(${(spread * 100).toFixed(2)}%)` : ""}
+          </button>
         </div>
       </div>
 
-      {result.best && (
+      {loading && <div className="text-xs text-gray-400">計算中...（Web Worker）</div>}
+
+      {result?.best && (
         <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">
           推奨: 利確 <span className="font-bold">{unitLabel(result.best.tp)}</span> / 損切り <span className="font-bold">{unitLabel(result.best.sl)}</span>
           {" → "}期待リターン <span className="font-bold">{(result.best.expReturn * 100).toFixed(2)}%</span>・勝率 {(result.best.winRate * 100).toFixed(0)}%
           {result.unit === "pct" && <>・期待R {result.best.expR.toFixed(2)}</>}
-          （エントリー {result.nEntries}件・当日引け建てロング）
+          （エントリー {result.nEntries}件・当日引け建てロング{deductCost ? "・コスト控除後" : ""}）
         </div>
       )}
 
@@ -177,7 +219,7 @@ export default function TpSlOptimizerChart({ prices }: Props) {
           <li>全日エントリーの平均なので、特定シグナルの最適TP/SLとは異なる（無条件ベースライン）。</li>
           <li>過去データへの最適化＝過剰最適化のリスク。サンプル外・ブートストラップで頑健性確認を。</li>
           <li>同日にTP/SL両方届いた場合の順序は日足では不明（本実装はSL優先で保守的に評価）。</li>
-          <li>取引コスト・スリッページ・ギャップでの想定外約定は未考慮。</li>
+          <li>「コスト控除」ONで、高安スプレッド推定（CSの中央値）を往復取引コストとして各トレードから差し引く。スリッページ・ギャップでの想定外約定は別途。</li>
         </ul>
       </AnalysisGuide>
     </div>

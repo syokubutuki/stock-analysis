@@ -129,7 +129,7 @@ export default function OvernightIntradayChart({ prices }: Props) {
         </ul>
         <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>取引コスト・スリッページ未控除。夜間/日中戦略は毎日2回約定するため、実際は手数料負けしやすい（特に夜間戦略）。</li>
+          <li>夜間/日中戦略は毎日1往復約定するため手数料負けしやすい。「コスト控除」ONで高安スプレッド推定（CSの中央値）を1日あたりの往復コストとして差し引いた正味エクイティを表示できる（スリッページは別途）。</li>
           <li>始値は寄り付き気配で歪むことがあり、流動性の薄い銘柄では誤差。</li>
           <li>配当・株式分割の調整方法により始値/終値の整合がずれる場合がある。</li>
         </ul>
