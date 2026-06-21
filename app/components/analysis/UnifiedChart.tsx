@@ -20,6 +20,7 @@ import {
   PRESETS,
   HEAVY_GROUPS,
   type SeriesDef,
+  type SeriesPreset,
   type ComputedSeries,
   type SeriesWorkerResponse,
 } from "../../lib/chart-series";
@@ -68,6 +69,29 @@ function fmt(v: number): string {
 
 const LS_ENABLED = "unifiedChart.enabled";
 const LS_EXPANDED = "unifiedChart.expanded";
+const LS_CUSTOM_PRESETS = "unifiedChart.customPresets";
+
+function loadCustomPresets(): SeriesPreset[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_CUSTOM_PRESETS);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        return arr.filter(
+          (p): p is SeriesPreset =>
+            p &&
+            typeof p.id === "string" &&
+            typeof p.label === "string" &&
+            Array.isArray(p.ids)
+        );
+      }
+    }
+  } catch {
+    // ignore malformed storage
+  }
+  return [];
+}
 
 function loadSet(key: string, fallback: Iterable<string>): Set<string> {
   if (typeof window === "undefined") return new Set(fallback);
@@ -135,6 +159,10 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
   const [legendTime, setLegendTime] = useState("");
   const [legendEntries, setLegendEntries] = useState<LegendEntry[]>([]);
   const [query, setQuery] = useState("");
+  const [customPresets, setCustomPresets] =
+    useState<SeriesPreset[]>(loadCustomPresets);
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
 
   const applyPreset = useCallback((ids: string[]) => {
     setEnabled(new Set(ids));
@@ -142,6 +170,26 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
 
   const clearAll = useCallback(() => {
     setEnabled(new Set());
+  }, []);
+
+  // 現在の選択をユーザー定義セットとして保存（同名は上書き）
+  const saveCurrentAsPreset = useCallback(() => {
+    const label = presetName.trim();
+    if (!label || enabled.size === 0) return;
+    const ids = [...enabled];
+    setCustomPresets((prev) => {
+      const exists = prev.some((p) => p.label === label);
+      if (exists) {
+        return prev.map((p) => (p.label === label ? { ...p, ids } : p));
+      }
+      return [...prev, { id: `custom_${Date.now()}`, label, ids }];
+    });
+    setPresetName("");
+    setSavingPreset(false);
+  }, [presetName, enabled]);
+
+  const deleteCustomPreset = useCallback((id: string) => {
+    setCustomPresets((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
   const toggle = useCallback((id: string) => {
@@ -340,6 +388,16 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
       // ignore
     }
   }, [expanded]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        LS_CUSTOM_PRESETS,
+        JSON.stringify(customPresets)
+      );
+    } catch {
+      // ignore
+    }
+  }, [customPresets]);
 
   // 計算済みデータをチャートに反映（全系列を同一ペインに重ねて表示）
   useEffect(() => {
@@ -543,13 +601,71 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
             {preset.label}
           </button>
         ))}
+        {/* ユーザー定義セット */}
+        {customPresets.map((preset) => (
+          <span
+            key={preset.id}
+            className="inline-flex items-center rounded text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+          >
+            <button
+              onClick={() => applyPreset(preset.ids)}
+              className="pl-1.5 py-0.5"
+              title={`${preset.ids.length}系列を表示`}
+            >
+              {preset.label}
+            </button>
+            <button
+              onClick={() => deleteCustomPreset(preset.id)}
+              className="px-1 py-0.5 text-emerald-400 hover:text-emerald-700"
+              title="このセットを削除"
+            >
+              ✕
+            </button>
+          </span>
+        ))}
         <button
           onClick={clearAll}
           className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
         >
           全クリア
         </button>
+        <button
+          onClick={() => setSavingPreset((v) => !v)}
+          disabled={enabled.size === 0}
+          className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title="現在表示中の系列をセットとして保存"
+        >
+          ＋セット保存
+        </button>
       </div>
+
+      {/* セット保存用の名前入力 */}
+      {savingPreset && (
+        <div className="flex items-center gap-1 mb-1.5">
+          <input
+            type="text"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveCurrentAsPreset();
+              else if (e.key === "Escape") {
+                setSavingPreset(false);
+                setPresetName("");
+              }
+            }}
+            autoFocus
+            placeholder="セット名（例: マイ・トレンド）"
+            className="flex-1 min-w-0 pl-2 pr-2 py-1 text-[11px] rounded border border-emerald-200 bg-white/80 focus:outline-none focus:border-emerald-400"
+          />
+          <button
+            onClick={saveCurrentAsPreset}
+            disabled={!presetName.trim() || enabled.size === 0}
+            className="px-2 py-1 rounded text-[10px] bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            保存
+          </button>
+        </div>
+      )}
 
       {/* 検索中: フラットな結果一覧 */}
       {q ? (
