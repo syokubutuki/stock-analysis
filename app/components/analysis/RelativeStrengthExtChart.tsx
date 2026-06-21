@@ -13,7 +13,7 @@ interface Props {
 const PRESETS = [
   { ticker: "^N225", label: "日経225" },
   { ticker: "^GSPC", label: "S&P500" },
-  { ticker: "^TPX", label: "TOPIX" },
+  { ticker: "1306.T", label: "TOPIX(ETF)" },
 ];
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {

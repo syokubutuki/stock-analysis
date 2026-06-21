@@ -16,7 +16,7 @@ type BenchmarkKey = "nikkei" | "topix";
 
 const BENCHMARKS: Record<BenchmarkKey, { ticker: string; label: string }> = {
   nikkei: { ticker: "^N225", label: "日経225" },
-  topix: { ticker: "^TPX", label: "TOPIX" },
+  topix: { ticker: "1306.T", label: "TOPIX(ETF)" },
 };
 
 // ---- Canvas drawing helpers ------------------------------------------------
