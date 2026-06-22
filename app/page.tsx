@@ -30,6 +30,10 @@ const CustomReturnChart = dynamic(
   () => import("./components/analysis/CustomReturnChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
 );
+const DiscretionaryLab = dynamic(
+  () => import("./components/analysis/DiscretionaryLab"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const DistributionShapeChart = dynamic(
   () => import("./components/analysis/DistributionShapeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -760,6 +764,7 @@ type SectionKey =
   | "causal"
   | "tailrisk"
   | "simulation"
+  | "discretionary"
   | "quantum";
 
 const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
@@ -781,6 +786,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
   { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ・ローソク足の季節性・高値/安値の時間帯分布(日中足)" },
   { key: "simulation", label: "シミュレーション", description: "カスタム売買・GBDT予測・株価予測(モンテカルロ)・バックテスト・分数BM・VG過程・最適停止" },
+  { key: "discretionary", label: "裁量トレード", description: "クリックで任意タイミング売買・Buy&Hold比較・裁量基準の逆算・期間適用バックテスト(シナリオ保存可)" },
   { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
@@ -1298,6 +1304,14 @@ export default function AnalysisPage() {
                   <VarianceGammaChart prices={filteredPrices} />
                   <FBMChart prices={filteredPrices} />
                 </>
+              )}
+
+              {activeSection === "discretionary" && (
+                <DiscretionaryLab
+                  prices={allPrices}
+                  ticker={data.ticker}
+                  currency={data.currency}
+                />
               )}
 
               {activeSection === "quantum" && (
