@@ -90,6 +90,18 @@ const AnalyticSignalChart = dynamic(
   () => import("./components/analysis/AnalyticSignalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const ComplexPlaneChart = dynamic(
+  () => import("./components/analysis/ComplexPlaneChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const PhaseClockChart = dynamic(
+  () => import("./components/analysis/PhaseClockChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const PotentialLandscapeChart = dynamic(
+  () => import("./components/analysis/PotentialLandscapeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const RecurrencePlot = dynamic(
   () => import("./components/analysis/RecurrencePlot"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -686,6 +698,10 @@ const StatePredictabilityChart = dynamic(
   () => import("./components/analysis/StatePredictabilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const WeekdayConditionalChart = dynamic(
+  () => import("./components/analysis/WeekdayConditionalChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const CalendarEffectChart = dynamic(
   () => import("./components/analysis/CalendarEffectChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1150,6 +1166,8 @@ export default function AnalysisPage() {
                   </div>
                   <EMDChart prices={filteredPrices} seriesMode={seriesMode} />
                   <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <ComplexPlaneChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <PhaseClockChart prices={filteredPrices} seriesMode={seriesMode} />
                   <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} />
                   <LombScargleChart prices={filteredPrices} seriesMode={seriesMode} />
                   <div id="sa-frequency-ssa" className="scroll-mt-20">
@@ -1174,6 +1192,7 @@ export default function AnalysisPage() {
                   <SimplexPredictionChart prices={filteredPrices} seriesMode={seriesMode} />
                   <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
                   <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />
+                  <PotentialLandscapeChart prices={filteredPrices} />
                   <div id="sa-nonlinear-tda" className="scroll-mt-20">
                     <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
                   </div>
@@ -1269,6 +1288,7 @@ export default function AnalysisPage() {
                   <SpiralHeatmap prices={filteredPrices} period={period} />
                   <CandleSeasonalityChart prices={filteredPrices} />
                   <CalendarEffectChart prices={filteredPrices} />
+                  <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <HighLowTimingChart ticker={data.ticker} />
                   <IntradayProfileChart ticker={data.ticker} />
