@@ -1283,7 +1283,7 @@ export default function AnalysisPage() {
 
               {activeSection === "simulation" && (
                 <>
-                  <CustomReturnChart prices={allPrices} />
+                  <CustomReturnChart prices={allPrices} ticker={data.ticker} />
                   <HistoricalAnalogChart prices={filteredPrices} />
                   <RegimeClusteringChart prices={filteredPrices} />
                   <MultivarSimplexChart prices={filteredPrices} />

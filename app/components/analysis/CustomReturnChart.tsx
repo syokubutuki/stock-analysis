@@ -13,6 +13,7 @@ import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStra
 
 interface Props {
   prices: PricePoint[];
+  ticker?: string;
 }
 
 // エントリー/エグジットの価格ポイント定義
@@ -112,7 +113,7 @@ function pctFmt(v: number, d = 2): string {
   return (v * 100).toFixed(d) + "%";
 }
 
-export default function CustomReturnChart({ prices }: Props) {
+export default function CustomReturnChart({ prices, ticker }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartApiRef = useRef<IChartApi | null>(null);
   const stripRef = useRef<HTMLCanvasElement>(null);
@@ -514,6 +515,7 @@ export default function CustomReturnChart({ prices }: Props) {
         effectiveStart={effectiveStart}
         effectiveEnd={effectiveEnd}
         onResult={setPredResult}
+        ticker={ticker}
       />
 
       <AnalysisGuide title="カスタムリターン分析の読み方">

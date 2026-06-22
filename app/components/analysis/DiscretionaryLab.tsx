@@ -27,6 +27,7 @@ import {
 } from "../../lib/discretionary-store";
 import DiscretionaryCriteriaPanel from "./DiscretionaryCriteriaPanel";
 import DiscretionaryBacktestPanel from "./DiscretionaryBacktestPanel";
+import DiscretionaryPolicyPanel from "./DiscretionaryPolicyPanel";
 import AnalysisGuide from "./AnalysisGuide";
 
 const DiscretionaryChart = dynamic(() => import("./DiscretionaryChart"), {
@@ -529,6 +530,16 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
         costRate={state.costRate}
         currency={currency}
         tradeDateRange={tradeDateRange}
+      />
+
+      {/* 方策学習 (層B / 実験的) */}
+      <DiscretionaryPolicyPanel
+        prices={prices}
+        table={table}
+        trades={state.trades}
+        initialCash={state.initialCash}
+        costRate={state.costRate}
+        currency={currency}
       />
 
       <AnalysisGuide title="裁量トレード・ラボの使い方">

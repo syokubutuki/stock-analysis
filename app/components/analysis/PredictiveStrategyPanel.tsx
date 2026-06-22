@@ -20,15 +20,18 @@ import {
   type IsotonicModel,
 } from "../../lib/ml/calibration";
 import AnalysisGuide from "./AnalysisGuide";
+import { listScenarios, getActiveId, reconcileTrades } from "../../lib/discretionary-store";
+import { holdingStateByDate } from "../../lib/discretionary-policy";
 
 // ── 型定義 ─────────────────────────────────────────
 
-type PredictionTarget = "strategy" | "strategy_high" | "close_up";
+type PredictionTarget = "strategy" | "strategy_high" | "close_up" | "discretionary";
 
 const TARGET_OPTIONS: { value: PredictionTarget; label: string; desc: string }[] = [
   { value: "strategy", label: "戦略リターン方向", desc: "選択中の戦略リターンが正か負か" },
   { value: "strategy_high", label: "大幅上昇", desc: "戦略リターンが閾値を超えるか" },
   { value: "close_up", label: "終値上昇", desc: "翌日終値が当日終値より高いか" },
+  { value: "discretionary", label: "あなたの裁量を再現", desc: "裁量トレードタブで保存した建玉状態 (ロング/手仕舞い) を当てる" },
 ];
 
 type PositionMode = "longOnly" | "longShort";
@@ -84,6 +87,7 @@ interface Props {
   effectiveStart: string;
   effectiveEnd: string;
   onResult: (result: PredictionResult | null) => void;
+  ticker?: string; // target=discretionary 用: 裁量シナリオの読込元
 }
 
 // ── 学習進捗 ──────────────────────────────────────
@@ -118,6 +122,7 @@ interface WFConfig {
   validationFraction: number; // 学習窓のうち検証に回す割合
   target: PredictionTarget;
   targetReturnThreshold: number;
+  holdingState?: Map<string, number>; // target=discretionary 用: 日付→建玉状態
   positionMode: PositionMode;
   longThreshold: number;
   shortThreshold: number;
@@ -186,6 +191,7 @@ async function runWalkForwardAsync(
       case "strategy": y = nextRet > 0 ? 1 : 0; break;
       case "strategy_high": y = nextRet > cfg.targetReturnThreshold ? 1 : 0; break;
       case "close_up": y = prices[i + 1].close > prices[i].close ? 1 : 0; break;
+      case "discretionary": y = cfg.holdingState?.get(prices[i + 1].time) ?? 0; break;
     }
 
     allX.push(vec);
@@ -563,6 +569,7 @@ export default function PredictiveStrategyPanel({
   effectiveStart,
   effectiveEnd,
   onResult,
+  ticker,
 }: Props) {
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(FEATURE_LIBRARY.filter((f) => f.defaultEnabled).map((f) => f.id)),
@@ -600,6 +607,7 @@ export default function PredictiveStrategyPanel({
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
+  const [discWarning, setDiscWarning] = useState<string | null>(null);
 
   const abortRef = useRef(false);
 
@@ -623,6 +631,31 @@ export default function PredictiveStrategyPanel({
 
   const run = useCallback(async () => {
     abortRef.current = false;
+    setDiscWarning(null);
+
+    // target=discretionary: 裁量タブで保存した建玉状態をラベルにする
+    let holdingState: Map<string, number> | undefined;
+    if (target === "discretionary") {
+      if (!ticker) {
+        setDiscWarning("銘柄が未選択のため裁量データを読み込めません。");
+        return;
+      }
+      const list = listScenarios(ticker);
+      const active = list.find((s) => s.id === getActiveId(ticker)) ?? list[0];
+      if (!active || active.trades.length === 0) {
+        setDiscWarning(
+          "この銘柄の裁量シナリオが保存されていません。「裁量トレード」タブで売買して保存してください。",
+        );
+        return;
+      }
+      const rec = reconcileTrades(active.trades, prices);
+      holdingState = holdingStateByDate(prices, rec.trades);
+      if (![...holdingState.values()].some((v) => v === 1)) {
+        setDiscWarning("ロング状態の日がありません (買い→売りの保有区間が必要)。");
+        return;
+      }
+    }
+
     setIsRunning(true);
     setResult(null);
     setProgress(null);
@@ -632,7 +665,7 @@ export default function PredictiveStrategyPanel({
       {
         enabled, paramMap, modelParams, trainWindow, testWindow, embargo,
         standardize, standardizeWindow, calibration, autoThreshold, validationFraction,
-        target, targetReturnThreshold, positionMode, longThreshold, shortThreshold,
+        target, targetReturnThreshold, holdingState, positionMode, longThreshold, shortThreshold,
         startDate: effectiveStart, endDate: effectiveEnd,
       },
       setProgress,
@@ -643,7 +676,7 @@ export default function PredictiveStrategyPanel({
     onResult(res);
     setIsRunning(false);
     setProgress(null);
-  }, [prices, dailyReturns, enabled, paramMap, modelParams, trainWindow, testWindow, embargo, standardize, standardizeWindow, calibration, autoThreshold, validationFraction, target, targetReturnThreshold, positionMode, longThreshold, shortThreshold, effectiveStart, effectiveEnd, onResult]);
+  }, [prices, dailyReturns, enabled, paramMap, modelParams, trainWindow, testWindow, embargo, standardize, standardizeWindow, calibration, autoThreshold, validationFraction, target, targetReturnThreshold, positionMode, longThreshold, shortThreshold, effectiveStart, effectiveEnd, onResult, ticker]);
 
   const cancel = useCallback(() => {
     abortRef.current = true;
@@ -883,6 +916,9 @@ export default function PredictiveStrategyPanel({
             確率 ≦ {shortThreshold.toFixed(2)} → ショート(売り)　|
             中間 → 現金保持
           </div>
+        )}
+        {discWarning && (
+          <div className="bg-amber-50 text-amber-700 rounded p-2 text-xs">⚠ {discWarning}</div>
         )}
       </div>
 
