@@ -509,7 +509,12 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
       }
     }
 
-    if (usedScales.has("volume")) {
+    // 出来高が空の銘柄(指数など)では volume 系列が描画されず "volume" スケールが
+    // 生成されないため、usedScales(描画前の予定)ではなく実際に追加された系列で判定する。
+    const hasVolumeSeries = [...seriesMapRef.current.values()].some(
+      (api) => seriesDefMapRef.current.get(api)?.scaleId === "volume"
+    );
+    if (hasVolumeSeries) {
       chart.priceScale("volume").applyOptions({
         scaleMargins: { top: 0.75, bottom: 0 },
       });
