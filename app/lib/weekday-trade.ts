@@ -88,6 +88,7 @@ export interface StrategyResult {
   sharpe: number; // トレード単位Sharpeを年率化
   maxDD: number; // 負の値
   exposure: number; // 市場滞在率(0..1)
+  heldDays: number; // 延べ市場滞在日数(Σ exitIdx−entryIdx+1)
   annualized: number;
 }
 
@@ -144,6 +145,7 @@ export function computeStrategy(prices: PricePoint[], spec: TradeSpec, compound:
     sharpe,
     maxDD,
     exposure,
+    heldDays: held,
     annualized,
   };
 }

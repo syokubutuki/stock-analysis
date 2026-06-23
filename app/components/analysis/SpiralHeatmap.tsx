@@ -54,16 +54,23 @@ function sameSpec(a: TradeSpec, b: TradeSpec): boolean {
 
 // ロング戦略ランキング: 全注文タイミング(4) × 全曜日ペア(25) = 100通りのロング戦略を
 // 指標で降順に並べる。初期表示の自動選択(最良ロング)とランキング表で共有する純粋関数。
-type RankMetric = "total" | "annualized" | "sharpe" | "efficiency" | "winRate";
+type RankMetric = "perDay" | "total" | "annualized" | "sharpe" | "efficiency" | "winRate";
 const RANK_METRIC_LABELS: Record<RankMetric, string> = {
+  perDay: "日当たり",
   total: "総リターン",
   annualized: "年率",
   sharpe: "Sharpe",
   efficiency: "効率",
   winRate: "勝率",
 };
+// 1市場滞在日あたりの平均リターン(総リターン÷延べ滞在日数)。
+// 滞在期間の長い戦略ほど総リターンが嵩む偏りを取り除き、保有1日あたりの質で公平に比較する。
+function perDayReturn(r: StrategyResult): number {
+  return r.heldDays > 0 ? r.totalReturn / r.heldDays : 0;
+}
 function strategyMetric(r: StrategyResult, m: RankMetric): number {
   switch (m) {
+    case "perDay": return perDayReturn(r);
     case "total": return r.totalReturn;
     case "annualized": return r.annualized;
     case "sharpe": return r.sharpe;
@@ -179,6 +186,8 @@ function quantile(sorted: number[], q: number): number {
 }
 function pct(v: number): string { return (v * 100).toFixed(3) + "%"; }
 function pct2(v: number): string { return (v * 100).toFixed(2) + "%"; }
+// 1滞在日あたりリターンはごく小さいので bps(万分率)で表示する
+function bpDay(v: number): string { return (v * 10000).toFixed(2) + "bp"; }
 function colorClass(v: number): string { return v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500"; }
 
 // t-test
@@ -331,27 +340,31 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const tradeMatrixRef = useRef<HTMLCanvasElement>(null);
   // 編集中のスペック（ビルダー）
   const [builder, setBuilder] = useState<TradeSpec>({ entryDow: 1, entryTiming: "close", exitDow: 2, exitTiming: "close", side: "long" });
-  // 比較対象として確定した戦略リスト。初期表示は「ロングで最もリターンの大きい組合せ」を自動選択。
-  const [specs, setSpecs] = useState<TradeSpec[]>(() => {
-    const ranked = rankLongStrategies(prices, true, "total");
-    return ranked.length ? [ranked[0].spec] : [];
-  });
+  // 比較対象として確定した戦略リスト。ユーザーが未編集の間はランキング1位を自動追従(下の useEffect)。
+  const [specs, setSpecs] = useState<TradeSpec[]>([]);
+  // ユーザーが比較リストを手動操作したか。trueになると自動追従を止め、選択を固定する。
+  const [specsTouched, setSpecsTouched] = useState(false);
   const [tradeCompound, setTradeCompound] = useState(true);
   const [matrixMetric, setMatrixMetric] = useState<MatrixMetric>("total");
-  // ロング戦略ランキングの並べ替え指標
-  const [rankMetric, setRankMetric] = useState<RankMetric>("total");
+  // ロング戦略ランキングの並べ替え指標(既定=日当たり: 滞在期間の偏りを除いた公平比較)
+  const [rankMetric, setRankMetric] = useState<RankMetric>("perDay");
+  // ロング戦略ランキングの折りたたみ表示
+  const [showRanking, setShowRanking] = useState(false);
   // 週内プラン(複数レグ連結)モード
   const [planMode, setPlanMode] = useState(false);
   const [gapFill, setGapFill] = useState<PlanGapFill>("cash");
   const [costBps, setCostBps] = useState(0);
   const addSpec = useCallback(() => {
+    setSpecsTouched(true);
     setSpecs(prev => (prev.length >= 6 || prev.some(s => sameSpec(s, builder))) ? prev : [...prev, builder]);
   }, [builder]);
   // 任意の spec を比較リストへ追加（ランキング/ヒートマップから共有）。連結モードは変更しない。
   const addSpecObj = useCallback((spec: TradeSpec) => {
+    setSpecsTouched(true);
     setSpecs(prev => (prev.length >= 6 || prev.some(s => sameSpec(s, spec))) ? prev : [...prev, spec]);
   }, []);
   const removeSpec = useCallback((idx: number) => {
+    setSpecsTouched(true);
     setSpecs(prev => prev.filter((_, i) => i !== idx));
   }, []);
 
@@ -639,6 +652,12 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     () => rankLongStrategies(prices, tradeCompound, rankMetric),
     [prices, tradeCompound, rankMetric],
   );
+  // ユーザーが比較リストを未編集の間は、ランキング1位(現在の並べ替え指標・期間・複利設定に追従)を
+  // 初期表示として自動選択する。これによりグラフの初期戦略がランキング表の1位と常に一致する。
+  useEffect(() => {
+    if (specsTouched || longRanking.length === 0) return;
+    setSpecs(prev => (prev.length === 1 && sameSpec(prev[0], longRanking[0].spec)) ? prev : [longRanking[0].spec]);
+  }, [longRanking, specsTouched]);
   // ヒートマップのセルをクリック → その(曜日ペア×注文タイミング×方向)を比較リストに追加(連結モードは変えない)
   const addSpecFromMatrix = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -1876,16 +1895,25 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
         {/* ロング戦略ランキング（リターン/Sharpe順） */}
         <div className="mb-2 border border-gray-100 rounded bg-white/70 p-2">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-xs font-medium text-gray-600">ロング戦略ランキング</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowRanking(v => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-800"
+              aria-expanded={showRanking}
+            >
+              <span className="text-gray-400 text-[10px] w-3 inline-block">{showRanking ? "▼" : "▶"}</span>
+              ロング戦略ランキング
+            </button>
             <span className="text-[11px] text-gray-400">全{longRanking.length}通り(注文4×曜日ペア25, 取引3未満は除外)を{RANK_METRIC_LABELS[rankMetric]}の高い順に</span>
-            <div className="flex gap-1 ml-auto">
-              {(Object.keys(RANK_METRIC_LABELS) as RankMetric[]).map(k => (
-                <button key={k} onClick={() => setRankMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${rankMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{RANK_METRIC_LABELS[k]}</button>
-              ))}
-            </div>
+            {showRanking && (
+              <div className="flex flex-wrap gap-1 ml-auto">
+                {(Object.keys(RANK_METRIC_LABELS) as RankMetric[]).map(k => (
+                  <button key={k} onClick={() => setRankMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${rankMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{RANK_METRIC_LABELS[k]}</button>
+                ))}
+              </div>
+            )}
           </div>
-          {longRanking.length === 0 ? (
+          {!showRanking ? null : longRanking.length === 0 ? (
             <div className="text-[11px] text-gray-400 py-1">成立する戦略がありません(データ不足)。</div>
           ) : (
             <div className="overflow-x-auto">
@@ -1895,6 +1923,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                     <th className="py-1 px-2 text-right font-medium">#</th>
                     <th className="py-1 px-2 text-left font-medium">戦略</th>
                     <th className="py-1 px-2 text-center font-medium">取引数</th>
+                    <th className="py-1 px-2 text-center font-medium" title="総リターン÷延べ市場滞在日数: 保有1日あたりの平均リターン。滞在期間の偏りを除いた公平比較の主指標">日当たり</th>
                     <th className="py-1 px-2 text-center font-medium">総リターン</th>
                     <th className="py-1 px-2 text-center font-medium">年率</th>
                     <th className="py-1 px-2 text-center font-medium">Sharpe</th>
@@ -1911,6 +1940,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                         <td className="py-1 px-2 text-right font-mono text-gray-500">{i + 1}</td>
                         <td className="py-1 px-2 font-medium text-gray-700">{specLabel(spec)}</td>
                         <td className="py-1 px-2 text-center font-mono text-gray-600">{result.nTrades}</td>
+                        <td className={`py-1 px-2 text-center font-mono font-semibold ${colorClass(perDayReturn(result))}`}>{result.heldDays > 0 ? bpDay(perDayReturn(result)) : "-"}</td>
                         <td className={`py-1 px-2 text-center font-mono ${colorClass(result.totalReturn)}`}>{pct2(result.totalReturn)}</td>
                         <td className={`py-1 px-2 text-center font-mono ${colorClass(result.annualized)}`}>{pct2(result.annualized)}</td>
                         <td className="py-1 px-2 text-center font-mono text-gray-600">{result.sharpe.toFixed(2)}</td>
@@ -2066,7 +2096,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
           <p className="font-medium text-gray-700 mt-3">B&Hを超えるレグの探し方</p>
           <ul className="list-disc pl-4 space-y-1">
-            <li><span className="font-medium">ロング戦略ランキング</span>は全100通り(注文4×曜日ペア25)のロング戦略を、総リターン/年率/Sharpe/効率/勝率の指標で降順に並べたもの。初期表示では1位(最もリターンの大きいロング)を自動で比較に表示する。各行の「+比較」で比較リストへ追加できる。</li>
+            <li><span className="font-medium">ロング戦略ランキング</span>(折りたたみ式)は全100通り(注文4×曜日ペア25)のロング戦略を、<span className="font-medium">日当たり</span>/総リターン/年率/Sharpe/効率/勝率の指標で降順に並べたもの。<span className="font-medium">既定は「日当たり」=総リターン÷延べ市場滞在日数(bps表示)</span>。総リターンで並べると「水始値→水始値」のように<span className="font-medium">毎週ほぼ常に持ち越す≒バイ&ホールド</span>の組合せが、単に市場滞在日数が長いという理由だけで上位を独占してしまう。日当たりは保有1日あたりの質に揃えるので、滞在期間の偏りを除いて本当に効率の良い曜日区間が浮かび上がる。</li>
+            <li><span className="font-medium">グラフの初期表示</span>は、比較リストを手動編集する前であれば<span className="font-medium">常に現在の並べ替え指標での1位に自動追従</span>する(指標・期間・複利設定を変えると追従先も変わる)。「+比較」やヒートマップのクリック、チップの×で一度でも手動編集すると自動追従は止まり、選択が固定される。</li>
             <li>あるいは<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で総リターン/Sharpe/勝率の良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。<span className="font-medium">良いセルをクリック</span>すると、その曜日ペア×注文タイミング×方向がそのまま比較リストに追加される。連結して1本に繋ぎたいときは<span className="font-medium">連結モード</span>を手動でオンにする。</li>
             <li>良いロングのレグを複数(例: 月終→火終 と 水終→木終)拾い、連結モード「現金」で滞在率を積み上げる。隙間の弱い曜日を避けつつ強い区間だけ拾えればB&H超えが狙える。</li>
             <li>あるいは「ロング保有」で土台をB&Hにし、ヒートマップで<span className="font-medium">マイナスが濃い曜日だけショート</span>のレグを重ねて差を上乗せする(滞在率≈1.0のまま改善余地を探す最短ルート)。</li>
