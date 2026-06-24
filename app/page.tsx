@@ -582,6 +582,10 @@ const ConditionalForwardChart = dynamic(
   () => import("./components/analysis/ConditionalForwardChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const ReturnBinHeatmapChart = dynamic(
+  () => import("./components/analysis/ReturnBinHeatmapChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const ShortTermReversalChart = dynamic(
   () => import("./components/analysis/ShortTermReversalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1275,6 +1279,7 @@ export default function AnalysisPage() {
               {activeSection === "conditional" && (
                 <>
                   <ConditionalForwardChart prices={filteredPrices} />
+                  <ReturnBinHeatmapChart prices={filteredPrices} />
                   <TrendMomentumChart prices={filteredPrices} />
                   <ShortTermReversalChart prices={filteredPrices} />
                   <TwoFactorHeatmapChart prices={filteredPrices} />

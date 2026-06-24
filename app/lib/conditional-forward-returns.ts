@@ -521,6 +521,164 @@ export function twoFactorForward(
 }
 
 // ============================================================
+// 状態軸 × フォワードリターンビン（任意ビン）
+// 「ある状態のとき、その先N日リターンがどの帯に偏るか」を行=状態・列=リターンビンで集計。
+// 単なる平均より分布の形（裾の厚さ・偏り）が見える。ビンは固定幅 or 等頻度分位を選べる。
+// ============================================================
+export type BinMode = "step" | "quantile";
+export interface BinConfig {
+  mode: BinMode;
+  stepPct?: number;   // step: ビン幅(%)。例 1 → 1%刻み
+  maxAbsPct?: number; // step: 中央から±この範囲まで等幅。外側は「以下/以上」のまとめビン
+  bins?: number;      // quantile: 等頻度分割数
+}
+
+export interface ReturnBinRow {
+  label: string;
+  n: number;
+  counts: number[]; // 各ビンの度数
+  freqs: number[];  // counts / n（行内で正規化＝その状態の中での割合）
+  meanFwd: number;
+  winRate: number;
+  isBaseline?: boolean;
+}
+
+export interface ReturnBinResult {
+  binLabels: string[];
+  binEdges: number[];     // 長さ binLabels.length + 1（端は ±Infinity）
+  binSigns: number[];     // 各ビンの代表符号（色付け用 -1/0/+1）
+  rows: ReturnBinRow[];   // present な状態 + 末尾に baseline（全標本）
+  nowLabel: string | null;
+  horizon: number;
+  totalN: number;
+  maxFreq: number;        // 色スケール用（行正規化頻度の最大）
+}
+
+function fmtEdgePct(v: number): string {
+  const x = v * 100;
+  const s = Math.abs(x % 1) < 1e-9 ? x.toFixed(0) : x.toFixed(1);
+  return `${x >= 0 ? "+" : ""}${s}%`;
+}
+
+export function stateByReturnBin(
+  prices: PricePoint[],
+  state: StateFn,
+  horizon: number,
+  bin: BinConfig,
+  opts: ForwardOptions = {}
+): ReturnBinResult {
+  const entry = opts.entry ?? "close";
+  const n = prices.length;
+  const lastUsable = entry === "close" ? n - horizon - 1 : n - horizon - 2;
+
+  const samples: { label: string; r: number }[] = [];
+  const allRets: number[] = [];
+  for (let i = 0; i <= lastUsable; i++) {
+    const label = state.stateOf(i);
+    if (label === null) continue;
+    let entryPx: number, exitPx: number;
+    if (entry === "close") {
+      entryPx = prices[i].close;
+      exitPx = prices[i + horizon].close;
+    } else {
+      entryPx = prices[i + 1].open;
+      exitPx = prices[i + 1 + horizon].open;
+    }
+    if (!(entryPx > 0) || !(exitPx > 0)) continue;
+    const r = (exitPx - entryPx) / entryPx;
+    samples.push({ label, r });
+    allRets.push(r);
+  }
+
+  // --- ビン境界の構築 ---
+  let edges: number[];
+  if (bin.mode === "quantile") {
+    const k = Math.max(2, Math.min(12, Math.round(bin.bins ?? 5)));
+    const sorted = [...allRets].sort((a, b) => a - b);
+    edges = [-Infinity];
+    for (let j = 1; j < k; j++) {
+      const idx = Math.min(sorted.length - 1, Math.floor((j / k) * sorted.length));
+      edges.push(sorted.length ? sorted[idx] : 0);
+    }
+    edges.push(Infinity);
+  } else {
+    const step = Math.max(0.0005, (bin.stepPct ?? 1) / 100);
+    const maxAbs = Math.max(step, (bin.maxAbsPct ?? 5) / 100);
+    const startK = Math.max(1, Math.round(maxAbs / step));
+    edges = [-Infinity];
+    for (let k = -startK; k <= startK; k++) edges.push(Math.round(k * step * 1e8) / 1e8);
+    edges.push(Infinity);
+  }
+
+  const binCount = edges.length - 1;
+  const binLabels: string[] = [];
+  const binSigns: number[] = [];
+  for (let j = 0; j < binCount; j++) {
+    const lo = edges[j], hi = edges[j + 1];
+    if (lo === -Infinity) { binLabels.push(`< ${fmtEdgePct(hi)}`); binSigns.push(-1); }
+    else if (hi === Infinity) { binLabels.push(`≥ ${fmtEdgePct(lo)}`); binSigns.push(1); }
+    else {
+      binLabels.push(`${fmtEdgePct(lo)}〜${fmtEdgePct(hi)}`);
+      const mid = (lo + hi) / 2;
+      binSigns.push(mid > 1e-9 ? 1 : mid < -1e-9 ? -1 : 0);
+    }
+  }
+
+  const binOf = (r: number): number => {
+    for (let j = 0; j < binCount; j++) if (r >= edges[j] && r < edges[j + 1]) return j;
+    return binCount - 1;
+  };
+
+  // --- 状態別に集計 ---
+  const grouped = new Map<string, { counts: number[]; rets: number[] }>();
+  for (const s of samples) {
+    let g = grouped.get(s.label);
+    if (!g) { g = { counts: new Array(binCount).fill(0), rets: [] }; grouped.set(s.label, g); }
+    g.counts[binOf(s.r)]++;
+    g.rets.push(s.r);
+  }
+
+  const present = state.order.filter((o) => grouped.has(o));
+  let maxFreq = 1e-9;
+  const rows: ReturnBinRow[] = present.map((label) => {
+    const g = grouped.get(label)!;
+    const nn = g.rets.length;
+    const freqs = g.counts.map((c) => (nn > 0 ? c / nn : 0));
+    maxFreq = Math.max(maxFreq, ...freqs);
+    return {
+      label,
+      n: nn,
+      counts: g.counts,
+      freqs,
+      meanFwd: mean(g.rets),
+      winRate: nn > 0 ? g.rets.filter((r) => r > 0).length / nn : 0,
+    };
+  });
+
+  // baseline（全標本）行
+  const baseCounts = new Array(binCount).fill(0);
+  for (const s of samples) baseCounts[binOf(s.r)]++;
+  const baseFreqs = baseCounts.map((c) => (allRets.length ? c / allRets.length : 0));
+  rows.push({
+    label: "全体（基準）",
+    n: allRets.length,
+    counts: baseCounts,
+    freqs: baseFreqs,
+    meanFwd: mean(allRets),
+    winRate: allRets.length ? allRets.filter((r) => r > 0).length / allRets.length : 0,
+    isBaseline: true,
+  });
+
+  let nowLabel: string | null = null;
+  for (let i = n - 1; i >= 0; i--) {
+    const l = state.stateOf(i);
+    if (l !== null) { nowLabel = l; break; }
+  }
+
+  return { binLabels, binEdges: edges, binSigns, rows, nowLabel, horizon, totalN: allRets.length, maxFreq };
+}
+
+// ============================================================
 // 集計本体
 // ============================================================
 export function conditionalForwardReturns(
