@@ -558,6 +558,22 @@ const VwapDeviationChart = dynamic(
   () => import("./components/analysis/VwapDeviationChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const ExecutionTimingChart = dynamic(
+  () => import("./components/analysis/ExecutionTimingChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SignalExecutionChart = dynamic(
+  () => import("./components/analysis/SignalExecutionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const EdgeDiscountChart = dynamic(
+  () => import("./components/analysis/EdgeDiscountChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const SlicedExecutionChart = dynamic(
+  () => import("./components/analysis/SlicedExecutionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const IntradayRegimeChart = dynamic(
   () => import("./components/analysis/IntradayRegimeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -604,6 +620,14 @@ const ShortTermReversalChart = dynamic(
 );
 const OvernightIntradayChart = dynamic(
   () => import("./components/analysis/OvernightIntradayChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ExecutionTimingScanChart = dynamic(
+  () => import("./components/analysis/ExecutionTimingScanChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ConditionalSegmentEdgeChart = dynamic(
+  () => import("./components/analysis/ConditionalSegmentEdgeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
 const SpreadEstimatorChart = dynamic(
@@ -1128,6 +1152,7 @@ export default function AnalysisPage() {
                     <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
                   </div>
                   <OvernightIntradayChart prices={filteredPrices} />
+                  <ExecutionTimingScanChart prices={filteredPrices} />
                   <WeekdayDecompChart prices={filteredPrices} />
                 </>
               )}
@@ -1291,6 +1316,7 @@ export default function AnalysisPage() {
               {activeSection === "conditional" && (
                 <>
                   <ConditionalForwardChart prices={filteredPrices} />
+                  <ConditionalSegmentEdgeChart prices={filteredPrices} />
                   <CustomBucketChart prices={filteredPrices} />
                   <ReturnBinHeatmapChart prices={filteredPrices} />
                   <ConditionMarkerChart prices={filteredPrices} />
@@ -1310,6 +1336,9 @@ export default function AnalysisPage() {
                   <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <HighLowTimingChart ticker={data.ticker} />
+                  <ExecutionTimingChart ticker={data.ticker} />
+                  <EdgeDiscountChart prices={allPrices} ticker={data.ticker} />
+                  <SlicedExecutionChart ticker={data.ticker} />
                   <IntradayWindowChart ticker={data.ticker} />
                   <IntradayProfileChart ticker={data.ticker} />
                   <VwapDeviationChart ticker={data.ticker} />
@@ -1318,6 +1347,7 @@ export default function AnalysisPage() {
                   <RealizedVolChart ticker={data.ticker} />
                   <GapIntradayChart ticker={data.ticker} />
                   <SignalIntradayChart ticker={data.ticker} />
+                  <SignalExecutionChart prices={allPrices} ticker={data.ticker} />
                 </>
               )}
 
