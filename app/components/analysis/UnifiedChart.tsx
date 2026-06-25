@@ -6,6 +6,7 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
+  PriceScaleMode,
   type IChartApi,
   type ISeriesApi,
   type Time,
@@ -153,6 +154,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
   useEffect(() => {
     isFullscreenRef.current = isFullscreen;
   }, [isFullscreen]);
+  const [logScale, setLogScale] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= 768
   );
@@ -320,6 +322,15 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
       chartRef.current = null;
     };
   }, []);
+
+  // 価格軸の対数/線形スケール切替（右軸）
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.priceScale("right").applyOptions({
+      mode: logScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+    });
+  }, [logScale, version]);
 
   // Web Worker のライフサイクル管理
   useEffect(() => {
@@ -633,6 +644,13 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
           className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
         >
           全クリア
+        </button>
+        <button
+          onClick={() => setLogScale((v) => !v)}
+          className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${logScale ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+          title="価格軸を対数スケール/線形スケールで切替"
+        >
+          {logScale ? "対数" : "線形"}スケール
         </button>
         <button
           onClick={() => setSavingPreset((v) => !v)}

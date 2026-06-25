@@ -590,6 +590,14 @@ const ConditionMarkerChart = dynamic(
   () => import("./components/analysis/ConditionMarkerChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const CustomBucketChart = dynamic(
+  () => import("./components/analysis/CustomBucketChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const IntradayWindowChart = dynamic(
+  () => import("./components/analysis/IntradayWindowChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const ShortTermReversalChart = dynamic(
   () => import("./components/analysis/ShortTermReversalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1283,6 +1291,7 @@ export default function AnalysisPage() {
               {activeSection === "conditional" && (
                 <>
                   <ConditionalForwardChart prices={filteredPrices} />
+                  <CustomBucketChart prices={filteredPrices} />
                   <ReturnBinHeatmapChart prices={filteredPrices} />
                   <ConditionMarkerChart prices={filteredPrices} />
                   <TrendMomentumChart prices={filteredPrices} />
@@ -1301,6 +1310,7 @@ export default function AnalysisPage() {
                   <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <HighLowTimingChart ticker={data.ticker} />
+                  <IntradayWindowChart ticker={data.ticker} />
                   <IntradayProfileChart ticker={data.ticker} />
                   <VwapDeviationChart ticker={data.ticker} />
                   <IntradayRegimeChart ticker={data.ticker} />

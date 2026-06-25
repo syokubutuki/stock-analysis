@@ -476,6 +476,151 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis): StateFn {
 }
 
 // ============================================================
+// カスタム条件ビルダ（ユーザー編集可能なバケット）
+// 指標と分割方法（固定閾値 / 等頻度分位）をユーザーが指定して状態関数を作る。
+// 値は「表示単位」（% や pt）で扱い、閾値もその単位で受け取る。
+// param（窓長）は #7「ローリング窓長の任意入力」も兼ねる。
+// ============================================================
+export type CustomMetric =
+  | "rsi" | "maDist" | "vol" | "roc" | "prevRet" | "pctFromHigh" | "bbPercentB";
+
+export interface CustomMetricDesc {
+  value: CustomMetric;
+  label: string;
+  unit: string;          // 表示単位（"%" / "pt" / ""）
+  defaultParam: number;
+  paramLabel: string;    // 窓長ラベル。"" なら窓長不要
+  defaultThresholds: number[]; // 表示単位・昇順
+  compute: (prices: PricePoint[], param: number) => number[]; // 表示単位の値配列
+}
+
+// 終値ベースの直近 win 日ローリング最大
+function rollingMaxClose(prices: PricePoint[], win: number): number[] {
+  const n = prices.length;
+  const out = new Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    let m = -Infinity;
+    for (let j = Math.max(0, i - win + 1); j <= i; j++) m = Math.max(m, prices[j].close);
+    if (i >= win - 1) out[i] = m;
+  }
+  return out;
+}
+
+export const CUSTOM_METRICS: CustomMetricDesc[] = [
+  {
+    value: "rsi", label: "RSI", unit: "pt", defaultParam: 14, paramLabel: "期間",
+    defaultThresholds: [30, 50, 70],
+    compute: (p, param) => wilderRSI(p, Math.max(2, Math.round(param))),
+  },
+  {
+    value: "maDist", label: "移動平均乖離", unit: "%", defaultParam: 200, paramLabel: "SMA期間",
+    defaultThresholds: [-10, 0, 10],
+    compute: (p, param) => {
+      const sma = trailingSMA(p, Math.max(2, Math.round(param)));
+      return p.map((pt, i) => (isNaN(sma[i]) || sma[i] <= 0 ? NaN : ((pt.close - sma[i]) / sma[i]) * 100));
+    },
+  },
+  {
+    value: "vol", label: "実現ボラ(日次σ)", unit: "%", defaultParam: 20, paramLabel: "窓長",
+    defaultThresholds: [1, 2],
+    compute: (p, param) => rollingRealizedVol(p, Math.max(3, Math.round(param))).map((v) => (isNaN(v) ? NaN : v * 100)),
+  },
+  {
+    value: "roc", label: "モメンタム(ROC)", unit: "%", defaultParam: 20, paramLabel: "期間",
+    defaultThresholds: [-10, 0, 10],
+    compute: (p, param) => {
+      const w = Math.max(1, Math.round(param));
+      return p.map((pt, i) => (i < w || p[i - w].close <= 0 ? NaN : (pt.close / p[i - w].close - 1) * 100));
+    },
+  },
+  {
+    value: "prevRet", label: "前日リターン", unit: "%", defaultParam: 1, paramLabel: "",
+    defaultThresholds: [-1, 0, 1],
+    compute: (p) => p.map((pt, i) => (i < 1 || p[i - 1].close <= 0 ? NaN : (pt.close / p[i - 1].close - 1) * 100)),
+  },
+  {
+    value: "pctFromHigh", label: "高値からの下落", unit: "%", defaultParam: 252, paramLabel: "高値窓",
+    defaultThresholds: [-15, -7, -2],
+    compute: (p, param) => {
+      const rm = rollingMaxClose(p, Math.max(2, Math.round(param)));
+      return p.map((pt, i) => (isNaN(rm[i]) || rm[i] <= 0 ? NaN : ((pt.close - rm[i]) / rm[i]) * 100));
+    },
+  },
+  {
+    value: "bbPercentB", label: "ボリンジャー%b", unit: "", defaultParam: 20, paramLabel: "期間",
+    defaultThresholds: [0, 0.2, 0.8, 1],
+    compute: (p, param) => {
+      const w = Math.max(2, Math.round(param));
+      const sma = trailingSMA(p, w);
+      const sd = trailingStd(p, w);
+      return p.map((pt, i) => {
+        if (isNaN(sma[i]) || isNaN(sd[i]) || sd[i] === 0) return NaN;
+        const upper = sma[i] + 2 * sd[i], lower = sma[i] - 2 * sd[i];
+        return (pt.close - lower) / (upper - lower);
+      });
+    },
+  },
+];
+
+// 有限値から k 等頻度分位の境界（k-1個）を返す
+export function quantiles(vals: number[], k: number): number[] {
+  const v = vals.filter((x) => isFinite(x)).sort((a, b) => a - b);
+  if (v.length < k) return [];
+  const out: number[] = [];
+  for (let j = 1; j < k; j++) out.push(v[Math.min(v.length - 1, Math.floor((j / k) * v.length))]);
+  return out;
+}
+
+export interface CustomBucketConfig {
+  metric: CustomMetric;
+  param: number;
+  mode: "fixed" | "quantile";
+  thresholds: number[]; // fixed: 境界（表示単位・昇順）
+  bins: number;         // quantile: 分割数
+}
+
+function fmtUnit(v: number, unit: string): string {
+  const s = Math.abs(v % 1) < 1e-9 ? v.toFixed(0) : v.toFixed(unit === "" ? 2 : 1);
+  return `${s}${unit}`;
+}
+
+export function buildCustomStateFn(prices: PricePoint[], cfg: CustomBucketConfig): StateFn {
+  const desc = CUSTOM_METRICS.find((m) => m.value === cfg.metric) ?? CUSTOM_METRICS[0];
+  const vals = desc.compute(prices, cfg.param || desc.defaultParam);
+  let edges: number[];
+  if (cfg.mode === "quantile") {
+    edges = quantiles(vals, Math.max(2, Math.min(10, Math.round(cfg.bins))));
+  } else {
+    edges = [...cfg.thresholds].filter((x) => isFinite(x)).sort((a, b) => a - b);
+  }
+  if (edges.length === 0) edges = [...desc.defaultThresholds];
+  // 同値（ゼロ幅）境界を除去
+  edges = edges.filter((e, idx) => idx === 0 || Math.abs(e - edges[idx - 1]) > 1e-9);
+
+  const order: string[] = [];
+  for (let j = 0; j <= edges.length; j++) {
+    if (j === 0) order.push(`< ${fmtUnit(edges[0], desc.unit)}`);
+    else if (j === edges.length) order.push(`≥ ${fmtUnit(edges[edges.length - 1], desc.unit)}`);
+    else order.push(`${fmtUnit(edges[j - 1], desc.unit)}〜${fmtUnit(edges[j], desc.unit)}`);
+  }
+
+  const binOf = (v: number): number => {
+    let idx = 0;
+    for (let j = 0; j < edges.length; j++) if (v >= edges[j]) idx = j + 1;
+    return idx;
+  };
+
+  return {
+    order,
+    stateOf: (i) => {
+      const v = vals[i];
+      if (!isFinite(v)) return null;
+      return order[binOf(v)];
+    },
+  };
+}
+
+// ============================================================
 // 9.2 2変数コンディショニング
 // ============================================================
 export interface TwoFactorCell {
