@@ -44,6 +44,10 @@ const PortfolioRiskPanel = dynamic(
   () => import("../components/analysis/PortfolioRiskPanel"),
   { ssr: false }
 );
+const EfficientFrontierChart = dynamic(
+  () => import("../components/analysis/EfficientFrontierChart"),
+  { ssr: false }
+);
 const BadgeTrackRecordPanel = dynamic(
   () => import("../components/analysis/BadgeTrackRecordPanel"),
   { ssr: false }
@@ -379,6 +383,10 @@ export default function PortfolioPage() {
           <>
           {Object.keys(data).length >= 2 && (
             <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} />
+          )}
+
+          {Object.keys(data).length >= 2 && (
+            <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} />
           )}
 
           <BadgeTrackRecordPanel
