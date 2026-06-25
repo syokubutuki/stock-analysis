@@ -37,6 +37,9 @@ export interface ForwardResult {
 export interface ForwardOptions {
   entry?: "close" | "open"; // close: 当日終値で建て、open: 翌日始値で建て
   boot?: number;
+  // 集計対象を絞る述語。指標は全履歴で計算したまま、サンプルだけを限定する
+  // （価格をスライスしないので RSI 等のウォームアップが壊れない）。期間クロスフィルタ用。
+  accept?: (i: number) => boolean;
 }
 
 // ============================================================
@@ -576,6 +579,7 @@ export function stateByReturnBin(
   for (let i = 0; i <= lastUsable; i++) {
     const label = state.stateOf(i);
     if (label === null) continue;
+    if (opts.accept && !opts.accept(i)) continue;
     let entryPx: number, exitPx: number;
     if (entry === "close") {
       entryPx = prices[i].close;
@@ -699,6 +703,7 @@ export function conditionalForwardReturns(
   for (let i = 0; i <= lastUsable; i++) {
     const label = state.stateOf(i);
     if (label === null) continue;
+    if (opts.accept && !opts.accept(i)) continue;
     let entryPx: number, exitPx: number, exitTime: string;
     if (entry === "close") {
       entryPx = prices[i].close;
