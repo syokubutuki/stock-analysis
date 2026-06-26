@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  createChart,
+  LineSeries,
+  type IChartApi,
+  type Time,
+} from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { GBDT, type GBDTParams, DEFAULT_GBDT_PARAMS } from "../../lib/ml/gbdt";
 import {
@@ -79,6 +85,29 @@ export interface PredictionResult {
     totalDays: number;
   };
   importance: { label: string; value: number }[];
+}
+
+// ── 未来予測 (アウトオブサンプル / 再帰多段) ───────
+/** 予測した未来1日分 */
+export interface ForecastDay {
+  time: string;
+  proba: number; // モデルの上昇確率
+  expRet: number; // その日の期待対数リターン
+  close: number; // 予測終値
+  upper: number; // +σ√h コーン上限
+  lower: number; // −σ√h コーン下限
+}
+
+export interface FutureForecast {
+  horizon: number;
+  trainEnd: string; // 学習に使った最終日
+  lastClose: number; // 起点の実終値
+  muUp: number; // 学習窓の上昇日平均リターン
+  muDown: number; // 学習窓の下落日平均リターン
+  sigma: number; // 終値間リターンの日次標準偏差
+  history: { time: string; close: number }[]; // 描画用の直近実終値
+  days: ForecastDay[];
+  cumExpRet: number; // 期間合計の期待対数リターン
 }
 
 interface Props {
@@ -401,6 +430,271 @@ async function runWalkForwardAsync(
   };
 }
 
+// ── 未来予測 (再帰多段) ───────────────────────────
+
+interface ForecastConfig {
+  enabled: Set<string>;
+  paramMap: Record<string, Record<string, number>>;
+  modelParams: GBDTParams;
+  trainWindow: number;
+  standardize: boolean;
+  standardizeWindow: number;
+  target: PredictionTarget;
+  targetReturnThreshold: number;
+  holdingState?: Map<string, number>;
+}
+
+// 翌営業日(週末をスキップ)。祝日は考慮しない簡易版
+function nextBusinessDay(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  do {
+    d.setUTCDate(d.getUTCDate() + 1);
+  } while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+  return d.toISOString().slice(0, 10);
+}
+
+// rawHist の末尾行を、直近 window 行(末尾含む)の平均・分散で標準化する。
+// standardizeMatrixCausal と同じ trailing 因果セマンティクスを1行分だけ再現。
+function standardizeLastRow(rawHist: number[][], window: number): number[] {
+  const t = rawHist.length - 1;
+  const f = rawHist[t].length;
+  const w = Math.max(1, Math.floor(window));
+  const start = Math.max(0, t - w + 1);
+  const count = t - start + 1;
+  const out = new Array<number>(f).fill(0);
+  for (let c = 0; c < f; c++) {
+    let sum = 0;
+    let sumSq = 0;
+    for (let k = start; k <= t; k++) {
+      const x = rawHist[k][c];
+      sum += x;
+      sumSq += x * x;
+    }
+    const m = sum / count;
+    const variance = Math.max(0, sumSq / count - m * m);
+    const sd = Math.sqrt(variance);
+    out[c] = count >= 2 && sd > 1e-9 ? (rawHist[t][c] - m) / sd : 0;
+  }
+  return out;
+}
+
+async function runFutureForecastAsync(
+  prices: PricePoint[],
+  dailyReturns: (number | null)[],
+  cfg: ForecastConfig,
+  horizon: number,
+  abortRef: { current: boolean },
+): Promise<FutureForecast | null> {
+  const lb = maxLookback(cfg.enabled, cfg.paramMap);
+  const featureList = enabledFeatureList(cfg.enabled);
+  if (featureList.length === 0) return null;
+  if (prices.length < lb + 30) return null;
+
+  // 全履歴の生特徴量 (i = lb .. prices.length-1)。末尾行は予測の起点。
+  const rawAll: number[][] = [];
+  const idxAll: number[] = [];
+  for (let i = lb; i < prices.length; i++) {
+    const vec = computeFeatureVector(prices, i, cfg.enabled, cfg.paramMap);
+    if (vec.some((v) => !isFinite(v))) continue;
+    rawAll.push(vec);
+    idxAll.push(i);
+  }
+  if (rawAll.length < 30) return null;
+
+  // 学習ラベル: 各行 i は features[i] → return[i+1] の向き。末尾行は次の値が無いので除外。
+  const trainRaw: number[][] = [];
+  const trainY: number[] = [];
+  for (let r = 0; r < rawAll.length; r++) {
+    const i = idxAll[r];
+    if (i + 1 >= prices.length) break; // 末尾(起点)はラベル無し
+    const nextRet = dailyReturns[i + 1];
+    if (nextRet == null) continue;
+    let y: number;
+    switch (cfg.target) {
+      case "strategy": y = nextRet > 0 ? 1 : 0; break;
+      case "strategy_high": y = nextRet > cfg.targetReturnThreshold ? 1 : 0; break;
+      case "close_up": y = prices[i + 1].close > prices[i].close ? 1 : 0; break;
+      case "discretionary": y = cfg.holdingState?.get(prices[i + 1].time) ?? 0; break;
+    }
+    trainRaw.push(rawAll[r]);
+    trainY.push(y);
+  }
+  if (trainRaw.length < 30) return null;
+
+  // 因果的標準化 (リークなし)。学習行・起点行・将来行で同じ trailing 窓を使う。
+  let stdAll: number[][] = rawAll;
+  if (cfg.standardize) {
+    stdAll = standardizeMatrixCausal(rawAll, cfg.standardizeWindow);
+  }
+
+  // 学習窓は直近 trainWindow 行に限定。標準化済み行列から対応分を抜く。
+  const trainCount = Math.min(cfg.trainWindow, trainRaw.length);
+  // trainRaw は rawAll の (ラベル有り) 先頭から並ぶので、標準化版も同じ並びで作り直す
+  const stdTrainAll: number[][] = [];
+  for (let r = 0; r < rawAll.length; r++) {
+    const i = idxAll[r];
+    if (i + 1 >= prices.length) break;
+    const nextRet = dailyReturns[i + 1];
+    if (nextRet == null) continue;
+    stdTrainAll.push(stdAll[r]);
+  }
+  const fitX = stdTrainAll.slice(stdTrainAll.length - trainCount);
+  const fitY = trainY.slice(trainY.length - trainCount);
+
+  const model = new GBDT(cfg.modelParams);
+  model.fit(fitX, fitY);
+  if (abortRef.current) return null;
+
+  // 価格換算用の統計: 直近 trainWindow 本の終値間対数リターン
+  const c2c: number[] = [];
+  const c2cStart = Math.max(1, prices.length - cfg.trainWindow);
+  for (let i = c2cStart; i < prices.length; i++) {
+    c2c.push(Math.log(prices[i].close / prices[i - 1].close));
+  }
+  const pos = c2c.filter((r) => r > 0);
+  const neg = c2c.filter((r) => r < 0);
+  const muUp = pos.length > 0 ? pos.reduce((a, b) => a + b, 0) / pos.length : 0;
+  const muDown = neg.length > 0 ? neg.reduce((a, b) => a + b, 0) / neg.length : 0;
+  const cMean = c2c.reduce((a, b) => a + b, 0) / c2c.length;
+  const sigma = Math.sqrt(
+    c2c.reduce((a, v) => a + (v - cMean) ** 2, 0) / Math.max(1, c2c.length),
+  );
+
+  // 直近出来高平均 (合成バー用)
+  const volWin = Math.min(20, prices.length);
+  let avgVol = 0;
+  for (let i = prices.length - volWin; i < prices.length; i++) avgVol += prices[i].volume;
+  avgVol /= volWin;
+
+  // ── 再帰多段予測 ──
+  const ext = prices.slice(); // 合成バーを順次 push
+  const rawHist = rawAll.slice(); // 標準化の trailing 窓用
+  let curVec = cfg.standardize ? stdAll[stdAll.length - 1] : rawAll[rawAll.length - 1];
+
+  const lastClose = prices[prices.length - 1].close;
+  const days: ForecastDay[] = [];
+  let cumLog = 0;
+
+  for (let h = 1; h <= horizon; h++) {
+    if (abortRef.current) return null;
+    const p = model.predictProba(curVec);
+    const r = p * muUp + (1 - p) * muDown;
+    cumLog += r;
+
+    const prevClose = ext[ext.length - 1].close;
+    const newClose = prevClose * Math.exp(r);
+    const open = prevClose;
+    const typicalRange = prevClose * sigma;
+    const high = Math.max(open, newClose) + typicalRange * 0.5;
+    const low = Math.max(newClose * 0.5, Math.min(open, newClose) - typicalRange * 0.5);
+    const time = nextBusinessDay(ext[ext.length - 1].time);
+    ext.push({ time, open, high, low, close: newClose, volume: avgVol });
+
+    // コーン: 起点からの不確実性は σ√h で拡大
+    const halfWidth = sigma * Math.sqrt(h);
+    days.push({
+      time,
+      proba: p,
+      expRet: r,
+      close: newClose,
+      upper: newClose * Math.exp(halfWidth),
+      lower: newClose * Math.exp(-halfWidth),
+    });
+
+    // 次ステップの起点特徴量を合成バーから再計算
+    const rawVec = computeFeatureVector(ext, ext.length - 1, cfg.enabled, cfg.paramMap);
+    if (rawVec.some((v) => !isFinite(v))) break;
+    rawHist.push(rawVec);
+    curVec = cfg.standardize ? standardizeLastRow(rawHist, cfg.standardizeWindow) : rawVec;
+
+    if (h % 5 === 0) await yieldToUI();
+  }
+
+  if (days.length === 0) return null;
+
+  // 描画用の直近実終値 (最大120本)
+  const histLen = Math.min(120, prices.length);
+  const history = prices
+    .slice(prices.length - histLen)
+    .map((q) => ({ time: q.time, close: q.close }));
+
+  return {
+    horizon: days.length,
+    trainEnd: prices[prices.length - 1].time,
+    lastClose,
+    muUp,
+    muDown,
+    sigma,
+    history,
+    days,
+    cumExpRet: cumLog,
+  };
+}
+
+// ── 未来予測チャート (実績終値 + 予測パス + コーン) ──
+
+function ForecastChart({ forecast }: { forecast: FutureForecast }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const chart: IChartApi = createChart(ref.current, {
+      layout: { background: { color: "#ffffff" }, textColor: "#333" },
+      grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
+      width: ref.current.clientWidth,
+      height: 260,
+      rightPriceScale: { visible: true },
+      timeScale: { timeVisible: false },
+    });
+
+    const fmt = (v: number) => v.toFixed(2);
+    const last = forecast.history[forecast.history.length - 1];
+
+    // 実績終値 (青)
+    const actual = chart.addSeries(LineSeries, {
+      color: "#2563eb", lineWidth: 2,
+      priceFormat: { type: "custom", formatter: fmt }, title: "実績終値",
+    });
+    actual.setData(forecast.history.map((h) => ({ time: h.time as Time, value: h.close })));
+
+    // コーン上限・下限 (淡いオレンジ破線)。起点を先頭に付けて連続させる
+    const coneOpts = (key: "upper" | "lower") => [
+      { time: last.time as Time, value: last.close },
+      ...forecast.days.map((d) => ({ time: d.time as Time, value: d[key] })),
+    ];
+    for (const key of ["upper", "lower"] as const) {
+      const s = chart.addSeries(LineSeries, {
+        color: "#fcd34d", lineWidth: 1, lineStyle: 2,
+        lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+      });
+      s.setData(coneOpts(key));
+    }
+
+    // 予測終値 (オレンジ実線)。起点を先頭に付けて実績と連続させる
+    const fc = chart.addSeries(LineSeries, {
+      color: "#f59e0b", lineWidth: 2,
+      priceFormat: { type: "custom", formatter: fmt }, title: "予測",
+    });
+    fc.setData([
+      { time: last.time as Time, value: last.close },
+      ...forecast.days.map((d) => ({ time: d.time as Time, value: d.close })),
+    ]);
+
+    chart.timeScale().fitContent();
+
+    const onResize = () => {
+      if (ref.current) chart.applyOptions({ width: ref.current.clientWidth });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.remove();
+    };
+  }, [forecast]);
+
+  return <div ref={ref} className="w-full rounded border border-gray-100" />;
+}
+
 // ── 進捗表示コンポーネント ────────────────────────
 
 function TrainingProgressPanel({ progress }: { progress: TrainingProgress }) {
@@ -609,6 +903,12 @@ export default function PredictiveStrategyPanel({
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
   const [discWarning, setDiscWarning] = useState<string | null>(null);
 
+  // 未来予測 (アウトオブサンプル)
+  const [horizon, setHorizon] = useState(21);
+  const [forecast, setForecast] = useState<FutureForecast | null>(null);
+  const [isForecasting, setIsForecasting] = useState(false);
+  const [forecastError, setForecastError] = useState<string | null>(null);
+
   const abortRef = useRef(false);
 
   const toggleFeature = useCallback((id: string) => {
@@ -681,6 +981,52 @@ export default function PredictiveStrategyPanel({
   const cancel = useCallback(() => {
     abortRef.current = true;
   }, []);
+
+  // target=discretionary 用: 裁量シナリオの建玉状態を読み込む (警告文字列を返す場合は失敗)
+  const loadHoldingState = useCallback((): Map<string, number> | string | undefined => {
+    if (target !== "discretionary") return undefined;
+    if (!ticker) return "銘柄が未選択のため裁量データを読み込めません。";
+    const list = listScenarios(ticker);
+    const active = list.find((s) => s.id === getActiveId(ticker)) ?? list[0];
+    if (!active || active.trades.length === 0) {
+      return "この銘柄の裁量シナリオが保存されていません。「裁量トレード」タブで売買して保存してください。";
+    }
+    const rec = reconcileTrades(active.trades, prices);
+    const hs = holdingStateByDate(prices, rec.trades);
+    if (![...hs.values()].some((v) => v === 1)) {
+      return "ロング状態の日がありません (買い→売りの保有区間が必要)。";
+    }
+    return hs;
+  }, [target, ticker, prices]);
+
+  const runForecast = useCallback(async () => {
+    abortRef.current = false;
+    setForecastError(null);
+
+    let holdingState: Map<string, number> | undefined;
+    if (target === "discretionary") {
+      const hs = loadHoldingState();
+      if (typeof hs === "string") { setForecastError(hs); return; }
+      holdingState = hs;
+    }
+
+    setIsForecasting(true);
+    setForecast(null);
+
+    const fc = await runFutureForecastAsync(
+      prices, dailyReturns,
+      {
+        enabled, paramMap, modelParams, trainWindow,
+        standardize, standardizeWindow, target, targetReturnThreshold, holdingState,
+      },
+      horizon,
+      abortRef,
+    );
+
+    if (!fc) setForecastError("データが不足しているか特徴量が無効で、未来予測を生成できませんでした。");
+    setForecast(fc);
+    setIsForecasting(false);
+  }, [prices, dailyReturns, enabled, paramMap, modelParams, trainWindow, standardize, standardizeWindow, target, targetReturnThreshold, horizon, loadHoldingState]);
 
   return (
     <div className="border border-indigo-200 rounded-lg bg-indigo-50/40 p-3 space-y-3">
@@ -981,6 +1327,73 @@ export default function PredictiveStrategyPanel({
         <div className="text-xs text-gray-400">特徴量を選択し「学習実行」を押してください</div>
       )}
 
+      {/* ── 未来予測 (アウトオブサンプル) ── */}
+      <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-2">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h5 className="text-sm font-semibold text-amber-800">未来予測（アウトオブサンプル）</h5>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              直近の最新日まで学習に使い、その先のまだ起きていない日を再帰的に予測して価格パスを描きます。
+            </p>
+          </div>
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">予測日数</label>
+              <input type="number" min={1} max={63} step={1} value={horizon}
+                onChange={(e) => setHorizon(Math.max(1, Math.min(63, Number(e.target.value) || 1)))}
+                className="w-20 px-2 py-1.5 text-xs border border-gray-300 rounded text-center" />
+            </div>
+            <button onClick={runForecast} disabled={isForecasting || enabledCount === 0}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed">
+              {isForecasting ? "予測中..." : `未来${horizon}日を予測`}
+            </button>
+          </div>
+        </div>
+
+        {forecastError && (
+          <div className="bg-amber-50 text-amber-700 rounded p-2 text-xs">⚠ {forecastError}</div>
+        )}
+
+        {forecast && !isForecasting && (() => {
+          const last = forecast.days[forecast.days.length - 1];
+          const totalRet = Math.exp(forecast.cumExpRet) - 1; // 単純リターン換算
+          const up = forecast.days.filter((d) => d.proba >= 0.5).length;
+          return (
+            <div className="space-y-2">
+              <ForecastChart forecast={forecast} />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+                <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-blue-600" /> 実績終値</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-amber-500" /> 予測パス</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5" style={{ background: "#fcd34d" }} /> ±σ√h コーン</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                <MetricCell label="起点(学習最終日)" value={forecast.trainEnd.slice(2)} />
+                <MetricCell label="起点終値" value={forecast.lastClose.toFixed(2)} />
+                <MetricCell label={`${forecast.horizon}日後 予測終値`} value={last.close.toFixed(2)}
+                  color={last.close >= forecast.lastClose ? "text-green-600" : "text-red-600"} />
+                <MetricCell label="期間 期待リターン" value={(totalRet >= 0 ? "+" : "") + (totalRet * 100).toFixed(2) + "%"}
+                  color={totalRet >= 0 ? "text-green-600" : "text-red-600"} />
+                <MetricCell label="上昇予測日数" value={`${up}/${forecast.horizon}`} />
+                <MetricCell label="日次ボラ σ" value={(forecast.sigma * 100).toFixed(2) + "%"} />
+                <MetricCell label="上昇日平均 μ↑" value={"+" + (forecast.muUp * 100).toFixed(2) + "%"} color="text-green-600" />
+                <MetricCell label="下落日平均 μ↓" value={(forecast.muDown * 100).toFixed(2) + "%"} color="text-red-600" />
+              </div>
+              <div className="text-[11px] text-gray-400">
+                予測は確率を期待リターン（期待r = p·μ↑ + (1−p)·μ↓）に換算した中心シナリオです。
+                日が進むほど合成データを再帰利用するため不確実性が増し、コーン（±σ√h）が広がります。
+                価格パスは終値方向に対する予測なので、上の「予測対象」を<span className="font-medium">「終値上昇」</span>にすると最も整合します。
+              </div>
+            </div>
+          );
+        })()}
+
+        {!forecast && !isForecasting && !forecastError && (
+          <div className="text-[11px] text-gray-400">
+            「未来{horizon}日を予測」を押すと、現在の特徴量・モデル設定・学習窓（{trainWindow}日）で未来の価格パスを推定します。
+          </div>
+        )}
+      </div>
+
       <AnalysisGuide title="GBDT予測モデルの詳細理論">
         <p className="font-medium text-gray-700">1. GBDT(勾配ブースティング決定木)とは</p>
         <p>
@@ -1053,6 +1466,26 @@ export default function PredictiveStrategyPanel({
           <li>取引コスト(手数料・スプレッド・スリッページ)は含みません。実運用では超過リターンがコストに消えることがあります。</li>
           <li>木の数を増やしすぎ・深くしすぎ・正則化(λ,γ)が弱すぎると過学習します。サブサンプリングと検証指標(AUC/バランス正答率)で確認してください。</li>
           <li>標準化や較正は学習窓内の過去情報のみで行い未来を使いませんが、レジーム急変時には過去統計が外れることがあります。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">8. 未来予測（アウトオブサンプル）の仕組み</p>
+        <p>
+          Walk-Forward が「過去で学習→既知の直後でテスト（答え合わせ可能）」なのに対し、未来予測は
+          <span className="font-medium">入手できる最新日まで全て学習に使い、まだ起きていない先の日を当てに行く</span>本番運用と同じ設定です。
+          GBDTは「翌日の方向（上がる確率 p）」しか出さないため、これを次の手順で価格パスに変換し、再帰的に未来へ伸ばします。
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">確率→期待リターン:</span> 学習窓の終値間リターンから、上昇日の平均 μ↑ と下落日の平均 μ↓ を求め、
+            その日の期待対数リターンを <span className="font-mono">r = p·μ↑ + (1−p)·μ↓</span> とします（p が高いほど μ↑ 寄りの上昇ドリフト）。</li>
+          <li><span className="font-medium">合成バーの生成:</span> 予測終値 <span className="font-mono">Close′ = Close·e^r</span> を作り、始値=前日終値・高安はσ幅で補完した仮想ローソクを履歴に追加します。</li>
+          <li><span className="font-medium">再帰:</span> 追加した合成バーから特徴量を再計算し、次の日の p を予測…を予測日数だけ繰り返します（多段予測）。</li>
+          <li><span className="font-medium">信頼度コーン:</span> ランダムウォーク近似で、起点からの不確実性は時間の平方根で広がります。h日後の帯は
+            <span className="font-mono"> Close′·e^(±σ√h)</span>（σ=日次ボラ）で、約±1標準偏差（およそ68%）の範囲の目安です。</li>
+        </ul>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li><span className="font-medium">読み方:</span> オレンジの実線が中心シナリオ（期待値）、淡いコーンが「この辺りに収まりやすい」範囲。コーンが早く広がる銘柄ほど予測の確度は低いと解釈します。</li>
+          <li><span className="font-medium">整合性:</span> 価格パスは終値方向の予測なので、上の「予測対象」を「終値上昇」にすると p の意味と最も合います（戦略リターン方向のままでも方向シグナルとして利用可）。</li>
+          <li><span className="font-medium">限界:</span> 多段予測は誤差が累積し、合成バーを入力に使うため後半ほど信頼性が落ちます。μ↑/μ↓・σ は過去窓の平均でしかなく、急変・イベント・ジャンプは表現できません。中心線は「平均的にこうなりやすい」程度の参考であり、点予測の的中を保証するものではありません。較正（Platt/Isotonic）は未来予測には適用していません。</li>
         </ul>
       </AnalysisGuide>
     </div>
