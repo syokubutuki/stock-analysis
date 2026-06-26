@@ -5,8 +5,10 @@ import { PricePoint } from "../../lib/types";
 import {
   conditionalForwardReturns,
   buildStateFn,
+  buildStateSeries,
   STATE_AXES,
   StateAxis,
+  StateSeries,
   ForwardStats,
 } from "../../lib/conditional-forward-returns";
 import StatBadge from "./StatBadge";
@@ -151,6 +153,69 @@ function drawYearStrip(
   });
 }
 
+// 状態を決める指標の実値を時系列で描く（しきい値帯つき）。「なぜその状態か」を可視化。
+function drawIndicator(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  series: StateSeries,
+  times: string[]
+) {
+  const ml = 8, mr = 52, mt = 20, mb = 16;
+  const plotW = width - ml - mr;
+  const plotH = height - mt - mb;
+  const vals = series.values;
+  const n = vals.length;
+  const finite = vals.filter((v): v is number => v != null && isFinite(v));
+  if (finite.length < 2) return;
+  let vmin = Math.min(...finite, ...series.thresholds.map((t) => t.value));
+  let vmax = Math.max(...finite, ...series.thresholds.map((t) => t.value));
+  const pad = (vmax - vmin) * 0.08 || 1;
+  vmin -= pad; vmax += pad;
+  const ys = (v: number) => mt + plotH - ((v - vmin) / (vmax - vmin)) * plotH;
+  const xs = (i: number) => ml + (i / Math.max(1, n - 1)) * plotW;
+
+  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText(`判定指標の推移: ${series.label}（点線=バケット境界）`, ml, 13);
+
+  // しきい値ライン
+  series.thresholds.forEach((t) => {
+    const y = ys(t.value);
+    ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#94a3b8"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
+    const lbl = series.unit === "%" ? `${t.value >= 0 ? "+" : ""}${t.value.toFixed(0)}%` : `${t.value}${series.unit}`;
+    ctx.fillText(lbl, ml + plotW + 3, y + 3);
+  });
+
+  // 値ライン
+  ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 1.5; ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < n; i++) {
+    const v = vals[i];
+    if (v == null || !isFinite(v)) { started = false; continue; }
+    const x = xs(i), y = ys(v);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // 直近値マーカー
+  for (let i = n - 1; i >= 0; i--) {
+    const v = vals[i];
+    if (v == null || !isFinite(v)) continue;
+    const x = xs(i), y = ys(v);
+    ctx.fillStyle = "#1d4ed8"; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1d4ed8"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "right";
+    const lbl = series.unit === "%" ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : `${v.toFixed(series.unit === "" ? 2 : 0)}${series.unit}`;
+    ctx.fillText(`現在 ${lbl}`, ml + plotW, mt - 6);
+    break;
+  }
+
+  // 時刻ラベル（端と中央）
+  ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+  [0, Math.floor(n / 2), n - 1].forEach((i) => { if (times[i]) ctx.fillText(times[i], xs(i), mt + plotH + 12); });
+}
+
 export default function ConditionalForwardChart({
   prices,
   axes = STATE_AXES,
@@ -160,6 +225,7 @@ export default function ConditionalForwardChart({
 }: Props) {
   const barRef = useRef<HTMLCanvasElement>(null);
   const yearRef = useRef<HTMLCanvasElement>(null);
+  const indRef = useRef<HTMLCanvasElement>(null);
   const [axis, setAxis] = useState<StateAxis>(defaultAxis ?? axes[0].value);
   const [horizon, setHorizon] = useState(5);
   const [entry, setEntry] = useState<"close" | "open">("close");
@@ -169,6 +235,11 @@ export default function ConditionalForwardChart({
     const st = buildStateFn(prices, axis);
     return conditionalForwardReturns(prices, st, horizon, { entry });
   }, [prices, axis, horizon, entry, minBars]);
+
+  const indicator = useMemo<StateSeries | null>(
+    () => (prices.length >= minBars ? buildStateSeries(prices, axis) : null),
+    [prices, axis, minBars]
+  );
 
   useEffect(() => {
     if (!result || result.buckets.length === 0) return;
@@ -182,9 +253,15 @@ export default function ConditionalForwardChart({
     }
   }, [result]);
 
-  if (prices.length < minBars) return null;
-  if (!result || result.buckets.length === 0) return null;
+  useEffect(() => {
+    if (!indicator || !indRef.current) return;
+    const init = initCanvas(indRef.current, 150);
+    if (init) drawIndicator(init.ctx, init.width, init.height, indicator, prices.map((p) => p.time));
+  }, [indicator, prices]);
 
+  if (prices.length < minBars || !result) return null;
+
+  const hasBuckets = result.buckets.length > 0;
   const maxAbs = Math.max(1e-9, ...result.buckets.map((b) => Math.abs(b.meanFwd)));
   const nowBucket = result.buckets.find((b) => b.label === result.nowLabel) ?? null;
 
@@ -233,6 +310,13 @@ export default function ConditionalForwardChart({
         <span className="ml-auto text-gray-400">全標本 {result.totalN}日 / 基準平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%</span>
       </div>
 
+      {/* 判定指標の推移（なぜその状態かを可視化） */}
+      {indicator ? (
+        <div className="relative"><canvas ref={indRef} /></div>
+      ) : (
+        <p className="text-[11px] text-gray-400">この軸（{axes.find((a) => a.value === axis)?.label}）は数値指標として表示できないため、推移グラフは省略します。</p>
+      )}
+
       {/* 現在バナー */}
       {nowBucket && (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
@@ -245,7 +329,15 @@ export default function ConditionalForwardChart({
         </div>
       )}
 
+      {!hasBuckets && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
+          この期間・この軸では集計対象のサンプルがありません（「{axes.find((a) => a.value === axis)?.label}」は十分な履歴が必要です）。
+          上の指標推移は表示されています。期間を長くするか、別の軸（RSI(2)・前日リターン等）をお試しください。
+        </div>
+      )}
+
       {/* 表 */}
+      {hasBuckets && (<>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
@@ -301,6 +393,7 @@ export default function ConditionalForwardChart({
 
       <div className="relative"><canvas ref={barRef} /></div>
       <div className="relative"><canvas ref={yearRef} /></div>
+      </>)}
 
       <AnalysisGuide title="状態→先行きリターン表の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

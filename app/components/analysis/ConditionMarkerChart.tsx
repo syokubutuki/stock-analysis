@@ -5,9 +5,11 @@ import {
   createChart,
   LineSeries,
   createSeriesMarkers,
+  LineStyle,
   type IChartApi,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  type IPriceLine,
   type SeriesMarker,
   type Time,
 } from "lightweight-charts";
@@ -15,12 +17,14 @@ import { PricePoint } from "../../lib/types";
 import {
   conditionalForwardReturns,
   buildStateFn,
+  buildStateSeries,
   STATE_AXES,
   REVERSAL_AXES,
   TREND_AXES,
   CANDLE_RUN_AXES,
   CALENDAR_AXES,
   StateAxis,
+  StateSeries,
 } from "../../lib/conditional-forward-returns";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
@@ -71,6 +75,12 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  // 判定根拠の指標ペイン
+  const indContainerRef = useRef<HTMLDivElement>(null);
+  const indChartRef = useRef<IChartApi | null>(null);
+  const indSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const indMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const indLinesRef = useRef<IPriceLine[]>([]);
 
   const [axis, setAxis] = useState<StateAxis>(ALL_AXES[0].value);
   const [horizon, setHorizon] = useState(5);
@@ -82,6 +92,12 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
   // 状態関数とバケット順（全履歴で計算）
   const st = useMemo(
     () => (prices.length >= minBars ? buildStateFn(prices, axis) : null),
+    [prices, axis, minBars]
+  );
+
+  // 状態判定の根拠となる指標系列（数値で表せる軸のみ）
+  const indicator = useMemo<StateSeries | null>(
+    () => (prices.length >= minBars ? buildStateSeries(prices, axis) : null),
     [prices, axis, minBars]
   );
 
@@ -152,6 +168,33 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
     seriesRef.current = series;
     markersRef.current = createSeriesMarkers(series, []);
 
+    // 判定根拠の指標チャート（価格と時間軸を同期）
+    let indChart: IChartApi | null = null;
+    if (indContainerRef.current) {
+      indChart = createChart(indContainerRef.current, {
+        layout: { background: { color: "#ffffff" }, textColor: "#333" },
+        grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f7f7f7" } },
+        width: indContainerRef.current.clientWidth,
+        height: 130,
+        crosshair: { mode: 0 },
+        rightPriceScale: { visible: true },
+        timeScale: { timeVisible: false },
+      });
+      indChartRef.current = indChart;
+      const indSeries = indChart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1, title: "判定指標" });
+      indSeriesRef.current = indSeries;
+      indMarkersRef.current = createSeriesMarkers(indSeries, []);
+
+      // 双方向の時間軸同期（ロックで再帰防止）
+      let lock = false;
+      const sync = (src: IChartApi, dst: IChartApi) => {
+        const r = src.timeScale().getVisibleLogicalRange();
+        if (r) dst.timeScale().setVisibleLogicalRange(r);
+      };
+      chart.timeScale().subscribeVisibleLogicalRangeChange(() => { if (lock) return; lock = true; sync(chart, indChart!); lock = false; });
+      indChart.timeScale().subscribeVisibleLogicalRangeChange(() => { if (lock) return; lock = true; sync(indChart!, chart); lock = false; });
+    }
+
     const idxFromClientX = (clientX: number): number | null => {
       const cont = containerRef.current;
       if (!cont) return null;
@@ -194,6 +237,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
 
     const onResize = () => {
       if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
+      if (indContainerRef.current && indChart) indChart.applyOptions({ width: indContainerRef.current.clientWidth });
       redrawFromRange();
     };
     window.addEventListener("resize", onResize);
@@ -204,9 +248,14 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
       window.removeEventListener("mouseup", onUp);
       window.removeEventListener("resize", onResize);
       chart.remove();
+      indChart?.remove();
       chartRef.current = null;
       seriesRef.current = null;
       markersRef.current = null;
+      indChartRef.current = null;
+      indSeriesRef.current = null;
+      indMarkersRef.current = null;
+      indLinesRef.current = [];
     };
   }, []);
 
@@ -218,12 +267,35 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
     redrawFromRange();
   }, [prices]);
 
+  // 判定根拠の指標系列 + しきい値ライン
+  useEffect(() => {
+    const s = indSeriesRef.current;
+    if (!s) return;
+    indLinesRef.current.forEach((pl) => s.removePriceLine(pl));
+    indLinesRef.current = [];
+    if (!indicator) { s.setData([]); indMarkersRef.current?.setMarkers([]); return; }
+    const data = [];
+    for (let i = 0; i < prices.length; i++) {
+      const v = indicator.values[i];
+      if (v != null && isFinite(v)) data.push({ time: prices[i].time as Time, value: v });
+    }
+    s.setData(data);
+    indicator.thresholds.forEach((t) => {
+      const pl = s.createPriceLine({
+        price: t.value, color: "#94a3b8", lineWidth: 1, lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true, title: t.label,
+      });
+      indLinesRef.current.push(pl);
+    });
+    // 価格チャートの表示範囲に合わせる
+    const r = chartRef.current?.timeScale().getVisibleLogicalRange();
+    if (r) indChartRef.current?.timeScale().setVisibleLogicalRange(r);
+  }, [indicator, prices]);
+
   // 範囲選択モードでチャートのパン/ズームを無効化
   useEffect(() => {
-    chartRef.current?.applyOptions({
-      handleScroll: !selectMode,
-      handleScale: !selectMode,
-    });
+    chartRef.current?.applyOptions({ handleScroll: !selectMode, handleScale: !selectMode });
+    indChartRef.current?.applyOptions({ handleScroll: !selectMode, handleScale: !selectMode });
   }, [selectMode]);
 
   // 選択ハイライトの再描画
@@ -250,7 +322,13 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
       } as SeriesMarker<Time>);
     }
     markersRef.current.setMarkers(ms);
-  }, [st, stateLabel, horizon, entry, prices, selRange]);
+    // 指標ペインにも同じ点灯マーカー（線上に重ね、どの値で点灯したか示す）
+    if (indMarkersRef.current) {
+      indMarkersRef.current.setMarkers(
+        indicator ? ms.map((m) => ({ ...m, position: "aboveBar" }) as SeriesMarker<Time>) : []
+      );
+    }
+  }, [st, stateLabel, horizon, entry, prices, selRange, indicator]);
 
   if (prices.length < minBars || !st || !result) return null;
 
@@ -355,6 +433,17 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
         />
       </div>
 
+      {/* 判定根拠の指標ペイン（価格と時間同期） */}
+      <div>
+        <div className="text-[11px] font-medium text-gray-600 mb-1">
+          判定根拠の指標{indicator ? `: ${indicator.label}` : ""}（▲=条件点灯 / 点線=バケット境界）
+        </div>
+        <div ref={indContainerRef} className={`w-full rounded border border-gray-100 ${indicator ? "" : "hidden"}`} />
+        {!indicator && (
+          <p className="text-[11px] text-gray-400">この軸（{ALL_AXES.find((a) => a.value === axis)?.label}）は数値指標として表せないため、根拠系列は表示できません。RSI(2)・前日リターン・直近高値からの下落・連続下落日数 等の軸でご確認ください。</p>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
         <span className="flex items-center gap-1"><span className="inline-block w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "7px solid #16a34a" }} /> 点灯後{horizon}日 上昇</span>
         <span className="flex items-center gap-1"><span className="inline-block w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "7px solid #dc2626" }} /> 点灯後{horizon}日 下落</span>
@@ -372,6 +461,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
           <li><strong>状態軸 / 表示する状態</strong>を選ぶと、その状態が成立した日に▲が並ぶ。▲の色は<strong>点灯後N日のリターンの符号</strong>（緑=上昇 / 赤=下落 / 灰=データ不足）。過去にそのシグナルがどれだけ機能したかが点ごとに分かる。</li>
           <li><strong>範囲選択モード ON</strong>にしてチャートを左右にドラッグすると、選択帯（青）が引かれ、上部サマリーがその期間だけで再計算される。「全期間に戻す」で解除。</li>
           <li>選択範囲外の▲は小さく表示され、集計から除外される。</li>
+          <li><strong>判定根拠の指標ペイン</strong>（価格チャートの下、時間軸を同期）に、状態判定のもとになった指標値（RSI・前日リターン・直近高値からの下落 等）と<strong>バケット境界（点線）</strong>を表示。各▲が「指標がどの水準に達して点灯したか」を線上で確認でき、条件発生の理由が一目で分かる。数値で表せない軸（トレンド・カレンダー系）では非表示。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 計算（先読みバイアスを排除）</p>

@@ -266,11 +266,14 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis): StateFn {
   if (axis === "pctFromHigh") {
     const order = ["大きく下(>-15%)", "やや下(-15〜-7%)", "小幅下(-7〜-2%)", "高値圏(0〜-2%)"];
     const win = 252;
+    // 短い期間でも集計できるよう、ウォームアップを期間長に応じて短縮する。
+    // 約1.6年(630日)以上のデータでは従来どおり 252日で確定し、挙動は不変。
+    const warm = Math.min(win - 1, Math.floor(prices.length * 0.4));
     const rollMax = new Array(prices.length).fill(NaN);
     for (let i = 0; i < prices.length; i++) {
       let m = -Infinity;
       for (let j = Math.max(0, i - win + 1); j <= i; j++) m = Math.max(m, prices[j].close);
-      if (i >= win - 1) rollMax[i] = m;
+      if (i >= warm) rollMax[i] = m;
     }
     return {
       order,
@@ -473,6 +476,101 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis): StateFn {
       return up ? order[2] : order[0];
     },
   };
+}
+
+// ============================================================
+// 状態の「根拠となる指標」の数値系列（可視化用）
+// buildStateFn が返すのはカテゴリ（バケット）のみ。ここでは状態を決める素の指標値と
+// バケット境界（しきい値）を返し、「なぜその状態に入ったか」を時系列で見せられるようにする。
+// 数値で表せない軸（トレンド・移動平均配列・カレンダー系）は null を返す。
+// ============================================================
+export interface StateSeries {
+  label: string;                 // "RSI(2)" 等
+  unit: string;                  // "pt" / "%" / "日" / ""
+  values: (number | null)[];     // 各 i の指標値（表示単位）。未確定は null
+  thresholds: { value: number; label: string }[]; // バケット境界（表示単位・昇順）
+  invert?: boolean;              // true: 値が小さいほど「弱い/売られ」側（縦軸の向き解釈用）
+}
+
+export function buildStateSeries(prices: PricePoint[], axis: StateAxis): StateSeries | null {
+  const n = prices.length;
+  const nan2null = (a: number[], mul = 1) => a.map((v) => (isNaN(v) ? null : v * mul));
+
+  if (axis === "rsi") {
+    return { label: "RSI(14)", unit: "pt", values: nan2null(wilderRSI(prices, 14)),
+      thresholds: [{ value: 30, label: "売られ過ぎ" }, { value: 50, label: "中立" }, { value: 70, label: "買われ過ぎ" }] };
+  }
+  if (axis === "rsi2") {
+    return { label: "RSI(2)", unit: "pt", values: nan2null(wilderRSI(prices, 2)),
+      thresholds: [{ value: 10, label: "極端売られ" }, { value: 30, label: "売られ" }, { value: 70, label: "買われ" }, { value: 90, label: "極端買われ" }] };
+  }
+  if (axis === "maDist") {
+    const sma = trailingSMA(prices, 200);
+    const vals = prices.map((p, i) => (isNaN(sma[i]) || sma[i] <= 0 ? NaN : ((p.close - sma[i]) / sma[i]) * 100));
+    return { label: "200日線乖離", unit: "%", values: nan2null(vals),
+      thresholds: [{ value: -10, label: "-10%" }, { value: 0, label: "0%" }, { value: 10, label: "+10%" }] };
+  }
+  if (axis === "vol") {
+    const rv = rollingRealizedVol(prices, 20);
+    const [t1, t2] = terciles(rv);
+    return { label: "実現ボラ(20日σ)", unit: "%", values: nan2null(rv, 100),
+      thresholds: [{ value: t1 * 100, label: "低/中境界" }, { value: t2 * 100, label: "中/高境界" }] };
+  }
+  if (axis === "pctFromHigh") {
+    const win = 252;
+    const warm = Math.min(win - 1, Math.floor(n * 0.4));
+    const rollMax = new Array(n).fill(NaN);
+    for (let i = 0; i < n; i++) {
+      let m = -Infinity;
+      for (let j = Math.max(0, i - win + 1); j <= i; j++) m = Math.max(m, prices[j].close);
+      if (i >= warm) rollMax[i] = m;
+    }
+    const vals = prices.map((p, i) => (isNaN(rollMax[i]) || rollMax[i] <= 0 ? NaN : ((p.close - rollMax[i]) / rollMax[i]) * 100));
+    return { label: "直近高値からの下落", unit: "%", values: nan2null(vals), invert: true,
+      thresholds: [{ value: -15, label: "-15%" }, { value: -7, label: "-7%" }, { value: -2, label: "-2%" }] };
+  }
+  if (axis === "bbPercentB") {
+    const sma = trailingSMA(prices, 20), sd = trailingStd(prices, 20);
+    const vals = prices.map((p, i) => {
+      if (isNaN(sma[i]) || isNaN(sd[i]) || sd[i] === 0) return NaN;
+      const up = sma[i] + 2 * sd[i], lo = sma[i] - 2 * sd[i];
+      return (p.close - lo) / (up - lo);
+    });
+    return { label: "ボリンジャー%b", unit: "", values: nan2null(vals),
+      thresholds: [{ value: 0, label: "下限" }, { value: 0.2, label: "0.2" }, { value: 0.8, label: "0.8" }, { value: 1, label: "上限" }] };
+  }
+  if (axis === "prevRet") {
+    const rets: number[] = [];
+    for (let i = 1; i < n; i++) if (prices[i - 1].close > 0) rets.push(prices[i].close / prices[i - 1].close - 1);
+    const [t1, t2] = terciles(rets);
+    const vals = prices.map((p, i) => (i < 1 || prices[i - 1].close <= 0 ? NaN : (p.close / prices[i - 1].close - 1) * 100));
+    return { label: "前日リターン", unit: "%", values: nan2null(vals),
+      thresholds: [{ value: t1 * 100, label: "下位境界" }, { value: t2 * 100, label: "上位境界" }] };
+  }
+  if (axis === "tsMom") {
+    const vals = prices.map((_, i) => (i < 252 ? NaN : (prices[i - 21].close / prices[i - 252].close - 1) * 100));
+    return { label: "12-1ヶ月モメンタム", unit: "%", values: nan2null(vals),
+      thresholds: [{ value: -10, label: "-10%" }, { value: 0, label: "0%" }, { value: 10, label: "+10%" }] };
+  }
+  if (axis === "dist52w") {
+    const win = 252;
+    const rollMax = new Array(n).fill(NaN);
+    for (let i = 0; i < n; i++) {
+      let m = -Infinity;
+      for (let j = Math.max(0, i - win + 1); j <= i; j++) m = Math.max(m, prices[j].high);
+      if (i >= Math.min(win - 1, Math.floor(n * 0.4))) rollMax[i] = m;
+    }
+    const vals = prices.map((p, i) => (isNaN(rollMax[i]) || rollMax[i] <= 0 ? NaN : ((p.close - rollMax[i]) / rollMax[i]) * 100));
+    return { label: "52週高値からの距離", unit: "%", values: nan2null(vals), invert: true,
+      thresholds: [{ value: -25, label: "-25%" }, { value: -10, label: "-10%" }, { value: -2, label: "-2%" }] };
+  }
+  if (axis === "downStreak") {
+    const streak = new Array(n).fill(0);
+    for (let i = 1; i < n; i++) streak[i] = prices[i].close < prices[i - 1].close ? streak[i - 1] + 1 : 0;
+    return { label: "連続下落日数", unit: "日", values: streak.map((v) => v), invert: true,
+      thresholds: [{ value: 1, label: "1日" }, { value: 2, label: "2日" }, { value: 3, label: "3日" }, { value: 4, label: "4日" }] };
+  }
+  return null; // trend / maAlign / momCrash / candleRun / カレンダー系は数値系列なし
 }
 
 // ============================================================
