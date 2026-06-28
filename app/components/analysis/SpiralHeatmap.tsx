@@ -345,7 +345,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   // ユーザーが比較リストを手動操作したか。trueになると自動追従を止め、選択を固定する。
   const [specsTouched, setSpecsTouched] = useState(false);
   const [tradeCompound, setTradeCompound] = useState(true);
-  const [matrixMetric, setMatrixMetric] = useState<MatrixMetric>("total");
+  const [matrixMetric, setMatrixMetric] = useState<MatrixMetric>("perDay");
   // ロング戦略ランキングの並べ替え指標(既定=日当たり: 滞在期間の偏りを除いた公平比較)
   const [rankMetric, setRankMetric] = useState<RankMetric>("perDay");
   // ロング戦略ランキングの折りたたみ表示
@@ -1344,7 +1344,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     // 色の基準は全4行列で共有し、タイミング間の比較を可能にする
     let maxAbs = 0;
     for (const m of matrices) for (const row of m.grid) for (const v of row) if (v !== null) maxAbs = Math.max(maxAbs, Math.abs(v));
-    const fmt = (v: number) => metric === "winRate" ? (v * 100).toFixed(0) + "%" : metric === "sharpe" ? v.toFixed(2) : (v * 100).toFixed(1) + "%";
+    const fmt = (v: number) => metric === "winRate" ? (v * 100).toFixed(0) + "%" : metric === "sharpe" ? v.toFixed(2) : metric === "perDay" ? (v * 10000).toFixed(1) + "bp" : (v * 100).toFixed(1) + "%";
 
     matrices.forEach((m, idx) => {
       const { subLeft, subTop, gridLeft, gridTop } = geom.subAt(idx);
@@ -2065,10 +2065,11 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         {/* all-combinations matrix */}
         <div className="mt-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs text-gray-500">全組合せヒートマップ（注文タイミング4通り）</span>
+            <span className="text-xs text-gray-500" title="注文タイミング4通り = エントリー(始値/終値)×エグジット(始値/終値)。各サブ行列は行=エントリー曜日・列=エグジット曜日の5×5">全組合せヒートマップ（注文タイミング4通り）</span>
             <span className="text-[11px] text-emerald-700">セルをクリックで{builder.side === "long" ? "ロング" : "ショート"}戦略を比較に追加</span>
+            {matrixMetric === "perDay" && <span className="text-[11px] text-gray-400">日当たりは bp(=0.01%)表示</span>}
             <div className="flex gap-1 ml-auto">
-              {([["total", "総リターン"], ["sharpe", "Sharpe"], ["winRate", "勝率"]] as [MatrixMetric, string][]).map(([k, l]) => (
+              {([["perDay", "日当たり"], ["total", "総リターン"], ["sharpe", "Sharpe"], ["winRate", "勝率"]] as [MatrixMetric, string][]).map(([k, l]) => (
                 <button key={k} onClick={() => setMatrixMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${matrixMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{l}</button>
               ))}
             </div>
@@ -2098,7 +2099,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           <ul className="list-disc pl-4 space-y-1">
             <li><span className="font-medium">ロング戦略ランキング</span>(折りたたみ式)は全100通り(注文4×曜日ペア25)のロング戦略を、<span className="font-medium">日当たり</span>/総リターン/年率/Sharpe/効率/勝率の指標で降順に並べたもの。<span className="font-medium">既定は「日当たり」=総リターン÷延べ市場滞在日数(bps表示)</span>。総リターンで並べると「水始値→水始値」のように<span className="font-medium">毎週ほぼ常に持ち越す≒バイ&ホールド</span>の組合せが、単に市場滞在日数が長いという理由だけで上位を独占してしまう。日当たりは保有1日あたりの質に揃えるので、滞在期間の偏りを除いて本当に効率の良い曜日区間が浮かび上がる。</li>
             <li><span className="font-medium">グラフの初期表示</span>は、比較リストを手動編集する前であれば<span className="font-medium">常に現在の並べ替え指標での1位に自動追従</span>する(指標・期間・複利設定を変えると追従先も変わる)。「+比較」やヒートマップのクリック、チップの×で一度でも手動編集すると自動追従は止まり、選択が固定される。</li>
-            <li>あるいは<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で総リターン/Sharpe/勝率の良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。<span className="font-medium">良いセルをクリック</span>すると、その曜日ペア×注文タイミング×方向がそのまま比較リストに追加される。連結して1本に繋ぎたいときは<span className="font-medium">連結モード</span>を手動でオンにする。</li>
+            <li>あるいは<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。<span className="font-medium">注文4通り</span>とは「エントリーを始値/終値」×「エグジットを始値/終値」の2×2の組合せ(始→始・始→終・終→始・終→終)で、各サブ行列は行=エントリー曜日・列=エグジット曜日の5×5。並べ替え指標は<span className="font-medium">日当たり(bp=0.01%表示)</span>/総リターン/Sharpe/勝率から選べ、<span className="font-medium">既定は日当たり</span>(滞在期間の長いセルが総リターンだけで濃くなる偏りを避ける)。<span className="font-medium">良いセルをクリック</span>すると、その曜日ペア×注文タイミング×方向がそのまま比較リストに追加される。連結して1本に繋ぎたいときは<span className="font-medium">連結モード</span>を手動でオンにする。</li>
             <li>良いロングのレグを複数(例: 月終→火終 と 水終→木終)拾い、連結モード「現金」で滞在率を積み上げる。隙間の弱い曜日を避けつつ強い区間だけ拾えればB&H超えが狙える。</li>
             <li>あるいは「ロング保有」で土台をB&Hにし、ヒートマップで<span className="font-medium">マイナスが濃い曜日だけショート</span>のレグを重ねて差を上乗せする(滞在率≈1.0のまま改善余地を探す最短ルート)。</li>
             <li><span className="font-medium">効率</span>と<span className="font-medium">コスト後の純リターン</span>の両方でB&Hを上回って初めて実戦的な優位です。</li>

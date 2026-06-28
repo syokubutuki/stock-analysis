@@ -52,6 +52,68 @@ function sharpeColor(sh: number, lo: number, hi: number, alpha: number): string 
   return `rgba(${r.toFixed(0)},${g.toFixed(0)},${b.toFixed(0)},${alpha})`;
 }
 
+type MarkerShape = "star" | "diamond" | "triangle" | "square";
+
+// 種別マーカーの形状をパスとして引く(塗り/線は呼び出し側)
+function drawMarkerShape(ctx: CanvasRenderingContext2D, x: number, y: number, kind: MarkerShape, r = 6.5) {
+  ctx.beginPath();
+  if (kind === "diamond") {
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r, y);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r, y);
+    ctx.closePath();
+  } else if (kind === "star") {
+    for (let i = 0; i < 10; i++) {
+      const rr = i % 2 === 0 ? r + 0.5 : r * 0.45;
+      const ang = (Math.PI / 5) * i - Math.PI / 2;
+      const px = x + rr * Math.cos(ang), py = y + rr * Math.sin(ang);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (kind === "triangle") {
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.9, y + r * 0.7);
+    ctx.lineTo(x - r * 0.9, y + r * 0.7);
+    ctx.closePath();
+  } else {
+    const s = r * 0.85;
+    ctx.rect(x - s, y - s, s * 2, s * 2);
+  }
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// テーブル見出し用の小さな形状グリフ(SVG)。チャートのマーカーと対応づける。
+function ShapeGlyph({ shape, color }: { shape: MarkerShape; color: string }) {
+  const c = color;
+  let path: React.ReactNode;
+  if (shape === "diamond") path = <polygon points="7,1 13,7 7,13 1,7" fill={c} />;
+  else if (shape === "triangle") path = <polygon points="7,1 13,12 1,12" fill={c} />;
+  else if (shape === "square") path = <rect x="2" y="2" width="10" height="10" fill={c} />;
+  else
+    path = (
+      <polygon
+        points="7,0.5 8.6,5 13.5,5 9.5,8 11,12.5 7,9.7 3,12.5 4.5,8 0.5,5 5.4,5"
+        fill={c}
+      />
+    );
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" className="shrink-0">
+      {path}
+    </svg>
+  );
+}
+
 const PAD = { left: 56, right: 16, top: 16, bottom: 40 };
 const HEIGHT = 420;
 
@@ -224,45 +286,56 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     ctx.arc(sx(0), sy(result.riskFree), 3, 0, Math.PI * 2);
     ctx.fill();
 
-    // マーカー描画ヘルパ
-    const marker = (p: { sigma: number; mu: number }, color: string, kind: "star" | "diamond" | "circle", label: string) => {
+    // マーカー描画ヘルパ。形状で種別を区別し、ラベルは白背景ピルで読みやすく、
+    // 方向(dir)を散らして近接点でのラベル衝突を避ける。
+    const marker = (
+      p: { sigma: number; mu: number; sharpe: number },
+      color: string,
+      kind: MarkerShape,
+      label: string,
+      dir: "ne" | "se" | "sw" | "nw"
+    ) => {
       const x = sx(p.sigma), y = sy(p.mu);
       ctx.fillStyle = color;
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      if (kind === "diamond") {
-        ctx.moveTo(x, y - 6);
-        ctx.lineTo(x + 6, y);
-        ctx.lineTo(x, y + 6);
-        ctx.lineTo(x - 6, y);
-        ctx.closePath();
-      } else if (kind === "star") {
-        for (let i = 0; i < 10; i++) {
-          const r = i % 2 === 0 ? 7 : 3;
-          const ang = (Math.PI / 5) * i - Math.PI / 2;
-          const px = x + r * Math.cos(ang), py = y + r * Math.sin(ang);
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-      } else {
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-      }
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      drawMarkerShape(ctx, x, y, kind);
+      ctx.fill();
+      ctx.stroke();
+
+      // ラベル(値付き)を白背景ピルで
+      const text = `${label}  S=${p.sharpe.toFixed(2)}`;
+      ctx.font = "bold 10px sans-serif";
+      const tw = ctx.measureText(text).width;
+      const padX = 4, padY = 2.5, gap = 9;
+      const right = dir === "ne" || dir === "se";
+      const below = dir === "se" || dir === "sw";
+      let bx = right ? x + gap : x - gap - tw - padX * 2;
+      let by = below ? y + gap : y - gap - (10 + padY * 2);
+      // 画面外にはみ出すなら反転
+      if (bx < PAD.left) bx = x + gap;
+      if (bx + tw + padX * 2 > width - PAD.right) bx = x - gap - tw - padX * 2;
+      if (by < PAD.top) by = y + gap;
+      if (by + 10 + padY * 2 > height - PAD.bottom) by = y - gap - (10 + padY * 2);
+      const bw = tw + padX * 2, bh = 10 + padY * 2;
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      roundRect(ctx, bx, by, bw, bh, 3);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = color;
-      ctx.font = "bold 10px sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText(label, x + 8, y - 8);
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, bx + padX, by + bh / 2 + 0.5);
     };
 
-    // ロングオンリー最適(雲の代表点)
-    marker(result.cloudMinVol, "#0ea5e9", "circle", "最小分散(LO)");
-    marker(result.cloudBestSharpe, "#7c3aed", "circle", "最大Sharpe(LO)");
-    // 閉形式の特異点
-    marker(result.gmv, "#2563eb", "diamond", "GMV");
-    if (result.tangency) marker(result.tangency, "#dc2626", "star", "接点(市場)");
+    // ロングオンリー最適(雲の代表点)。形状: ▲最大Sharpe / ■最小分散
+    marker(result.cloudMinVol, "#0ea5e9", "square", "最小分散(LO)", "sw");
+    marker(result.cloudBestSharpe, "#7c3aed", "triangle", "最大Sharpe(LO)", "se");
+    // 閉形式の特異点。形状: ◆GMV / ★接点
+    marker(result.gmv, "#2563eb", "diamond", "GMV", "nw");
+    if (result.tangency) marker(result.tangency, "#dc2626", "star", "接点(市場)", "ne");
 
     // ホバー十字
     if (hover) {
@@ -359,22 +432,23 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
               </div>
 
               {/* 凡例 */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
-                <Legend color="#059669" label="効率的フロンティア(空売り可・実線)" />
-                <Legend color="#9ca3af" label="非効率枝(破線)" />
-                <Legend color="#f59e0b" label="資本市場線 CML" />
-                <Legend color="#2563eb" label="GMV(大域最小分散)" />
-                <Legend color="#dc2626" label="接点=市場ポートフォリオ" />
-                <Legend color="#7c3aed" label="最大Sharpe(ロングオンリー)" />
-                <Legend color="#0ea5e9" label="最小分散(ロングオンリー)" />
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-gray-500 items-center">
+                <LineLegend color="#059669" label="効率的フロンティア(空売り可)" />
+                <LineLegend color="#9ca3af" label="非効率枝" dashed />
+                <LineLegend color="#f59e0b" label="資本市場線 CML" dashed />
+                <PointLegend shape="star" color="#dc2626" label="接点=市場ポートフォリオ" />
+                <PointLegend shape="triangle" color="#7c3aed" label="最大Sharpe(ロングオンリー)" />
+                <PointLegend shape="diamond" color="#2563eb" label="GMV(大域最小分散)" />
+                <PointLegend shape="square" color="#0ea5e9" label="最小分散(ロングオンリー)" />
                 <span className="text-gray-400">点群=ランダム配分(色=シャープ比 青低→緑→赤高)</span>
               </div>
 
-              {/* 代表ポートフォリオの構成 */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                <WeightTable title="接点(市場)ポートフォリオ" subtitle="最大シャープ・空売り可" point={result.tangency} tickers={result.tickers} names={names} riskFree={result.riskFree} />
-                <WeightTable title="最大Sharpe(ロングオンリー)" subtitle="空売り無し・実装可能" point={result.cloudBestSharpe} tickers={result.tickers} names={names} riskFree={result.riskFree} />
-                <WeightTable title="GMV(大域最小分散)" subtitle="期待リターン推定に頑健" point={result.gmv} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+              {/* 代表ポートフォリオの構成(チャートのマーカーと色・形で対応) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                <WeightTable shape="star" color="#dc2626" title="接点(市場)ポートフォリオ" subtitle="最大シャープ・空売り可" point={result.tangency} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                <WeightTable shape="triangle" color="#7c3aed" title="最大Sharpe(ロングオンリー)" subtitle="空売り無し・実装可能" point={result.cloudBestSharpe} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                <WeightTable shape="diamond" color="#2563eb" title="GMV(大域最小分散)" subtitle="期待リターン推定に頑健・空売り可" point={result.gmv} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                <WeightTable shape="square" color="#0ea5e9" title="最小分散(ロングオンリー)" subtitle="空売り無し・低リスク重視" point={result.cloudMinVol} tickers={result.tickers} names={names} riskFree={result.riskFree} />
               </div>
 
               <AnalysisGuide title="効率的フロンティア・資本市場線(CAPM)の詳細理論">
@@ -438,16 +512,29 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function LineLegend({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
-    <span className="flex items-center gap-1">
-      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+    <span className="flex items-center gap-1.5">
+      <svg width="20" height="8" viewBox="0 0 20 8" className="shrink-0">
+        <line x1="0" y1="4" x2="20" y2="4" stroke={color} strokeWidth="2.5" strokeDasharray={dashed ? "4 3" : undefined} />
+      </svg>
+      {label}
+    </span>
+  );
+}
+
+function PointLegend({ shape, color, label }: { shape: MarkerShape; color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <ShapeGlyph shape={shape} color={color} />
       {label}
     </span>
   );
 }
 
 function WeightTable({
+  shape,
+  color,
   title,
   subtitle,
   point,
@@ -455,6 +542,8 @@ function WeightTable({
   names,
   riskFree,
 }: {
+  shape: MarkerShape;
+  color: string;
   title: string;
   subtitle: string;
   point: PortfolioPoint | null;
@@ -465,7 +554,10 @@ function WeightTable({
   if (!point) {
     return (
       <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 text-xs text-gray-400">
-        <div className="font-medium text-gray-600">{title}</div>
+        <div className="flex items-center gap-1.5 font-medium text-gray-600">
+          <ShapeGlyph shape={shape} color={color} />
+          {title}
+        </div>
         <div className="mt-2">この Rf では定義されません(接点が最小分散点より下)。Rf を調整してください。</div>
       </div>
     );
@@ -475,8 +567,11 @@ function WeightTable({
     .map((t, i) => ({ ticker: t, w: point.weights[i] }))
     .sort((a, b) => Math.abs(b.w) - Math.abs(a.w));
   return (
-    <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-      <div className="font-medium text-gray-700 text-sm">{title}</div>
+    <div className="bg-gray-50 rounded-lg border border-gray-200 border-l-4 p-3" style={{ borderLeftColor: color }}>
+      <div className="flex items-center gap-1.5 font-medium text-gray-700 text-sm">
+        <ShapeGlyph shape={shape} color={color} />
+        {title}
+      </div>
       <div className="text-[10px] text-gray-400 mb-2">{subtitle}</div>
       <div className="flex gap-3 text-[11px] text-gray-600 mb-2 tabular-nums">
         <span>μ {(point.mu * 100).toFixed(1)}%</span>

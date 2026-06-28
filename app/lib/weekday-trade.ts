@@ -349,7 +349,7 @@ export function computePlan(
   };
 }
 
-export type MatrixMetric = "total" | "sharpe" | "winRate";
+export type MatrixMetric = "perDay" | "total" | "sharpe" | "winRate";
 
 // 全25通り(エントリー曜日 × エグジット曜日)の指標グリッド。row=エントリー, col=エグジット (0=月..4=金)
 export function weekdayMatrix(
@@ -369,7 +369,8 @@ export function weekdayMatrix(
         row.push(null);
         continue;
       }
-      row.push(metric === "total" ? res.totalReturn : metric === "sharpe" ? res.sharpe : res.winRate);
+      const perDay = res.heldDays > 0 ? res.totalReturn / res.heldDays : 0; // 1滞在日あたり平均リターン
+      row.push(metric === "perDay" ? perDay : metric === "total" ? res.totalReturn : metric === "sharpe" ? res.sharpe : res.winRate);
     }
     grid.push(row);
   }
