@@ -550,6 +550,10 @@ const CandleSeasonalityChart = dynamic(
   () => import("./components/analysis/CandleSeasonalityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const WeekClockChart = dynamic(
+  () => import("./components/analysis/WeekClockChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const IntradayProfileChart = dynamic(
   () => import("./components/analysis/IntradayProfileChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1332,6 +1336,7 @@ export default function AnalysisPage() {
                 <>
                   <SpiralHeatmap prices={filteredPrices} period={period} />
                   <CandleSeasonalityChart prices={filteredPrices} />
+                  <WeekClockChart prices={filteredPrices} ticker={data.ticker} />
                   <CalendarEffectChart prices={filteredPrices} />
                   <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
