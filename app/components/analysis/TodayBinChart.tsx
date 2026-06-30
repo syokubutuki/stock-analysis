@@ -12,6 +12,7 @@ import {
   TodayBinResult,
   TodayBin,
   Occurrence,
+  WeekdayBreakdown,
   entryLabel,
   horizonLabel,
 } from "../../lib/today-bin";
@@ -44,6 +45,13 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 
 const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const fmtPct1 = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
+const WD_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+
+function retBg(v: number, maxAbs: number): string {
+  const t = maxAbs > 0 ? Math.min(1, Math.abs(v) / maxAbs) : 0;
+  if (v >= 0) return `rgba(22, 163, 74, ${0.06 + t * 0.55})`;
+  return `rgba(220, 38, 38, ${0.06 + t * 0.55})`;
+}
 
 function binFill(idx: number, k: number, dim = false): string {
   // 下位=赤 → 上位=緑のグラデーション
@@ -341,6 +349,69 @@ function OccurrenceTable({ occ }: { occ: Occurrence[] }) {
   );
 }
 
+// ---------- 曜日内訳ヒートマップ（今日のビンを月〜金で分解） ----------
+function WeekdayBreakdownPanel({ rows, todayDow, baselineMean }: { rows: WeekdayBreakdown[]; todayDow: number | null; baselineMean: number }) {
+  const maxAbs = Math.max(1e-9, ...rows.map((r) => (r.n > 0 ? Math.abs(r.meanFwd) : 0)));
+  const best = rows.reduce<WeekdayBreakdown | null>((acc, r) => (r.n >= 5 && (!acc || r.meanFwd > acc.meanFwd) ? r : acc), null);
+  const worst = rows.reduce<WeekdayBreakdown | null>((acc, r) => (r.n >= 5 && (!acc || r.meanFwd < acc.meanFwd) ? r : acc), null);
+  return (
+    <div>
+      <p className="text-[11px] text-gray-500 mb-1">
+        このビンを曜日で分解（全日共通ビン境界・◀=今日／青枠=今日の曜日／基準 全日平均{fmtPct(baselineMean)}）
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] text-center">
+          <thead>
+            <tr className="text-gray-400">
+              <th className="px-1 py-0.5 text-left font-normal"></th>
+              {rows.map((r) => {
+                const isToday = r.dow === todayDow;
+                return (
+                  <th key={r.dow} className={`px-1 py-0.5 font-bold ${isToday ? "text-blue-700" : "text-gray-500"}`}>
+                    {isToday && <span className="mr-0.5">◀</span>}{WD_LABELS[r.dow]}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="px-1 py-0.5 text-left text-gray-400">平均</td>
+              {rows.map((r) => (
+                <td key={r.dow} className={`px-1 py-0.5 font-medium tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+                  style={{ background: r.n >= 3 ? retBg(r.meanFwd, maxAbs) : "#f9fafb", color: r.n >= 3 ? "#1f2937" : "#d1d5db" }}>
+                  {r.n >= 3 ? fmtPct(r.meanFwd) : "—"}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-1 py-0.5 text-left text-gray-400">勝率</td>
+              {rows.map((r) => (
+                <td key={r.dow} className={`px-1 py-0.5 tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""} ${r.n >= 3 ? "text-gray-600" : "text-gray-300"}`}>
+                  {r.n >= 3 ? `${(r.winRate * 100).toFixed(0)}%` : "—"}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-1 py-0.5 text-left text-gray-400">n</td>
+              {rows.map((r) => (
+                <td key={r.dow} className={`px-1 py-0.5 tabular-nums text-gray-400 ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}>{r.n}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {best && worst && best.dow !== worst.dow && (
+        <p className="text-[11px] text-gray-500 mt-1">
+          このビンでは <span className="font-bold text-green-700">{WD_LABELS[best.dow]}曜が最強（平均{fmtPct(best.meanFwd)}）</span>、
+          <span className="font-bold text-red-700">{WD_LABELS[worst.dow]}曜が最弱（平均{fmtPct(worst.meanFwd)}）</span>。
+          同じシグナルでも曜日で効きが変わる（n小の曜日は参考）。
+        </p>
+      )}
+    </div>
+  );
+}
+
 function actionTag(action: TodayBin["action"]) {
   if (action === "long") return <span className="inline-block rounded bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px] font-bold">買い候補</span>;
   if (action === "short") return <span className="inline-block rounded bg-red-100 text-red-700 px-1.5 py-0.5 text-[10px] font-bold">売り/回避</span>;
@@ -535,11 +606,14 @@ export default function TodayBinChart({ prices }: Props) {
             <p className="text-[11px] text-gray-400 mt-1">行クリックでそのビンの先行き分布・発生日に切替（青枠=今日の該当ビン）。</p>
           </div>
 
-          {/* 選択ビンの発生日 */}
+          {/* 選択ビンの曜日内訳＋発生日 */}
           {activeBin && activeBin.occurrences.length > 0 && (
-            <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3">
-              <p className="text-xs font-bold text-indigo-900 mb-2">深掘り: {activeBin.label}{activeBin.idx === res.todayBinIdx ? "（今日のビン）" : ""}</p>
-              <OccurrenceTable occ={activeBin.occurrences} />
+            <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3 space-y-3">
+              <p className="text-xs font-bold text-indigo-900">深掘り: {activeBin.label}{activeBin.idx === res.todayBinIdx ? "（今日のビン）" : ""}</p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <WeekdayBreakdownPanel rows={activeBin.byWeekday} todayDow={activeBin.idx === res.todayBinIdx ? res.todayDow : null} baselineMean={res.baselineMean} />
+                <OccurrenceTable occ={activeBin.occurrences} />
+              </div>
             </div>
           )}
         </>
@@ -579,14 +653,21 @@ export default function TodayBinChart({ prices }: Props) {
           <li><strong>全履歴散布図</strong>: 横=今日の状態値、縦=先行きリターンの全点雲＋ビン平均の階段。右肩上がりならモメンタム（順張り）、右肩下がりなら逆張り（平均回帰）の地合い。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>
+        <p className="font-medium text-gray-700 mt-3">6. 曜日内訳（同じシグナルでも曜日で効きが違うか）</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>深掘りパネルの<strong>曜日内訳</strong>は、選択ビン（既定=今日のビン）の発生日を月〜金で割り、各曜日の平均・勝率・nを並べる。<strong>ビン境界は全日共通のまま</strong>なので5曜日を横並びで直接比較できる。</li>
+          <li>「今日は火曜・窓は上位ビン。だが上位ビンは<strong>木曜だけ効いて月曜は死んでいる</strong>」のような曜日固有の癖に一目で気づける。今日の曜日は青枠＋◀で強調。</li>
+          <li>曜日で割ると標本が細るため、n小の曜日は参考。曜日を軸に建て→週内パスや2軸で深掘りしたいときは別コンポーネント「曜日 × 値動きビン 条件付き分析」へ。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">7. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>今日のビンの<strong>判断列</strong>が「買い候補」かつ基準（無条件平均）を超え、散布図の傾きと整合するなら順張りエントリーの後押し。</li>
           <li>裾のビン（最上位/最下位）で先行きが<strong>逆符号</strong>なら平均回帰（行き過ぎの戻り取り）。</li>
           <li>発生日一覧で<strong>最近も効いているか</strong>を確認（古い時代だけのエッジは陳腐化している可能性）。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
+        <p className="font-medium text-gray-700 mt-3">8. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>取引コスト・スリッページ・寄付きの板の薄さは未考慮。窓の大きい日は実約定が想定とずれやすい。</li>
           <li>分位境界は標本依存。期間（PeriodSelector）を変えると境界もビン成績も動く。必ず n と有意性を確認し「参考(n小)」は重視しない。</li>

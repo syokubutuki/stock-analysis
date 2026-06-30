@@ -143,6 +143,14 @@ export interface Occurrence {
   exitDate: string;
 }
 
+// ビンを曜日で分解した内訳（全日共通ビン境界のまま、結果だけ曜日で割る）
+export interface WeekdayBreakdown {
+  dow: number; // 1=月..5=金
+  n: number;
+  meanFwd: number;
+  winRate: number;
+}
+
 export interface TodayBin {
   idx: number;
   label: string;
@@ -159,6 +167,7 @@ export interface TodayBin {
   significant: boolean;
   forwards: number[];
   occurrences: Occurrence[];
+  byWeekday: WeekdayBreakdown[]; // dow 1..5（標本ゼロでもn=0で並ぶ）
   action: "long" | "short" | "none";
 }
 
@@ -169,6 +178,7 @@ export interface TodayBinResult {
   scatter: { v: number; fwd: number }[]; // 状態値×先行きの全点（散布図用）
   todayValue: number | null;
   todayDate: string | null;
+  todayDow: number | null; // 1=月..5=金（曜日内訳のハイライト用）
   todayBinIdx: number | null;
   todayPercentile: number | null; // 0..1（今日の状態値の累積順位）
   todayHasForward: boolean; // 今日の建玉が exit まで到達済みか（=過去化しているか）
@@ -245,6 +255,26 @@ export function todayBin(
     const p = pByIdx.get(idx) ?? 1;
     const significant = p < 0.05 && acc.rets.length >= 10;
     const { lo, hi } = rangeOf(idx);
+
+    // 曜日内訳（このビンの発生日を月〜金で分解）
+    const wdRets = new Map<number, number[]>();
+    for (const o of acc.occ) {
+      const d = new Date(o.date).getDay();
+      if (d < 1 || d > 5) continue;
+      const arr = wdRets.get(d) ?? [];
+      arr.push(o.fwd);
+      wdRets.set(d, arr);
+    }
+    const byWeekday: WeekdayBreakdown[] = [1, 2, 3, 4, 5].map((d) => {
+      const arr = wdRets.get(d) ?? [];
+      return {
+        dow: d,
+        n: arr.length,
+        meanFwd: mean(arr),
+        winRate: arr.length ? arr.filter((x) => x > 0).length / arr.length : 0,
+      };
+    });
+
     return {
       idx,
       label: bins.order[idx],
@@ -261,6 +291,7 @@ export function todayBin(
       significant,
       forwards: acc.rets,
       occurrences: acc.occ,
+      byWeekday,
       action: decideAction(m, winRate, significant),
     };
   });
@@ -290,6 +321,7 @@ export function todayBin(
     scatter,
     todayValue,
     todayDate,
+    todayDow: todayDate ? new Date(todayDate).getDay() : null,
     todayBinIdx,
     todayPercentile,
     todayHasForward,
