@@ -24,7 +24,10 @@ import {
 
 export type Signature = "gap" | "intraday" | "fullday" | "excessIntraday";
 export type BinScheme = "sign" | "tercile" | "quintile";
-export type Exit = { kind: "weekday"; dow: number } | { kind: "ndays"; n: number };
+export type Exit =
+  | { kind: "weekday"; dow: number }
+  | { kind: "ndays"; n: number }
+  | { kind: "nextweek"; dow: number };
 
 export const SIGNATURES: { value: Signature; label: string; desc: string }[] = [
   { value: "intraday", label: "日中リターン", desc: "(終値−始値)/始値。寄りからの当日値動き。" },
@@ -126,11 +129,31 @@ function sameWeekExitIdx(dows: number[], i: number, target: number): number {
   return -1;
 }
 
+// 「翌週」の指定曜日引けを特定する。取引日列では平日の曜日番号が週内で単調増加し、
+// 週末をまたぐと減少する。最初の境界を越えた“次の週”の中から target 曜日を探す。
+// その週に target 曜日が無い（祝日休場）場合は -1（その回は集計から除外）。
+function nextWeekExitIdx(dows: number[], i: number, target: number): number {
+  let prev = dows[i];
+  let crossed = false;
+  for (let j = i + 1; j < dows.length; j++) {
+    if (dows[j] <= prev) {
+      if (crossed) return -1; // 翌々週に到達 = 翌週は target 休場
+      crossed = true;
+    }
+    if (crossed && dows[j] === target) return j;
+    prev = dows[j];
+  }
+  return -1;
+}
+
 function fwdReturn(closes: number[], dows: number[], i: number, exit: Exit): { r: number; exitIdx: number } | null {
   let j: number;
   if (exit.kind === "ndays") {
     j = i + exit.n;
     if (j >= closes.length) return null;
+  } else if (exit.kind === "nextweek") {
+    j = nextWeekExitIdx(dows, i, exit.dow);
+    if (j < 0) return null;
   } else {
     j = sameWeekExitIdx(dows, i, exit.dow);
     if (j < 0) return null;
@@ -141,7 +164,18 @@ function fwdReturn(closes: number[], dows: number[], i: number, exit: Exit): { r
 
 export function exitLabelOf(exit: Exit): string {
   if (exit.kind === "ndays") return `${exit.n}営業日先 引け`;
+  if (exit.kind === "nextweek") return `翌週 ${WD_LABELS[exit.dow]}曜 引け`;
   return `同週 ${WD_LABELS[exit.dow]}曜 引け`;
+}
+
+// 週跨ぎパス用スロット（week:0=エントリー週, 1=翌週）
+export interface PathSlot {
+  week: number;
+  dow: number;
+  label: string;
+}
+function slotLabel(week: number, dow: number): string {
+  return (week === 1 ? "翌" : "") + WD_LABELS[dow];
 }
 
 // 個別発生日（ドリルダウン用）
@@ -157,6 +191,7 @@ export interface Occurrence {
 // 1D: エントリー曜日 × シグネチャビン
 // ============================================================
 export interface PathPoint {
+  week: number; // 0=エントリー週, 1=翌週
   dow: number;
   label: string;
   meanCum: number;
@@ -188,6 +223,7 @@ export interface WeekdayCondResult {
   order: string[];
   entryDow: number;
   exitLabel: string;
+  pathSlots: PathSlot[];
   nowBinLabel: string | null;
   nowDate: string | null;
   baselineMean: number;
@@ -222,11 +258,14 @@ export function weekdayConditional(
   interface Acc {
     rets: number[];
     years: number[];
-    pathByDow: Map<number, number[]>;
+    pathByKey: Map<number, number[]>; // key = week*10 + dow
     occ: Occurrence[];
   }
   const accs = new Map<string, Acc>();
-  for (const label of bins.order) accs.set(label, { rets: [], years: [], pathByDow: new Map(), occ: [] });
+  for (const label of bins.order) accs.set(label, { rets: [], years: [], pathByKey: new Map(), occ: [] });
+
+  // 累積パスを追う週数。翌週exitのときだけ週末をまたいで翌週まで延長する。
+  const maxWeek = exit.kind === "nextweek" ? 1 : 0;
 
   const allRets: number[] = [];
   for (const r of subset) {
@@ -234,13 +273,18 @@ export function weekdayConditional(
     const acc = accs.get(bins.assign(sv))!;
 
     let prevDow = dows[r.i];
+    let wk = 0;
     for (let j = r.i + 1; j < closes.length; j++) {
-      if (dows[j] <= prevDow) break;
+      if (dows[j] <= prevDow) {
+        wk++;
+        if (wk > maxWeek) break;
+      }
       if (closes[r.i] > 0 && closes[j] > 0) {
         const cum = closes[j] / closes[r.i] - 1;
-        const arr = acc.pathByDow.get(dows[j]) ?? [];
+        const key = wk * 10 + dows[j];
+        const arr = acc.pathByKey.get(key) ?? [];
         arr.push(cum);
-        acc.pathByDow.set(dows[j], arr);
+        acc.pathByKey.set(key, arr);
       }
       prevDow = dows[j];
     }
@@ -252,6 +296,13 @@ export function weekdayConditional(
       acc.occ.push({ date: prices[r.i].time, sigVal: sv, fwd: fr.r, exitDate: prices[fr.exitIdx].time });
       allRets.push(fr.r);
     }
+  }
+
+  // パスのスロット順（エントリー週: entryDow→金、翌週exitなら続けて 翌月→翌exitDow）
+  const pathSlots: PathSlot[] = [{ week: 0, dow: entryDow, label: slotLabel(0, entryDow) }];
+  for (let d = entryDow + 1; d <= 5; d++) pathSlots.push({ week: 0, dow: d, label: slotLabel(0, d) });
+  if (exit.kind === "nextweek") {
+    for (let d = 1; d <= exit.dow; d++) pathSlots.push({ week: 1, dow: d, label: slotLabel(1, d) });
   }
 
   const present = bins.order.filter((o) => (accs.get(o)?.rets.length ?? 0) >= 3);
@@ -276,13 +327,17 @@ export function weekdayConditional(
     });
     const byYear = [...byYearMap.entries()].sort((a, b) => a[0] - b[0]).map(([year, arr]) => ({ year, meanFwd: mean(arr), n: arr.length }));
 
-    const path: PathPoint[] = [{ dow: entryDow, label: WD_LABELS[entryDow], meanCum: 0, lo: 0, hi: 0, n: acc.rets.length }];
-    for (let d = entryDow + 1; d <= 5; d++) {
-      const arr = acc.pathByDow.get(d);
+    const path: PathPoint[] = [];
+    for (const s of pathSlots) {
+      if (s.week === 0 && s.dow === entryDow) {
+        path.push({ week: 0, dow: entryDow, label: s.label, meanCum: 0, lo: 0, hi: 0, n: acc.rets.length });
+        continue;
+      }
+      const arr = acc.pathByKey.get(s.week * 10 + s.dow);
       if (!arr || arr.length < 3) continue;
       const mc = mean(arr);
       const se = std(arr) / Math.sqrt(arr.length);
-      path.push({ dow: d, label: WD_LABELS[d], meanCum: mc, lo: mc - 1.96 * se, hi: mc + 1.96 * se, n: arr.length });
+      path.push({ week: s.week, dow: s.dow, label: s.label, meanCum: mc, lo: mc - 1.96 * se, hi: mc + 1.96 * se, n: arr.length });
     }
 
     return {
@@ -317,6 +372,7 @@ export function weekdayConditional(
     order: present,
     entryDow,
     exitLabel: exitLabelOf(exit),
+    pathSlots,
     nowBinLabel,
     nowDate,
     baselineMean: mean(allRets),

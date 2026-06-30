@@ -16,6 +16,7 @@ import {
   WeekdayPivotResult,
   WeekdayMatrixResult,
   WD_LABELS,
+  exitLabelOf,
 } from "../../lib/weekday-conditional";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
@@ -77,33 +78,51 @@ function drawPaths(
 ) {
   const ml = 50, mr = 92, mt = 26, mb = 26;
   const plotW = width - ml - mr, plotH = height - mt - mb;
+  const slots = result.pathSlots;
+  const S = slots.length;
+  const crossWeek = slots.some((s) => s.week === 1);
+  const slotIdx = new Map(slots.map((s, si) => [s.week * 10 + s.dow, si]));
   ctx.fillStyle = "#374151";
   ctx.font = "bold 11px sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(`${WD_LABELS[result.entryDow]}曜引け→同週の平均パス（ビン別・累積／点クリックで深掘り）`, ml - 42, 14);
+  ctx.fillText(`${WD_LABELS[result.entryDow]}曜引け→${crossWeek ? "翌週" : "同週"}の平均パス（ビン別・累積／点クリックで深掘り）`, ml - 42, 14);
 
-  const xs: number[] = [];
-  for (let d = result.entryDow; d <= 5; d++) xs.push(d);
   const allV = result.bins.flatMap((b) => b.path.flatMap((p) => [p.lo, p.hi, p.meanCum]));
   const vmax = Math.max(0.0001, ...allV);
   const vmin = Math.min(-0.0001, ...allV);
   const pad = (vmax - vmin) * 0.08;
   const yHi = vmax + pad, yLo = vmin - pad;
-  const xAt = (d: number) => ml + (xs.length <= 1 ? plotW / 2 : ((d - result.entryDow) / (xs.length - 1)) * plotW);
+  const xAt = (si: number) => ml + (S <= 1 ? plotW / 2 : (si / (S - 1)) * plotW);
   const yAt = (v: number) => mt + ((yHi - v) / (yHi - yLo)) * plotH;
 
-  ctx.strokeStyle = "#e5e7eb";
   ctx.lineWidth = 1;
-  xs.forEach((d) => {
+  slots.forEach((s, si) => {
+    ctx.strokeStyle = "#e5e7eb";
     ctx.beginPath();
-    ctx.moveTo(xAt(d), mt);
-    ctx.lineTo(xAt(d), mt + plotH);
+    ctx.moveTo(xAt(si), mt);
+    ctx.lineTo(xAt(si), mt + plotH);
     ctx.stroke();
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = s.week === 1 ? "#7c3aed" : "#6b7280";
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(WD_LABELS[d], xAt(d), mt + plotH + 16);
+    ctx.fillText(s.label, xAt(si), mt + plotH + 16);
   });
+  // 週末をまたぐ境界（翌週の最初のスロットの手前）に破線
+  const firstNext = slots.findIndex((s) => s.week === 1);
+  if (firstNext > 0) {
+    const bx = (xAt(firstNext - 1) + xAt(firstNext)) / 2;
+    ctx.strokeStyle = "#c4b5fd";
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(bx, mt);
+    ctx.lineTo(bx, mt + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#7c3aed";
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("週末", bx, mt + 8);
+  }
   const zeroY = yAt(0);
   ctx.strokeStyle = "#9ca3af";
   ctx.setLineDash([3, 3]);
@@ -119,6 +138,7 @@ function drawPaths(
   ctx.fillText("0%", ml - 6, zeroY + 3);
   ctx.fillText(fmtPct(yLo), ml - 6, mt + plotH);
 
+  const xOf = (p: { week: number; dow: number }) => xAt(slotIdx.get(p.week * 10 + p.dow) ?? 0);
   result.bins.forEach((b, idx) => {
     const color = binColor(idx, result.bins.length);
     const isNow = b.label === result.nowBinLabel;
@@ -126,10 +146,10 @@ function drawPaths(
       ctx.fillStyle = color + "22";
       ctx.beginPath();
       b.path.forEach((p, k) => {
-        const x = xAt(p.dow), y = yAt(p.hi);
+        const x = xOf(p), y = yAt(p.hi);
         if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
-      for (let k = b.path.length - 1; k >= 0; k--) ctx.lineTo(xAt(b.path[k].dow), yAt(b.path[k].lo));
+      for (let k = b.path.length - 1; k >= 0; k--) ctx.lineTo(xOf(b.path[k]), yAt(b.path[k].lo));
       ctx.closePath();
       ctx.fill();
     }
@@ -137,20 +157,21 @@ function drawPaths(
     ctx.lineWidth = isNow ? 3 : 1.5;
     ctx.beginPath();
     b.path.forEach((p, k) => {
-      const x = xAt(p.dow), y = yAt(p.meanCum);
+      const x = xOf(p), y = yAt(p.meanCum);
       if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
     // 点＋ホットスポット
     b.path.forEach((p) => {
-      const x = xAt(p.dow), y = yAt(p.meanCum);
+      const x = xOf(p), y = yAt(p.meanCum);
+      const isEntry = p.week === 0 && p.dow === result.entryDow;
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(x, y, isNow ? 4 : 3, 0, Math.PI * 2);
       ctx.fill();
       hotspots.push({
         x: x - 7, y: y - 7, w: 14, h: 14,
-        tip: `${b.label}｜${WD_LABELS[p.dow]}引け: ${fmtPct(p.meanCum)}（n=${p.n}${p.dow !== result.entryDow ? `, CI ${fmtPct(p.lo)}〜${fmtPct(p.hi)}` : ""}）`,
+        tip: `${b.label}｜${p.label}引け: ${fmtPct(p.meanCum)}（n=${p.n}${isEntry ? "" : `, CI ${fmtPct(p.lo)}〜${fmtPct(p.hi)}`}）`,
         onClick: () => onPick(b.rank),
       });
     });
@@ -388,10 +409,11 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   const hotspotsRef = useRef<Hotspot[]>([]);
 
   const [view, setView] = useState<View>("path");
+  const [showCond, setShowCond] = useState(false); // 条件入力パネル（初期は折り畳み）
   const [entryDow, setEntryDow] = useState(1);
   const [sig, setSig] = useState<Signature>("intraday");
   const [scheme, setScheme] = useState<BinScheme>("tercile");
-  const [exitKind, setExitKind] = useState<"weekday" | "ndays">("weekday");
+  const [exitKind, setExitKind] = useState<"weekday" | "ndays" | "nextweek">("weekday");
   const [exitDow, setExitDow] = useState(5);
   const [exitN, setExitN] = useState(2);
   const [ySig, setYSig] = useState<Signature>("gap"); // ピボットY軸（X軸は sig を流用）
@@ -400,10 +422,11 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   const [drillCell, setDrillCell] = useState<string | null>(null); // pivot: "xi|yi"
   const [tip, setTip] = useState<{ left: number; top: number; text: string } | null>(null);
 
-  const exit: Exit = useMemo(
-    () => (exitKind === "weekday" ? { kind: "weekday", dow: exitDow } : { kind: "ndays", n: exitN }),
-    [exitKind, exitDow, exitN],
-  );
+  const exit: Exit = useMemo(() => {
+    if (exitKind === "weekday") return { kind: "weekday", dow: exitDow };
+    if (exitKind === "nextweek") return { kind: "nextweek", dow: exitDow };
+    return { kind: "ndays", n: exitN };
+  }, [exitKind, exitDow, exitN]);
 
   const result = useMemo(() => (prices.length < 120 ? null : weekdayConditional(prices, entryDow, sig, scheme, exit)), [prices, entryDow, sig, scheme, exit]);
   const pivot = useMemo(() => (prices.length < 120 || view !== "pivot" ? null : weekdayPivot(prices, entryDow, sig, ySig, scheme, exit)), [prices, entryDow, sig, ySig, scheme, exit, view]);
@@ -420,7 +443,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
       if (init) drawPivot(init.ctx, init.width, init.height, pivot, hotspotsRef.current, (key) => setDrillCell(key));
     } else if (view === "matrix" && matrix && matrixRef.current) {
       const init = initCanvas(matrixRef.current, 52 + matrix.dows.length * 42);
-      if (init) drawMatrix(init.ctx, init.width, init.height, matrix, hotspotsRef.current, (d, bi) => { setEntryDow(d); setDrillRank(bi); setDrillCell(null); setView("path"); });
+      if (init) drawMatrix(init.ctx, init.width, init.height, matrix, hotspotsRef.current, (d, bi) => { setEntryDow(d); setDrillRank(bi); setDrillCell(null); setView("path"); if (exitKind === "weekday" && exitDow <= d) { if (d >= 5) { setExitKind("nextweek"); setExitDow(1); } else setExitDow(5); } });
     }
   }, [view, result, pivot, matrix]);
 
@@ -444,15 +467,20 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   const maxAbs = result ? Math.max(1e-9, ...result.bins.map((b) => Math.abs(b.meanFwd))) : 1;
   const nowBin = result?.bins.find((b) => b.label === result.nowBinLabel) ?? null;
   const sigLabel = SIGNATURES.find((s) => s.value === sig)?.label ?? "";
+  const ySigLabel = SIGNATURES.find((s) => s.value === ySig)?.label ?? "";
+  const schemeLabel = SCHEMES.find((s) => s.value === scheme)?.label ?? "";
   const drillBin = result?.bins.find((b) => b.rank === drillRank) ?? null;
   const drillPivotCell = pivot?.cells.find((c) => `${c.xi}|${c.yi}` === drillCell) ?? null;
+
+  // 折り畳んだ条件パネルの見出しに出す現在条件のサマリ
+  const condSummary = `${view === "matrix" ? "全曜日" : `${WD_LABELS[entryDow]}曜引け`} · ${sigLabel}${view === "pivot" ? ` × ${ySigLabel}` : ""}ビン(${schemeLabel}) · → ${exitLabelOf(exit)}`;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <div>
         <h3 className="font-bold text-gray-800">曜日 × 値動きビン 条件付き分析（インタラクティブ）</h3>
         <p className="text-xs text-gray-500 mt-0.5">
-          任意曜日を、その日の値動き（夜間ギャップ=前日Close比の当日Openリターン 等）でビンに分け、ビン/セルをクリックして“その後どう動くか”を深掘りする。
+          任意曜日を、その日の値動き（前日比・夜間ギャップ・日中リターン 等）でビンに分け、ビンごとに“その後どう動くか”を深掘りする。exitに「翌週の指定曜日引け」を選べば、例えば<strong>金曜が前日比マイナスで引けた週の、翌週月曜からの値動き</strong>を前日比ビン別に集計できる。
         </p>
       </div>
 
@@ -463,13 +491,22 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         ))}
       </div>
 
-      {/* 共通コントロール */}
-      <div className="space-y-2 bg-gray-50 rounded-md p-2.5">
+      {/* 共通コントロール（初期は折り畳み） */}
+      <div className="bg-gray-50 rounded-md">
+        <button onClick={() => setShowCond((v) => !v)} className="w-full flex items-center justify-between gap-2 px-2.5 py-2 text-xs text-left">
+          <span className="text-gray-600 min-w-0">
+            <span className="text-gray-400 mr-1.5">条件</span>
+            <span className="font-medium">{condSummary}</span>
+          </span>
+          <span className="text-indigo-600 shrink-0 font-medium">{showCond ? "閉じる ▲" : "変更 ▼"}</span>
+        </button>
+        {showCond && (
+        <div className="space-y-2 px-2.5 pb-2.5 pt-2 border-t border-gray-200">
         {view !== "matrix" && (
           <div className="flex items-center gap-2 text-xs flex-wrap">
             <span className="text-gray-500 w-20">エントリー曜日</span>
             {ENTRY_DOWS.map((d) => (
-              <button key={d} onClick={() => { setEntryDow(d); setDrillRank(null); setDrillCell(null); if (d >= 5) setExitKind("ndays"); else if (exitDow <= d) setExitDow(5); }}
+              <button key={d} onClick={() => { setEntryDow(d); setDrillRank(null); setDrillCell(null); if (d >= 5) { setExitKind("nextweek"); setExitDow(1); } else if (exitKind === "weekday" && exitDow <= d) setExitDow(5); }}
                 className={`px-2.5 py-1 rounded font-medium ${entryDow === d ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>{WD_LABELS[d]}</button>
             ))}
           </div>
@@ -497,23 +534,26 @@ export default function WeekdayConditionalChart({ prices }: Props) {
           </div>
           <div className="flex items-center gap-1">
             <span className="text-gray-500">売り(exit)</span>
-            <button onClick={() => setExitKind("weekday")} className={`px-2 py-0.5 rounded ${exitKind === "weekday" ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>同週の曜日引け</button>
+            <button disabled={view !== "matrix" && entryDow >= 5} onClick={() => { setExitKind("weekday"); if (exitDow <= entryDow) setExitDow(5); }} className={`px-2 py-0.5 rounded ${exitKind === "weekday" ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"} ${view !== "matrix" && entryDow >= 5 ? "opacity-40 cursor-not-allowed" : ""}`}>同週の曜日引け</button>
+            <button onClick={() => setExitKind("nextweek")} className={`px-2 py-0.5 rounded ${exitKind === "nextweek" ? "bg-violet-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>翌週の曜日引け</button>
             <button onClick={() => setExitKind("ndays")} className={`px-2 py-0.5 rounded ${exitKind === "ndays" ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>N営業日先</button>
           </div>
-          {exitKind === "weekday" ? (
-            <div className="flex items-center gap-1">
-              {ENTRY_DOWS.filter((d) => view === "matrix" || d > entryDow).map((d) => (
-                <button key={d} onClick={() => setExitDow(d)} className={`px-2 py-0.5 rounded ${exitDow === d ? "bg-gray-800 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{WD_LABELS[d]}</button>
-              ))}
-            </div>
-          ) : (
+          {exitKind === "ndays" ? (
             <div className="flex items-center gap-1">
               {NDAYS.map((n) => (
                 <button key={n} onClick={() => setExitN(n)} className={`px-2 py-0.5 rounded ${exitN === n ? "bg-gray-800 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{n}日</button>
               ))}
             </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              {ENTRY_DOWS.filter((d) => exitKind === "nextweek" || view === "matrix" || d > entryDow).map((d) => (
+                <button key={d} onClick={() => setExitDow(d)} className={`px-2 py-0.5 rounded ${exitDow === d ? "bg-gray-800 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{exitKind === "nextweek" ? `翌${WD_LABELS[d]}` : WD_LABELS[d]}</button>
+              ))}
+            </div>
           )}
         </div>
+        </div>
+        )}
       </div>
 
       {/* ===== ビュー: ビン別パス&EV ===== */}
@@ -646,8 +686,8 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>建ては必ずエントリー曜日の「引け」</strong>。日中リターンや窓はその日の引けで確定するため、引け以降でしか同条件で建てられない（寄り建ては未確定情報を使う先読み）。</li>
           <li><strong>ビン分割</strong>: 上下(0で2)/3分位/5分位。分位はそのエントリー曜日の分布から境界を作り標本数がほぼ揃う。ラベル括弧内が値域。</li>
-          <li><strong>曜日別パス</strong>: エントリー引けを0%として同週の各曜日の平均累積。週末をまたいだら打ち切り。帯=平均±1.96×標準誤差。</li>
-          <li><strong>exit</strong>: 「同週の指定曜日引け」または「N営業日先引け」。フォワード=(exit終値−エントリー終値)/エントリー終値。</li>
+          <li><strong>曜日別パス</strong>: エントリー引けを0%として各曜日の平均累積。「翌週の曜日引け」exitのときは週末（破線）をまたいで翌週(翌月・翌火…)まで延長し、それ以外は同週末で打ち切り。帯=平均±1.96×標準誤差。</li>
+          <li><strong>exit</strong>: 「同週の指定曜日引け」「<strong>翌週の指定曜日引け</strong>」「N営業日先引け」の3種。フォワード=(exit終値−エントリー終値)/エントリー終値。<em>翌週exit</em>は最初の週末を1回だけ越えた“次の週”の指定曜日（その週が祝日休場ならその回は除外）。金曜エントリーで翌月曜を選べば「金引け→翌月曜引け」の週末持ち越しリターンになる。</li>
           <li><strong>有意性</strong>: 平均=0 の1標本t検定 → 複数ビン/セルを Benjamini-Hochberg FDR で多重比較補正。95%CIは移動ブロック・ブートストラップ。</li>
         </ul>
 
