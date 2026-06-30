@@ -750,6 +750,10 @@ const CalendarEffectChart = dynamic(
   () => import("./components/analysis/CalendarEffectChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const TodayBinChart = dynamic(
+  () => import("./components/analysis/TodayBinChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const RelativeStrengthExtChart = dynamic(
   () => import("./components/analysis/RelativeStrengthExtChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1338,6 +1342,7 @@ export default function AnalysisPage() {
                   <CandleSeasonalityChart prices={filteredPrices} />
                   <WeekClockChart prices={filteredPrices} ticker={data.ticker} />
                   <CalendarEffectChart prices={filteredPrices} />
+                  <TodayBinChart prices={filteredPrices} />
                   <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <HighLowTimingChart ticker={data.ticker} />

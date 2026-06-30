@@ -27,7 +27,7 @@ export type BinScheme = "sign" | "tercile" | "quintile";
 export type Exit =
   | { kind: "weekday"; dow: number }
   | { kind: "ndays"; n: number }
-  | { kind: "nextweek"; dow: number };
+  | { kind: "nextweek"; dow: number; weeks: number }; // weeks=1:翌週, 2:翌々週, …
 
 export const SIGNATURES: { value: Signature; label: string; desc: string }[] = [
   { value: "intraday", label: "日中リターン", desc: "(終値−始値)/始値。寄りからの当日値動き。" },
@@ -129,18 +129,18 @@ function sameWeekExitIdx(dows: number[], i: number, target: number): number {
   return -1;
 }
 
-// 「翌週」の指定曜日引けを特定する。取引日列では平日の曜日番号が週内で単調増加し、
-// 週末をまたぐと減少する。最初の境界を越えた“次の週”の中から target 曜日を探す。
+// 「weeks週後」の指定曜日引けを特定する。取引日列では平日の曜日番号が週内で単調増加し、
+// 週末をまたぐと減少する。週末境界を weeks 回越えた“その週”の中から target 曜日を探す。
 // その週に target 曜日が無い（祝日休場）場合は -1（その回は集計から除外）。
-function nextWeekExitIdx(dows: number[], i: number, target: number): number {
+function nextWeekExitIdx(dows: number[], i: number, target: number, weeks: number): number {
   let prev = dows[i];
-  let crossed = false;
+  let crossed = 0;
   for (let j = i + 1; j < dows.length; j++) {
     if (dows[j] <= prev) {
-      if (crossed) return -1; // 翌々週に到達 = 翌週は target 休場
-      crossed = true;
+      crossed++;
+      if (crossed > weeks) return -1; // 目的の週を通り越した = その週は target 休場
     }
-    if (crossed && dows[j] === target) return j;
+    if (crossed === weeks && dows[j] === target) return j;
     prev = dows[j];
   }
   return -1;
@@ -152,7 +152,7 @@ function fwdReturn(closes: number[], dows: number[], i: number, exit: Exit): { r
     j = i + exit.n;
     if (j >= closes.length) return null;
   } else if (exit.kind === "nextweek") {
-    j = nextWeekExitIdx(dows, i, exit.dow);
+    j = nextWeekExitIdx(dows, i, exit.dow, exit.weeks);
     if (j < 0) return null;
   } else {
     j = sameWeekExitIdx(dows, i, exit.dow);
@@ -162,20 +162,34 @@ function fwdReturn(closes: number[], dows: number[], i: number, exit: Exit): { r
   return { r: closes[j] / closes[i] - 1, exitIdx: j };
 }
 
+// 週数の和名（exitラベル用）: 1→翌週, 2→翌々週, 3以上→N週後
+export function weekWord(weeks: number): string {
+  if (weeks === 1) return "翌週";
+  if (weeks === 2) return "翌々週";
+  return `${weeks}週後`;
+}
+// 曜日ラベルの週プレフィックス（軸表示用・コンパクト）: 0→"", 1→翌, 2→翌々, 3以上→"N週"
+function weekPrefix(week: number): string {
+  if (week === 0) return "";
+  if (week === 1) return "翌";
+  if (week === 2) return "翌々";
+  return `${week}週`;
+}
+
 export function exitLabelOf(exit: Exit): string {
   if (exit.kind === "ndays") return `${exit.n}営業日先 引け`;
-  if (exit.kind === "nextweek") return `翌週 ${WD_LABELS[exit.dow]}曜 引け`;
+  if (exit.kind === "nextweek") return `${weekWord(exit.weeks)} ${WD_LABELS[exit.dow]}曜 引け`;
   return `同週 ${WD_LABELS[exit.dow]}曜 引け`;
 }
 
-// 週跨ぎパス用スロット（week:0=エントリー週, 1=翌週）
+// 週跨ぎパス用スロット（week:0=エントリー週, 1=翌週, 2=翌々週, …）
 export interface PathSlot {
   week: number;
   dow: number;
   label: string;
 }
 function slotLabel(week: number, dow: number): string {
-  return (week === 1 ? "翌" : "") + WD_LABELS[dow];
+  return weekPrefix(week) + WD_LABELS[dow];
 }
 
 // 個別発生日（ドリルダウン用）
@@ -264,8 +278,8 @@ export function weekdayConditional(
   const accs = new Map<string, Acc>();
   for (const label of bins.order) accs.set(label, { rets: [], years: [], pathByKey: new Map(), occ: [] });
 
-  // 累積パスを追う週数。翌週exitのときだけ週末をまたいで翌週まで延長する。
-  const maxWeek = exit.kind === "nextweek" ? 1 : 0;
+  // 累積パスを追う週数。週後exitのときだけ週末をまたいで指定週まで延長する。
+  const maxWeek = exit.kind === "nextweek" ? exit.weeks : 0;
 
   const allRets: number[] = [];
   for (const r of subset) {
@@ -298,11 +312,15 @@ export function weekdayConditional(
     }
   }
 
-  // パスのスロット順（エントリー週: entryDow→金、翌週exitなら続けて 翌月→翌exitDow）
+  // パスのスロット順（エントリー週: entryDow→金、週後exitなら続けて中間の週は月→金、
+  // 最終週は月→exitDow まで）
   const pathSlots: PathSlot[] = [{ week: 0, dow: entryDow, label: slotLabel(0, entryDow) }];
   for (let d = entryDow + 1; d <= 5; d++) pathSlots.push({ week: 0, dow: d, label: slotLabel(0, d) });
   if (exit.kind === "nextweek") {
-    for (let d = 1; d <= exit.dow; d++) pathSlots.push({ week: 1, dow: d, label: slotLabel(1, d) });
+    for (let w = 1; w < exit.weeks; w++) {
+      for (let d = 1; d <= 5; d++) pathSlots.push({ week: w, dow: d, label: slotLabel(w, d) });
+    }
+    for (let d = 1; d <= exit.dow; d++) pathSlots.push({ week: exit.weeks, dow: d, label: slotLabel(exit.weeks, d) });
   }
 
   const present = bins.order.filter((o) => (accs.get(o)?.rets.length ?? 0) >= 3);

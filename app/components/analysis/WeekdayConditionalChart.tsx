@@ -17,6 +17,7 @@ import {
   WeekdayMatrixResult,
   WD_LABELS,
   exitLabelOf,
+  weekWord,
 } from "../../lib/weekday-conditional";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
@@ -85,7 +86,7 @@ function drawPaths(
   ctx.fillStyle = "#374151";
   ctx.font = "bold 11px sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(`${WD_LABELS[result.entryDow]}曜引け→${crossWeek ? "翌週" : "同週"}の平均パス（ビン別・累積／点クリックで深掘り）`, ml - 42, 14);
+  ctx.fillText(`${WD_LABELS[result.entryDow]}曜引け→${crossWeek ? "翌週以降" : "同週"}の平均パス（ビン別・累積／点クリックで深掘り）`, ml - 42, 14);
 
   const allV = result.bins.flatMap((b) => b.path.flatMap((p) => [p.lo, p.hi, p.meanCum]));
   const vmax = Math.max(0.0001, ...allV);
@@ -107,10 +108,10 @@ function drawPaths(
     ctx.textAlign = "center";
     ctx.fillText(s.label, xAt(si), mt + plotH + 16);
   });
-  // 週末をまたぐ境界（翌週の最初のスロットの手前）に破線
-  const firstNext = slots.findIndex((s) => s.week === 1);
-  if (firstNext > 0) {
-    const bx = (xAt(firstNext - 1) + xAt(firstNext)) / 2;
+  // 週末をまたぐ各境界（週が切り替わるスロットの手前）に破線
+  for (let si = 1; si < slots.length; si++) {
+    if (slots[si].week === slots[si - 1].week) continue;
+    const bx = (xAt(si - 1) + xAt(si)) / 2;
     ctx.strokeStyle = "#c4b5fd";
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -394,6 +395,7 @@ const SCHEMES: { value: BinScheme; label: string }[] = [
   { value: "quintile", label: "5分位" },
 ];
 const NDAYS = [1, 2, 3, 5];
+const NWEEKS = [1, 2, 3, 4];
 type View = "path" | "pivot" | "matrix";
 
 function actionTag(action: WeekdayBin["action"]) {
@@ -416,6 +418,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   const [exitKind, setExitKind] = useState<"weekday" | "ndays" | "nextweek">("weekday");
   const [exitDow, setExitDow] = useState(5);
   const [exitN, setExitN] = useState(2);
+  const [exitWeeks, setExitWeeks] = useState(1); // 週後exitの週数（1=翌週,2=翌々週,…）
   const [ySig, setYSig] = useState<Signature>("gap"); // ピボットY軸（X軸は sig を流用）
 
   const [drillRank, setDrillRank] = useState<number | null>(null); // path: ビン rank
@@ -424,9 +427,9 @@ export default function WeekdayConditionalChart({ prices }: Props) {
 
   const exit: Exit = useMemo(() => {
     if (exitKind === "weekday") return { kind: "weekday", dow: exitDow };
-    if (exitKind === "nextweek") return { kind: "nextweek", dow: exitDow };
+    if (exitKind === "nextweek") return { kind: "nextweek", dow: exitDow, weeks: exitWeeks };
     return { kind: "ndays", n: exitN };
-  }, [exitKind, exitDow, exitN]);
+  }, [exitKind, exitDow, exitN, exitWeeks]);
 
   const result = useMemo(() => (prices.length < 120 ? null : weekdayConditional(prices, entryDow, sig, scheme, exit)), [prices, entryDow, sig, scheme, exit]);
   const pivot = useMemo(() => (prices.length < 120 || view !== "pivot" ? null : weekdayPivot(prices, entryDow, sig, ySig, scheme, exit)), [prices, entryDow, sig, ySig, scheme, exit, view]);
@@ -538,6 +541,14 @@ export default function WeekdayConditionalChart({ prices }: Props) {
             <button onClick={() => setExitKind("nextweek")} className={`px-2 py-0.5 rounded ${exitKind === "nextweek" ? "bg-violet-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>翌週の曜日引け</button>
             <button onClick={() => setExitKind("ndays")} className={`px-2 py-0.5 rounded ${exitKind === "ndays" ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>N営業日先</button>
           </div>
+          {exitKind === "nextweek" && (
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">何週後</span>
+              {NWEEKS.map((w) => (
+                <button key={w} onClick={() => setExitWeeks(w)} className={`px-2 py-0.5 rounded ${exitWeeks === w ? "bg-violet-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{weekWord(w)}</button>
+              ))}
+            </div>
+          )}
           {exitKind === "ndays" ? (
             <div className="flex items-center gap-1">
               {NDAYS.map((n) => (
@@ -547,7 +558,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
           ) : (
             <div className="flex items-center gap-1">
               {ENTRY_DOWS.filter((d) => exitKind === "nextweek" || view === "matrix" || d > entryDow).map((d) => (
-                <button key={d} onClick={() => setExitDow(d)} className={`px-2 py-0.5 rounded ${exitDow === d ? "bg-gray-800 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{exitKind === "nextweek" ? `翌${WD_LABELS[d]}` : WD_LABELS[d]}</button>
+                <button key={d} onClick={() => setExitDow(d)} className={`px-2 py-0.5 rounded ${exitDow === d ? "bg-gray-800 text-white" : "bg-gray-100 hover:bg-gray-200"}`}>{WD_LABELS[d]}</button>
               ))}
             </div>
           )}
@@ -686,8 +697,8 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>建ては必ずエントリー曜日の「引け」</strong>。日中リターンや窓はその日の引けで確定するため、引け以降でしか同条件で建てられない（寄り建ては未確定情報を使う先読み）。</li>
           <li><strong>ビン分割</strong>: 上下(0で2)/3分位/5分位。分位はそのエントリー曜日の分布から境界を作り標本数がほぼ揃う。ラベル括弧内が値域。</li>
-          <li><strong>曜日別パス</strong>: エントリー引けを0%として各曜日の平均累積。「翌週の曜日引け」exitのときは週末（破線）をまたいで翌週(翌月・翌火…)まで延長し、それ以外は同週末で打ち切り。帯=平均±1.96×標準誤差。</li>
-          <li><strong>exit</strong>: 「同週の指定曜日引け」「<strong>翌週の指定曜日引け</strong>」「N営業日先引け」の3種。フォワード=(exit終値−エントリー終値)/エントリー終値。<em>翌週exit</em>は最初の週末を1回だけ越えた“次の週”の指定曜日（その週が祝日休場ならその回は除外）。金曜エントリーで翌月曜を選べば「金引け→翌月曜引け」の週末持ち越しリターンになる。</li>
+          <li><strong>曜日別パス</strong>: エントリー引けを0%として各曜日の平均累積。「週後の曜日引け」exitのときは週末（破線）をまたいで指定週(翌週=翌月・翌火…／翌々週=翌々月…)まで延長し、それ以外は同週末で打ち切り。帯=平均±1.96×標準誤差。</li>
+          <li><strong>exit</strong>: 「同週の指定曜日引け」「<strong>N週後の指定曜日引け</strong>（翌週／翌々週／3週後／4週後）」「N営業日先引け」の3種。フォワード=(exit終値−エントリー終値)/エントリー終値。<em>週後exit</em>は週末をweeks回越えた“その週”の指定曜日（その週が祝日休場ならその回は除外）。例: 金曜エントリーで「翌週・月曜」なら週末持ち越し、「翌々週・金曜」なら約2週間先までの累積を見る。</li>
           <li><strong>有意性</strong>: 平均=0 の1標本t検定 → 複数ビン/セルを Benjamini-Hochberg FDR で多重比較補正。95%CIは移動ブロック・ブートストラップ。</li>
         </ul>
 
