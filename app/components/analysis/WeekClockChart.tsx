@@ -54,8 +54,9 @@ function drawDailyCandle(ctx: CanvasRenderingContext2D, W: number, H: number, r:
   const yOf = (v: number) => mt + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
+  const origin = r.anchorMode === "monday" ? "月曜始値" : "週初日の始値";
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("月曜始値=0 を原点とした累積OHLC（実体=平均終値, ヒゲ=平均累積高安）", ml, mt - 12);
+  ctx.fillText(`${origin}=0 を原点とした累積OHLC（実体=平均終値, ヒゲ=平均累積高安）`, ml, mt - 12);
 
   // Yグリッド & ゼロ線
   ctx.font = "9px sans-serif"; ctx.textAlign = "right";
@@ -71,7 +72,7 @@ function drawDailyCandle(ctx: CanvasRenderingContext2D, W: number, H: number, r:
   ctx.setLineDash([]);
   const y0 = yOf(0);
   ctx.fillStyle = "#6b7280"; ctx.textAlign = "left"; ctx.font = "9px sans-serif";
-  ctx.fillText("月曜始値", ml + 2, y0 - 3);
+  ctx.fillText(origin, ml + 2, y0 - 3);
 
   const slot = plotW / slots.length;
   const bw = Math.min(34, slot * 0.5);
@@ -186,8 +187,9 @@ function drawIntradayClock(ctx: CanvasRenderingContext2D, W: number, H: number, 
   const xOf = (i: number) => ml + (i / (pts.length - 1)) * plotW;
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
+  const originLabel = r.anchorMode === "monday" ? "月曜寄り" : "週初日寄り";
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("月曜寄り=0 からの週内クロック（帯=平均累積高安, 線=平均終値）", ml, mt - 12);
+  ctx.fillText(`${originLabel}=0 からの週内クロック（帯=平均累積高安, 線=平均終値）`, ml, mt - 12);
 
   ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 5; i++) {
@@ -222,10 +224,10 @@ function drawIntradayClock(ctx: CanvasRenderingContext2D, W: number, H: number, 
   pts.forEach((p, i) => { const x = xOf(i), y = yOf(p.meanClose); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
   ctx.stroke();
 
-  // 終点ラベル
+  // 終点ラベル（最終スロットの引け）
   const last = pts[pts.length - 1];
   ctx.fillStyle = "#1d4ed8"; ctx.textAlign = "left"; ctx.font = "9px sans-serif";
-  ctx.fillText(`金曜引け ${pctStr(last.meanClose)}`, ml + 4, mt + 12);
+  ctx.fillText(`${last.label.split(" ")[0]}引け ${pctStr(last.meanClose)}`, ml + 4, mt + 12);
 }
 
 const H = 340;
@@ -303,7 +305,7 @@ export default function WeekClockChart({ prices, ticker }: Props) {
       {gran === "daily" && daily && (
         <>
           <div className="text-xs text-gray-500">
-            対象 {daily.nWeeks} 週（{anchorMode === "monday" ? "月曜のある週のみ" : "各週の最初の営業日を原点"}）
+            対象 {daily.nWeeks} 週（{anchorMode === "monday" ? "月曜のある週のみ・暦の曜日で整列" : "各週の最初の営業日を原点・営業日序数で整列"}）
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs">
             {daily.slots.filter((s) => s.n > 0).map((s) => (
@@ -316,7 +318,9 @@ export default function WeekClockChart({ prices, ticker }: Props) {
             ))}
           </div>
           <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">
-            {"各曜日のローソクは「月曜始値を0としたその曜日終値までの累積OHLC」。実体=平均終値、ヒゲ上端=週初からの平均累積高値、下端=平均累積安値。青線は中央値の終値パス。終値が右肩上がりなら週内ドリフトは上向き、ヒゲが早い曜日で大きく開くなら週前半に値幅が出やすい。"}
+            {anchorMode === "monday"
+              ? "各曜日のローソクは「月曜始値を0としたその曜日終値までの累積OHLC」。実体=平均終値、ヒゲ上端=週初からの平均累積高値、下端=平均累積安値。青線は中央値の終値パス。終値が右肩上がりなら週内ドリフトは上向き、ヒゲが早い曜日で大きく開くなら週前半に値幅が出やすい。"
+              : "各スロットは「その週の最初の営業日の始値を0とした、n営業日目終値までの累積OHLC」。祝日で月曜が無い週も『1日目＝原点』で揃えるため、暦の曜日ではなく営業日序数で整列する（曜日混入による経路の歪みを回避）。実体=平均終値、ヒゲ=平均累積高安、青線=中央値の終値パス。"}
           </p>
         </>
       )}
@@ -351,7 +355,7 @@ export default function WeekClockChart({ prices, ticker }: Props) {
 
         <p className="font-medium text-gray-700 mt-3">3. 用語</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><strong>原点(アンカー)</strong>: 毎週リセットする基準点。ここでは月曜始値。祝日で月曜が無い週は「月曜のみ」モードで除外、「週初日」モードでは火曜などその週最初の営業日始値を採用。</li>
+          <li><strong>原点(アンカー)と整列</strong>: 毎週リセットする基準点。<strong>月曜のみ</strong>モードは月曜始値を原点とし、月曜が無い祝日週は除外して<strong>暦の曜日</strong>(月〜金)で集計する。<strong>週初日</strong>モードはその週最初の営業日の始値を原点とし、<strong>営業日序数</strong>(1日目〜5日目)で集計する。後者で曜日集計にすると、祝日週の火曜が別原点(火曜始値)のまま火曜スロットに混入し経路が歪むため、序数整列でこれを防いでいる。</li>
           <li><strong>走査最大/最小</strong>: 週初から現時点までの最大値・最小値（ランニング極値）。週が到達したレンジの“外枠”を表す。</li>
           <li><strong>累積足</strong>: open を常に0(月曜始値)に固定したローソク。実体が右へ伸び、ヒゲが週の経過とともに広がる。</li>
         </ul>

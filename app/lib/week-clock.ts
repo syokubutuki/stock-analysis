@@ -119,22 +119,27 @@ export function computeWeekClockDaily(prices: PricePoint[], anchorMode: AnchorMo
     nWeeks++;
     let runHigh = -Infinity;
     let runLow = Infinity;
-    for (const d of wk) {
+    for (let k = 0; k < wk.length; k++) {
+      const d = wk[k];
       if (d.high > runHigh) runHigh = d.high;
       if (d.low < runLow) runLow = d.low;
       if (d.close <= 0) continue;
-      close[d.dow].push(ln(anchor, d.close));
-      high[d.dow].push(ln(anchor, runHigh));
-      low[d.dow].push(ln(anchor, runLow));
+      // monday: 暦の曜日でスロット集計（祝日は欠番）。firstday: 各週の営業日序数(1..5)で整列。
+      const slot = anchorMode === "monday" ? d.dow : k + 1;
+      if (slot < 1 || slot > 5) continue;
+      close[slot].push(ln(anchor, d.close));
+      high[slot].push(ln(anchor, runHigh));
+      low[slot].push(ln(anchor, runLow));
     }
   }
 
   const slots: DaySlotStat[] = [];
   for (let dow = 1; dow <= 5; dow++) {
+    const label = anchorMode === "monday" ? WD_NAMES[dow] : `${dow}日目`;
     const c = [...close[dow]].sort((a, b) => a - b);
     if (c.length === 0) {
       slots.push({
-        dow, label: WD_NAMES[dow], n: 0,
+        dow, label, n: 0,
         meanClose: NaN, medianClose: NaN, p10: NaN, p25: NaN, p75: NaN, p90: NaN,
         meanHigh: NaN, meanLow: NaN, upRate: NaN,
       });
@@ -142,7 +147,7 @@ export function computeWeekClockDaily(prices: PricePoint[], anchorMode: AnchorMo
     }
     slots.push({
       dow,
-      label: WD_NAMES[dow],
+      label,
       n: c.length,
       meanClose: mean(close[dow]),
       medianClose: quantile(c, 0.5),
@@ -161,10 +166,10 @@ export function computeWeekClockDaily(prices: PricePoint[], anchorMode: AnchorMo
 // ─────────────────────────── 日中足: 週内クロック ───────────────────────────
 
 export interface IntradayClockPoint {
-  weekday: number; // 1..5
+  weekday: number; // monday: 曜日1..5 / firstday: 営業日序数1..5
   minute: number; // ローカル0時からの分
-  label: string; // "火 10:30"
-  isWeekdayStart: boolean; // 各曜日の先頭スロット（区切り描画用）
+  label: string; // "火 10:30" または "1日目 10:30"
+  isWeekdayStart: boolean; // 各曜日(序数)の先頭スロット（区切り描画用）
   n: number;
   meanClose: number;
   medianClose: number;
@@ -179,6 +184,7 @@ export interface WeekClockIntraday {
   nWeeks: number;
   binMinutes: number;
   weekdays: number[];
+  anchorMode: AnchorMode;
 }
 
 function minuteLabel(m: number): string {
@@ -241,6 +247,15 @@ export function computeWeekClockIntraday(
       anchor = wk[0].open;
     }
     nWeeks++;
+    // firstday: その週に出現する営業日を昇順で 1..5 の序数に割り当てる（祝日週も「1日目」で整列）。
+    const dayOrdinal = new Map<number, number>();
+    if (anchorMode === "firstday") {
+      let ord = 0;
+      for (const b of wk) {
+        const ld = localDay(b.ts, gmtoffset);
+        if (!dayOrdinal.has(ld)) dayOrdinal.set(ld, ++ord);
+      }
+    }
     let runHigh = -Infinity;
     let runLow = Infinity;
     for (const b of wk) {
@@ -249,9 +264,11 @@ export function computeWeekClockIntraday(
       const ld = localDay(b.ts, gmtoffset);
       const dow = isoDow((((ld % 7) + 7 + 4) % 7));
       if (dow > 5) continue;
-      weekdaysPresent.add(dow);
+      const slot = anchorMode === "monday" ? dow : (dayOrdinal.get(ld) as number);
+      if (slot < 1 || slot > 5) continue;
+      weekdaysPresent.add(slot);
       const bi = binIndexOfMinute(localMinute(b.ts, gmtoffset), grid);
-      const key = dow * 1000 + bi;
+      const key = slot * 1000 + bi;
       if (b.close > 0) push(close, key, ln(anchor, b.close));
       push(high, key, ln(anchor, runHigh));
       push(low, key, ln(anchor, runLow));
@@ -260,17 +277,18 @@ export function computeWeekClockIntraday(
 
   const weekdays = [...weekdaysPresent].sort((a, b) => a - b);
   const points: IntradayClockPoint[] = [];
-  for (const dow of weekdays) {
+  for (const slot of weekdays) {
+    const prefix = anchorMode === "monday" ? WD_NAMES[slot] : `${slot}日目`;
     for (let bi = 0; bi < nBins; bi++) {
-      const key = dow * 1000 + bi;
+      const key = slot * 1000 + bi;
       const c = close.get(key);
       if (!c || c.length === 0) continue;
       const cs = [...c].sort((a, b) => a - b);
       points.push({
-        weekday: dow,
+        weekday: slot,
         minute: grid.bins[bi].startMinute,
-        label: `${WD_NAMES[dow]} ${minuteLabel(grid.bins[bi].startMinute)}`,
-        isWeekdayStart: bi === 0 || !close.has(dow * 1000 + (bi - 1)),
+        label: `${prefix} ${minuteLabel(grid.bins[bi].startMinute)}`,
+        isWeekdayStart: bi === 0 || !close.has(slot * 1000 + (bi - 1)),
         n: c.length,
         meanClose: mean(c),
         medianClose: quantile(cs, 0.5),
@@ -292,5 +310,5 @@ export function computeWeekClockIntraday(
     }
   }
 
-  return { points, nWeeks, binMinutes, weekdays };
+  return { points, nWeeks, binMinutes, weekdays, anchorMode };
 }
