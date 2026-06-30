@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createChart,
+  LineSeries,
+  createSeriesMarkers,
+  type IChartApi,
+  type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
+  type Time,
+} from "lightweight-charts";
 import { useIntraday } from "../../hooks/useIntraday";
 import {
   computeWindowWeekday, WindowWeekdayResult,
-  computeWindowBinTiming, WindowBinTimingResult,
+  computeWindowBinTiming,
 } from "../../lib/intraday-window";
 import {
   initCanvas, IntervalButtons, LoadingError, IntradayCaveat,
@@ -53,64 +63,17 @@ function drawWeekdayBars(ctx: CanvasRenderingContext2D, W: number, H: number, re
   });
 }
 
-// ビン色分け日付タイムライン帯：背景に原系列(終値)ライン、選択曜日の各日を
-// 所属クインタイル色でライン上にドット＋下部の帯に縦バーで配置する。
-function drawBinTimeline(ctx: CanvasRenderingContext2D, W: number, H: number, res: WindowBinTimingResult) {
-  const ml = 8, mr = 8, mt = 10, mb = 16, stripH = 14, gap = 8;
-  const plotW = W - ml - mr;
-  const priceTop = mt;
-  const priceBot = H - mb - stripH - gap;
-  const stripTop = priceBot + gap;
-  const span = Math.max(1, res.msMax - res.msMin);
-  const xOf = (ms: number) => ml + ((ms - res.msMin) / span) * plotW;
-
-  // 背景：原系列の終値ライン
-  const closes = res.seriesDates.map((s) => s.close).filter((c) => c > 0);
-  if (closes.length > 1) {
-    const lo = Math.min(...closes), hi = Math.max(...closes);
-    const yOf = (c: number) => priceBot - ((c - lo) / (hi - lo || 1)) * (priceBot - priceTop);
-    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1; ctx.beginPath();
-    let started = false;
-    for (const s of res.seriesDates) {
-      if (s.close <= 0) continue;
-      const x = xOf(s.ms), y = yOf(s.close);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // 選択曜日の各日をライン上にビン色ドットで
-    const closeByMs = new Map(res.seriesDates.map((s) => [s.ms, s.close]));
-    for (const d of res.days) {
-      const c = closeByMs.get(d.ms);
-      if (c == null || c <= 0) continue;
-      ctx.fillStyle = BIN_COLORS[d.bin] ?? "#9ca3af";
-      ctx.beginPath(); ctx.arc(xOf(d.ms), yOf(c), 2.6, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  // 下部の帯：日付昇順に縦バーで所属ビンを色分け
-  ctx.fillStyle = "#f9fafb"; ctx.fillRect(ml, stripTop, plotW, stripH);
-  ctx.strokeStyle = "#e5e7eb"; ctx.strokeRect(ml, stripTop, plotW, stripH);
-  for (const d of res.days) {
-    ctx.fillStyle = BIN_COLORS[d.bin] ?? "#9ca3af";
-    ctx.fillRect(xOf(d.ms) - 1.2, stripTop + 1, 2.4, stripH - 2);
-  }
-
-  // 日付目盛（左/中/右）
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
-  const ticks = [res.msMin, (res.msMin + res.msMax) / 2, res.msMax];
-  ticks.forEach((ms, i) => {
-    ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center";
-    const x = i === 0 ? ml : i === 2 ? W - mr : ml + plotW / 2;
-    ctx.fillText(fmtYM(ms), x, H - 4);
-  });
-}
+const TL_HEIGHT = 240;
 
 export default function IntradayWindowChart({ ticker }: Props) {
   const [interval, setInterval] = useState("15m");
   const { resp, loading, error } = useIntraday(ticker, interval);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const timelineRef = useRef<HTMLCanvasElement>(null);
+  // 分位ビン×原系列タイムライン（ズーム/パン可能な lightweight-charts）
+  const tlContainerRef = useRef<HTMLDivElement>(null);
+  const tlChartRef = useRef<IChartApi | null>(null);
+  const tlSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const tlMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   const [startMin, setStartMin] = useState<number | null>(null);
   const [endMin, setEndMin] = useState<number | null>(null);
@@ -134,6 +97,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
     if (!resp || resp.bars.length === 0 || startMin === null || endMin === null) return null;
     return computeWindowWeekday(resp.bars, resp.gmtoffset, startMin, endMin, intervalToMin(interval));
   }, [resp, startMin, endMin, interval]);
+  const showResult = !!result;
 
   useEffect(() => {
     if (!result || !canvasRef.current) return;
@@ -141,26 +105,74 @@ export default function IntradayWindowChart({ ticker }: Props) {
     if (init) drawWeekdayBars(init.ctx, init.width, init.height, result);
   }, [result]);
 
-  // 選択曜日の初期化（最も標本数の多い曜日、無ければ月）
-  useEffect(() => {
-    if (!result || result.rows.length === 0) { setSelectedWd(null); return; }
-    setSelectedWd((prev) => {
-      if (prev !== null && result.rows.some((r) => r.weekday === prev)) return prev;
-      const best = [...result.rows].sort((a, b) => b.n - a.n)[0];
-      return best.weekday;
-    });
-  }, [result]);
+  // 実際に用いる曜日：ユーザー選択が有効ならそれ、無ければ最も標本数の多い曜日（レンダー時に導出）
+  const effectiveWd = useMemo(() => {
+    if (!result || result.rows.length === 0) return null;
+    if (selectedWd !== null && result.rows.some((r) => r.weekday === selectedWd)) return selectedWd;
+    return [...result.rows].sort((a, b) => b.n - a.n)[0].weekday;
+  }, [result, selectedWd]);
 
   // 分位ビン × 時間軸位置
   const timing = useMemo(() => {
-    if (!resp || resp.bars.length === 0 || startMin === null || endMin === null || selectedWd === null) return null;
-    return computeWindowBinTiming(resp.bars, resp.gmtoffset, startMin, endMin, selectedWd, intervalToMin(interval));
-  }, [resp, startMin, endMin, selectedWd, interval]);
+    if (!resp || resp.bars.length === 0 || startMin === null || endMin === null || effectiveWd === null) return null;
+    return computeWindowBinTiming(resp.bars, resp.gmtoffset, startMin, endMin, effectiveWd);
+  }, [resp, startMin, endMin, effectiveWd]);
 
+  // タイムラインチャート初期化（コンテナがDOMに出現したら生成）
   useEffect(() => {
-    if (!timing || timing.days.length === 0 || !timelineRef.current) return;
-    const init = initCanvas(timelineRef.current, 180);
-    if (init) drawBinTimeline(init.ctx, init.width, init.height, timing);
+    if (!showResult || !tlContainerRef.current) return;
+    const chart = createChart(tlContainerRef.current, {
+      layout: { background: { color: "#ffffff" }, textColor: "#333" },
+      grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
+      width: tlContainerRef.current.clientWidth,
+      height: TL_HEIGHT,
+      crosshair: { mode: 0 },
+      rightPriceScale: { visible: true },
+      timeScale: { timeVisible: false, secondsVisible: false },
+    });
+    tlChartRef.current = chart;
+    const series = chart.addSeries(LineSeries, { color: "#cbd5e1", lineWidth: 1, title: "原系列(終値)" });
+    tlSeriesRef.current = series;
+    tlMarkersRef.current = createSeriesMarkers(series, []);
+
+    const onResize = () => {
+      if (tlContainerRef.current) chart.applyOptions({ width: tlContainerRef.current.clientWidth });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.remove();
+      tlChartRef.current = null;
+      tlSeriesRef.current = null;
+      tlMarkersRef.current = null;
+    };
+  }, [showResult]);
+
+  // タイムラインのデータ＆ビン色マーカー更新
+  useEffect(() => {
+    const series = tlSeriesRef.current;
+    if (!series) return;
+    if (!timing || timing.days.length === 0) {
+      series.setData([]);
+      tlMarkersRef.current?.setMarkers([]);
+      return;
+    }
+    series.setData(
+      timing.seriesDates.filter((s) => s.close > 0).map((s) => ({ time: s.date as Time, value: s.close }))
+    );
+    const markers: SeriesMarker<Time>[] = timing.days.map((d) => ({
+      time: d.date as Time,
+      position: "inBar",
+      color: BIN_COLORS[d.bin] ?? "#9ca3af",
+      shape: "circle",
+      size: 1,
+    }));
+    tlMarkersRef.current?.setMarkers(markers);
+    // 生成時にコンテナが hidden(width=0) だった場合に備え、可視化後の幅を反映
+    if (tlContainerRef.current && tlContainerRef.current.clientWidth > 0) {
+      tlChartRef.current?.applyOptions({ width: tlContainerRef.current.clientWidth });
+    }
+    tlChartRef.current?.timeScale().fitContent();
   }, [timing]);
 
   return (
@@ -252,7 +264,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
             <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
               <span className="font-medium text-gray-700">ビン位置の確認:</span>
               <select
-                value={selectedWd ?? ""}
+                value={effectiveWd ?? ""}
                 onChange={(e) => setSelectedWd(Number(e.target.value))}
                 className="px-2 py-1 border border-gray-300 rounded"
               >
@@ -267,17 +279,20 @@ export default function IntradayWindowChart({ ticker }: Props) {
             <div className="flex items-center gap-3 flex-wrap text-[11px]">
               {BIN_COLORS.map((c, i) => (
                 <span key={i} className="inline-flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: c }} />
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: c }} />
                   <span className="text-gray-600">{BIN_LABELS[i]}リターン</span>
                 </span>
               ))}
-              <span className="text-gray-400">（下=帯／上=終値ライン上のドット）</span>
+              <span className="text-gray-400">（灰=原系列の終値ライン／●=選択曜日の各日をビン色で。ドラッグでパン・ホイールでズーム）</span>
             </div>
+
+            <div
+              ref={tlContainerRef}
+              className={`w-full rounded border border-gray-100 ${timing && timing.days.length > 0 ? "" : "hidden"}`}
+            />
 
             {timing && timing.days.length > 0 ? (
               <>
-                <div className="relative"><canvas ref={timelineRef} /></div>
-
                 {/* ビン別 時間的位置サマリー */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -364,7 +379,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
         </p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>分位ビン（クインタイル）</strong>: その曜日の窓リターンを値の小さい順に並べ、ランクで均等に5分割する。最下位＝下位20%、最上位＝上位20%。各ビンの日数がほぼ等しくなるので時期の偏りを比較しやすい。</li>
-          <li><strong>原系列タイムライン</strong>: 横軸＝暦日。背景の灰色ラインが原系列（日次終値）。その上のドットと下部の帯が、選択曜日の各日を所属ビンの色（赤=最下位〜緑=最上位）で示す。</li>
+          <li><strong>原系列タイムライン</strong>: 横軸＝暦日。背景の灰色ラインが原系列（日次終値）。その上に選択曜日の各日を所属ビンの色（赤=最下位〜緑=最上位）の●で重ねる。チャートは<strong>ホイールでズーム・ドラッグでパン</strong>でき、特定期間を拡大して細かく確認できる。</li>
           <li><strong>重心</strong>: あるビンに属する日の平均日付。ビンの「時間的な中心」を表す。</li>
           <li><strong>時間分布の集中/分散</strong>: ビン内の日付の標準偏差を全期間幅で正規化した値。値が小さい（集中）ほど、その分位の日が特定期間に固まっていることを意味する。直感的には「最上位リターンの月曜が全部この四半期に集中している＝その時期だけのレジーム効果」を見抜くための指標。</li>
         </ul>

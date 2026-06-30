@@ -50,6 +50,18 @@
 - `SeriesMode` でデータ変換（close/logReturn等）
 - `AnalysisGuide` は折りたたみ式パネル（`app/components/analysis/AnalysisGuide.tsx`）
 
+## チャート描画方式の選択（重要）
+
+時系列を「横軸＝時間/日付」で見せるチャートは、**原則 `lightweight-charts` を標準**とする。静的Canvas2Dは画像のように埋め込まれてしまい、ブラウザ拡大ではページ全体が拡大するだけで期間の細部を見られないため、**時間軸方向のズーム/パンが価値を持つチャートにCanvas2Dを使わない**。
+
+- **lightweight-charts を使う**: 横軸が時間・日付の系列（価格ライン、リターン、マーカー、ヒートライン等）。ホイールでズーム・ドラッグでパンが標準で効く。期間の細部を拡大確認できることが必須。
+  - 基本形は `createChart` + `addSeries(LineSeries, …)` + `createSeriesMarkers(series, markers)`。実装の手本は `ConditionMarkerChart.tsx` / `IntradayWindowChart.tsx`。
+  - 初期化は「コンテナがDOMに出現してから」生成する（条件レンダリングするコンテナは `useEffect` の依存に出現フラグを入れる）。`window.resize` で `applyOptions({ width })`、アンマウントで `chart.remove()`。
+  - 複数ペインは `timeScale().subscribeVisibleLogicalRangeChange` で時間軸を相互同期。
+  - 日付の `Time` は `"YYYY-MM-DD"` 文字列。マーカーは系列に存在する時刻にのみ置ける。色はマーカー単位で指定可、`shape`/`position`（inBar/aboveBar/belowBar）で表現。
+- **Canvas2D を使ってよい**: 横軸が時間でない静的図（分布ヒストグラム、散布図、QQ、相関行列、位相空間、ネットワーク、発散バー等）。ズーム不要で一枚絵が適切なもの。
+- v5 API 注意: `series.setMarkers()` は廃止 → `createSeriesMarkers(series, markers)`。`lineWidth` は整数のみ。`HistogramSeries` はマーカー非対応。
+
 ## Canvas描画のパターン
 
 ```typescript

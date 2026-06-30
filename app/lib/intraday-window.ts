@@ -60,7 +60,7 @@ export interface WindowBinTimingResult {
   numBins: number;
   days: DayWindowReturn[];                       // 当該曜日、日付昇順、bin割当済
   bins: ReturnBin[];
-  seriesDates: { ms: number; close: number }[];  // 全営業日の終値（背景ライン用、日付昇順）
+  seriesDates: { date: string; ms: number; close: number }[]; // 全営業日の終値（背景ライン用、日付昇順）
   msMin: number;
   msMax: number;
 }
@@ -167,7 +167,6 @@ export function computeWindowBinTiming(
   startMinute: number,
   endMinute: number,
   weekday: number,
-  binMinutes = 30,
   numBins = 5
 ): WindowBinTimingResult | null {
   const days = groupByDay(bars, gmtoffset);
@@ -177,7 +176,7 @@ export function computeWindowBinTiming(
   const end = Math.max(startMinute, endMinute);
 
   // 背景ライン用：全営業日の終値（日付昇順）
-  const seriesDates = days.map((d) => ({ ms: dateToMs(d.date), close: d.close }));
+  const seriesDates = days.map((d) => ({ date: d.date, ms: dateToMs(d.date), close: d.close }));
   const msMin = seriesDates.length ? seriesDates[0].ms : 0;
   const msMax = seriesDates.length ? seriesDates[seriesDates.length - 1].ms : 0;
 
