@@ -314,7 +314,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const monthBarRef = useRef<HTMLCanvasElement>(null);
   const dowBoxRef = useRef<HTMLCanvasElement>(null);
   const crossHeatRef = useRef<HTMLCanvasElement>(null);
-  const intraweekRef = useRef<HTMLCanvasElement>(null);
   const yearMonthRef = useRef<HTMLCanvasElement>(null);
   const womBarRef = useRef<HTMLCanvasElement>(null);
   const dowCumulRef = useRef<HTMLCanvasElement>(null);
@@ -590,42 +589,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return { years, series };
   }, [days]);
 
-  // === intraweek pattern (月→金 + 翌月: 週末ギャップを含む) ===
-  const intraweekData = useMemo(() => {
-    // 各週を曜日キーの辞書で保持（祝日欠落に頑健 / 翌週月曜の参照に必要）
-    const weeks: Record<number, number>[] = [];
-    let cur: Record<number, number> = {};
-    let started = false;
-    for (const d of days) {
-      if (d.dayOfWeek === 1 && started) { weeks.push(cur); cur = {}; started = false; }
-      if (d.dayOfWeek >= 1 && d.dayOfWeek <= 5) { cur[d.dayOfWeek] = d.closeReturn; started = true; }
-    }
-    if (started) weeks.push(cur);
-
-    const avgCumul: { pos: number; avg: number; weekend: boolean }[] = [];
-    // pos 0..4 = 月火水木金: 月曜起点の週内累積
-    for (let w = 1; w <= 5; w++) {
-      const vals: number[] = [];
-      for (const wk of weeks) {
-        let cum = 0; let ok = false;
-        for (let d = 1; d <= w; d++) { if (wk[d] !== undefined) { cum += wk[d]; ok = true; } }
-        if (ok) vals.push(cum);
-      }
-      if (vals.length > 0) avgCumul.push({ pos: w - 1, avg: mean(vals), weekend: false });
-    }
-    // pos 5 = 翌月: 当週の週内累積(月→金) に 週末ギャップ(=翌週月曜のcloseReturn) を加算
-    const wkVals: number[] = [];
-    for (let i = 0; i < weeks.length - 1; i++) {
-      const wk = weeks[i], nxt = weeks[i + 1];
-      if (nxt[1] === undefined) continue;
-      let cum = 0;
-      for (let d = 1; d <= 5; d++) if (wk[d] !== undefined) cum += wk[d];
-      wkVals.push(cum + nxt[1]);
-    }
-    if (wkVals.length > 0) avgCumul.push({ pos: 5, avg: mean(wkVals), weekend: true });
-    return avgCumul;
-  }, [days]);
-
   // === 曜日トレード: 各戦略の結果 / バイ&ホールド / 全組合せマトリクス ===
   const tradeResults = useMemo<StrategyResult[]>(
     () => specs.map(s => computeStrategy(prices, s, tradeCompound)),
@@ -871,67 +834,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           ctx.textAlign = "center"; ctx.font = "9px sans-serif";
           ctx.fillText((cell.mean * 100).toFixed(2) + "%", x + cellW / 2, y + cellH / 2 + 3);
         }
-      }
-    }
-  }, []);
-
-  // Intraweek pattern (月→金 に 翌月曜=週末ギャップ を追加)
-  const drawIntraweek = useCallback((canvas: HTMLCanvasElement, data: { pos: number; avg: number; weekend: boolean }[]) => {
-    const r = initCanvas(canvas, 180); if (!r) return;
-    const { ctx, width, height } = r;
-    if (data.length < 2) return;
-    const pad = { top: 15, bottom: 25, left: 55, right: 15 };
-    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
-    const maxPos = Math.max(...data.map(d => d.pos), 1); // 5 if 翌月曜あり
-    let minV = Infinity, maxV = -Infinity;
-    for (const p of data) { minV = Math.min(minV, p.avg); maxV = Math.max(maxV, p.avg); }
-    minV = Math.min(minV, 0); maxV = Math.max(maxV, 0);
-    const range = maxV - minV || 0.01;
-    const toY = (v: number) => pad.top + plotH * (1 - (v - minV) / range);
-    const toX = (pos: number) => pad.left + (pos / maxPos) * plotW;
-
-    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(pad.left, toY(0)); ctx.lineTo(width - pad.right, toY(0)); ctx.stroke();
-
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
-    for (let i = 0; i <= 4; i++) {
-      const val = minV + (range * i) / 4;
-      const y = pad.top + plotH * (1 - i / 4);
-      ctx.fillText((val * 100).toFixed(3) + "%", pad.left - 5, y + 3);
-      ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
-    }
-
-    // 金曜(週末をまたぐ前)の位置に縦の区切り線を入れて週末区間を示す
-    const fri = data.find(d => d.pos === 4);
-    if (fri && data.some(d => d.weekend)) {
-      const fx = toX(4);
-      ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
-      ctx.beginPath(); ctx.moveTo(fx, pad.top); ctx.lineTo(fx, pad.top + plotH); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // 平日区間(実線) と 週末区間(破線) を分けて描画
-    for (let i = 1; i < data.length; i++) {
-      const x0 = toX(data[i - 1].pos), y0 = toY(data[i - 1].avg);
-      const x1 = toX(data[i].pos), y1 = toY(data[i].avg);
-      ctx.strokeStyle = data[i].weekend ? "#f59e0b" : "#3b82f6";
-      ctx.lineWidth = 2;
-      ctx.setLineDash(data[i].weekend ? [5, 4] : []);
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    const labels = ["月", "火", "水", "木", "金", "月"];
-    for (let i = 0; i < data.length; i++) {
-      const x = toX(data[i].pos);
-      const y = toY(data[i].avg);
-      const col = data[i].weekend ? "#f59e0b" : "#3b82f6";
-      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#666"; ctx.textAlign = "center"; ctx.font = "10px sans-serif";
-      ctx.fillText(labels[data[i].pos] || "", x, height - 8);
-      if (data[i].weekend) {
-        ctx.fillStyle = "#f59e0b"; ctx.font = "8px sans-serif";
-        ctx.fillText("(翌週)", x, height - 18);
       }
     }
   }, []);
@@ -1457,9 +1359,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       drawCrossHeatmap(crossHeatRef.current, crossStats, DOW_TRADING.map(d => DOW_LABELS[d]), MONTH_LABELS, DOW_TRADING, crossMaxAbs);
     }
 
-    // 5. Intraweek
-    if (intraweekRef.current) drawIntraweek(intraweekRef.current, intraweekData);
-
     // 6. Year x Month
     if (yearMonthRef.current) drawYearMonth(yearMonthRef.current, yearMonthData);
 
@@ -1475,7 +1374,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     if (domBarRef.current) drawDomBar(domBarRef.current, domStats);
     if (seasonRef.current) drawSeasonality(seasonRef.current, seasonality);
     if (yearlyDowRef.current) drawYearlyTrend(yearlyDowRef.current, yearlyDowTrend.series, yearlyDowTrend.years, DOW_COLORS, DOW_LABELS, DOW_TRADING);
-  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, intraweekData, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, yearlyDowTrend, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawIntraweek, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, drawYearlyTrend, getBarData, getBoxData]);
+  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, yearlyDowTrend, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, drawYearlyTrend, getBarData, getBoxData]);
 
   // === Draw interactive distribution explorer ===
   useEffect(() => {
@@ -1816,20 +1715,13 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </AnalysisGuide>
       </div>
 
-      {/* ===== 4. Intraweek pattern ===== */}
-      <div>
-        <div className="text-xs text-gray-500 mb-1">
-          週内パターン (月→金→翌月 平均累積リターン推移)
-          <span className="text-amber-600 ml-1">※金→月の橙破線＝週末ギャップ</span>
-        </div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={intraweekRef} /></div>
-        <AnalysisGuide title="解説: 週内パターン (月→金→翌月 累積推移)">
-          <p><span className="font-medium">何を明らかにするか:</span> 1週間の中で上昇が前半/後半どちらに偏るか、週末の持ち越しでギャップが出やすいか(Weekend/Monday効果)を、月曜起点でそろえた平均累積で可視化します。</p>
-          <p><span className="font-medium">使う数字・数式:</span> 位置 w(月=1..金=5)の値=各週の Σ&#123;d=1..w&#125; r_d(r_d=その曜日の前C→当C)を全週平均。「翌月(橙破線)」=各週の Σ&#123;d=1..5&#125; r_d に翌週月曜の r を足して平均(=金曜終値→翌週月曜終値の週末ギャップを含む)。</p>
-          <p><span className="font-medium">読み方:</span> 青実線(平日)の傾き=週内の上昇の偏り。金→翌月の橙破線が<span className="font-medium">下向き=週末持ち越しでギャップダウンしやすい</span>、上向き=週明けに買われやすい。</p>
-          <p><span className="font-medium">注意:</span> 「典型的な週」の平均像で、個々の週のばらつきは表しません。祝日欠落日はその週でスキップするため位置ごとにNが異なります。</p>
-        </AnalysisGuide>
-      </div>
+      {/* 週内パターン(月→金→翌月の累積)は「曜日エッジスキャン」の週内クロックに集約。
+          そちらは夜間/日中の10素片に分解し、谷=買・山=売の最良窓やエッジの年次推移まで見られる。 */}
+      <p className="text-[11px] text-gray-400">
+        週内の累積リターン経路（夜間/日中の分解・週末ギャップ・谷で買い／山で売り）は
+        <span className="font-medium text-gray-500">「曜日エッジスキャン」の週内クロック</span>
+        に統合しました。
+      </p>
 
       {/* ===== 曜日トレード・シミュレータ ===== */}
       <div className="border border-emerald-100 rounded-lg p-3 bg-emerald-50/30">
