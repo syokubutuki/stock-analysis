@@ -35,22 +35,41 @@ interface Hotspot {
   onClick?: () => void;
 }
 
-function initCanvas(canvas: HTMLCanvasElement, height: number) {
+function initCanvas(canvas: HTMLCanvasElement, height: number, zoom = 1) {
   const parent = canvas.parentElement;
   if (!parent) return null;
-  const width = parent.clientWidth;
+  const width = parent.clientWidth; // 論理幅（スクロールコンテナの表示幅・zoomに依らず一定）
   if (width < 2) return null;
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+  canvas.width = width * dpr * zoom;
+  canvas.height = height * dpr * zoom;
+  canvas.style.width = `${width * zoom}px`;
+  canvas.style.height = `${height * zoom}px`;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.scale(dpr, dpr);
+  // zoom を ctx に載せることで、フォント・線・座標すべてを一括で拡大（描画コードは論理座標のまま）
+  ctx.scale(dpr * zoom, dpr * zoom);
   ctx.fillStyle = "#fafafa";
   ctx.fillRect(0, 0, width, height);
   return { ctx, width, height };
+}
+
+function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number) => void }) {
+  return (
+    <div className="flex items-center gap-1 text-[11px]">
+      <span className="text-gray-400">表示倍率</span>
+      {[1, 1.5, 2, 3].map((z) => (
+        <button
+          key={z}
+          onClick={() => setZoom(z)}
+          className={`px-2 py-0.5 rounded ${zoom === z ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+        >
+          {z === 1 ? "100%" : `${z * 100}%`}
+        </button>
+      ))}
+      {zoom !== 1 && <span className="text-gray-300 ml-1">拡大時は枠内を横スクロール</span>}
+    </div>
+  );
 }
 
 const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
@@ -411,6 +430,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   const hotspotsRef = useRef<Hotspot[]>([]);
 
   const [view, setView] = useState<View>("path");
+  const [zoom, setZoom] = useState(1); // 描画倍率（キャンバスを大きく再描画して細部を拡大）
   const [showCond, setShowCond] = useState(false); // 条件入力パネル（初期は折り畳み）
   const [entryDow, setEntryDow] = useState(1);
   const [sig, setSig] = useState<Signature>("intraday");
@@ -439,28 +459,30 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   useEffect(() => {
     hotspotsRef.current = [];
     if (view === "path" && result && pathRef.current) {
-      const init = initCanvas(pathRef.current, 264);
+      const init = initCanvas(pathRef.current, 264, zoom);
       if (init) drawPaths(init.ctx, init.width, init.height, result, hotspotsRef.current, (rank) => { setDrillRank(rank); setDrillCell(null); });
     } else if (view === "pivot" && pivot && pivotRef.current) {
-      const init = initCanvas(pivotRef.current, 56 + pivot.yOrder.length * 48);
+      const init = initCanvas(pivotRef.current, 56 + pivot.yOrder.length * 48, zoom);
       if (init) drawPivot(init.ctx, init.width, init.height, pivot, hotspotsRef.current, (key) => setDrillCell(key));
     } else if (view === "matrix" && matrix && matrixRef.current) {
-      const init = initCanvas(matrixRef.current, 52 + matrix.dows.length * 42);
+      const init = initCanvas(matrixRef.current, 52 + matrix.dows.length * 42, zoom);
       if (init) drawMatrix(init.ctx, init.width, init.height, matrix, hotspotsRef.current, (d, bi) => { setEntryDow(d); setDrillRank(bi); setDrillCell(null); setView("path"); if (exitKind === "weekday" && exitDow <= d) { if (d >= 5) { setExitKind("nextweek"); setExitDow(1); } else setExitDow(5); } });
     }
-  }, [view, result, pivot, matrix]);
+  }, [view, result, pivot, matrix, zoom]);
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    // cssX/Y はスクロールコンテンツ内の表示座標（ツールチップ配置用）、mx/my は論理座標（当たり判定用）
+    const cssX = e.clientX - rect.left, cssY = e.clientY - rect.top;
+    const mx = cssX / zoom, my = cssY / zoom;
     const hs = hotspotsRef.current.find((h) => mx >= h.x && mx <= h.x + h.w && my >= h.y && my <= h.y + h.h);
-    if (hs) setTip({ left: mx, top: my, text: hs.tip });
+    if (hs) setTip({ left: cssX, top: cssY, text: hs.tip });
     else setTip(null);
     e.currentTarget.style.cursor = hs?.onClick ? "pointer" : "default";
   };
   const onClickCanvas = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const mx = (e.clientX - rect.left) / zoom, my = (e.clientY - rect.top) / zoom;
     const hs = hotspotsRef.current.find((h) => mx >= h.x && mx <= h.x + h.w && my >= h.y && my <= h.y + h.h);
     hs?.onClick?.();
   };
@@ -579,7 +601,8 @@ export default function WeekdayConditionalChart({ prices }: Props) {
             </div>
           )}
 
-          <div className="relative">
+          <ZoomBar zoom={zoom} setZoom={setZoom} />
+          <div className="relative overflow-auto">
             <canvas ref={pathRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[280px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
@@ -640,7 +663,8 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         <p className="text-xs text-gray-400">この条件では標本が不足しています。</p>
       ) : (
         <>
-          <div className="relative">
+          <ZoomBar zoom={zoom} setZoom={setZoom} />
+          <div className="relative overflow-auto">
             <canvas ref={pivotRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[300px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
@@ -666,7 +690,8 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         <p className="text-xs text-gray-400">この条件では標本が不足しています。</p>
       ) : (
         <>
-          <div className="relative">
+          <ZoomBar zoom={zoom} setZoom={setZoom} />
+          <div className="relative overflow-auto">
             <canvas ref={matrixRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[300px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
