@@ -618,6 +618,34 @@ const IntradayWindowChart = dynamic(
   () => import("./components/analysis/IntradayWindowChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const UsBetaChart = dynamic(
+  () => import("./components/analysis/UsBetaChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsPathChart = dynamic(
+  () => import("./components/analysis/UsPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsAbsorptionChart = dynamic(
+  () => import("./components/analysis/UsAbsorptionChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsVolSpilloverChart = dynamic(
+  () => import("./components/analysis/UsVolSpilloverChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsTimingEdgeChart = dynamic(
+  () => import("./components/analysis/UsTimingEdgeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsLeadLagChart = dynamic(
+  () => import("./components/analysis/UsLeadLagChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsDriverChart = dynamic(
+  () => import("./components/analysis/UsDriverChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const ShortTermReversalChart = dynamic(
   () => import("./components/analysis/ShortTermReversalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1363,6 +1391,14 @@ export default function AnalysisPage() {
                   <GapIntradayChart ticker={data.ticker} />
                   <SignalIntradayChart ticker={data.ticker} />
                   <SignalExecutionChart prices={allPrices} ticker={data.ticker} />
+                  {/* 前夜米国 → 当日日中 スピルオーバー7手法 */}
+                  <UsDriverChart ticker={data.ticker} />
+                  <UsBetaChart ticker={data.ticker} />
+                  <UsPathChart ticker={data.ticker} />
+                  <UsAbsorptionChart ticker={data.ticker} />
+                  <UsLeadLagChart ticker={data.ticker} />
+                  <UsVolSpilloverChart ticker={data.ticker} />
+                  <UsTimingEdgeChart ticker={data.ticker} />
                 </>
               )}
 
