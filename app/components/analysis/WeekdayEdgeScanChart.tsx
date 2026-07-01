@@ -67,6 +67,13 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
   const nSignificant = useMemo(() => scan.stats.filter((s) => s.pAdj < 0.05).length, [scan.stats]);
 
+  // 週内クロックの標本規模: 各曜日(夜間素片)のnが対象週数、その総和が対象営業日数
+  const clockSample = useMemo(() => {
+    const counts = atomAnalysis.atoms.filter((a) => a.kind === "overnight").map((a) => a.n);
+    const totalDays = counts.reduce((s, v) => s + v, 0);
+    return { totalDays, minN: Math.min(...counts), maxN: Math.max(...counts) };
+  }, [atomAnalysis]);
+
   // === エッジ・スペクトル(10素片の平均±SEと有意性) ===
   const drawSpectrum = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[]) => {
     const r = initCanvas(canvas, 220); if (!r) return;
@@ -265,7 +272,12 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
       {/* ===== (A) 週内クロック ===== */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">週内クロック: 素片を時間順に積み上げた累積平均リターン(谷で買い・山で売り)</div>
+        <div className="text-xs text-gray-500 mb-1">
+          週内クロック: 素片を時間順に積み上げた累積平均リターン(谷で買い・山で売り)
+          <span className="text-gray-400">
+            {" "}｜対象 {clockSample.totalDays.toLocaleString()} 営業日（各曜日 n={clockSample.minN}〜{clockSample.maxN} 週）から算出
+          </span>
+        </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={clockRef} /></div>
         <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           {bl && (
