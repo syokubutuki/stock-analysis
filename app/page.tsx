@@ -646,6 +646,18 @@ const UsDriverChart = dynamic(
   () => import("./components/analysis/UsDriverChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const UsHoldingPeriodChart = dynamic(
+  () => import("./components/analysis/UsHoldingPeriodChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsDigestionBoundaryChart = dynamic(
+  () => import("./components/analysis/UsDigestionBoundaryChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsEventTimeChart = dynamic(
+  () => import("./components/analysis/UsEventTimeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const ShortTermReversalChart = dynamic(
   () => import("./components/analysis/ShortTermReversalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -770,6 +782,19 @@ const StatePredictabilityChart = dynamic(
   () => import("./components/analysis/StatePredictabilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+// エッジ探索セクション
+const InteractionScanChart = dynamic(
+  () => import("./components/analysis/InteractionScanChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RegimeEdgeMapChart = dynamic(
+  () => import("./components/analysis/RegimeEdgeMapChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const WalkForwardChart = dynamic(
+  () => import("./components/analysis/WalkForwardChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const WeekdayConditionalChart = dynamic(
   () => import("./components/analysis/WeekdayConditionalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -855,6 +880,7 @@ type SectionKey =
   | "fractal"
   | "network"
   | "conditional"
+  | "edge"
   | "calendar"
   | "regime"
   | "causal"
@@ -877,6 +903,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・ローリングHurst+サロゲート帯・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
   { key: "conditional", label: "条件付き分析", description: "状態→先行きリターン表（RSI/ボラ/トレンド別の条件付き期待値・有意性・年次持続性）" },
+  { key: "edge", label: "エッジ探索", description: "条件ペア交互作用スキャン・レジーム別エッジマップ・ウォークフォワード頑健性・シグナル合成" },
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
   { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
@@ -1368,6 +1395,14 @@ export default function AnalysisPage() {
                 </>
               )}
 
+              {activeSection === "edge" && (
+                <>
+                  <InteractionScanChart prices={filteredPrices} />
+                  <RegimeEdgeMapChart prices={filteredPrices} />
+                  <WalkForwardChart prices={filteredPrices} />
+                </>
+              )}
+
               {activeSection === "calendar" && (
                 <>
                   <SpiralHeatmap prices={filteredPrices} period={period} />
@@ -1399,6 +1434,10 @@ export default function AnalysisPage() {
                   <UsLeadLagChart ticker={data.ticker} />
                   <UsVolSpilloverChart ticker={data.ticker} />
                   <UsTimingEdgeChart ticker={data.ticker} />
+                  {/* 消化時間エッジ探索(保有期間・消化境界・イベント時間) */}
+                  <UsHoldingPeriodChart ticker={data.ticker} />
+                  <UsDigestionBoundaryChart ticker={data.ticker} />
+                  <UsEventTimeChart ticker={data.ticker} />
                 </>
               )}
 

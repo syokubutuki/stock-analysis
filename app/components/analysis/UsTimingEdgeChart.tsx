@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { computeTiming, binCounts, TimingResult } from "../../lib/us-spillover-timing";
+import { computeTiming, binCounts, maxStatPermutation, TimingResult, MaxStatResult } from "../../lib/us-spillover-timing";
 import { BinScheme } from "../../lib/us-spillover-core";
 import { useAlignedDays, UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import {
@@ -58,6 +58,22 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
     [data, scheme, selBinSafe]
   );
 
+  // 機能8: 族補正(max統計順列)。重いのでボタン起動。パラメータkeyで結果の陳腐化を判定(effectでsetStateしない)。
+  const permKey = `${usTicker}|${interval}|${scheme}|${selBinSafe}`;
+  const [perm, setPerm] = useState<{ key: string; res: MaxStatResult | null }>({ key: "", res: null });
+  const [permBusy, setPermBusy] = useState(false);
+  const permShown = perm.key === permKey ? perm.res : null;
+  const runPerm = () => {
+    if (!data) return;
+    setPermBusy(true);
+    // 同期計算だがUIにbusyを反映させるため次フレームで実行
+    requestAnimationFrame(() => {
+      const r = maxStatPermutation(data.aligned, data.grid, data.gmtoffset, scheme, selBinSafe, 300);
+      setPerm({ key: permKey, res: r });
+      setPermBusy(false);
+    });
+  };
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const G = result.timeLabels.length;
@@ -102,6 +118,24 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
       {result && (
         <>
           <div className="relative"><canvas ref={canvasRef} /></div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={runPerm}
+              disabled={permBusy}
+              className="px-2 py-0.5 text-xs rounded bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              {permBusy ? "検定中…" : "族補正(max統計順列)を実行"}
+            </button>
+            {permShown && (
+              <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium ${
+                permShown.p < 0.05 ? "bg-green-100 text-green-700 border-green-300" : "bg-gray-100 text-gray-500 border-gray-300"}`}>
+                {permShown.p < 0.05 ? "族補正後も有意" : "族補正では非有意"}
+                <span className="opacity-70">p={permShown.p < 0.001 ? "<.001" : permShown.p.toFixed(3)}・max|t|={permShown.obsMaxT.toFixed(2)}</span>
+              </span>
+            )}
+            <span className="text-[11px] text-gray-400">全窓の最大|t|の帰無分布で、最良窓が偶然でないかを1検定で判定（FDRより厳格）</span>
+          </div>
 
           <div className="space-y-1">
             <div className="text-xs font-medium text-gray-700">{result.binLabel} の翌日・好機タイミング上位（FDR有意）</div>
