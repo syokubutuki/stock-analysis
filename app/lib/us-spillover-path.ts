@@ -20,10 +20,20 @@ export interface PathBin {
   endP: number; // 終端が0と異なるかのt検定p値
 }
 
+// 原系列タイムライン用: 整合できた各JP立会日と、その前夜米国リターンで割り当てたビン。
+export interface PathDay {
+  date: string; // JP立会日 YYYY-MM-DD(原系列上の位置)
+  close: number; // JP日次終値(原系列ライン)
+  bin: number; // 前夜米国リターンで割り当てたビン番号
+  usDate: string; // 対応する前夜の米国立会日
+  usRet: number; // 前夜米国の対数リターン
+}
+
 export interface PathResult {
   bins: PathBin[];
   timeLabels: string[];
   maxAbs: number; // 縦軸スケール
+  days: PathDay[]; // 整合各日のビン所属(原系列色分け用)、JP日付昇順
 }
 
 export function computePaths(
@@ -37,6 +47,13 @@ export function computePaths(
 
   const byBin: number[][][] = Array.from({ length: meta.count }, () => []);
   rows.forEach((a, i) => byBin[binIdx[i]].push(dayCumPath(a.jp, grid, gmtoffset)));
+
+  // 原系列(JP日次終値)上での色分け用に、各整合日のビン所属を日付昇順で保持。
+  const days: PathDay[] = rows
+    .map((a, i) => ({
+      date: a.jp.date, close: a.jp.close, bin: binIdx[i], usDate: a.us.date, usRet: a.us.ret,
+    }))
+    .sort((p, q) => p.date.localeCompare(q.date));
 
   const bins: PathBin[] = [];
   let maxAbs = 1e-6;
@@ -58,5 +75,5 @@ export function computePaths(
       path, lo, hi, endMean: path[G - 1], endP: tt ? tt.p : 1,
     });
   }
-  return { bins, timeLabels: grid.bins.map((x) => x.label), maxAbs };
+  return { bins, timeLabels: grid.bins.map((x) => x.label), maxAbs, days };
 }

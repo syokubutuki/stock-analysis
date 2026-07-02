@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createChart,
+  LineSeries,
+  createSeriesMarkers,
+  type IChartApi,
+  type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
+  type Time,
+} from "lightweight-charts";
 import { computePaths, PathResult } from "../../lib/us-spillover-path";
 import { BinScheme } from "../../lib/us-spillover-core";
 import { useAlignedDays, UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
@@ -67,17 +77,79 @@ export default function UsPathChart({ ticker }: Props) {
   const [showBand, setShowBand] = useState(true);
   const { data, loading, error } = useAlignedDays(ticker, interval, usTicker);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // ビン所属 × 原系列タイムライン(ズーム/パン可能な lightweight-charts)
+  const tlContainerRef = useRef<HTMLDivElement>(null);
+  const tlChartRef = useRef<IChartApi | null>(null);
+  const tlSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const tlMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   const result: PathResult | null = useMemo(
     () => (data ? computePaths(data.aligned, data.grid, data.gmtoffset, scheme) : null),
     [data, scheme]
   );
+  const showResult = !!result;
 
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 260);
     if (init) drawPaths(init.ctx, init.width, init.height, result, showBand);
   }, [result, showBand]);
+
+  // タイムラインチャート初期化(コンテナがDOMに出現したら生成)
+  useEffect(() => {
+    if (!showResult || !tlContainerRef.current) return;
+    const chart = createChart(tlContainerRef.current, {
+      layout: { background: { color: "#ffffff" }, textColor: "#333" },
+      grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
+      width: tlContainerRef.current.clientWidth,
+      height: 240,
+      crosshair: { mode: 0 },
+      rightPriceScale: { visible: true },
+      timeScale: { timeVisible: false, secondsVisible: false },
+    });
+    tlChartRef.current = chart;
+    const series = chart.addSeries(LineSeries, { color: "#cbd5e1", lineWidth: 1, title: "原系列(終値)" });
+    tlSeriesRef.current = series;
+    tlMarkersRef.current = createSeriesMarkers(series, []);
+
+    const onResize = () => {
+      if (tlContainerRef.current) chart.applyOptions({ width: tlContainerRef.current.clientWidth });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.remove();
+      tlChartRef.current = null;
+      tlSeriesRef.current = null;
+      tlMarkersRef.current = null;
+    };
+  }, [showResult]);
+
+  // タイムラインのデータ＆ビン色マーカー更新(前夜米国ビンで各JP立会日を色分け)
+  useEffect(() => {
+    const series = tlSeriesRef.current;
+    if (!series) return;
+    if (!result || result.days.length === 0) {
+      series.setData([]);
+      tlMarkersRef.current?.setMarkers([]);
+      return;
+    }
+    series.setData(
+      result.days.filter((d) => d.close > 0).map((d) => ({ time: d.date as Time, value: d.close }))
+    );
+    const markers: SeriesMarker<Time>[] = result.days.map((d) => ({
+      time: d.date as Time,
+      position: "inBar",
+      color: result.bins[d.bin]?.color ?? "#9ca3af",
+      shape: "circle",
+      size: 1,
+    }));
+    tlMarkersRef.current?.setMarkers(markers);
+    if (tlContainerRef.current && tlContainerRef.current.clientWidth > 0) {
+      tlChartRef.current?.applyOptions({ width: tlContainerRef.current.clientWidth });
+    }
+    tlChartRef.current?.timeScale().fitContent();
+  }, [result]);
 
   const usLabel = US_DRIVERS.find((d) => d.ticker === usTicker)?.label ?? usTicker;
 
@@ -147,6 +219,34 @@ export default function UsPathChart({ ticker }: Props) {
             各線は前夜 {usLabel} のビンに属する日の、寄り基準の平均累積リターン。右肩上がり＝日中も買われる、
             寄り直後にピークを打って垂れる＝寄り天フェード。
           </p>
+
+          {/* ── ビン所属 × 原系列タイムライン ── */}
+          <div className="pt-3 border-t border-gray-100 space-y-3">
+            <div className="text-xs text-gray-600">
+              <span className="font-medium text-gray-700">ビン所属の確認:</span>{" "}
+              <span className="text-gray-400">
+                前夜 {usLabel} の各ビンに属するJP立会日が、原系列（対象銘柄の日次終値）のどこに位置するかを色分け表示。
+                ホイールでズーム・ドラッグでパン。
+              </span>
+            </div>
+
+            {/* ビン凡例 */}
+            <div className="flex items-center gap-3 flex-wrap text-[11px]">
+              {result.bins.map((b) => (
+                <span key={b.bin} className="inline-flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: b.color }} />
+                  <span className="text-gray-600">{b.label}</span>
+                </span>
+              ))}
+              <span className="text-gray-400">（灰=原系列の終値ライン／●=各JP立会日を前夜米国ビン色で）</span>
+            </div>
+
+            <div ref={tlContainerRef} className="w-full rounded border border-gray-100" />
+            <p className="text-[11px] text-gray-400">
+              特定色（例 米大幅高）が一部期間に固まっていれば、そのビンの平均パスはその時期のレジームが作った
+              見かけのエッジの可能性。全期間に均等に散らばっているほど、米国→日中の連動は時期によらず安定。
+            </p>
+          </div>
         </>
       )}
 
@@ -181,7 +281,18 @@ export default function UsPathChart({ ticker }: Props) {
           <li>方法2のβと併読: βで方向、パスでタイミングを決める。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
+        <p className="font-medium text-gray-700 mt-3">5. ビン所属 × 原系列タイムライン（偏りの確認）</p>
+        <p>
+          {"平均パスは『そのビンに属する全日を通算した1本の形』であり、その日々が暦のどこに散らばっているか（全期間で安定なのか、特定時期に偏って生まれたのか）は見えない。そこで整合できた各JP立会日を、前夜米国リターンで割り当てたビンの色（赤=米大幅安〜緑=米大幅高）の●で、原系列（対象銘柄の日次終値ライン）上に直接プロットする。"}
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>横軸＝暦日</strong>。背景の灰ラインが原系列（日次終値）。その上に各立会日を所属ビン色の●で重ねる。ホイールでズーム・ドラッグでパンして特定期間を拡大できる。</li>
+          <li>色は方法1の平均パスの線色と同一（同じビン＝同じ色）なので、上の平均パスとタイムラインを見比べられる。</li>
+          <li><strong>均等に散らばる</strong>: そのビン（例 米大幅高翌日）の連動エッジは時期によらず安定 → 実運用で信頼しやすい。</li>
+          <li><strong>一部期間に固まる</strong>: そのビンの平均パスは、その時期の相場レジームが作った見かけのエッジの可能性 → 直近で再現するとは限らない。背景の終値ラインと重ねれば「上昇局面でだけ米大幅高が続いた」等、地合いとの連動も確認できる。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>分位を細かくするほど1ビンの日数が減り、パスがギザつく。5/15分足は約60日しか取れないため、5分位×多足だと各ビン数日になり不安定。</li>
           <li>平均パスは外れ値(大事件の日)に引っ張られる。帯の広がりで信頼度を確認する。</li>
