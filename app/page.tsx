@@ -626,6 +626,10 @@ const UsPathChart = dynamic(
   () => import("./components/analysis/UsPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const WeekdayIntradayPathChart = dynamic(
+  () => import("./components/analysis/WeekdayIntradayPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const UsAbsorptionChart = dynamic(
   () => import("./components/analysis/UsAbsorptionChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1418,6 +1422,7 @@ export default function AnalysisPage() {
                   <TodayBinChart prices={filteredPrices} />
                   <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
+                  <WeekdayIntradayPathChart ticker={data.ticker} />
                   <HighLowTimingChart ticker={data.ticker} />
                   <ExecutionTimingChart ticker={data.ticker} />
                   <EdgeDiscountChart prices={allPrices} ticker={data.ticker} />
