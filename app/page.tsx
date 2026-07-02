@@ -795,6 +795,10 @@ const WalkForwardChart = dynamic(
   () => import("./components/analysis/WalkForwardChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const SignalStackingChart = dynamic(
+  () => import("./components/analysis/SignalStackingChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const WeekdayConditionalChart = dynamic(
   () => import("./components/analysis/WeekdayConditionalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1400,6 +1404,7 @@ export default function AnalysisPage() {
                   <InteractionScanChart prices={filteredPrices} />
                   <RegimeEdgeMapChart prices={filteredPrices} />
                   <WalkForwardChart prices={filteredPrices} />
+                  <SignalStackingChart prices={filteredPrices} />
                 </>
               )}
 
