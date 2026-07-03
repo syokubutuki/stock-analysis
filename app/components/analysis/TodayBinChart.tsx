@@ -13,6 +13,7 @@ import {
   TodayBin,
   Occurrence,
   WeekdayBreakdown,
+  EntryTiming,
   entryLabel,
   horizonLabel,
 } from "../../lib/today-bin";
@@ -350,14 +351,18 @@ function OccurrenceTable({ occ }: { occ: Occurrence[] }) {
 }
 
 // ---------- 曜日内訳ヒートマップ（今日のビンを月〜金で分解） ----------
-function WeekdayBreakdownPanel({ rows, todayDow, baselineMean }: { rows: WeekdayBreakdown[]; todayDow: number | null; baselineMean: number }) {
+function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLabel: hLabel }: { rows: WeekdayBreakdown[]; todayDow: number | null; baselineMean: number; entry: EntryTiming; horizonLabel: string }) {
   const maxAbs = Math.max(1e-9, ...rows.map((r) => (r.n > 0 ? Math.abs(r.meanFwd) : 0)));
   const best = rows.reduce<WeekdayBreakdown | null>((acc, r) => (r.n >= 5 && (!acc || r.meanFwd > acc.meanFwd) ? r : acc), null);
   const worst = rows.reduce<WeekdayBreakdown | null>((acc, r) => (r.n >= 5 && (!acc || r.meanFwd < acc.meanFwd) ? r : acc), null);
+  const entryGlyph = entry === "open" ? "寄" : "引"; // 建て時刻（決済は常に引け）
   return (
     <div>
       <p className="text-[11px] text-gray-500 mb-1">
-        このビンを曜日で分解（全日共通ビン境界・◀=今日／青枠=今日の曜日／基準 全日平均{fmtPct(baselineMean)}）
+        このビンを曜日で分解：<span className="inline-flex items-center gap-0.5 rounded bg-white/70 border border-gray-200 px-1 font-medium text-gray-600">{entryGlyph}<span className="text-gray-400">▸</span>引</span>{" "}
+        各曜日に<span className="font-medium text-gray-600">{entryLabel(entry)}建て→{hLabel}まで</span>持ったときの平均リターン
+        （その日を<em className="not-italic font-medium">起点にした先行き</em>。週内クロックの“水準”とは別物）。
+        <br />全日共通ビン境界・◀=今日／青枠=今日の曜日／基準 全日平均{fmtPct(baselineMean)}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-[11px] text-center">
@@ -376,7 +381,9 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean }: { rows: Weekday
           </thead>
           <tbody>
             <tr>
-              <td className="px-1 py-0.5 text-left text-gray-400">平均</td>
+              <td className="px-1 py-0.5 text-left text-gray-500 whitespace-nowrap" title={`各曜日に${entryLabel(entry)}建て→${hLabel}の平均リターン`}>
+                <span className="text-gray-400">{entryGlyph}▸引</span> 平均
+              </td>
               {rows.map((r) => (
                 <td key={r.dow} className={`px-1 py-0.5 font-medium tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}
                   style={{ background: r.n >= 3 ? retBg(r.meanFwd, maxAbs) : "#f9fafb", color: r.n >= 3 ? "#1f2937" : "#d1d5db" }}>
@@ -611,7 +618,7 @@ export default function TodayBinChart({ prices }: Props) {
             <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3 space-y-3">
               <p className="text-xs font-bold text-indigo-900">深掘り: {activeBin.label}{activeBin.idx === res.todayBinIdx ? "（今日のビン）" : ""}</p>
               <div className="grid md:grid-cols-2 gap-4">
-                <WeekdayBreakdownPanel rows={activeBin.byWeekday} todayDow={activeBin.idx === res.todayBinIdx ? res.todayDow : null} baselineMean={res.baselineMean} />
+                <WeekdayBreakdownPanel rows={activeBin.byWeekday} todayDow={activeBin.idx === res.todayBinIdx ? res.todayDow : null} baselineMean={res.baselineMean} entry={res.entry} horizonLabel={res.horizonLabel} />
                 <OccurrenceTable occ={activeBin.occurrences} />
               </div>
             </div>
@@ -657,6 +664,7 @@ export default function TodayBinChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li>深掘りパネルの<strong>曜日内訳</strong>は、選択ビン（既定=今日のビン）の発生日を月〜金で割り、各曜日の平均・勝率・nを並べる。<strong>ビン境界は全日共通のまま</strong>なので5曜日を横並びで直接比較できる。</li>
           <li>「今日は火曜・窓は上位ビン。だが上位ビンは<strong>木曜だけ効いて月曜は死んでいる</strong>」のような曜日固有の癖に一目で気づける。今日の曜日は青枠＋◀で強調。</li>
+          <li className="text-gray-600"><strong>重要</strong>: ここの「平均」は<strong>その曜日に建てた後の先行きリターン（増分）</strong>であって、週内クロックのような<strong>月曜始値からの累積“水準”ではない</strong>。両者は別物なので、たとえば「週内クロックで月曜が週の谷（水準が最も低い）」なのに「この曜日内訳で月曜が最強（先行きが最大）」になるのは矛盾しない——谷で建てて上昇分を取れるから、むしろ整合する。</li>
           <li>曜日で割ると標本が細るため、n小の曜日は参考。曜日を軸に建て→週内パスや2軸で深掘りしたいときは別コンポーネント「曜日 × 値動きビン 条件付き分析」へ。</li>
         </ul>
 
