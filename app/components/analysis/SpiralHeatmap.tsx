@@ -1,6 +1,13 @@
 "use client";
 
 import React, { useMemo, useCallback, useRef, useEffect, useState } from "react";
+import {
+  createChart,
+  LineSeries,
+  type IChartApi,
+  type ISeriesApi,
+  type Time,
+} from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
@@ -46,6 +53,21 @@ const TIMING_COMBOS: [Timing, Timing][] = [
 function specLabel(s: TradeSpec): string {
   const dow = ["", "月", "火", "水", "木", "金"];
   return `${dow[s.entryDow]}${TIMING_LABEL[s.entryTiming]}→${dow[s.exitDow]}${TIMING_LABEL[s.exitTiming]}${s.side === "short" ? " [売]" : ""}`;
+}
+// EquityPoint.t は "YYYY-MM-DD" を UTC 深夜として解釈した ms（weekday-trade.ts の toDayPts と同じ）。
+// lightweight-charts の日付 Time("YYYY-MM-DD") へ UTC で往復変換する。
+function msToYmd(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+// lightweight-charts は時刻が厳密に昇順かつ重複なしであることを要求する。
+// 同一日に複数点が来た場合は後勝ちで潰し、昇順に整える。
+function toEquityRows(pts: EquityPoint[]): { time: Time; value: number }[] {
+  const byDay = new Map<string, number>();
+  for (const p of pts) byDay.set(msToYmd(p.t), p.v);
+  return [...byDay.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([time, value]) => ({ time: time as Time, value }));
 }
 function sameSpec(a: TradeSpec, b: TradeSpec): boolean {
   return a.entryDow === b.entryDow && a.exitDow === b.exitDow
@@ -344,7 +366,10 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   }, []);
 
   // === 曜日トレード・シミュレータ state ===
-  const tradeEquityRef = useRef<HTMLCanvasElement>(null);
+  // エクイティ曲線は横軸=日付の時系列なので、ズーム/パン可能な lightweight-charts で描画する。
+  const equityContainerRef = useRef<HTMLDivElement>(null);
+  const equityChartRef = useRef<IChartApi | null>(null);
+  const equitySeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const tradeMatrixRef = useRef<HTMLCanvasElement>(null);
   // 編集中のスペック（ビルダー）
   const [builder, setBuilder] = useState<TradeSpec>({ entryDow: 1, entryTiming: "close", exitDow: 2, exitTiming: "close", side: "long" });
@@ -1166,76 +1191,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
   }, []);
 
-  // 曜日トレード: エクイティカーブ（複数戦略 + バイ&ホールド）
-  const drawEquityCurves = useCallback((
-    canvas: HTMLCanvasElement,
-    bh: EquityPoint[],
-    strategies: { label: string; color: string; points: EquityPoint[] }[],
-  ) => {
-    const r = initCanvas(canvas, 260); if (!r) return;
-    const { ctx, width, height } = r;
-    const pad = { top: 15, bottom: 38, left: 55, right: 15 };
-    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
-    const allPts = [...bh, ...strategies.flatMap(s => s.points)];
-    if (allPts.length < 2) {
-      ctx.fillStyle = "#9ca3af"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("トレードが成立していません", width / 2, height / 2);
-      return;
-    }
-    let tMin = Infinity, tMax = -Infinity, vMin = 0, vMax = 0;
-    for (const p of allPts) { tMin = Math.min(tMin, p.t); tMax = Math.max(tMax, p.t); vMin = Math.min(vMin, p.v); vMax = Math.max(vMax, p.v); }
-    const tRange = tMax - tMin || 1, vRange = vMax - vMin || 0.01;
-    const toX = (t: number) => pad.left + ((t - tMin) / tRange) * plotW;
-    const toY = (v: number) => pad.top + plotH * (1 - (v - vMin) / vRange);
-
-    // y grid + labels (%)
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
-    for (let i = 0; i <= 5; i++) {
-      const val = vMin + (vRange * i) / 5;
-      const y = pad.top + plotH * (1 - i / 5);
-      ctx.fillText((val * 100).toFixed(0) + "%", pad.left - 5, y + 3);
-      ctx.strokeStyle = val === 0 ? "#d1d5db" : "#f0f0f0"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
-    }
-    // zero line emphasis
-    if (vMin <= 0 && vMax >= 0) {
-      const zy = toY(0);
-      ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zy); ctx.lineTo(width - pad.right, zy); ctx.stroke();
-    }
-    // x date labels (start / mid / end)
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
-    for (let i = 0; i <= 4; i++) {
-      const t = tMin + (tRange * i) / 4;
-      const x = pad.left + (plotW * i) / 4;
-      const d = new Date(t);
-      ctx.fillText(`${d.getFullYear()}/${d.getMonth() + 1}`, x, height - 26);
-    }
-
-    // buy & hold (grey, behind)
-    ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5; ctx.beginPath();
-    for (let i = 0; i < bh.length; i++) { const x = toX(bh[i].t), y = toY(bh[i].v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
-    ctx.stroke();
-
-    // strategies
-    for (const s of strategies) {
-      if (s.points.length < 2) continue;
-      ctx.strokeStyle = s.color; ctx.lineWidth = 1.5; ctx.beginPath();
-      for (let i = 0; i < s.points.length; i++) { const x = toX(s.points[i].t), y = toY(s.points[i].v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
-      ctx.stroke();
-    }
-
-    // legend
-    ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
-    const legendItems = [{ label: "バイ&ホールド", color: "#9ca3af" }, ...strategies];
-    for (const it of legendItems) {
-      ctx.strokeStyle = it.color; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(lx, height - 6); ctx.lineTo(lx + 14, height - 6); ctx.stroke();
-      ctx.fillStyle = "#666"; ctx.fillText(it.label, lx + 17, height - 3);
-      lx += ctx.measureText(it.label).width + 32;
-      if (lx > width - 80) { lx = pad.left; }
-    }
-  }, []);
-
   // 曜日トレード: 注文タイミング全4通り(始値/終値 × 始値/終値)の
   // (エントリー曜日 × エグジット曜日)ヒートマップを描画。
   // 幅が広ければ2列、狭い端末(スマホ)では1列に縦積みして重なりを防ぐ。
@@ -1414,20 +1369,80 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     if (distRef.current) drawDistribution(distRef.current, distGroups, distShowHist, distShowNormal);
   }, [distGroups, distShowHist, distShowNormal, drawDistribution]);
 
-  // === Draw 曜日トレード・シミュレータ ===
+  // 表示中のエクイティ系列（B&H + 戦略 or 連結プラン）をまとめる。
+  const equitySeriesData = useMemo(() => {
+    const strategies = planMode
+      ? [{ label: "週内プラン(連結)", color: "#059669", points: planResult.equity }]
+      : tradeResults.map((res, i) => ({
+          label: specLabel(specs[i]),
+          color: STRAT_COLORS[i % STRAT_COLORS.length],
+          points: res.equity,
+        }));
+    return { strategies };
+  }, [planMode, planResult, tradeResults, specs]);
+
+  // === エクイティ曲線チャートの生成（コンテナ出現後に1度だけ） ===
   useEffect(() => {
-    if (tradeEquityRef.current) {
-      const strategies = planMode
-        ? [{ label: "週内プラン(連結)", color: "#059669", points: planResult.equity }]
-        : tradeResults.map((res, i) => ({
-            label: specLabel(specs[i]),
-            color: STRAT_COLORS[i % STRAT_COLORS.length],
-            points: res.equity,
-          }));
-      drawEquityCurves(tradeEquityRef.current, bhEquity, strategies);
+    if (days.length === 0 || !equityContainerRef.current) return;
+    const chart = createChart(equityContainerRef.current, {
+      layout: { background: { color: "#ffffff" }, textColor: "#333" },
+      grid: { vertLines: { color: "#f5f5f5" }, horzLines: { color: "#f0f0f0" } },
+      width: equityContainerRef.current.clientWidth,
+      height: 260,
+      crosshair: { mode: 0 },
+      rightPriceScale: { visible: true },
+      localization: { priceFormatter: (v: number) => `${(v * 100).toFixed(1)}%` },
+      timeScale: { timeVisible: false, secondsVisible: false },
+    });
+    equityChartRef.current = chart;
+    const onResize = () => {
+      if (equityContainerRef.current) chart.applyOptions({ width: equityContainerRef.current.clientWidth });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.remove();
+      equityChartRef.current = null;
+      equitySeriesRef.current = [];
+    };
+  }, [days.length]);
+
+  // === エクイティ曲線のデータ更新（系列の増減に応じて張り替え） ===
+  useEffect(() => {
+    const chart = equityChartRef.current;
+    if (!chart) return;
+    for (const s of equitySeriesRef.current) chart.removeSeries(s);
+    equitySeriesRef.current = [];
+
+    // バイ&ホールド（灰・背面）
+    if (bhEquity.length >= 2) {
+      const bhs = chart.addSeries(LineSeries, {
+        color: "#9ca3af", lineWidth: 1, title: "B&H",
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      bhs.setData(toEquityRows(bhEquity));
+      equitySeriesRef.current.push(bhs);
     }
+    // 各戦略 / 連結プラン
+    for (const s of equitySeriesData.strategies) {
+      if (s.points.length < 2) continue;
+      const ls = chart.addSeries(LineSeries, {
+        color: s.color, lineWidth: 2, title: s.label,
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      ls.setData(toEquityRows(s.points));
+      equitySeriesRef.current.push(ls);
+    }
+    if (equityContainerRef.current && equityContainerRef.current.clientWidth > 0) {
+      chart.applyOptions({ width: equityContainerRef.current.clientWidth });
+    }
+    chart.timeScale().fitContent();
+  }, [bhEquity, equitySeriesData]);
+
+  // === Draw 曜日トレード・シミュレータ（全組合せヒートマップ） ===
+  useEffect(() => {
     if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
-  }, [tradeResults, specs, bhEquity, tradeMatrices, matrixMetric, planMode, planResult, drawEquityCurves, drawTimingMatrices]);
+  }, [tradeMatrices, matrixMetric, drawTimingMatrices]);
 
   // 全組合せヒートマップは幅に応じて列数(2列⇄1列)を切り替えるため、
   // 画面幅の変化(端末回転・リサイズ)で再描画してレイアウトの重なりを防ぐ。
@@ -1922,8 +1937,19 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           )}
         </div>
 
-        {/* equity curve */}
-        <div className="w-full rounded border border-gray-100 bg-white overflow-hidden"><canvas ref={tradeEquityRef} /></div>
+        {/* equity curve（ズーム/パン可能な lightweight-charts） */}
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
+          <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+            <span className="inline-block w-4 h-0.5" style={{ backgroundColor: "#9ca3af" }} />バイ&ホールド
+          </span>
+          {equitySeriesData.strategies.map((s, i) => (
+            <span key={i} className="inline-flex items-center gap-1 text-[11px]" style={{ color: s.color }}>
+              <span className="inline-block w-4 h-0.5" style={{ backgroundColor: s.color }} />{s.label}
+            </span>
+          ))}
+          <span className="text-[11px] text-gray-400 ml-auto">ホイールでズーム・ドラッグでパン。折れ線の各頂点＝1トレードの決済日。十字線で日付を確認できる。</span>
+        </div>
+        <div ref={equityContainerRef} className="w-full rounded border border-gray-100 bg-white overflow-hidden" />
 
         {/* metrics table */}
         {specs.length > 0 && (
