@@ -29,7 +29,9 @@ function compute(rows: AlignedDay[], grid: BinGrid, gmtoffset: number): Boundary
   const op = orientedMeanPath(rows, grid, gmtoffset);
   const tauThreshIdx = estimateTau(op.fraction);
   const inc = op.path.slice(1).map((v, i) => v - op.path[i]);
-  const tauCPIdx = changePointDrift(inc) + 1;
+  // changePointDrift の返り k は「増分inc[0..k-1]=ビン0..k-1が第1レジーム」の分割点。
+  // 境界の累積は cum[k-1]、これは reversalSplit の T-index 表現で tauIdx=k(bIdx=k-1)に一致する。
+  const tauCPIdx = changePointDrift(inc);
   return {
     op, tauThreshIdx, tauCPIdx,
     revThresh: reversalSplit(rows, grid, gmtoffset, tauThreshIdx),

@@ -31,7 +31,7 @@ export interface TimingResult {
 }
 
 export function binCounts(aligned: AlignedDay[], scheme: BinScheme): BinCount[] {
-  const rows = aligned.filter((a) => isFinite(a.us.ret));
+  const rows = aligned.filter((a) => isFinite(a.us.ret) && a.us.ret !== 0);
   const idx = assignBins(rows.map((a) => a.us.ret), scheme);
   const meta = binMeta(scheme);
   return meta.labels.map((label, b) => ({
@@ -43,7 +43,7 @@ export function computeTiming(
   aligned: AlignedDay[], grid: BinGrid | null, gmtoffset: number,
   scheme: BinScheme, selectedBin: number
 ): TimingResult | null {
-  const rows = aligned.filter((a) => isFinite(a.us.ret));
+  const rows = aligned.filter((a) => isFinite(a.us.ret) && a.us.ret !== 0);
   if (rows.length < 8 || !grid) return null;
   const binIdx = assignBins(rows.map((a) => a.us.ret), scheme);
   const meta = binMeta(scheme);
@@ -106,7 +106,7 @@ export function maxStatPermutation(
   aligned: AlignedDay[], grid: BinGrid | null, gmtoffset: number,
   scheme: BinScheme, selectedBin: number, iters = 200, seed = 0x51ed2a
 ): MaxStatResult | null {
-  const rows = aligned.filter((a) => isFinite(a.us.ret));
+  const rows = aligned.filter((a) => isFinite(a.us.ret) && a.us.ret !== 0);
   if (!grid || rows.length < 8) return null;
   const binIdx = assignBins(rows.map((a) => a.us.ret), scheme);
   const dayRows = rows.filter((_, i) => binIdx[i] === selectedBin);

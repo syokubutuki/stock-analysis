@@ -59,7 +59,7 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
   );
 
   // 機能8: 族補正(max統計順列)。重いのでボタン起動。パラメータkeyで結果の陳腐化を判定(effectでsetStateしない)。
-  const permKey = `${usTicker}|${interval}|${scheme}|${selBinSafe}`;
+  const permKey = `${ticker}|${usTicker}|${interval}|${scheme}|${selBinSafe}`;
   const [perm, setPerm] = useState<{ key: string; res: MaxStatResult | null }>({ key: "", res: null });
   const [permBusy, setPermBusy] = useState(false);
   const permShown = perm.key === permKey ? perm.res : null;

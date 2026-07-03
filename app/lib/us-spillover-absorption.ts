@@ -9,7 +9,7 @@
 // (B) 反転確率: 前場(寄り→正午)と後場(正午→引け)の符号が反対になる割合を米国ビン別に集計。
 //     米国が大きく動いた翌日ほど後場で反転しやすい/しにくいを検証する。
 
-import { AlignedDay, dayCumPath, assignBins, binMeta, BinScheme } from "./us-spillover-core";
+import { AlignedDay, dayCumPath, assignBins, binMeta, BinScheme, orientedMeanPath } from "./us-spillover-core";
 import { BinGrid } from "./intraday-core";
 import { mean, tTest } from "./stats-significance";
 
@@ -41,20 +41,9 @@ export function computeAbsorption(
   if (rows.length < 8 || !grid) return null;
   const G = grid.bins.length;
 
-  // 向き付けした前日終値基準パス F(t): 長さ G+1 (index0=寄付=gap点)
-  const oriented: number[][] = rows.map((a) => {
-    const s = sgn(a.us.ret);
-    const cum = dayCumPath(a.jp, grid, gmtoffset); // 寄り基準
-    const f = new Array(G + 1);
-    f[0] = s * a.gap; // 寄付時点 = ギャップ
-    for (let g = 0; g < G; g++) f[g + 1] = s * (a.gap + cum[g]);
-    return f;
-  });
-
-  const M = new Array(G + 1).fill(0);
-  for (let t = 0; t <= G; t++) M[t] = mean(oriented.map((f) => f[t]));
+  // 向き付けした前日終値基準の平均累積パス M(t) と実現割合 f(t)(共有プリミティブ)。
+  const { path: M, fraction } = orientedMeanPath(rows, grid, gmtoffset);
   const endMean = M[G];
-  const fraction = M.map((m) => (Math.abs(endMean) > 1e-9 ? m / endMean : 0));
   const gapShare = fraction[0];
 
   const timeLabels = ["寄付", ...grid.bins.map((b) => b.label)];

@@ -15,7 +15,7 @@ interface Props { ticker: string; }
 
 const LEVELS = [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
 
-// 進捗level(横) × その到達後の残余リターン(縦%)のバー。level=1.0(消化完了)に基準線。
+// 進捗level=×gap(横) × その到達後の前向きリターン(縦%)のバー。level=1.0(=ギャップ相当)に基準線。
 function drawProgress(ctx: CanvasRenderingContext2D, W: number, H: number, pts: ProgressPoint[]) {
   const ml = 42, mr = 10, mt = 12, mb = 26;
   const plotW = W - ml - mr, plotH = H - mt - mb;
@@ -35,10 +35,10 @@ function drawProgress(ctx: CanvasRenderingContext2D, W: number, H: number, pts: 
     ctx.fillStyle = p.postMean >= 0 ? "#16a34a" : "#dc2626";
     ctx.fillRect(x + 2, Math.min(y0, y1), w, Math.abs(y1 - y0));
     ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
-    ctx.fillText(`${Math.round(p.level * 100)}%`, x + slot / 2, H - 14);
+    ctx.fillText(`${p.level}×`, x + slot / 2, H - 14);
     ctx.fillText(`n${p.n}`, x + slot / 2, H - 4);
   });
-  // level=100% の位置に基準線
+  // level=1.0×gap の位置に基準線
   const idx100 = pts.findIndex((p) => Math.abs(p.level - 1) < 1e-6);
   if (idx100 >= 0) {
     const x = ml + idx100 * slot + slot / 2;
@@ -105,14 +105,14 @@ export default function UsEventTimeChart({ ticker }: Props) {
       {progress.length > 0 && (
         <>
           <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 text-xs text-gray-700">
-            消化進捗ごとの『その後、引けまでに残る値動き』。進捗が低いほど残余は大きく(まだ取れる)、100%付近で0へ。
-            {overshoot && overshoot.postMean < 0 && <> 進捗125%(行き過ぎ)到達後は平均 <span className="font-bold text-red-700">{fmtSignedPct(overshoot.postMean)}</span> と逆行 → オーバーシュートの戻り取り。</>}
+            日中の値動きが『夜間ギャップの何倍(×gap)』まで進んだ“後”、引けまでに前向きに取れる値動き。基準は寄り前に判明するギャップなので先読みなし。
+            {overshoot && overshoot.postMean < 0 && <> ギャップの1.25倍(行き過ぎ)到達後は平均 <span className="font-bold text-red-700">{fmtSignedPct(overshoot.postMean)}</span> と逆行 → オーバーシュートの戻り取り。</>}
           </div>
 
-          <div className="text-xs text-gray-500">消化進捗率(その日の引け値を100%)× 到達後の残余リターン</div>
+          <div className="text-xs text-gray-500">日中進捗(夜間ギャップの倍数 ×gap)× 到達後→引けの前向きリターン</div>
           <div className="relative"><canvas ref={canvasRef} /></div>
           <p className="text-[11px] text-gray-400">
-            緑=到達後まだ同方向に伸びる / 赤=到達後は逆行。青破線=消化100%。壁時計でなく“消化の進み具合”で日をそろえるので、速い日と遅い日が混ざらない。
+            緑=到達後まだ同方向に伸びる / 赤=到達後は逆行。青破線=1.0×gap(ギャップ相当)。基準を未来の引け値でなく前夜ギャップにしたので、選抜に先読みが入らない。
           </p>
 
           {speed && (
@@ -121,26 +121,26 @@ export default function UsEventTimeChart({ ticker }: Props) {
               <SpeedBar g={speed.fast} maxAbs={speedMaxAbs} />
               <SpeedBar g={speed.slow} maxAbs={speedMaxAbs} />
               <p className="text-[11px] text-gray-400">
-                速い日=寄り近辺で消化完了、遅い日=日中も進行。遅い日の後場が有意にプラスなら「寄りで消化しきれない日を選んで日中順張り」が有効。
+                速い日=ギャップ半分への到達が早い、遅い日=遅い。分類は到達時刻(過去)のみで決め、後場リターンは前向き測定。遅い日の後場が有意にプラスなら「寄りで進みきらない日を選んで日中順張り」が有効。
               </p>
             </div>
           )}
         </>
       )}
 
-      <IntradayCaveat extra="進捗率=各日の向き付け累積÷自日引け値。消化速度=向き付け累積が自日50%に到達する時刻の早さ。" />
+      <IntradayCaveat extra="進捗=各日の向き付け累積÷夜間ギャップの大きさ|gap|(寄り前に判明=未来非依存)。消化速度=累積がギャップ半分に到達する時刻の早さ。" />
 
       <AnalysisGuide title="消化イベント時間分析（進捗軸・速度層別）の詳細">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>
         <p>
-          {"壁時計の時刻(9:30, 10:00…)でなく、『前夜米国の消化がどこまで進んだか(進捗率)』を時間軸に据え直す。消化が速い日と遅い日を同じ土俵にそろえられるので、時計時刻だと混ざってボケるエッジがくっきり出る。さらに消化速度そのもので日を分け、遅い日に持続エッジが残るかを調べる。"}
+          {"壁時計の時刻(9:30, 10:00…)でなく、『日中の値動きが前夜ギャップの何倍まで進んだか』を時間軸に据え直す。基準を寄り前に判明する夜間ギャップにすることで、消化が速い日と遅い日を同じ土俵にそろえつつ、選抜に未来(引け値)を使わない。時計時刻だと混ざってボケるエッジがくっきり出る。さらに消化速度で日を分け、遅い日に持続エッジが残るかを調べる。"}
         </p>
         <p className="font-medium text-gray-700 mt-3">2. 計算</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>{"進捗率: 各日の向き付け累積(寄り基準)を、その日の引け値で正規化。C(t)/C(引け)。0→1で消化完了、1超で行き過ぎ。"}</li>
-          <li>{"進捗軸エッジ: 各levelに初到達した後、引けまでの残余リターン C(引け)−C(到達時刻) を集計・t検定。低levelで大きく正、100%で0、100%超で負なら順当。"}</li>
-          <li>{"消化速度: 向き付け累積が自日の50%に達する時刻の早さ。中央値で fast/slow に二分。"}</li>
-          <li>{"層別比較: fast/slow それぞれの後場(正午→引け)の向き付けリターンを平均・t検定。"}</li>
+          <li>{"進捗(×gap): 各日の向き付け累積(寄り基準)C(t)を、夜間ギャップの大きさ|gap|で正規化。C(t)/|gap|。1で日中がギャップ相当まで進行、1超で行き過ぎ。|gap|は寄り前に確定=未来非依存。"}</li>
+          <li>{"進捗軸エッジ: 各level(×gap)に初到達した“後”、引けまでの前向きリターン C(引け)−C(到達時刻) を集計・t検定。選抜は到達時刻までの過去パスだけに依存。低levelで大きく正、1×付近で0、1×超で負なら順当。"}</li>
+          <li>{"消化速度: 向き付け累積が |gap| の半分に達する時刻の早さ。中央値で fast/slow に二分(分類は過去のみ)。"}</li>
+          <li>{"層別比較: fast/slow それぞれの後場(正午→引け)の前向きリターンを平均・t検定。"}</li>
         </ul>
         <p className="font-medium text-gray-700 mt-3">3. 用語・例え</p>
         <ul className="list-disc pl-4 space-y-1">
@@ -156,8 +156,8 @@ export default function UsEventTimeChart({ ticker }: Props) {
         </ul>
         <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>進捗は自日引けで正規化するため、引けが寄り近辺(移動が小さい)日は進捗が暴れる。米国連動の明確な銘柄で使う。</li>
-          <li>進捗100%到達は『事後的』(その日の引けを知って計算)。リアルタイムでは進捗を推定で使う点に注意。</li>
+          <li>基準は夜間ギャップ|gap|。ギャップがほぼ無い日(|gap|≈0)は進捗が暴れるため除外している。ギャップが出る銘柄・地合いで使う。</li>
+          <li>進捗の基準は寄り前に判明するため選抜に先読みは無いが、後場リターン等の“結果”は当然事後値。リアルタイムでは到達levelをトリガーに使う。</li>
           <li>速度層別は中央値分割で各群の n が半減。StatBadge を確認。</li>
           <li>向き付け前提のため、米国と無相関な銘柄では意味が薄い(方法7と併読)。</li>
         </ul>

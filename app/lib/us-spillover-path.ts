@@ -39,7 +39,7 @@ export interface PathResult {
 export function computePaths(
   aligned: AlignedDay[], grid: BinGrid | null, gmtoffset: number, scheme: BinScheme
 ): PathResult | null {
-  const rows = aligned.filter((a) => isFinite(a.us.ret));
+  const rows = aligned.filter((a) => isFinite(a.us.ret) && a.us.ret !== 0);
   if (rows.length < 8 || !grid) return null;
   const binIdx = assignBins(rows.map((a) => a.us.ret), scheme);
   const meta = binMeta(scheme);

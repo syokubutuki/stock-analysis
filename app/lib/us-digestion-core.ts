@@ -9,6 +9,7 @@
 import { DayData, BinGrid, localMinute, binIndexOfMinute } from "./intraday-core";
 import {
   AlignedDay, dayBinCloses, dayCumPath, assignBins, binMeta, BinScheme,
+  orientedMeanPath as coreOrientedMeanPath,
 } from "./us-spillover-core";
 import { mean, std, tTest, quantileSorted } from "./stats-significance";
 
@@ -19,20 +20,20 @@ const sgn = (x: number) => (x >= 0 ? 1 : -1);
 export interface BinCount { bin: number; label: string; color: string; n: number; }
 
 export function digestionBinCounts(aligned: AlignedDay[], scheme: BinScheme): BinCount[] {
-  const rows = aligned.filter((a) => isFinite(a.us.ret));
+  const rows = aligned.filter((a) => isFinite(a.us.ret) && a.us.ret !== 0);
   const idx = assignBins(rows.map((a) => a.us.ret), scheme);
   const meta = binMeta(scheme);
   return meta.labels.map((label, b) => ({ bin: b, label, color: meta.colors[b], n: idx.filter((v) => v === b).length }));
 }
 
 export function rowsInBin(aligned: AlignedDay[], scheme: BinScheme, selBin: number): AlignedDay[] {
-  const rows = aligned.filter((a) => isFinite(a.us.ret));
+  const rows = aligned.filter((a) => isFinite(a.us.ret) && a.us.ret !== 0);
   const idx = assignBins(rows.map((a) => a.us.ret), scheme);
   return rows.filter((_, i) => idx[i] === selBin);
 }
 
-// 各時間ビンの高値/安値(バー無しビンは終値で補完)。MFE/MAE 用。
-export function dayBinHighLow(day: DayData, grid: BinGrid, gmtoffset: number): { hi: number[]; lo: number[] } {
+// 各時間ビンの高値/安値/終値(バー無しビンは終値で補完)。MFE/MAE 用。closes も返し再計算を避ける。
+export function dayBinHighLow(day: DayData, grid: BinGrid, gmtoffset: number): { hi: number[]; lo: number[]; closes: number[] } {
   const closes = dayBinCloses(day, grid, gmtoffset);
   const hi = closes.slice(), lo = closes.slice();
   for (const b of day.bars) {
@@ -41,7 +42,7 @@ export function dayBinHighLow(day: DayData, grid: BinGrid, gmtoffset: number): {
     hi[bi] = Math.max(hi[bi], b.high);
     lo[bi] = Math.min(lo[bi], b.low);
   }
-  return { hi, lo };
+  return { hi, lo, closes };
 }
 
 // ───────────────────────── 機能1: 保有期間曲線 ─────────────────────────
@@ -81,29 +82,26 @@ export interface ExcursionPoint {
 }
 
 // entryIdx からの保有時間ごとに、米国符号で向き付けした MFE/MAE の平均を返す。
+// running fav/adv を exit j の前進とともに更新する単一パス O(days·G)。
 export function excursionCurve(rows: AlignedDay[], grid: BinGrid, gmtoffset: number, entryIdx: number): ExcursionPoint[] {
   const G = grid.bins.length;
-  const per = rows.map((a) => {
-    const { hi, lo } = dayBinHighLow(a.jp, grid, gmtoffset);
-    const closes = dayBinCloses(a.jp, grid, gmtoffset);
-    return { hi, lo, pe: closes[entryIdx], s: sgn(a.us.ret) };
-  });
+  const per = rows
+    .map((a) => { const { hi, lo, closes } = dayBinHighLow(a.jp, grid, gmtoffset); return { hi, lo, pe: closes[entryIdx], s: sgn(a.us.ret) }; })
+    .filter((d) => d.pe > 0);
+  const fav = per.map(() => -Infinity);
+  const adv = per.map(() => Infinity);
   const out: ExcursionPoint[] = [];
   for (let j = entryIdx + 1; j < G; j++) {
     const mfes: number[] = [], maes: number[] = [];
-    for (const d of per) {
-      if (!(d.pe > 0)) continue;
-      let fav = -Infinity, adv = Infinity;
-      for (let k = entryIdx + 1; k <= j; k++) {
-        // ロング(s>0): 有利=高値方向, 不利=安値方向。ショート(s<0)は逆。
-        const favK = d.s > 0 ? Math.log(d.hi[k] / d.pe) : Math.log(d.pe / d.lo[k]);
-        const advK = d.s > 0 ? Math.log(d.lo[k] / d.pe) : Math.log(d.pe / d.hi[k]);
-        if (favK > fav) fav = favK;
-        if (advK < adv) adv = advK;
-      }
-      if (isFinite(fav)) mfes.push(fav);
-      if (isFinite(adv)) maes.push(adv);
-    }
+    per.forEach((d, di) => {
+      // ロング(s>0): 有利=高値方向, 不利=安値方向。ショート(s<0)は逆。
+      const favK = d.s > 0 ? Math.log(d.hi[j] / d.pe) : Math.log(d.pe / d.lo[j]);
+      const advK = d.s > 0 ? Math.log(d.lo[j] / d.pe) : Math.log(d.pe / d.hi[j]);
+      if (favK > fav[di]) fav[di] = favK;
+      if (advK < adv[di]) adv[di] = advK;
+      if (isFinite(fav[di])) mfes.push(fav[di]);
+      if (isFinite(adv[di])) maes.push(adv[di]);
+    });
     if (mfes.length < 3) continue;
     out.push({ dt: j - entryIdx, label: grid.bins[j].label, n: mfes.length, mfe: mean(mfes), mae: mean(maes) });
   }
@@ -119,16 +117,7 @@ export interface OrientedPath {
 }
 
 export function orientedMeanPath(rows: AlignedDay[], grid: BinGrid, gmtoffset: number): OrientedPath {
-  const G = grid.bins.length;
-  const cum = rows.map((a) => dayCumPath(a.jp, grid, gmtoffset));
-  const T = G + 1;
-  const path = new Array(T).fill(0);
-  for (let t = 0; t < T; t++) {
-    const col = rows.map((a, d) => sgn(a.us.ret) * (t === 0 ? a.gap : a.gap + cum[d][t - 1]));
-    path[t] = mean(col);
-  }
-  const end = path[T - 1];
-  const fraction = path.map((v) => (Math.abs(end) > 1e-9 ? v / end : 0));
+  const { path, fraction } = coreOrientedMeanPath(rows, grid, gmtoffset);
   return { path, fraction, timeLabels: ["寄付", ...grid.bins.map((b) => b.label)] };
 }
 
@@ -207,27 +196,29 @@ export function hazardCurve(rows: AlignedDay[], grid: BinGrid, gmtoffset: number
 // ───────────────────────── 機能5: 消化進捗を軸にしたエッジ ─────────────────────────
 
 export interface ProgressPoint {
-  level: number; // 進捗率(0..1.5 等)
+  level: number; // 進捗＝夜間ギャップの何倍(×gap)まで日中で進んだか(未来非依存の基準)
   n: number;
-  postMean: number; // その進捗到達後、引けまでの向き付け残余リターン平均
+  postMean: number; // その水準に初到達した後、引けまでの向き付け前向きリターン平均
   postP: number;
   avgTimeIdx: number; // 到達した平均時間ビン
 }
 
-// 各日の向き付け累積(寄り基準)をその日の引け値で正規化し、進捗levelに初到達した後の残余を集計。
+// 各日の向き付け累積(寄り基準)を、未来非依存の基準=夜間ギャップの大きさ|gap|で正規化し、
+// 進捗level(×gap)に初到達した“後”の引けまでの前向きリターンを集計する。
+// 選抜は到達時刻までの過去パスのみに依存し、引け値(未来)では選抜しない → 先読みバイアスを排除。
 export function progressResample(rows: AlignedDay[], grid: BinGrid, gmtoffset: number, levels: number[]): ProgressPoint[] {
   const G = grid.bins.length;
   const per = rows
-    .map((a) => { const cum = dayCumPath(a.jp, grid, gmtoffset); const s = sgn(a.us.ret); const C = cum.map((v) => s * v); return { C, E: C[G - 1] }; })
-    .filter((d) => d.E > 1e-6);
+    .map((a) => { const cum = dayCumPath(a.jp, grid, gmtoffset); const s = sgn(a.us.ret); return { C: cum.map((v) => s * v), unit: Math.abs(a.gap) }; })
+    .filter((d) => d.unit > 1e-6);
   const out: ProgressPoint[] = [];
   for (const L of levels) {
     const posts: number[] = [], times: number[] = [];
     for (const d of per) {
       let g0 = -1;
-      for (let g = 0; g < G; g++) if (d.C[g] / d.E >= L) { g0 = g; break; }
+      for (let g = 0; g < G; g++) if (d.C[g] / d.unit >= L) { g0 = g; break; }
       if (g0 < 0) continue;
-      posts.push(d.C[G - 1] - d.C[g0]);
+      posts.push(d.C[G - 1] - d.C[g0]); // 到達後→引けの前向きリターン
       times.push(g0);
     }
     if (posts.length < 3) continue;
@@ -241,8 +232,9 @@ export function progressResample(rows: AlignedDay[], grid: BinGrid, gmtoffset: n
 
 export interface SpeedGroup { label: string; n: number; afternoonMean: number; afternoonP: number; medianReachIdx: number; }
 
-// 各日を「向き付け累積が自日終値の50%に到達する時刻」で fast/slow に中央値分割し、後場(中央→引け)の
-// 向き付けリターンを比較する。遅い日ほど日中に持続エッジが残るか、を検証する。
+// 各日を「向き付け累積が夜間ギャップの半分(=0.5×|gap|、未来非依存)に到達する時刻」で fast/slow に
+// 中央値分割し、後場(中央→引け)の向き付けリターンを比較する。遅い日ほど日中に持続エッジが残るか。
+// 分割は到達時刻(過去)にのみ依存し、引け値(未来)では選抜しない → 先読みバイアスを排除。
 export function stratifyBySpeed(rows: AlignedDay[], grid: BinGrid, gmtoffset: number): { fast: SpeedGroup; slow: SpeedGroup; timeLabels: string[] } | null {
   const G = grid.bins.length;
   const mid = Math.max(1, Math.floor(G / 2));
@@ -251,12 +243,12 @@ export function stratifyBySpeed(rows: AlignedDay[], grid: BinGrid, gmtoffset: nu
       const cum = dayCumPath(a.jp, grid, gmtoffset);
       const s = sgn(a.us.ret);
       const C = cum.map((v) => s * v);
-      const E = C[G - 1];
+      const unit = Math.abs(a.gap);
       let reach = G;
-      if (E > 1e-6) for (let g = 0; g < G; g++) if (C[g] / E >= 0.5) { reach = g; break; }
-      return { reach, afternoon: C[G - 1] - C[mid - 1], E };
+      if (unit > 1e-6) for (let g = 0; g < G; g++) if (C[g] >= 0.5 * unit) { reach = g; break; }
+      return { reach, afternoon: C[G - 1] - C[mid - 1], unit };
     })
-    .filter((d) => d.E > 1e-6);
+    .filter((d) => d.unit > 1e-6);
   if (per.length < 8) return null;
   const medR = quantileSorted(per.map((d) => d.reach).sort((a, b) => a - b), 0.5);
   const fast = per.filter((d) => d.reach <= medR);

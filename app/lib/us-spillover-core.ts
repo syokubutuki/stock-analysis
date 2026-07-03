@@ -17,7 +17,7 @@ import { PricePoint } from "./types";
 import {
   DayData, BinGrid, binIndexOfMinute, localMinute,
 } from "./intraday-core";
-import { mean, std, quantileSorted } from "./stats-significance";
+import { mean, quantileSorted } from "./stats-significance";
 
 // ───────────────────────── 米国リターン系列 ─────────────────────────
 
@@ -25,24 +25,15 @@ export interface UsReturn {
   date: string; // 米国立会日 YYYY-MM-DD
   ret: number; // ln(close/prevClose) 前日終値比(オーバーナイト含む米国当日騰落)
   intra: number; // ln(close/open) 米国正規セッション内
-  z: number; // ret を直近ボラで標準化(先読み防止のため当該日を除く過去のstdを使用)。不足時 NaN
 }
 
-// 米国日足から前日比・日中の対数リターンと、標準化zスコアを算出する。
-// z は「その日のリターンが平常のボラの何倍か」。過去 zWindow 日の std のみ使い先読みを避ける。
-export function computeUsReturns(prices: PricePoint[], zWindow = 60): UsReturn[] {
+// 米国日足から前日比・日中の対数リターンを算出する。
+export function computeUsReturns(prices: PricePoint[]): UsReturn[] {
   const out: UsReturn[] = [];
-  const rets: number[] = [];
   for (let i = 1; i < prices.length; i++) {
     const pc = prices[i - 1].close, c = prices[i].close, o = prices[i].open;
     if (!(pc > 0) || !(c > 0)) continue;
-    const ret = Math.log(c / pc);
-    const intra = o > 0 ? Math.log(c / o) : 0;
-    const w = rets.slice(-zWindow);
-    const s = w.length >= 10 ? std(w) : NaN;
-    const z = s && s > 0 ? ret / s : NaN;
-    out.push({ date: prices[i].time, ret, intra, z });
-    rets.push(ret);
+    out.push({ date: prices[i].time, ret: Math.log(c / pc), intra: o > 0 ? Math.log(c / o) : 0 });
   }
   return out;
 }
@@ -139,6 +130,25 @@ export function dayCumPath(day: DayData, grid: BinGrid, gmtoffset: number): numb
   const o = day.open;
   if (!(o > 0)) return new Array(grid.bins.length).fill(0);
   return dayBinCloses(day, grid, gmtoffset).map((p) => (p > 0 ? Math.log(p / o) : 0));
+}
+
+// 各日を米国符号で向き付けした「前日終値基準の平均累積パス」M(t)。長さ T=G+1(index0=寄付=平均ギャップ)。
+// F(t)=sign(r_US)·ln(P_t/prevClose) の日次平均。fraction=M(t)/M(引け) は消化の実現割合。
+// computeAbsorption と UsDigestionBoundary が共有する中核プリミティブ。
+export function orientedMeanPath(
+  rows: AlignedDay[], grid: BinGrid, gmtoffset: number
+): { path: number[]; fraction: number[] } {
+  const G = grid.bins.length;
+  const cum = rows.map((a) => dayCumPath(a.jp, grid, gmtoffset));
+  const T = G + 1;
+  const path = new Array(T).fill(0);
+  for (let t = 0; t < T; t++) {
+    const col = rows.map((a, d) => (a.us.ret >= 0 ? 1 : -1) * (t === 0 ? a.gap : a.gap + cum[d][t - 1]));
+    path[t] = mean(col);
+  }
+  const end = path[T - 1];
+  const fraction = path.map((v) => (Math.abs(end) > 1e-9 ? v / end : 0));
+  return { path, fraction };
 }
 
 // ───────────────────────── 単回帰 y = α + β·x ─────────────────────────
