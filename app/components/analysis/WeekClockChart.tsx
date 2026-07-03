@@ -173,23 +173,32 @@ function drawDailyBand(ctx: CanvasRenderingContext2D, W: number, H: number, r: W
 }
 
 // ───────────────────────── 日中足: 連続クロック ─────────────────────────
-function drawIntradayClock(ctx: CanvasRenderingContext2D, W: number, H: number, r: WeekClockIntraday) {
-  const ml = 52, mr = 16, mt = 26, mb = 30;
+// 横軸ビューポート [a,b]（インデックス領域 0..N-1 の正規化割合 0..1）でズーム/パン。
+type ClockView = { a: number; b: number };
+const CLOCK_ML = 52, CLOCK_MR = 16;
+
+function drawIntradayClock(ctx: CanvasRenderingContext2D, W: number, H: number, r: WeekClockIntraday, view: ClockView) {
+  const ml = CLOCK_ML, mr = CLOCK_MR, mt = 26, mb = 30;
   const plotW = W - ml - mr, plotH = H - mt - mb;
   const pts = r.points;
   if (pts.length < 2) return;
+  const N = pts.length;
 
   let yMax = 0, yMin = 0;
   for (const p of pts) { if (p.meanHigh > yMax) yMax = p.meanHigh; if (p.meanLow < yMin) yMin = p.meanLow; }
   const pad = (yMax - yMin) * 0.08 || 0.005;
   yMax += pad; yMin -= pad;
   const yOf = (v: number) => mt + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
-  const xOf = (i: number) => ml + (i / (pts.length - 1)) * plotW;
+  // インデックス i を [view.a, view.b] にマップ（ズーム時は plot 幅いっぱいに引き伸ばす）
+  const span = Math.max(1e-6, view.b - view.a);
+  const xOf = (i: number) => ml + ((i / (N - 1) - view.a) / span) * plotW;
+  const inView = (x: number) => x >= ml - 0.5 && x <= ml + plotW + 0.5;
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   const originLabel = r.anchorMode === "monday" ? "月曜寄り" : "週初日寄り";
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText(`${originLabel}=0 からの週内クロック（帯=平均累積高安, 線=平均終値）`, ml, mt - 12);
+  const zoomed = view.a > 1e-4 || view.b < 1 - 1e-4;
+  ctx.fillText(`${originLabel}=0 からの週内クロック（帯=平均累積高安, 線=平均終値）${zoomed ? " ※拡大中" : ""}`, ml, mt - 12);
 
   ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 5; i++) {
@@ -202,27 +211,55 @@ function drawIntradayClock(ctx: CanvasRenderingContext2D, W: number, H: number, 
   }
   ctx.setLineDash([]);
 
-  // 高安エンベロープ
-  ctx.fillStyle = "#3b82f622"; ctx.beginPath();
-  pts.forEach((p, i) => { const x = xOf(i), y = yOf(p.meanHigh); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-  for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(xOf(i), yOf(pts[i].meanLow));
-  ctx.closePath(); ctx.fill();
+  // 曜日ごとにセグメント分割（境目では線を結ばない）
+  const segments: number[][] = [];
+  pts.forEach((p, i) => {
+    if (i === 0 || p.isWeekdayStart) segments.push([]);
+    segments[segments.length - 1].push(i);
+  });
 
-  // 曜日区切り & ラベル
+  // 帯・線は plot 内にクリップ（ズームで領域外へはみ出さないように）
+  ctx.save();
+  ctx.beginPath(); ctx.rect(ml, mt, plotW, plotH); ctx.clip();
+
+  // 高安エンベロープ（曜日セグメントごとに独立して塗る）
+  ctx.fillStyle = "#3b82f622";
+  for (const seg of segments) {
+    if (seg.length < 2) continue;
+    ctx.beginPath();
+    seg.forEach((idx, k) => { const x = xOf(idx), y = yOf(pts[idx].meanHigh); if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    for (let k = seg.length - 1; k >= 0; k--) ctx.lineTo(xOf(seg[k]), yOf(pts[seg[k]].meanLow));
+    ctx.closePath(); ctx.fill();
+  }
+
+  // 曜日区切り（縦線）
+  pts.forEach((p, i) => {
+    if (!p.isWeekdayStart) return;
+    const x = xOf(i);
+    if (!inView(x)) return;
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, mt); ctx.lineTo(x, mt + plotH); ctx.stroke();
+  });
+
+  // 平均終値パス（曜日セグメントごとに独立して描く）
+  ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 2;
+  for (const seg of segments) {
+    if (seg.length < 2) continue;
+    ctx.beginPath();
+    seg.forEach((idx, k) => { const x = xOf(idx), y = yOf(pts[idx].meanClose); if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 曜日ラベル（軸下・クリップ外）
   ctx.textAlign = "center";
   pts.forEach((p, i) => {
     if (!p.isWeekdayStart) return;
     const x = xOf(i);
-    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, mt); ctx.lineTo(x, mt + plotH); ctx.stroke();
+    if (!inView(x)) return;
     ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif";
-    ctx.fillText(p.label.split(" ")[0], x + 16, mt + plotH + 14);
+    ctx.fillText(p.label.split(" ")[0], Math.min(x + 16, ml + plotW - 8), mt + plotH + 14);
   });
-
-  // 平均終値パス
-  ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 2; ctx.beginPath();
-  pts.forEach((p, i) => { const x = xOf(i), y = yOf(p.meanClose); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-  ctx.stroke();
 
   // 終点ラベル（最終スロットの引け）
   const last = pts[pts.length - 1];
@@ -238,6 +275,8 @@ export default function WeekClockChart({ prices, ticker }: Props) {
   const [anchorMode, setAnchorMode] = useState<AnchorMode>("monday");
   const [dailyView, setDailyView] = useState<DailyView>("candle");
   const [intervalKey, setIntervalKey] = useState("30m");
+  const [view, setView] = useState<ClockView>({ a: 0, b: 1 });
+  const dragRef = useRef<{ px: number; a: number; b: number } | null>(null);
 
   const daily = useMemo<WeekClockDaily | null>(
     () => (prices.length >= 10 ? computeWeekClockDaily(prices, anchorMode) : null),
@@ -261,9 +300,62 @@ export default function WeekClockChart({ prices, ticker }: Props) {
       if (dailyView === "candle") drawDailyCandle(ctx, width, H, daily);
       else drawDailyBand(ctx, width, H, daily);
     } else if (intra) {
-      drawIntradayClock(ctx, width, H, intra);
+      drawIntradayClock(ctx, width, H, intra, view);
     }
-  }, [gran, daily, dailyView, intra]);
+  }, [gran, daily, dailyView, intra, view]);
+
+  // データ・粒度・原点が変わったらズームを全体表示に戻す
+  useEffect(() => { setView({ a: 0, b: 1 }); }, [gran, intervalKey, anchorMode, intra]);
+
+  // 日中足クロックの横軸ズーム/パン（ホイール=拡大, ドラッグ=移動, ダブルクリック=全体）
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || gran !== "intraday" || !intra) return;
+    const plotW = () => canvas.clientWidth - CLOCK_ML - CLOCK_MR;
+    const clampView = (a: number, b: number): ClockView => {
+      const w = Math.min(1, Math.max(0.03, b - a));
+      let na = a, nb = a + w;
+      if (na < 0) { na = 0; nb = w; }
+      if (nb > 1) { nb = 1; na = 1 - w; }
+      return { a: na, b: nb };
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const frac = Math.min(1, Math.max(0, (e.clientX - rect.left - CLOCK_ML) / plotW()));
+      setView((v) => {
+        const f = v.a + frac * (v.b - v.a);           // カーソル位置のドメイン座標
+        const w = (v.b - v.a) * (e.deltaY > 0 ? 1.2 : 1 / 1.2);
+        return clampView(f - frac * w, f - frac * w + w);
+      });
+    };
+    const onDown = (e: PointerEvent) => {
+      dragRef.current = { px: e.clientX, a: view.a, b: view.b };
+      canvas.setPointerCapture(e.pointerId);
+    };
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const delta = ((e.clientX - d.px) / plotW()) * (d.b - d.a);
+      setView(clampView(d.a - delta, d.b - delta));
+    };
+    const onUp = () => { dragRef.current = null; };
+    const onDbl = () => setView({ a: 0, b: 1 });
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointermove", onMove);
+    canvas.addEventListener("pointerup", onUp);
+    canvas.addEventListener("pointercancel", onUp);
+    canvas.addEventListener("dblclick", onDbl);
+    return () => {
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("pointermove", onMove);
+      canvas.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("pointercancel", onUp);
+      canvas.removeEventListener("dblclick", onDbl);
+    };
+  }, [gran, intra, view.a, view.b]);
 
   if (prices.length < 10) return null;
 
@@ -300,7 +392,17 @@ export default function WeekClockChart({ prices, ticker }: Props) {
 
       {gran === "intraday" && <LoadingError loading={loading} error={error} />}
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          className={gran === "intraday" ? "cursor-grab active:cursor-grabbing touch-none" : ""}
+        />
+        {gran === "intraday" && intra && (
+          <span className="absolute top-1 right-2 text-[10px] text-gray-400 select-none pointer-events-none">
+            ホイール=拡大 / ドラッグ=移動 / ダブルクリック=全体
+          </span>
+        )}
+      </div>
 
       {gran === "daily" && daily && (
         <>
