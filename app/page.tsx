@@ -630,6 +630,18 @@ const WeekdayIntradayPathChart = dynamic(
   () => import("./components/analysis/WeekdayIntradayPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const TurnOfMonthPathChart = dynamic(
+  () => import("./components/analysis/TurnOfMonthPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const WeekdayUsPathChart = dynamic(
+  () => import("./components/analysis/WeekdayUsPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const WeekdayIntradayEdgeChart = dynamic(
+  () => import("./components/analysis/WeekdayIntradayEdgeChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const UsAbsorptionChart = dynamic(
   () => import("./components/analysis/UsAbsorptionChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1423,6 +1435,9 @@ export default function AnalysisPage() {
                   <WeekdayConditionalChart prices={filteredPrices} />
                   <WeekdayEdgeScanChart prices={filteredPrices} />
                   <WeekdayIntradayPathChart ticker={data.ticker} />
+                  <TurnOfMonthPathChart ticker={data.ticker} />
+                  <WeekdayUsPathChart ticker={data.ticker} />
+                  <WeekdayIntradayEdgeChart ticker={data.ticker} />
                   <HighLowTimingChart ticker={data.ticker} />
                   <ExecutionTimingChart ticker={data.ticker} />
                   <EdgeDiscountChart prices={allPrices} ticker={data.ticker} />
