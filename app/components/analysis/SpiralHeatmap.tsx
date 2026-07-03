@@ -95,21 +95,30 @@ function rankLongStrategies(prices: PricePoint[], compound: boolean, metric: Ran
   return out;
 }
 
+// エントリー/エグジット軸の色(HTML凡例と Canvas 軸ラベルで共有し、縦=建て・横=手仕舞いを直感的に示す)
+const AXIS_ENTRY_COLOR = "#1d4ed8"; // 青 = エントリー(建て・行/縦軸)
+const AXIS_EXIT_COLOR = "#b45309";  // 橙 = エグジット(手仕舞い・列/横軸)
 // 注文タイミング・ヒートマップ(4サブ行列)のレイアウト幾何。描画とクリック判定で共有する。
-const TM_LAYOUT = { cellW: 44, cellH: 24, rowLabelW: 20, titleH: 16, headerH: 14, rowGap: 26, topPad: 6 };
+// axisLabelW: 左の縦書き「エントリー↓」帯、axisHeaderH: 上の「エグジット→」帯の高さ。
+const TM_LAYOUT = { cellW: 44, cellH: 24, rowLabelW: 20, axisLabelW: 15, titleH: 18, axisHeaderH: 13, headerH: 14, rowGap: 30, colGap: 14, topPad: 6 };
 function timingMatrixGeom(width: number) {
   const L = TM_LAYOUT;
-  const subW = L.rowLabelW + 5 * L.cellW;       // サブ行列1つの横幅
-  const subH = L.titleH + L.headerH + 5 * L.cellH; // サブ行列1つの縦幅
-  const totalH = L.topPad + 2 * subH + L.rowGap;
-  const colHalf = width / 2;                      // 各列を画面半分に割り当て
+  const subW = L.axisLabelW + L.rowLabelW + 5 * L.cellW;        // サブ行列1つの横幅
+  const subH = L.titleH + L.axisHeaderH + L.headerH + 5 * L.cellH; // サブ行列1つの縦幅
+  // 幅に応じて列数を決める。2列を並べると重なる狭い端末(スマホ)では1列に縦積みする。
+  const cols = width >= 2 * subW + L.colGap ? 2 : 1;
+  const rows = Math.ceil(4 / cols);
+  const totalH = L.topPad + rows * subH + (rows - 1) * L.rowGap;
+  const colW = width / cols;                       // 各列に割り当てる横幅
   const subAt = (idx: number) => {
-    const col = idx % 2, rowBlock = Math.floor(idx / 2);
-    const subLeft = col * colHalf + (colHalf - subW) / 2;
+    const col = idx % cols, rowBlock = Math.floor(idx / cols);
+    const subLeft = col * colW + (colW - subW) / 2;
     const subTop = L.topPad + rowBlock * (subH + L.rowGap);
-    return { subLeft, subTop, gridLeft: subLeft + L.rowLabelW, gridTop: subTop + L.titleH + L.headerH };
+    const gridLeft = subLeft + L.axisLabelW + L.rowLabelW;
+    const gridTop = subTop + L.titleH + L.axisHeaderH + L.headerH;
+    return { subLeft, subTop, gridLeft, gridTop };
   };
-  return { ...L, subW, subH, totalH, colHalf, subAt };
+  return { ...L, subW, subH, cols, rows, totalH, subAt };
 }
 // クリック座標(CSS px) → どのセル(idx=タイミング, 行=エントリー曜日, 列=エグジット曜日)か
 function hitTestTimingMatrix(width: number, x: number, y: number): { idx: number; entryDow: number; exitDow: number } | null {
@@ -1228,7 +1237,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   }, []);
 
   // 曜日トレード: 注文タイミング全4通り(始値/終値 × 始値/終値)の
-  // (エントリー曜日 × エグジット曜日)ヒートマップを2×2グリッドで描画
+  // (エントリー曜日 × エグジット曜日)ヒートマップを描画。
+  // 幅が広ければ2列、狭い端末(スマホ)では1列に縦積みして重なりを防ぐ。
   const drawTimingMatrices = useCallback((
     canvas: HTMLCanvasElement,
     matrices: { entryTiming: Timing; exitTiming: Timing; grid: (number | null)[][] }[],
@@ -1238,10 +1248,11 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     // 幾何はクリック判定と共有(timingMatrixGeom)
     // initCanvas に渡す高さを得るため、まず暫定幅でレイアウトを求める
     const parentW = canvas.parentElement?.clientWidth || 600;
-    const { cellW, cellH, subW, totalH } = timingMatrixGeom(parentW);
+    const { cellW, cellH, totalH } = timingMatrixGeom(parentW);
     const r = initCanvas(canvas, totalH); if (!r) return;
     const { ctx, width } = r;
     const geom = timingMatrixGeom(width);
+    const gridW = 5 * cellW, gridH = 5 * cellH;
 
     // 色の基準は全4行列で共有し、タイミング間の比較を可能にする
     let maxAbs = 0;
@@ -1251,17 +1262,36 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     matrices.forEach((m, idx) => {
       const { subLeft, subTop, gridLeft, gridTop } = geom.subAt(idx);
 
-      // サブタイトル（注文タイミング）
-      ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(`${TIMING_LABEL[m.entryTiming]}→${TIMING_LABEL[m.exitTiming]}`, subLeft + subW / 2, subTop + 12);
+      // サブタイトル（注文タイミング）: 建て時刻→手仕舞い時刻を軸色で分けて示す
+      ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      const entryTxt = `建 ${TIMING_LABEL[m.entryTiming]}`, arrowTxt = " → ", exitTxt = `仕舞 ${TIMING_LABEL[m.exitTiming]}`;
+      const twEntry = ctx.measureText(entryTxt).width, twArrow = ctx.measureText(arrowTxt).width, twExit = ctx.measureText(exitTxt).width;
+      let tx = gridLeft + (gridW - (twEntry + twArrow + twExit)) / 2;
+      const titleY = subTop + 13;
+      ctx.fillStyle = AXIS_ENTRY_COLOR; ctx.fillText(entryTxt, tx, titleY); tx += twEntry;
+      ctx.fillStyle = "#9ca3af"; ctx.fillText(arrowTxt, tx, titleY); tx += twArrow;
+      ctx.fillStyle = AXIS_EXIT_COLOR; ctx.fillText(exitTxt, tx, titleY);
 
-      // エグジット曜日ヘッダー
-      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+      // 横軸タイトル「エグジット(手仕舞い)曜日 →」: 列ヘッダーの上に橙で
+      ctx.fillStyle = AXIS_EXIT_COLOR; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("エグジット(手仕舞い)曜日 →", gridLeft + gridW / 2, gridTop - geom.headerH - 3);
+
+      // 縦軸タイトル「↓ エントリー(建て)曜日」: グリッド左に縦書き(90°回転)で青
+      ctx.save();
+      ctx.translate(subLeft + geom.axisLabelW / 2 + 2, gridTop + gridH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = AXIS_ENTRY_COLOR; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("↓ エントリー(建て)曜日", 0, 0);
+      ctx.restore();
+      ctx.textBaseline = "alphabetic";
+
+      // エグジット曜日ヘッダー(列): 橙系
+      ctx.fillStyle = AXIS_EXIT_COLOR; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
       for (let j = 0; j < 5; j++) ctx.fillText(dow[j], gridLeft + j * cellW + cellW / 2, gridTop - 4);
 
       for (let i = 0; i < 5; i++) {
-        // エントリー曜日（行ラベル）
-        ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right"; ctx.font = "9px sans-serif";
+        // エントリー曜日（行ラベル）: 青系
+        ctx.fillStyle = AXIS_ENTRY_COLOR; ctx.textAlign = "right"; ctx.font = "9px sans-serif";
         ctx.fillText(dow[i], gridLeft - 4, gridTop + i * cellH + cellH / 2 + 3);
         for (let j = 0; j < 5; j++) {
           const v = m.grid[i][j];
@@ -1289,9 +1319,12 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       }
     });
 
-    // 軸の説明（左下）
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText("行=エントリー曜日 / 列=エグジット曜日", 2, totalH - 3);
+    // 軸の凡例（左下）: 色で縦=建て・横=手仕舞いを再確認
+    ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    let lx = 2; const ly = totalH - 3;
+    ctx.fillStyle = AXIS_ENTRY_COLOR; ctx.fillText("縦↓=エントリー(建て)曜日", lx, ly); lx += ctx.measureText("縦↓=エントリー(建て)曜日").width + 8;
+    ctx.fillStyle = "#9ca3af"; ctx.fillText("/", lx, ly); lx += ctx.measureText("/").width + 8;
+    ctx.fillStyle = AXIS_EXIT_COLOR; ctx.fillText("横→=エグジット(手仕舞い)曜日", lx, ly);
   }, []);
 
   // === helper to get bar data from raw buckets for current tab ===
@@ -1395,6 +1428,16 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
     if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
   }, [tradeResults, specs, bhEquity, tradeMatrices, matrixMetric, planMode, planResult, drawEquityCurves, drawTimingMatrices]);
+
+  // 全組合せヒートマップは幅に応じて列数(2列⇄1列)を切り替えるため、
+  // 画面幅の変化(端末回転・リサイズ)で再描画してレイアウトの重なりを防ぐ。
+  useEffect(() => {
+    const onResize = () => {
+      if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [tradeMatrices, matrixMetric, drawTimingMatrices]);
 
   if (days.length === 0) {
     return (
@@ -1956,8 +1999,13 @@ export default function SpiralHeatmap({ prices, period }: Props) {
 
         {/* all-combinations matrix */}
         <div className="mt-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs text-gray-500" title="注文タイミング4通り = エントリー(始値/終値)×エグジット(始値/終値)。各サブ行列は行=エントリー曜日・列=エグジット曜日の5×5">全組合せヒートマップ（注文タイミング4通り）</span>
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
+            <span className="text-xs text-gray-500">全組合せヒートマップ（注文タイミング4通り）</span>
+            <span className="text-[11px] inline-flex items-center gap-1 rounded bg-gray-50 border border-gray-200 px-1.5 py-0.5">
+              <span className="font-semibold text-blue-700">縦↓＝エントリー(建て)曜日</span>
+              <span className="text-gray-400">×</span>
+              <span className="font-semibold text-amber-700">横→＝エグジット(手仕舞い)曜日</span>
+            </span>
             <span className="text-[11px] text-emerald-700">セルをクリックで{builder.side === "long" ? "ロング" : "ショート"}戦略を比較に追加</span>
             {matrixMetric === "perDay" && <span className="text-[11px] text-gray-400">日当たりは bp(=0.01%)表示</span>}
             <div className="flex gap-1 ml-auto">
