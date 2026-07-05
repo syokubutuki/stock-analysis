@@ -14,6 +14,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import {
   computeStrategy,
   computePlan,
+  bestCombination,
   buyHoldEquity,
   buyHoldMetrics,
   weekdayMatrix,
@@ -25,6 +26,7 @@ import {
   type StrategyResult,
   type PlanGapFill,
   type PlanResult,
+  type BestCombination,
 } from "../../lib/weekday-trade";
 
 interface Props {
@@ -42,6 +44,9 @@ const MONTH_LABELS = [
 ];
 // 曜日トレード戦略の重ね描き用カラーパレット
 const STRAT_COLORS = ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+// 比較リストに登録できるレグの上限。最適プラン(週内クロック10スロットを連結)は最大10レグに
+// なり得るので、単独ロングの手動比較(従来6)より広く取る。
+const MAX_SPECS = 12;
 const TIMING_LABEL: Record<Timing, string> = { open: "始値", close: "終値" };
 // 注文タイミングの全組み合わせ（エントリー × エグジット）
 const TIMING_COMBOS: [Timing, Timing][] = [
@@ -72,6 +77,9 @@ function toEquityRows(pts: EquityPoint[]): { time: Time; value: number }[] {
 function sameSpec(a: TradeSpec, b: TradeSpec): boolean {
   return a.entryDow === b.entryDow && a.exitDow === b.exitDow
     && a.entryTiming === b.entryTiming && a.exitTiming === b.exitTiming && a.side === b.side;
+}
+function sameSpecList(a: TradeSpec[], b: TradeSpec[]): boolean {
+  return a.length === b.length && a.every((s, i) => sameSpec(s, b[i]));
 }
 
 // ロング戦略ランキング: 全注文タイミング(4) × 全曜日ペア(25) = 100通りのロング戦略を
@@ -385,7 +393,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const tradeMatrixRef = useRef<HTMLCanvasElement>(null);
   // 編集中のスペック（ビルダー）
   const [builder, setBuilder] = useState<TradeSpec>({ entryDow: 1, entryTiming: "close", exitDow: 2, exitTiming: "close", side: "long" });
-  // 比較対象として確定した戦略リスト。ユーザーが未編集の間はランキング1位を自動追従(下の useEffect)。
+  // 比較対象として確定した戦略リスト。ユーザーが未編集の間は最適プラン(買+売の非重複組合せ)を自動追従(下の useEffect)。
   const [specs, setSpecs] = useState<TradeSpec[]>([]);
   // ユーザーが比較リストを手動操作したか。trueになると自動追従を止め、選択を固定する。
   const [specsTouched, setSpecsTouched] = useState(false);
@@ -395,22 +403,27 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const [rankMetric, setRankMetric] = useState<RankMetric>("perDay");
   // ロング戦略ランキングの折りたたみ表示
   const [showRanking, setShowRanking] = useState(false);
-  // 週内プラン(複数レグ連結)モード
-  const [planMode, setPlanMode] = useState(false);
+  // 週内プラン(複数レグ連結)モード。既定オン: 初期表示の最適プラン(複数レグ)を1本に連結して見せる。
+  const [planMode, setPlanMode] = useState(true);
   const [gapFill, setGapFill] = useState<PlanGapFill>("cash");
   const [costBps, setCostBps] = useState(0);
   const addSpec = useCallback(() => {
     setSpecsTouched(true);
-    setSpecs(prev => (prev.length >= 6 || prev.some(s => sameSpec(s, builder))) ? prev : [...prev, builder]);
+    setSpecs(prev => (prev.length >= MAX_SPECS || prev.some(s => sameSpec(s, builder))) ? prev : [...prev, builder]);
   }, [builder]);
   // 任意の spec を比較リストへ追加（ランキング/ヒートマップから共有）。連結モードは変更しない。
   const addSpecObj = useCallback((spec: TradeSpec) => {
     setSpecsTouched(true);
-    setSpecs(prev => (prev.length >= 6 || prev.some(s => sameSpec(s, spec))) ? prev : [...prev, spec]);
+    setSpecs(prev => (prev.length >= MAX_SPECS || prev.some(s => sameSpec(s, spec))) ? prev : [...prev, spec]);
   }, []);
   const removeSpec = useCallback((idx: number) => {
     setSpecsTouched(true);
     setSpecs(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+  // 手動編集後に最適プラン(買+売の非重複組合せ)へ戻す。specsTouched を解除して自動追従を再開させる。
+  const restoreOptimal = useCallback(() => {
+    setSpecsTouched(false);
+    setPlanMode(true);
   }, []);
 
   // === core data ===
@@ -699,17 +712,23 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     })),
     [prices, builder.side, tradeCompound, matrixMetric],
   );
-  // ロング戦略ランキング: 全100通りを指標で降順に。初期の自動選択と表示で共有。
+  // ロング戦略ランキング: 全100通りを指標で降順に。ランキング表で使用。
   const longRanking = useMemo<RankedStrategy[]>(
     () => rankLongStrategies(prices, tradeCompound, rankMetric),
     [prices, tradeCompound, rankMetric],
   );
-  // ユーザーが比較リストを未編集の間は、ランキング1位(現在の並べ替え指標・期間・複利設定に追従)を
-  // 初期表示として自動選択する。これによりグラフの初期戦略がランキング表の1位と常に一致する。
+  // 最適プラン: 週内クロックを10スロットに分解し各スロットの最適サイド(買/売/無)を独立選択→
+  // 連続同符号を連結したレグ列。無レバ・単位ポジション・非重複の枠内で最大リターンの組合せ。
+  const bestCombo = useMemo<BestCombination>(
+    () => bestCombination(prices, tradeCompound),
+    [prices, tradeCompound],
+  );
+  // ユーザーが比較リストを未編集の間は、最適プラン(買+売の複数レグ)を初期表示として自動選択する。
+  // 期間・複利設定を変えると最適プランも変わり追従する。手動編集すると固定される。
   useEffect(() => {
-    if (specsTouched || longRanking.length === 0) return;
-    setSpecs(prev => (prev.length === 1 && sameSpec(prev[0], longRanking[0].spec)) ? prev : [longRanking[0].spec]);
-  }, [longRanking, specsTouched]);
+    if (specsTouched) return;
+    setSpecs(prev => sameSpecList(prev, bestCombo.legs) ? prev : bestCombo.legs);
+  }, [bestCombo, specsTouched]);
   // ヒートマップのセルをクリック → その(曜日ペア×注文タイミング×方向)を比較リストに追加(連結モードは変えない)
   const addSpecFromMatrix = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -1883,7 +1902,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       <div className="border border-emerald-100 rounded-lg p-3 bg-emerald-50/30">
         <div className="text-sm font-medium text-gray-700 mb-2">
           曜日トレード・シミュレータ
-          <span className="text-xs font-normal text-gray-400">（任意の曜日・注文タイミングで売買。連結モードで週内の複数レグを1本に繋ぎ、滞在率を上げてB&Hと公平比較）</span>
+          <span className="text-xs font-normal text-gray-400">（初期表示＝買+売を組合せた最大リターンの週内プラン。任意の曜日・注文タイミングで売買を編集でき、連結モードで複数レグを1本に繋いでB&Hと公平比較）</span>
         </div>
 
         {/* builder */}
@@ -1923,7 +1942,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
               ))}
             </div>
           </div>
-          <button onClick={addSpec} disabled={specs.length >= 6} className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40">+ 比較に追加</button>
+          <button onClick={addSpec} disabled={specs.length >= MAX_SPECS} className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40">+ 比較に追加</button>
           <label className="flex items-center gap-1 cursor-pointer text-gray-500 pb-1 ml-auto">
             <input type="checkbox" checked={tradeCompound} onChange={e => setTradeCompound(e.target.checked)} className="accent-emerald-600" />
             複利 Π(1+r)（オフで単純合計 Σr）
@@ -1931,7 +1950,12 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         </div>
 
         {/* active strategy chips */}
-        <div className="flex flex-wrap gap-1 mb-2">
+        <div className="flex flex-wrap items-center gap-1 mb-2">
+          {!specsTouched && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-amber-100 text-amber-800 border border-amber-200" title="週内クロックを10スロットに分解し各スロットの買/売/無を独立最適化した、非重複で最大リターンの組合せ">
+              ★ 最適プラン（買{bestCombo.nLong}・売{bestCombo.nShort}スロット / 週内滞在{Math.round(bestCombo.coverage * 100)}%）
+            </span>
+          )}
           {specs.map((s, i) => (
             <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border" style={{ borderColor: STRAT_COLORS[i % STRAT_COLORS.length], color: STRAT_COLORS[i % STRAT_COLORS.length] }}>
               {specLabel(s)}
@@ -1939,6 +1963,9 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             </span>
           ))}
           {specs.length === 0 && <span className="text-[11px] text-gray-400">戦略を「比較に追加」してください</span>}
+          {specsTouched && (
+            <button onClick={restoreOptimal} className="ml-1 px-2 py-0.5 text-[11px] rounded bg-amber-600 text-white hover:bg-amber-700" title="手動編集を破棄し、買+売の最大リターン組合せを再表示">★ 最適プランに戻す</button>
+          )}
         </div>
 
         {/* ロング戦略ランキング（リターン/Sharpe順） */}
@@ -1997,7 +2024,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                         <td className="py-1 px-2 text-center">
                           <button
                             onClick={() => addSpecObj(spec)}
-                            disabled={active || specs.length >= 6}
+                            disabled={active || specs.length >= MAX_SPECS}
                             className="px-2 py-0.5 text-[11px] rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
                           >{active ? "追加済" : "+ 比較"}</button>
                         </td>
@@ -2150,6 +2177,16 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           <p className="font-medium text-gray-700 mt-3">なぜ単独の戦略はB&Hに累積で負けやすいか（重要）</p>
           <p>1本の戦略(例: 月終→火終で1日保有)は、エグジット後〜次のエントリーまで<span className="font-medium">現金で待機</span>します。複利の世界ではリターンの源泉は「市場にいる時間」なので、週5営業日中1日しか持たない＝<span className="font-medium">滞在率(exposure)≈0.2</span>の戦略が、常時フル投資(滞在率1.0)のB&Hに累積で勝つのは構造的にほぼ不可能です。これは戦略が悪いのではなく<span className="font-medium">土俵が違う比較</span>であることが原因です。表の<span className="font-medium">効率=総リターン÷滞在率</span>(市場にいる時間あたりの質)を見れば、滞在率を揃えた本来の優位がわかります。</p>
 
+          <p className="font-medium text-gray-700 mt-3">初期表示＝最適プラン（買+売の非重複組合せ・最大リターン）</p>
+          <p>比較リストを手動編集する前の初期表示は、<span className="font-medium">買いと売りを組合せて最大リターンになる週内プラン</span>を自動選択します。求め方は次の通りで、貪欲法ではなく<span className="font-medium">厳密な最適解</span>です:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li><span className="font-medium">週内クロックを10スロットに分解:</span> 各曜日D(月〜金)の<span className="font-medium">日中(D始→D終)</span>と<span className="font-medium">オーバーナイト(D終→翌始)</span>で 5×2=10 区間。金曜後のオーバーナイトは週末ギャップ(金終→月始)。</li>
+            <li><span className="font-medium">スロット独立最適化:</span> 連結プランの富 W = Π(1 + pos_s·r_s) は<span className="font-medium">スロットごとに因数分解</span>できる(各スロットは毎週同じ pos を適用)。よって各スロットで pos∈{"{+1買, −1売, 0無}"} を独立に選び、そのスロットの累積富 max(買W, 売W, 1) を最大化すれば、全体の富も最大になる。買W&lt;1 かつ 売W&lt;1(高ボラでゼロドリフトのボラ引き)なら<span className="font-medium">無ポジ</span>が最良。</li>
+            <li><span className="font-medium">レグへ連結:</span> 連続する同符号スロットを環状に連結して1レグ(例: 木終→火始の買い)にまとめ、連結モードで1本のエクイティにする。<span className="font-medium">非重複</span>(同時に2ポジションを持たない)が保証される。</li>
+            <li>チップ上の<span className="font-medium">「★ 最適プラン」</span>バッジに買/売スロット数と週内滞在率を表示。期間・複利設定を変えると最適プランも再計算され追従する。手動で「+比較」やヒートマップクリック等をすると固定され、<span className="font-medium">「★ 最適プランに戻す」</span>で復帰できる。</li>
+          </ul>
+          <p className="text-[11px] text-gray-400">※ これは<span className="font-medium">過去データ上で</span>最大リターンになる後知恵の組合せ。多数スロットの符号を過去に最適化するため<span className="font-medium">過剰適合(オーバーフィット)</span>しやすく、将来もそのまま効く保証はない点に注意(下の注意点も参照)。</p>
+
           <p className="font-medium text-gray-700 mt-3">連結モード（複数レグを週内で1本に繋ぐ）</p>
           <p>B&Hに累積で勝つには滞在率を上げる必要があります。連結モードは登録した戦略を<span className="font-medium">週内のレグ</span>とみなし、1本の資金ストリームに連結します。内部実装は<span className="font-medium">セグメント×ポジションベクトル方式</span>:</p>
           <ul className="list-disc pl-4 space-y-1">
@@ -2162,7 +2199,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           <p className="font-medium text-gray-700 mt-3">B&Hを超えるレグの探し方</p>
           <ul className="list-disc pl-4 space-y-1">
             <li><span className="font-medium">ロング戦略ランキング</span>(折りたたみ式)は全100通り(注文4×曜日ペア25)のロング戦略を、<span className="font-medium">日当たり</span>/総リターン/年率/Sharpe/効率/勝率の指標で降順に並べたもの。<span className="font-medium">既定は「日当たり」=総リターン÷延べ市場滞在日数(bps表示)</span>。総リターンで並べると「水始値→水始値」のように<span className="font-medium">毎週ほぼ常に持ち越す≒バイ&ホールド</span>の組合せが、単に市場滞在日数が長いという理由だけで上位を独占してしまう。日当たりは保有1日あたりの質に揃えるので、滞在期間の偏りを除いて本当に効率の良い曜日区間が浮かび上がる。</li>
-            <li><span className="font-medium">グラフの初期表示</span>は、比較リストを手動編集する前であれば<span className="font-medium">常に現在の並べ替え指標での1位に自動追従</span>する(指標・期間・複利設定を変えると追従先も変わる)。「+比較」やヒートマップのクリック、チップの×で一度でも手動編集すると自動追従は止まり、選択が固定される。</li>
+            <li>このランキングは<span className="font-medium">ロング単独</span>の1レグを効率良い順に眺めるための一覧で、良い区間を「+比較」で手動リストに拾える(初期表示は上記の買+売の最適プランで、こちらは編集用の素材)。</li>
+            <li><span className="font-medium">グラフの初期表示</span>は、比較リストを手動編集する前であれば<span className="font-medium">買+売の最大リターン組合せ(最適プラン)に自動追従</span>する(期間・複利設定を変えると再計算される)。「+比較」やヒートマップのクリック、チップの×で一度でも手動編集すると自動追従は止まり、<span className="font-medium">「★ 最適プランに戻す」</span>で復帰できる。</li>
             <li>あるいは<span className="font-medium">全組合せヒートマップ</span>(5×5曜日ペア×注文4通り)で良いペアを発見(緑=プラス/赤=マイナス、トレード3未満は「-」)。<span className="font-medium">注文4通り</span>とは「エントリーを始値/終値」×「エグジットを始値/終値」の2×2の組合せ(始→始・始→終・終→始・終→終)で、各サブ行列は行=エントリー曜日・列=エグジット曜日の5×5。並べ替え指標は<span className="font-medium">日当たり(bp=0.01%表示)</span>/総リターン/Sharpe/勝率から選べ、<span className="font-medium">既定は日当たり</span>(滞在期間の長いセルが総リターンだけで濃くなる偏りを避ける)。<span className="font-medium">良いセルをクリック</span>すると、その曜日ペア×注文タイミング×方向がそのまま比較リストに追加される。連結して1本に繋ぎたいときは<span className="font-medium">連結モード</span>を手動でオンにする。</li>
             <li>良いロングのレグを複数(例: 月終→火終 と 水終→木終)拾い、連結モード「現金」で滞在率を積み上げる。隙間の弱い曜日を避けつつ強い区間だけ拾えればB&H超えが狙える。</li>
             <li>あるいは「ロング保有」で土台をB&Hにし、ヒートマップで<span className="font-medium">マイナスが濃い曜日だけショート</span>のレグを重ねて差を上乗せする(滞在率≈1.0のまま改善余地を探す最短ルート)。</li>

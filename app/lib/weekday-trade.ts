@@ -349,6 +349,107 @@ export function computePlan(
   };
 }
 
+// =============================================================
+// 最適プラン（買+売の非重複組合せ）
+// -------------------------------------------------------------
+// 週内クロックを 10 の「スロット(価格イベント間の区間)」に分解する:
+//   偶数スロット 2(D-1)   = 曜日D の日中 (D始値→D終値)
+//   奇数スロット 2(D-1)+1 = 曜日D 後のオーバーナイト (D終値→翌営業日始値)
+//   ※ 金曜後(奇数, D=5, スロット9)は週末ギャップ(金終→月始)。
+// プランの富は W = Π_s Π_(スロットsの各出現) (1 + pos_s · r) と書け、スロット毎に
+// 因数分解できる。したがって各スロットの pos∈{+1(買),-1(売),0(無)} を独立に選んで
+// そのスロットの累積富を最大化すれば、(無レバ・単位ポジション・非重複という枠内で)
+// 大域的に最大リターンの組合せが得られる。連続する同符号スロットを環状に連結して
+// レグ列(TradeSpec[])に戻すと、そのまま連結モードで再現できる。
+// =============================================================
+
+export interface ComboSlot {
+  slot: number; // 0..9
+  side: Side | "flat";
+  n: number;
+  longW: number; // 買いで通したときの富(compound)/1+Σr(単純)
+  shortW: number; // 売りで通したときの富
+}
+
+export interface BestCombination {
+  legs: TradeSpec[];
+  slots: ComboSlot[];
+  nLong: number;
+  nShort: number;
+  coverage: number; // 非flatスロットの割合(0..1)=週内滞在率
+}
+
+// スロット境界 → (曜日, タイミング)
+function slotStart(slot: number): { dow: number; timing: Timing } {
+  const D = Math.floor(slot / 2) + 1; // 1..5
+  return slot % 2 === 0 ? { dow: D, timing: "open" } : { dow: D, timing: "close" };
+}
+function slotEnd(slot: number): { dow: number; timing: Timing } {
+  const D = Math.floor(slot / 2) + 1;
+  // 偶数(日中): D終値で確定 / 奇数(オーバーナイト): 翌営業日始値で確定(金→月)
+  return slot % 2 === 0 ? { dow: D, timing: "close" } : { dow: D === 5 ? 1 : D + 1, timing: "open" };
+}
+
+// 各スロットの最適サイドから、連続する同符号ランを環状に連結してレグ列を作る。
+function mergeSlotsToLegs(slots: ComboSlot[]): TradeSpec[] {
+  const sides = slots.map((s) => s.side);
+  if (sides.every((s) => s === "flat")) return [];
+  // 前スロットと符号が変わる位置を開始点にする(全て同符号なら start=0 のまま=週内連続1レグ)。
+  let start = 0;
+  for (let k = 0; k < 10; k++) {
+    if (sides[k] !== sides[(k + 9) % 10]) { start = k; break; }
+  }
+  const legs: TradeSpec[] = [];
+  let k = 0;
+  while (k < 10) {
+    const s = (start + k) % 10;
+    const side = sides[s];
+    if (side === "flat") { k++; continue; }
+    let len = 1;
+    while (k + len < 10 && sides[(start + k + len) % 10] === side) len++;
+    const st = slotStart(s);
+    const en = slotEnd((start + k + len - 1) % 10);
+    legs.push({ entryDow: st.dow, entryTiming: st.timing, exitDow: en.dow, exitTiming: en.timing, side: side as Side });
+    k += len;
+  }
+  return legs;
+}
+
+export function bestCombination(prices: PricePoint[], compound: boolean, minSamples = 5): BestCombination {
+  const pts = toDayPts(prices);
+  const n = pts.length;
+  const slotRets: number[][] = Array.from({ length: 10 }, () => []);
+  for (let i = 0; i < n; i++) {
+    const D = pts[i].dow;
+    if (D < 1 || D > 5) continue;
+    const o = pts[i].open, c = pts[i].close;
+    if (o > 0) slotRets[2 * (D - 1)].push(c / o - 1); // 日中
+    if (i < n - 1 && c > 0) slotRets[2 * (D - 1) + 1].push(pts[i + 1].open / c - 1); // オーバーナイト
+  }
+  const slots: ComboSlot[] = slotRets.map((rets, slot) => {
+    let longW: number, shortW: number;
+    if (compound) {
+      longW = rets.reduce((w, r) => w * (1 + r), 1);
+      shortW = rets.reduce((w, r) => w * (1 - r), 1);
+    } else {
+      const sum = rets.reduce((a, b) => a + b, 0);
+      longW = 1 + sum;
+      shortW = 1 - sum;
+    }
+    // 富を最大化: max(買W, 売W, 1)。両方 <1(高ボラ・ゼロドリフトのボラ引き)なら無ポジが最良。
+    let side: Side | "flat" = "flat";
+    if (rets.length >= minSamples) {
+      if (longW >= shortW && longW > 1) side = "long";
+      else if (shortW > 1) side = "short";
+    }
+    return { slot, side, n: rets.length, longW, shortW };
+  });
+  const legs = mergeSlotsToLegs(slots);
+  const nLong = slots.filter((s) => s.side === "long").length;
+  const nShort = slots.filter((s) => s.side === "short").length;
+  return { legs, slots, nLong, nShort, coverage: (nLong + nShort) / 10 };
+}
+
 export type MatrixMetric = "perDay" | "total" | "sharpe" | "winRate";
 
 // 全25通り(エントリー曜日 × エグジット曜日)の指標グリッド。row=エントリー, col=エグジット (0=月..4=金)
