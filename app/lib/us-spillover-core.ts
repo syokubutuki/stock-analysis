@@ -106,6 +106,33 @@ export function assignBins(values: number[], scheme: BinScheme): number[] {
   return bins;
 }
 
+// ビン境界(内部しきい値)を返す。長さ = count-1。
+// sign: [0]。tercile/quintile: assignBins と同じ順位均等分割の境界値(=各上位ビンの最小値)。
+// これにより「新しい値(=今日の前夜米国)がどのビンに入るか」を閾値比較で判定できる。
+export function binEdges(values: number[], scheme: BinScheme): number[] {
+  if (scheme === "sign") return [0];
+  const k = scheme === "tercile" ? 3 : 5;
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n === 0) return new Array(k - 1).fill(0);
+  const edges: number[] = [];
+  for (let b = 1; b < k; b++) {
+    // assignBins: bin=floor(rank*k/n)。bin=b になる最小rankは ceil(b*n/k)。その値が境界。
+    const rank = Math.min(n - 1, Math.ceil((b * n) / k));
+    edges.push(sorted[rank]);
+  }
+  return edges;
+}
+
+// 単一の値が、与えた境界のもとで何番目のビンに入るか(0..count-1)。
+// sign: v>=0 → 1。quantile: v が境界以上のものを数えたインデックス(境界値はその上位ビンに属す)。
+export function binOfValue(v: number, scheme: BinScheme, edges: number[]): number {
+  if (scheme === "sign") return v >= 0 ? 1 : 0;
+  let b = 0;
+  for (const e of edges) if (v >= e) b++;
+  return b;
+}
+
 // ───────────────────────── 日内累積パス(共有時間格子) ─────────────────────────
 
 // 1営業日のバー列を時間格子(BinGrid)に写像し、各ビン時点での終値を返す。

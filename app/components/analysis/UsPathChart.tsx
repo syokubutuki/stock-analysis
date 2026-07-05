@@ -11,7 +11,7 @@ import {
   type SeriesMarker,
   type Time,
 } from "lightweight-charts";
-import { computePaths, PathResult } from "../../lib/us-spillover-path";
+import { computePaths, PathResult, UsBinMode } from "../../lib/us-spillover-path";
 import { BinScheme } from "../../lib/us-spillover-core";
 import { useAlignedDays, UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import { US_DRIVERS } from "../../hooks/useUsDaily";
@@ -22,6 +22,19 @@ import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props { ticker: string; }
+
+// ビン分けに使う前夜米国リターンの種類。
+const US_MODES: { value: UsBinMode; label: string; formula: string }[] = [
+  { value: "ret", label: "前日終値比", formula: "ln(当日終値 / 前日終値)（オーバーナイト含む米国当日騰落）" },
+  { value: "intra", label: "日中", formula: "ln(当日終値 / 当日始値)（米国正規セッション内の値動き）" },
+];
+
+// ビンの前夜米国リターン範囲を表示用に整形（対数リターンを%相当で表示）。
+function fmtBinRange(lo: number | null, hi: number | null): string {
+  if (lo === null) return `≤ ${fmtSignedPct(hi!, 2)}`;
+  if (hi === null) return `≥ ${fmtSignedPct(lo, 2)}`;
+  return `${fmtSignedPct(lo, 2)} 〜 ${fmtSignedPct(hi, 2)}`;
+}
 
 // US方向ビン別の日内平均累積パス(時間軸方向の“形” → 固定短区間の平均プロファイルなのでCanvas2D)
 function drawPaths(
@@ -74,6 +87,7 @@ export default function UsPathChart({ ticker }: Props) {
   const [usTicker, setUsTicker] = useState("^GSPC");
   const [interval, setInterval] = useState("15m");
   const [scheme, setScheme] = useState<BinScheme>("tercile");
+  const [usMode, setUsMode] = useState<UsBinMode>("ret");
   const [showBand, setShowBand] = useState(true);
   const { data, loading, error } = useAlignedDays(ticker, interval, usTicker);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,8 +98,8 @@ export default function UsPathChart({ ticker }: Props) {
   const tlMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   const result: PathResult | null = useMemo(
-    () => (data ? computePaths(data.aligned, data.grid, data.gmtoffset, scheme) : null),
-    [data, scheme]
+    () => (data ? computePaths(data.aligned, data.grid, data.gmtoffset, scheme, usMode, data.us) : null),
+    [data, scheme, usMode]
   );
   const showResult = !!result;
 
@@ -152,6 +166,8 @@ export default function UsPathChart({ ticker }: Props) {
   }, [result]);
 
   const usLabel = US_DRIVERS.find((d) => d.ticker === usTicker)?.label ?? usTicker;
+  const modeMeta = US_MODES.find((m) => m.value === usMode)!;
+  const todayBin = result && result.today ? result.bins[result.today.bin] : null;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -161,6 +177,21 @@ export default function UsPathChart({ ticker }: Props) {
       </div>
       <div className="flex items-center gap-4 flex-wrap">
         <UsDriverButtons value={usTicker} onChange={setUsTicker} />
+        <div className="flex items-center gap-1 flex-wrap text-xs">
+          <span className="text-gray-500">ビン基準:</span>
+          {US_MODES.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => setUsMode(m.value)}
+              title={m.formula}
+              className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                usMode === m.value ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
         <BinSchemeButtons value={scheme} onChange={setScheme} />
         <label className="flex items-center gap-1 text-xs text-gray-600">
           <input type="checkbox" checked={showBand} onChange={(e) => setShowBand(e.target.checked)} />
@@ -175,14 +206,55 @@ export default function UsPathChart({ ticker }: Props) {
 
       {result && (
         <>
-          {/* 凡例 */}
-          <div className="flex items-center gap-3 flex-wrap text-[11px]">
-            {result.bins.map((b) => (
-              <span key={b.bin} className="inline-flex items-center gap-1">
-                <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: b.color }} />
-                <span className="text-gray-600">{b.label}（n={b.n}）</span>
+          {/* ビン分けの基準を明示 */}
+          <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 text-[11px] text-gray-600">
+            <span className="font-medium text-gray-700">ビン分けの基準:</span>{" "}
+            前夜 {usLabel} の<span className="font-medium">{modeMeta.label}</span>リターン ={" "}
+            <span className="font-mono">{modeMeta.formula}</span>。
+            {scheme === "sign"
+              ? "　符号（0を境）で2分割。"
+              : `　全標本を順位で${result.bins.length}等分（等頻度分位）した境界でビン化。各ビンの下段に前夜米国リターンの範囲を表示。`}
+          </div>
+
+          {/* 今日（直近の前夜米国）がどのビンか */}
+          {result.today && todayBin && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+              {result.today.unpaired && (
+                <span className="inline-block mr-1 px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-bold align-middle">
+                  寄り前・未反映
+                </span>
+              )}
+              <span className="font-bold">直近の前夜米国（{result.today.usDate}）: {modeMeta.label} {fmtSignedPct(result.today.value, 2)}</span>
+              {" → "}
+              <span className="inline-flex items-center gap-1 align-middle">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: todayBin.color }} />
+                <span className="font-bold">{todayBin.label}</span>
               </span>
-            ))}
+              <span className="text-blue-700">
+                {"　ビン範囲 "}{fmtBinRange(todayBin.rangeLo, todayBin.rangeHi)}
+                {"　全体分布の下から "}{(result.today.percentile * 100).toFixed(0)}{"%位"}
+              </span>
+            </div>
+          )}
+
+          {/* 凡例（各ビンの前夜米国リターン範囲つき） */}
+          <div className="flex items-center gap-3 flex-wrap text-[11px]">
+            {result.bins.map((b) => {
+              const isToday = result.today?.bin === b.bin;
+              return (
+                <span
+                  key={b.bin}
+                  className={`inline-flex items-center gap-1 rounded px-1 ${isToday ? "ring-1 ring-blue-400 bg-blue-50" : ""}`}
+                >
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: b.color }} />
+                  <span className="text-gray-600">
+                    {b.label}
+                    <span className="text-gray-400">（{fmtBinRange(b.rangeLo, b.rangeHi)}｜n={b.n}）</span>
+                    {isToday && <span className="text-blue-600 font-bold">◀今</span>}
+                  </span>
+                </span>
+              );
+            })}
           </div>
 
           <div className="relative"><canvas ref={canvasRef} /></div>
@@ -193,30 +265,36 @@ export default function UsPathChart({ ticker }: Props) {
               <thead>
                 <tr className="text-gray-500 border-b border-gray-200">
                   <th className="text-left py-1 px-2">米国ビン</th>
+                  <th className="text-left px-2">前夜米国リターン範囲</th>
                   <th className="text-right px-2">日数</th>
                   <th className="text-right px-2">寄り→引け平均</th>
                   <th className="text-left px-2">有意性</th>
                 </tr>
               </thead>
               <tbody>
-                {result.bins.filter((b) => b.n > 0).map((b) => (
-                  <tr key={b.bin} className="border-b border-gray-100">
-                    <td className="py-1 px-2">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: b.color }} />
-                        <span className="text-gray-700">{b.label}</span>
-                      </span>
-                    </td>
-                    <td className="text-right px-2 text-gray-600">{b.n}</td>
-                    <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
-                    <td className="px-2"><StatBadge n={b.n} p={b.endP} significant={b.endP < 0.05} /></td>
-                  </tr>
-                ))}
+                {result.bins.filter((b) => b.n > 0).map((b) => {
+                  const isToday = result.today?.bin === b.bin;
+                  return (
+                    <tr key={b.bin} className={`border-b border-gray-100 ${isToday ? "bg-blue-50" : ""}`}>
+                      <td className="py-1 px-2">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: b.color }} />
+                          <span className="text-gray-700">{b.label}</span>
+                          {isToday && <span className="text-blue-600 font-bold">◀今</span>}
+                        </span>
+                      </td>
+                      <td className="px-2 text-gray-500 tabular-nums whitespace-nowrap">{fmtBinRange(b.rangeLo, b.rangeHi)}</td>
+                      <td className="text-right px-2 text-gray-600">{b.n}</td>
+                      <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
+                      <td className="px-2"><StatBadge n={b.n} p={b.endP} significant={b.endP < 0.05} /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <p className="text-[11px] text-gray-400">
-            各線は前夜 {usLabel} のビンに属する日の、寄り基準の平均累積リターン。右肩上がり＝日中も買われる、
+            各線は前夜 {usLabel} の{modeMeta.label}リターンのビンに属する日の、寄り基準の平均累積リターン。右肩上がり＝日中も買われる、
             寄り直後にピークを打って垂れる＝寄り天フェード。
           </p>
 
@@ -262,6 +340,8 @@ export default function UsPathChart({ ticker }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li>{"各営業日について、寄り基準の累積対数リターン r(t) = ln(P_t / 始値) を時間格子上で算出(P_t=その時間ビンの終値、無ければ直前値で補完)。"}</li>
           <li>{"前夜米国リターンでビン分割(陰陽/3分位/5分位)。分位は順位で均等分割するので各ビンの日数がほぼ揃う。"}</li>
+          <li>{"ビン分けの基準リターンは選択可能: "}<strong>前日終値比</strong>{" ln(C/前日C)＝オーバーナイト込みの米国当日騰落、または "}<strong>日中</strong>{" ln(C/O)＝米国正規セッション内の値動き。夜間ギャップとザラ場のどちらが翌日日本に効くかを切り替えて比較できる。"}</li>
+          <li>{"各ビンの前夜米国リターン範囲(境界しきい値)を凡例・表に表示。分位境界は全標本の順位から算出した値で、"}<strong>今日の状況がどのビンに入るか</strong>{"は上部の青バナー(直近の前夜米国リターン→所属ビン＋分布内の位置%)で確認できる。"}</li>
           <li>{"ビンごとに各時刻の平均パスを取り、平均 ± 1.96·標準誤差(SE=σ/√n)を95%帯として重ねる。"}</li>
           <li>{"終端(寄り→引け)の平均が0と異なるかを1標本t検定で評価。"}</li>
         </ul>

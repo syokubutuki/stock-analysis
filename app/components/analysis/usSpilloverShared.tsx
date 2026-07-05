@@ -8,7 +8,7 @@ import { useIntraday } from "../../hooks/useIntraday";
 import { useUsDaily, US_DRIVERS } from "../../hooks/useUsDaily";
 import { groupByDay, buildBinGrid, BinGrid } from "../../lib/intraday-core";
 import {
-  computeUsReturns, alignJpUs, AlignedDay, BinScheme,
+  computeUsReturns, alignJpUs, AlignedDay, UsReturn, BinScheme,
 } from "../../lib/us-spillover-core";
 
 export function intervalToMin(interval: string): number {
@@ -18,6 +18,7 @@ export function intervalToMin(interval: string): number {
 
 export interface AlignedData {
   aligned: AlignedDay[];
+  us: UsReturn[]; // 前夜米国リターンの全系列(日付昇順)。未ペアの最新終値も含む(=寄り前の“ゆうべのNY”)
   grid: BinGrid | null;
   gmtoffset: number;
 }
@@ -35,7 +36,7 @@ export function useAlignedDays(ticker: string, interval: string, usTicker: strin
     const us = computeUsReturns(usPrices);
     const aligned = alignJpUs(days, us);
     const grid = buildBinGrid(resp.bars, resp.gmtoffset, intervalToMin(interval));
-    return { aligned, grid, gmtoffset: resp.gmtoffset };
+    return { aligned, us, grid, gmtoffset: resp.gmtoffset };
   }, [resp, usPrices, interval]);
 
   return { data, loading: il || ul, error: ie || ue };
