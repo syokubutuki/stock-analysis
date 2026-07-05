@@ -8,6 +8,7 @@ import PeriodSelector from "./components/analysis/PeriodSelector";
 import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
 import WatchlistPanel from "./components/WatchlistPanel";
 import TickerSearchInput from "./components/TickerSearchInput";
+import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
 import { SeriesMode } from "./lib/series-mode";
 
 const DiffSeriesChart = dynamic(
@@ -961,6 +962,12 @@ export default function AnalysisPage() {
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
   const [tickerInput, setTickerInput] = useState("");
+  // カレンダー節: タイトル絞り込みと一括開閉
+  const [calendarFilter, setCalendarFilter] = useState("");
+  const [calendarBulk, setCalendarBulk] = useState<{ nonce: number; open: boolean }>({
+    nonce: 0,
+    open: false,
+  });
 
   // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
   const restoredRef = useRef(false);
@@ -1436,50 +1443,136 @@ export default function AnalysisPage() {
                 </>
               )}
 
-              {activeSection === "calendar" && (
-                <>
-                  <SpiralHeatmap prices={filteredPrices} period={period} />
-                  <CandleSeasonalityChart prices={filteredPrices} />
-                  <WeekClockChart prices={filteredPrices} ticker={data.ticker} />
-                  <CalendarEffectChart prices={filteredPrices} />
-                  <SessionGapChart prices={filteredPrices} />
-                  <TodayBinChart prices={filteredPrices} />
-                  <WeekdayConditionalChart prices={filteredPrices} />
-                  <WeekdayEdgeScanChart prices={filteredPrices} />
-                  <WeekdayIntradayPathChart ticker={data.ticker} />
-                  <TurnOfMonthPathChart ticker={data.ticker} />
-                  <WeekdayUsPathChart ticker={data.ticker} />
-                  <MondayGapChart prices={allPrices} />
-                  <RegimeUsPathChart ticker={data.ticker} />
-                  <WeekdayIntradayEdgeChart ticker={data.ticker} />
-                  <SectorBasketWeekdayChart ticker={data.ticker} />
-                  <HighLowTimingChart ticker={data.ticker} />
-                  <ExecutionTimingChart ticker={data.ticker} />
-                  <EdgeDiscountChart prices={allPrices} ticker={data.ticker} />
-                  <SlicedExecutionChart ticker={data.ticker} />
-                  <IntradayWindowChart ticker={data.ticker} />
-                  <IntradayProfileChart ticker={data.ticker} />
-                  <VwapDeviationChart ticker={data.ticker} />
-                  <IntradayRegimeChart ticker={data.ticker} />
-                  <IntradayExcursionChart ticker={data.ticker} />
-                  <RealizedVolChart ticker={data.ticker} />
-                  <GapIntradayChart ticker={data.ticker} />
-                  <SignalIntradayChart ticker={data.ticker} />
-                  <SignalExecutionChart prices={allPrices} ticker={data.ticker} />
-                  {/* 前夜米国 → 当日日中 スピルオーバー7手法 */}
-                  <UsDriverChart ticker={data.ticker} />
-                  <UsBetaChart ticker={data.ticker} />
-                  <UsPathChart ticker={data.ticker} />
-                  <UsAbsorptionChart ticker={data.ticker} />
-                  <UsLeadLagChart ticker={data.ticker} />
-                  <UsVolSpilloverChart ticker={data.ticker} />
-                  <UsTimingEdgeChart ticker={data.ticker} />
-                  {/* 消化時間エッジ探索(保有期間・消化境界・イベント時間) */}
-                  <UsHoldingPeriodChart ticker={data.ticker} />
-                  <UsDigestionBoundaryChart ticker={data.ticker} />
-                  <UsEventTimeChart ticker={data.ticker} />
-                </>
-              )}
+              {activeSection === "calendar" && (() => {
+                const q = calendarFilter.trim().toLowerCase();
+                const groups: {
+                  group: string;
+                  items: { id: string; title: string; node: React.ReactNode }[];
+                }[] = [
+                  {
+                    group: "曜日・カレンダー（日足）",
+                    items: [
+                      { id: "cal-spiral", title: "カレンダー螺旋ヒートマップ", node: <SpiralHeatmap prices={filteredPrices} period={period} /> },
+                      { id: "cal-candle-season", title: "ローソク足の季節性（足の中身×カレンダー）", node: <CandleSeasonalityChart prices={filteredPrices} /> },
+                      { id: "cal-weekclock", title: "週内クロック（月曜始値基準の累積OHLC）", node: <WeekClockChart prices={filteredPrices} ticker={data.ticker} /> },
+                      { id: "cal-event-effect", title: "カレンダー・イベント効果（月末/SQ/連休/季節の先行きリターン）", node: <CalendarEffectChart prices={filteredPrices} /> },
+                      { id: "cal-session-gap", title: "休場コンテキスト別 曜日値動き（連休・祝日の歪み検出）", node: <SessionGapChart prices={filteredPrices} /> },
+                      { id: "cal-today-bin", title: "今日の値動き → リターンビン即時判断（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
+                      { id: "cal-weekday-cond", title: "曜日 × 値動きビン 条件付き分析（インタラクティブ）", node: <WeekdayConditionalChart prices={filteredPrices} /> },
+                      { id: "cal-weekday-edge", title: "曜日タイミング好機スキャン", node: <WeekdayEdgeScanChart prices={filteredPrices} /> },
+                      { id: "cal-monday-gap", title: "月曜ギャップ解剖（週初めの「下げて始まる」を層別）", node: <MondayGapChart prices={allPrices} /> },
+                    ],
+                  },
+                  {
+                    group: "曜日×日内 累積パス・エッジ（日中足）",
+                    items: [
+                      { id: "cal-weekday-intra-path", title: "曜日 × 当日日内 平均累積パス", node: <WeekdayIntradayPathChart ticker={data.ticker} /> },
+                      { id: "cal-tom-path", title: "月内位置（月初/中旬/月末）× 当日日内 平均累積パス", node: <TurnOfMonthPathChart ticker={data.ticker} /> },
+                      { id: "cal-weekday-us-path", title: "曜日 × 前夜米国ビン 交互作用：日内平均累積パス", node: <WeekdayUsPathChart ticker={data.ticker} /> },
+                      { id: "cal-regime-us-path", title: "相場基調 × 前夜米国 交互作用：日内平均累積パス", node: <RegimeUsPathChart ticker={data.ticker} /> },
+                      { id: "cal-weekday-intra-edge", title: "曜日 × 日内タイミング エッジスキャン", node: <WeekdayIntradayEdgeChart ticker={data.ticker} /> },
+                      { id: "cal-sector-basket", title: "業種バスケット 曜日×日内（標本プール）", node: <SectorBasketWeekdayChart ticker={data.ticker} /> },
+                    ],
+                  },
+                  {
+                    group: "日中プロファイル・約定タイミング（日中足）",
+                    items: [
+                      { id: "cal-highlow-timing", title: "高値・安値の時間帯分析", node: <HighLowTimingChart ticker={data.ticker} /> },
+                      { id: "cal-exec-timing", title: "寄り/引け 近傍 約定タイミング最適化", node: <ExecutionTimingChart ticker={data.ticker} /> },
+                      { id: "cal-edge-discount", title: "エッジ割引（公式マーク vs 約定可能価格）", node: <EdgeDiscountChart prices={allPrices} ticker={data.ticker} /> },
+                      { id: "cal-sliced-exec", title: "TWAP/VWAP 分割約定の効果", node: <SlicedExecutionChart ticker={data.ticker} /> },
+                      { id: "cal-intra-window", title: "任意時刻ウィンドウ × 曜日 クロス集計", node: <IntradayWindowChart ticker={data.ticker} /> },
+                      { id: "cal-intra-profile", title: "時間帯プロファイル（いつ動くか）", node: <IntradayProfileChart ticker={data.ticker} /> },
+                      { id: "cal-vwap-dev", title: "VWAP乖離分析（回帰か継続か）", node: <VwapDeviationChart ticker={data.ticker} /> },
+                      { id: "cal-intra-regime", title: "当日内の状態（どういう日か）", node: <IntradayRegimeChart ticker={data.ticker} /> },
+                      { id: "cal-intra-excursion", title: "当日内 MFE/MAE と TP/SL最適化", node: <IntradayExcursionChart ticker={data.ticker} /> },
+                      { id: "cal-realized-vol", title: "マイクロ構造の代理（実現ボラ・夜間/日中・出来高クロック）", node: <RealizedVolChart ticker={data.ticker} /> },
+                      { id: "cal-gap-intra", title: "ギャップ後の日中挙動（窓埋め vs gap-and-go）", node: <GapIntradayChart ticker={data.ticker} /> },
+                      { id: "cal-signal-intra", title: "日足シグナル翌日の日中エントリー最適化", node: <SignalIntradayChart ticker={data.ticker} /> },
+                      { id: "cal-signal-exec", title: "日足シグナル × 最適約定時刻", node: <SignalExecutionChart prices={allPrices} ticker={data.ticker} /> },
+                    ],
+                  },
+                  {
+                    group: "前夜米国 → 当日日中 スピルオーバー",
+                    items: [
+                      { id: "cal-us-driver", title: "支配ドライバ指数の特定 と 乖離日分析", node: <UsDriverChart ticker={data.ticker} /> },
+                      { id: "cal-us-beta", title: "前夜米国 → 当日スピルオーバーβ（ギャップ織り込み分解）", node: <UsBetaChart ticker={data.ticker} /> },
+                      { id: "cal-us-path", title: "前夜米国ビン × 当日日内 平均累積パス", node: <UsPathChart ticker={data.ticker} /> },
+                      { id: "cal-us-absorption", title: "前夜米国の織り込み速度と日中の反転確率", node: <UsAbsorptionChart ticker={data.ticker} /> },
+                      { id: "cal-us-leadlag", title: "前夜米国 → 日中相関の減衰（米国の記憶は何時まで効くか）", node: <UsLeadLagChart ticker={data.ticker} /> },
+                      { id: "cal-us-vol", title: "ボラティリティ・スピルオーバー（米国の荒れ → 当日の荒れ）", node: <UsVolSpilloverChart ticker={data.ticker} /> },
+                      { id: "cal-us-timing", title: "米国方向別 最適エントリー/エグジット時刻スキャン", node: <UsTimingEdgeChart ticker={data.ticker} /> },
+                    ],
+                  },
+                  {
+                    group: "消化時間エッジ（保有期間・消化境界・イベント時間）",
+                    items: [
+                      { id: "cal-us-holding", title: "米国方向別 保有期間の最適化（IR×Δ / MFE・MAE）", node: <UsHoldingPeriodChart ticker={data.ticker} /> },
+                      { id: "cal-us-digestion", title: "消化完了点(τ)とレジーム反転・反転ハザード", node: <UsDigestionBoundaryChart ticker={data.ticker} /> },
+                      { id: "cal-us-eventtime", title: "消化イベント時間分析（進捗率軸のエッジ / 消化速度層別）", node: <UsEventTimeChart ticker={data.ticker} /> },
+                    ],
+                  },
+                ];
+                const filtered = groups
+                  .map((g) => ({
+                    ...g,
+                    items: q ? g.items.filter((it) => it.title.toLowerCase().includes(q)) : g.items,
+                  }))
+                  .filter((g) => g.items.length > 0);
+                const totalShown = filtered.reduce((s, g) => s + g.items.length, 0);
+                return (
+                  <>
+                    {/* ツールバー: 絞り込み + 一括開閉 */}
+                    <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-gray-50/95 backdrop-blur border-b border-gray-200 flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={calendarFilter}
+                        onChange={(e) => setCalendarFilter(e.target.value)}
+                        placeholder="分析名で絞り込み（例: 週内 / 米国 / VWAP）"
+                        className="flex-1 min-w-[180px] text-sm border border-gray-300 rounded px-2 py-1"
+                      />
+                      {calendarFilter && (
+                        <button
+                          onClick={() => setCalendarFilter("")}
+                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                        >
+                          クリア
+                        </button>
+                      )}
+                      <span className="text-xs text-gray-400">{totalShown}件</span>
+                      <button
+                        onClick={() => setCalendarBulk((b) => ({ nonce: b.nonce + 1, open: true }))}
+                        className="text-xs text-blue-600 hover:bg-blue-50 border border-blue-200 rounded px-2 py-1"
+                      >
+                        すべて開く
+                      </button>
+                      <button
+                        onClick={() => setCalendarBulk((b) => ({ nonce: b.nonce + 1, open: false }))}
+                        className="text-xs text-gray-600 hover:bg-gray-100 border border-gray-300 rounded px-2 py-1"
+                      >
+                        すべて閉じる
+                      </button>
+                    </div>
+                    {filtered.map((g) => (
+                      <div key={g.group} className="space-y-2">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
+                          {g.group}
+                        </h3>
+                        {g.items.map((it) => (
+                          <CollapsibleAnalysis key={it.id} id={it.id} title={it.title} bulk={calendarBulk}>
+                            {it.node}
+                          </CollapsibleAnalysis>
+                        ))}
+                      </div>
+                    ))}
+                    {totalShown === 0 && (
+                      <div className="text-sm text-gray-400 py-8 text-center">
+                        「{calendarFilter}」に一致する分析はありません。
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {activeSection === "simulation" && (
                 <>
