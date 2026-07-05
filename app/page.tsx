@@ -972,6 +972,8 @@ export default function AnalysisPage() {
     (open: boolean) => setSectionBulk((b) => ({ nonce: b.nonce + 1, open })),
     []
   );
+  // 上部固定バーの自動隠し（下スクロールで隠し・上スクロールで再表示）
+  const [barHidden, setBarHidden] = useState(false);
 
   // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
   const restoredRef = useRef(false);
@@ -1018,6 +1020,28 @@ export default function AnalysisPage() {
       localStorage.setItem("sa:period", period);
     } catch {}
   }, [period]);
+
+  // Headroom: 下方向スクロールで固定バーを隠し、上方向/最上部で再表示する。
+  // レイアウトを動かさない transform で行うためスクロール量が揺れても破綻しない。
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const dy = y - lastY;
+        if (y < 80) setBarHidden(false);           // 最上部付近は常に表示
+        else if (dy > 6) setBarHidden(true);        // 下スクロール → 隠す
+        else if (dy < -6) setBarHidden(false);      // 上スクロール → 表示
+        lastY = y;
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Series Explorer の系列グループから対応する詳細分析セクションへジャンプする。
   // タブを切り替えた後、保留中のアンカー DOM を探してスクロール＆ハイライトする。
@@ -1080,8 +1104,13 @@ export default function AnalysisPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-        {/* sticky ヘッダ: 検索 + 期間/系列 + セクションタブ（再検索やタブ切替で一番上へ戻らずに済む） */}
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-3 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 space-y-2">
+        {/* sticky ヘッダ: 検索 + 期間/系列 + セクションタブ（再検索やタブ切替で一番上へ戻らずに済む）。
+            下スクロール中は隠して分析領域を広く使い、上スクロールで即再表示する。 */}
+        <div
+          className={`sticky top-0 z-30 -mx-4 px-4 py-3 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 space-y-2 transition-transform duration-200 ${
+            barHidden ? "-translate-y-full" : "translate-y-0"
+          }`}
+        >
           {/* 入力エリア */}
           <div className="flex items-center gap-3 flex-wrap">
             <TickerSearchInput
