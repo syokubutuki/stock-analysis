@@ -972,8 +972,12 @@ export default function AnalysisPage() {
     (open: boolean) => setSectionBulk((b) => ({ nonce: b.nonce + 1, open })),
     []
   );
-  // 上部固定バーの自動隠し（下スクロールで隠し・上スクロールで再表示）
+  // 上部固定バーの自動隠し。3状態:
+  //  - 最上部: 検索行 + タブ全表示 (barHidden=false, tabsVisible=true)
+  //  - 下スクロール中: 全部隠す (barHidden=true)
+  //  - 上スクロール中(途中): 検索行だけ表示 (barHidden=false, tabsVisible=false)
   const [barHidden, setBarHidden] = useState(false);
+  const [tabsVisible, setTabsVisible] = useState(true);
 
   // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
   const restoredRef = useRef(false);
@@ -1021,8 +1025,9 @@ export default function AnalysisPage() {
     } catch {}
   }, [period]);
 
-  // Headroom: 下方向スクロールで固定バーを隠し、上方向/最上部で再表示する。
-  // レイアウトを動かさない transform で行うためスクロール量が揺れても破綻しない。
+  // Headroom: 下スクロールでバーを隠し、上スクロールでは検索行だけ再表示する。
+  // タブ行は最上部でのみ表示（ヒステリシスで境界のちらつきを防ぐ）。
+  // 表示/非表示は transform で行うためスクロール量が揺れても破綻しない。
   useEffect(() => {
     let lastY = window.scrollY;
     let ticking = false;
@@ -1032,9 +1037,16 @@ export default function AnalysisPage() {
       requestAnimationFrame(() => {
         const y = window.scrollY;
         const dy = y - lastY;
-        if (y < 80) setBarHidden(false);           // 最上部付近は常に表示
-        else if (dy > 6) setBarHidden(true);        // 下スクロール → 隠す
-        else if (dy < -6) setBarHidden(false);      // 上スクロール → 表示
+        if (y <= 4) {
+          // 最上部: 全表示
+          setBarHidden(false);
+          setTabsVisible(true);
+        } else {
+          // 最上部から十分離れたらタブ行を畳む（戻すのは最上部のみ＝ヒステリシス）
+          if (y > 120) setTabsVisible(false);
+          if (dy > 6) setBarHidden(true);        // 下スクロール → 全部隠す
+          else if (dy < -6) setBarHidden(false); // 上スクロール → 検索行を表示
+        }
         lastY = y;
         ticking = false;
       });
@@ -1142,8 +1154,8 @@ export default function AnalysisPage() {
             )}
           </div>
 
-          {/* セクションタブ */}
-          {data && filteredPrices.length > 0 && (
+          {/* セクションタブ（最上部でのみ表示。読書中は畳んで検索行だけ残す） */}
+          {tabsVisible && data && filteredPrices.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {SECTIONS.map(({ key, label, description }) => (
                 <button
