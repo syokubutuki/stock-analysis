@@ -8,7 +8,7 @@ import PeriodSelector from "./components/analysis/PeriodSelector";
 import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
 import WatchlistPanel from "./components/WatchlistPanel";
 import TickerSearchInput from "./components/TickerSearchInput";
-import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
+import AccordionSection from "./components/analysis/AccordionSection";
 import { SeriesMode } from "./lib/series-mode";
 
 const DiffSeriesChart = dynamic(
@@ -962,12 +962,16 @@ export default function AnalysisPage() {
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
   const [tickerInput, setTickerInput] = useState("");
-  // カレンダー節: タイトル絞り込みと一括開閉
-  const [calendarFilter, setCalendarFilter] = useState("");
-  const [calendarBulk, setCalendarBulk] = useState<{ nonce: number; open: boolean }>({
+  // 折りたたみ節: タイトル絞り込みと一括開閉（アクティブ節で共有）
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [sectionBulk, setSectionBulk] = useState<{ nonce: number; open: boolean }>({
     nonce: 0,
     open: false,
   });
+  const bumpBulk = useCallback(
+    (open: boolean) => setSectionBulk((b) => ({ nonce: b.nonce + 1, open })),
+    []
+  );
 
   // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
   const restoredRef = useRef(false);
@@ -1019,7 +1023,13 @@ export default function AnalysisPage() {
   // タブを切り替えた後、保留中のアンカー DOM を探してスクロール＆ハイライトする。
   const pendingScrollRef = useRef<string | null>(null);
   const navigateToSection = useCallback((section: string, anchor?: string) => {
+    // 折りたたみ化した節では、ジャンプ先パネルを開いた状態でマウントさせるため
+    // 事前に localStorage の開閉フラグを立てておく（CollapsibleAnalysis が遅延初期化で読む）。
+    if (anchor) {
+      try { localStorage.setItem(`sa:open:${anchor}`, "1"); } catch {}
+    }
     pendingScrollRef.current = anchor ?? null;
+    setSectionFilter("");
     setActiveSection(section as SectionKey);
   }, []);
   useEffect(() => {
@@ -1029,7 +1039,8 @@ export default function AnalysisPage() {
     // セクション切替→再レンダリング→要素出現のタイミング差を rAF リトライで吸収する
     let tries = 0;
     const tick = () => {
-      const el = document.getElementById(id);
+      // 従来の素の div アンカー(sa-*) と、折りたたみパネル(panel-sa-*) の両方に対応
+      const el = document.getElementById(id) || document.getElementById(`panel-${id}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
         el.classList.add("sa-flash");
@@ -1069,34 +1080,57 @@ export default function AnalysisPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-        {/* 入力エリア */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <TickerSearchInput
-            value={tickerInput}
-            onChange={setTickerInput}
-            onSubmit={fetchStock}
-            loading={loading}
-          />
-          <WatchlistPanel
-            currentTicker={data?.ticker ?? null}
-            currentName={data?.name ?? null}
-            onSelect={(ticker) => {
-              setTickerInput(ticker);
-              fetchStock(ticker);
-            }}
-          />
-          {data && (
-            <>
-              <span className="text-gray-600 text-sm font-medium">
-                {data.name}
-              </span>
-              <PeriodSelector current={period} onChange={setPeriod} />
-              <SeriesModeSelector
-                current={seriesMode}
-                onChange={setSeriesMode}
-                disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
-              />
-            </>
+        {/* sticky ヘッダ: 検索 + 期間/系列 + セクションタブ（再検索やタブ切替で一番上へ戻らずに済む） */}
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-3 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 space-y-2">
+          {/* 入力エリア */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <TickerSearchInput
+              value={tickerInput}
+              onChange={setTickerInput}
+              onSubmit={fetchStock}
+              loading={loading}
+            />
+            <WatchlistPanel
+              currentTicker={data?.ticker ?? null}
+              currentName={data?.name ?? null}
+              onSelect={(ticker) => {
+                setTickerInput(ticker);
+                fetchStock(ticker);
+              }}
+            />
+            {data && (
+              <>
+                <span className="text-gray-600 text-sm font-medium">
+                  {data.name}
+                </span>
+                <PeriodSelector current={period} onChange={setPeriod} />
+                <SeriesModeSelector
+                  current={seriesMode}
+                  onChange={setSeriesMode}
+                  disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
+                />
+              </>
+            )}
+          </div>
+
+          {/* セクションタブ */}
+          {data && filteredPrices.length > 0 && (
+            <div className="flex gap-1 flex-wrap">
+              {SECTIONS.map(({ key, label, description }) => (
+                <button
+                  key={key}
+                  onClick={() => { setActiveSection(key); setSectionFilter(""); }}
+                  title={description}
+                  className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                    activeSection === key
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -1108,6 +1142,10 @@ export default function AnalysisPage() {
 
         {data && filteredPrices.length > 0 && (
           <>
+            <div className="text-xs text-gray-400">
+              {SECTIONS.find(s => s.key === activeSection)?.description}
+            </div>
+
             {/* サマリー */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <SummaryCard
@@ -1139,52 +1177,60 @@ export default function AnalysisPage() {
               />
             </div>
 
-            {/* セクションタブ */}
-            <div className="flex gap-1 flex-wrap border-b border-gray-200 pb-2">
-              {SECTIONS.map(({ key, label, description }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveSection(key)}
-                  title={description}
-                  className={`px-3 py-1.5 text-sm rounded-t font-medium transition-colors ${
-                    activeSection === key
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              {SECTIONS.find(s => s.key === activeSection)?.description}
-            </div>
-
             {/* セクション内容 */}
             <div className="space-y-6">
               {activeSection === "basic" && (
                 <>
+                  {/* Series Explorer は常時表示のヒーローチャート（ジャンプの起点） */}
                   <UnifiedChart prices={allPrices} period={period} onNavigate={navigateToSection} />
-                  <StructureScorecardChart prices={filteredPrices} />
-                  <ConsolidatedScorecardChart prices={filteredPrices} />
-                  <RollingAnimationChart prices={filteredPrices} />
-                  <BenchmarkChart prices={allPrices} period={period} />
-                  <RelativeStrengthChart prices={filteredPrices} />
-                  <RelativeStrengthExtChart prices={filteredPrices} />
-                  <BenchmarkDCCChart prices={filteredPrices} ticker={data.ticker} />
-                  <DiffSeriesChart prices={allPrices} period={period} />
-                  <VolumeAnalysis prices={allPrices} period={period} />
-                  <RelativeVolumeChart prices={filteredPrices} />
-                  <VolumeIndicatorsChart prices={filteredPrices} />
-                  <SignedVolumeChart prices={filteredPrices} />
-                  <VolumeProfileChart prices={filteredPrices} />
-                  <VolumeProfileExtChart prices={filteredPrices} />
-                  <VolumeReturnChart prices={filteredPrices} />
-                  <VolumeLeadChart prices={filteredPrices} />
-                  <GapAnalysisChart prices={allPrices} period={period} />
-                  <HoldingPeriodChart prices={filteredPrices} />
-                  <MultiTimeframeChart prices={filteredPrices} />
-                  <BehavioralChart prices={filteredPrices} />
+                  <AccordionSection
+                    filter={sectionFilter}
+                    onFilterChange={setSectionFilter}
+                    bulk={sectionBulk}
+                    onBulk={bumpBulk}
+                    groups={[
+                      {
+                        group: "スコア・サマリー",
+                        items: [
+                          { id: "basic-structure-score", title: "構造スコアカード", node: <StructureScorecardChart prices={filteredPrices} /> },
+                          { id: "basic-consolidated-score", title: "総合スコアカード（多分析の所見を1枚に集約）", node: <ConsolidatedScorecardChart prices={filteredPrices} /> },
+                          { id: "basic-rolling-anim", title: "ローリング・アニメーション（リスク/リターンの遷移）", node: <RollingAnimationChart prices={filteredPrices} /> },
+                        ],
+                      },
+                      {
+                        group: "ベンチマーク・相対力",
+                        items: [
+                          { id: "basic-benchmark", title: "ベンチマーク比較", node: <BenchmarkChart prices={allPrices} period={period} /> },
+                          { id: "basic-relstrength", title: "相対力（対ベンチマーク）と RSモメンタム", node: <RelativeStrengthChart prices={filteredPrices} /> },
+                          { id: "basic-relstrength-ext", title: "相対力の拡張（キャプチャ比・共和分・リードラグ）", node: <RelativeStrengthExtChart prices={filteredPrices} /> },
+                          { id: "basic-dcc", title: "時変相関 DCC（対ベンチマーク）", node: <BenchmarkDCCChart prices={filteredPrices} ticker={data.ticker} /> },
+                        ],
+                      },
+                      {
+                        group: "出来高",
+                        items: [
+                          { id: "basic-volume", title: "出来高分析", node: <VolumeAnalysis prices={allPrices} period={period} /> },
+                          { id: "basic-rvol", title: "相対出来高 RVOL（出来高の枯渇/急増）", node: <RelativeVolumeChart prices={filteredPrices} /> },
+                          { id: "basic-vol-indicators", title: "出来高系指標の拡張（VPT/A-D/MFI/Force/EOM）", node: <VolumeIndicatorsChart prices={filteredPrices} /> },
+                          { id: "basic-signed-volume", title: "出来高×リターンの符号付き分析（買い需要/売り需要の質）", node: <SignedVolumeChart prices={filteredPrices} /> },
+                          { id: "basic-volume-profile", title: "出来高プロファイル (Volume at Price)", node: <VolumeProfileChart prices={filteredPrices} /> },
+                          { id: "basic-volume-profile-ext", title: "期間ボリュームプロファイル拡張（POC・バリューエリア・HVN/LVN）", node: <VolumeProfileExtChart prices={filteredPrices} /> },
+                          { id: "basic-volume-return", title: "出来高-リターン同時分析", node: <VolumeReturnChart prices={filteredPrices} /> },
+                          { id: "basic-volume-lead", title: "出来高先行性分析", node: <VolumeLeadChart prices={filteredPrices} /> },
+                        ],
+                      },
+                      {
+                        group: "価格系列・その他",
+                        items: [
+                          { id: "basic-diff", title: "差分系列", node: <DiffSeriesChart prices={allPrices} period={period} /> },
+                          { id: "basic-gap", title: "ギャップ・日中/夜間リターン分解", node: <GapAnalysisChart prices={allPrices} period={period} /> },
+                          { id: "basic-holding", title: "最適保有期間分析", node: <HoldingPeriodChart prices={filteredPrices} /> },
+                          { id: "basic-mtf", title: "マルチタイムフレーム分析", node: <MultiTimeframeChart prices={filteredPrices} /> },
+                          { id: "basic-behavioral", title: "行動ファイナンス指標", node: <BehavioralChart prices={filteredPrices} /> },
+                        ],
+                      },
+                    ]}
+                  />
                 </>
               )}
 
@@ -1203,33 +1249,46 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "ohlc" && (
-                <>
-                  <div id="sa-ohlc" className="scroll-mt-20">
-                    <CandleStructureChart prices={allPrices} period={period} />
-                  </div>
-                  <CrashSurgeStreakChart prices={filteredPrices} />
-                  <CandlestickPatternChart prices={filteredPrices} />
-                  <CandlePatternEdgeChart prices={filteredPrices} />
-                  <CandleRunChart prices={filteredPrices} />
-                  <WickPressureChart prices={filteredPrices} />
-                  <IntradayPathChart prices={filteredPrices} />
-                  <ClosePositionChart prices={filteredPrices} />
-                  <TrueRangeDecompChart prices={filteredPrices} />
-                  <MFEMAEChart prices={allPrices} period={period} />
-                  <TpSlOptimizerChart prices={filteredPrices} />
-                  <div id="sa-ohlc-gap" className="scroll-mt-20">
-                    <GapScatterChart prices={allPrices} period={period} />
-                  </div>
-                  <GapClassificationChart prices={filteredPrices} />
-                  <div id="sa-ohlc-range" className="scroll-mt-20">
-                    <IntradayRangeChart prices={allPrices} period={period} />
-                  </div>
-                  <RangeVolatilityChart prices={allPrices} period={period} />
-                  <OHLCVolatilityChart prices={filteredPrices} />
-                  <div id="sa-ohlc-micro" className="scroll-mt-20">
-                    <MicrostructureChart prices={filteredPrices} />
-                  </div>
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "ローソク足の構造・パターン",
+                      items: [
+                        { id: "sa-ohlc", title: "ローソク足構造分析", node: <CandleStructureChart prices={allPrices} period={period} /> },
+                        { id: "ohlc-crash-surge", title: "連続暴落・暴騰ラン分析", node: <CrashSurgeStreakChart prices={filteredPrices} /> },
+                        { id: "ohlc-pattern", title: "ローソク足パターン認識", node: <CandlestickPatternChart prices={filteredPrices} /> },
+                        { id: "ohlc-pattern-edge", title: "ローソク足パターンの統計的エッジ", node: <CandlePatternEdgeChart prices={filteredPrices} /> },
+                        { id: "ohlc-candle-run", title: "連続ローソク（陽連/陰連）の先行きリターン", node: <CandleRunChart prices={filteredPrices} /> },
+                        { id: "ohlc-wick", title: "髭非対称・圧力指標の時系列（買い圧/売り圧）", node: <WickPressureChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "日中パス・引け・含み損益",
+                      items: [
+                        { id: "ohlc-intra-path", title: "日中パス推定", node: <IntradayPathChart prices={filteredPrices} /> },
+                        { id: "ohlc-close-position", title: "Close Position分析（引け方分析）", node: <ClosePositionChart prices={filteredPrices} /> },
+                        { id: "ohlc-true-range", title: "True Range分解", node: <TrueRangeDecompChart prices={filteredPrices} /> },
+                        { id: "ohlc-mfemae", title: "MFE/MAE 分析（含み益・含み損の到達分布）", node: <MFEMAEChart prices={allPrices} period={period} /> },
+                        { id: "ohlc-tpsl", title: "最適 TP/SL（保有期間別 MFE/MAE）", node: <TpSlOptimizerChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "ギャップ・レンジ・ボラティリティ",
+                      items: [
+                        { id: "sa-ohlc-gap", title: "ギャップ散布図（夜間→日中の関係）", node: <GapScatterChart prices={allPrices} period={period} /> },
+                        { id: "ohlc-gap-class", title: "窓の分類と窓埋め統計（gap-and-go vs fade）", node: <GapClassificationChart prices={filteredPrices} /> },
+                        { id: "sa-ohlc-range", title: "日中レンジ分析", node: <IntradayRangeChart prices={allPrices} period={period} /> },
+                        { id: "ohlc-range-vol", title: "レンジベース・ボラティリティ推定", node: <RangeVolatilityChart prices={allPrices} period={period} /> },
+                        { id: "ohlc-ohlc-vol", title: "OHLCボラティリティ推定量の比較（Yang-Zhang ほか）", node: <OHLCVolatilityChart prices={filteredPrices} /> },
+                        { id: "sa-ohlc-micro", title: "マイクロストラクチャー指標（スプレッド/インパクト）", node: <MicrostructureChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "risk" && (
@@ -1443,12 +1502,13 @@ export default function AnalysisPage() {
                 </>
               )}
 
-              {activeSection === "calendar" && (() => {
-                const q = calendarFilter.trim().toLowerCase();
-                const groups: {
-                  group: string;
-                  items: { id: string; title: string; node: React.ReactNode }[];
-                }[] = [
+              {activeSection === "calendar" && (
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
                   {
                     group: "曜日・カレンダー（日足）",
                     items: [
@@ -1512,91 +1572,55 @@ export default function AnalysisPage() {
                       { id: "cal-us-eventtime", title: "消化イベント時間分析（進捗率軸のエッジ / 消化速度層別）", node: <UsEventTimeChart ticker={data.ticker} /> },
                     ],
                   },
-                ];
-                const filtered = groups
-                  .map((g) => ({
-                    ...g,
-                    items: q ? g.items.filter((it) => it.title.toLowerCase().includes(q)) : g.items,
-                  }))
-                  .filter((g) => g.items.length > 0);
-                const totalShown = filtered.reduce((s, g) => s + g.items.length, 0);
-                return (
-                  <>
-                    {/* ツールバー: 絞り込み + 一括開閉 */}
-                    <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-gray-50/95 backdrop-blur border-b border-gray-200 flex flex-wrap items-center gap-2">
-                      <input
-                        type="text"
-                        value={calendarFilter}
-                        onChange={(e) => setCalendarFilter(e.target.value)}
-                        placeholder="分析名で絞り込み（例: 週内 / 米国 / VWAP）"
-                        className="flex-1 min-w-[180px] text-sm border border-gray-300 rounded px-2 py-1"
-                      />
-                      {calendarFilter && (
-                        <button
-                          onClick={() => setCalendarFilter("")}
-                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-                        >
-                          クリア
-                        </button>
-                      )}
-                      <span className="text-xs text-gray-400">{totalShown}件</span>
-                      <button
-                        onClick={() => setCalendarBulk((b) => ({ nonce: b.nonce + 1, open: true }))}
-                        className="text-xs text-blue-600 hover:bg-blue-50 border border-blue-200 rounded px-2 py-1"
-                      >
-                        すべて開く
-                      </button>
-                      <button
-                        onClick={() => setCalendarBulk((b) => ({ nonce: b.nonce + 1, open: false }))}
-                        className="text-xs text-gray-600 hover:bg-gray-100 border border-gray-300 rounded px-2 py-1"
-                      >
-                        すべて閉じる
-                      </button>
-                    </div>
-                    {filtered.map((g) => (
-                      <div key={g.group} className="space-y-2">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
-                          {g.group}
-                        </h3>
-                        {g.items.map((it) => (
-                          <CollapsibleAnalysis key={it.id} id={it.id} title={it.title} bulk={calendarBulk}>
-                            {it.node}
-                          </CollapsibleAnalysis>
-                        ))}
-                      </div>
-                    ))}
-                    {totalShown === 0 && (
-                      <div className="text-sm text-gray-400 py-8 text-center">
-                        「{calendarFilter}」に一致する分析はありません。
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+                  ]}
+                />
+              )}
 
               {activeSection === "simulation" && (
-                <>
-                  <CustomReturnChart prices={allPrices} ticker={data.ticker} />
-                  <HistoricalAnalogChart prices={filteredPrices} />
-                  <RegimeClusteringChart prices={filteredPrices} />
-                  <MultivarSimplexChart prices={filteredPrices} />
-                  <PriceForecastChart prices={filteredPrices} />
-                  <SimpleBacktestChart prices={filteredPrices} />
-                  <div id="sa-sim-meanrev" className="scroll-mt-20">
-                    <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <div id="sa-sim-arima" className="scroll-mt-20">
-                    <ArimaChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <StopComparisonChart prices={filteredPrices} />
-                  <RMultipleChart prices={filteredPrices} />
-                  <BlockBootstrapChart prices={filteredPrices} />
-                  <KellyChart prices={filteredPrices} />
-                  <JumpDiffusionChart prices={filteredPrices} />
-                  <OptimalStoppingChart prices={filteredPrices} />
-                  <VarianceGammaChart prices={filteredPrices} />
-                  <FBMChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "売買シミュレーション・予測",
+                      items: [
+                        { id: "sim-custom-return", title: "カスタム売買タイミング累積リターン", node: <CustomReturnChart prices={allPrices} ticker={data.ticker} /> },
+                        { id: "sim-analog", title: "ヒストリカル・アナログ（類似局面検索）", node: <HistoricalAnalogChart prices={filteredPrices} /> },
+                        { id: "sim-regime-cluster", title: "特徴量クラスタリングによるレジーム分類（k-means）", node: <RegimeClusteringChart prices={filteredPrices} /> },
+                        { id: "sim-multivar-simplex", title: "多変量埋め込みでの近傍予測（multivariate simplex）", node: <MultivarSimplexChart prices={filteredPrices} /> },
+                        { id: "sim-forecast", title: "株価予測シミュレーター（モンテカルロ）", node: <PriceForecastChart prices={filteredPrices} /> },
+                        { id: "sim-backtest", title: "シンプルバックテスト", node: <SimpleBacktestChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "時系列モデル",
+                      items: [
+                        { id: "sa-sim-meanrev", title: "平均回帰（Ornstein-Uhlenbeck）", node: <MeanReversionChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "sa-sim-arima", title: "SARIMA モデル（予測・診断）", node: <ArimaChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                    {
+                      group: "資金管理・頑健性",
+                      items: [
+                        { id: "sim-stop-compare", title: "ストップ方式の比較（固定%/ATR/シャンデリア/トレーリング）", node: <StopComparisonChart prices={filteredPrices} /> },
+                        { id: "sim-rmultiple", title: "トレード期待値・R倍数分布", node: <RMultipleChart prices={filteredPrices} /> },
+                        { id: "sim-block-boot", title: "ブロック・ブートストラップでの頑健性", node: <BlockBootstrapChart prices={filteredPrices} /> },
+                        { id: "sim-kelly", title: "ケリー基準・最適f とサイズ曲線", node: <KellyChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "確率過程モデル",
+                      items: [
+                        { id: "sim-jump", title: "Merton ジャンプ拡散モデル", node: <JumpDiffusionChart prices={filteredPrices} /> },
+                        { id: "sim-optstop", title: "最適停止（売り時の閾値）", node: <OptimalStoppingChart prices={filteredPrices} /> },
+                        { id: "sim-vg", title: "Variance Gamma 過程", node: <VarianceGammaChart prices={filteredPrices} /> },
+                        { id: "sim-fbm", title: "分数ブラウン運動（fBM）", node: <FBMChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "discretionary" && (

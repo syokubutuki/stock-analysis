@@ -50,8 +50,9 @@ export default function CollapsibleAnalysis({
     return defaultOpen;
   });
 
-  // 親からの一括開閉命令に追従する（初回nonceは無視する）
-  const lastBulkNonce = useRef<number | null>(null);
+  // 親からの一括開閉命令に追従する。マウント時点の nonce を初期値にしておき、
+  // 初回レンダリングでは発火させない（localStorage 復元を上書きしないため）。
+  const lastBulkNonce = useRef<number | null>(bulk ? bulk.nonce : null);
   useEffect(() => {
     if (!bulk) return;
     if (lastBulkNonce.current === bulk.nonce) return;
@@ -75,7 +76,7 @@ export default function CollapsibleAnalysis({
   return (
     <section
       id={`panel-${id}`}
-      className="bg-white rounded-lg border border-gray-200 overflow-hidden scroll-mt-24"
+      className="bg-white rounded-lg border border-gray-200 overflow-hidden scroll-mt-36"
     >
       <button
         onClick={toggle}
