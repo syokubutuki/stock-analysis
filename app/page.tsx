@@ -638,6 +638,14 @@ const WeekdayUsPathChart = dynamic(
   () => import("./components/analysis/WeekdayUsPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const RegimeUsPathChart = dynamic(
+  () => import("./components/analysis/RegimeUsPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const MondayGapChart = dynamic(
+  () => import("./components/analysis/MondayGapChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const WeekdayIntradayEdgeChart = dynamic(
   () => import("./components/analysis/WeekdayIntradayEdgeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1437,6 +1445,8 @@ export default function AnalysisPage() {
                   <WeekdayIntradayPathChart ticker={data.ticker} />
                   <TurnOfMonthPathChart ticker={data.ticker} />
                   <WeekdayUsPathChart ticker={data.ticker} />
+                  <MondayGapChart prices={allPrices} />
+                  <RegimeUsPathChart ticker={data.ticker} />
                   <WeekdayIntradayEdgeChart ticker={data.ticker} />
                   <HighLowTimingChart ticker={data.ticker} />
                   <ExecutionTimingChart ticker={data.ticker} />
