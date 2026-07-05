@@ -183,6 +183,7 @@ interface BarDef {
 }
 
 // --- stat helpers ---
+const pad2 = (n: number) => String(n).padStart(2, "0");
 function mean(a: number[]): number { return a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0; }
 function median(a: number[]): number {
   if (!a.length) return 0;
@@ -349,12 +350,23 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const womBarRef = useRef<HTMLCanvasElement>(null);
   const dowCumulRef = useRef<HTMLCanvasElement>(null);
   const monthCumulRef = useRef<HTMLCanvasElement>(null);
-  const yearlyDowRef = useRef<HTMLCanvasElement>(null);
+  // 曜日別 平均リターンの推移: 横軸=日付の時系列なのでズーム/パン可能な lightweight-charts で描画する。
+  const trendContainerRef = useRef<HTMLDivElement>(null);
+  const trendChartRef = useRef<IChartApi | null>(null);
+  const trendSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const domBarRef = useRef<HTMLCanvasElement>(null);
   const seasonRef = useRef<HTMLCanvasElement>(null);
   const distRef = useRef<HTMLCanvasElement>(null);
 
   const [returnTab, setReturnTab] = useState<ReturnTab>("rate");
+
+  // === 曜日別 平均リターンの推移 state ===
+  // bucket: 分解能セレクタ(年/四半期/月/週)で排他バケットに集計しその平均。trendSmooth>0で連続バケットの移動平均。
+  // rolling: 各曜日の出現列に対し直近trendWindow回の移動平均を毎出現日にプロット(xは全出現日で最密)。
+  const [trendMode, setTrendMode] = useState<"bucket" | "rolling">("bucket");
+  const [trendRes, setTrendRes] = useState<"year" | "quarter" | "month" | "week">("year");
+  const [trendSmooth, setTrendSmooth] = useState(0); // bucket: 連続バケットの移動平均窓(0/1=生値)
+  const [trendWindow, setTrendWindow] = useState(26); // rolling: 直近W回の平均
 
   // === interactive distribution explorer state ===
   const [distField, setDistField] = useState<RawFieldKey>("close");
@@ -605,23 +617,66 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return s;
   }, [days]);
 
-  // === 曜日別 平均リターンの年次推移 (アノマリーの持続/減衰を見る) ===
-  const yearlyDowTrend = useMemo(() => {
-    const map: Record<number, Record<number, number[]>> = {};
-    for (const dow of DOW_TRADING) map[dow] = {};
-    for (const d of days) {
-      if (!(d.dayOfWeek in map)) continue;
-      (map[d.dayOfWeek][d.year] ||= []).push(d.closeReturn);
+  // === 曜日別 平均リターンの推移 (分解能可変 + 拡大表示: アノマリーの持続/減衰を見る) ===
+  // bucket: 分解能(年/四半期/月/週)で排他バケットに集計しその平均。trendSmooth>1で連続バケットの移動平均。
+  // rolling: 各曜日の出現列に直近trendWindow回の移動平均を毎出現日にプロット(xは全出現日で最密)。
+  // 返り値は共通で Record<曜日, {time:"YYYY-MM-DD", value, n}[]> (lightweight-charts にそのまま渡す)。
+  const dowTrend = useMemo(() => {
+    const out: Record<number, { time: string; value: number; n: number }[]> = {};
+    for (const dow of DOW_TRADING) out[dow] = [];
+    if (days.length === 0) return out;
+
+    if (trendMode === "rolling") {
+      const W = Math.max(1, trendWindow);
+      for (const dow of DOW_TRADING) {
+        const buf: number[] = [];
+        let sum = 0;
+        for (const d of days) {
+          if (d.dayOfWeek !== dow) continue;
+          buf.push(d.closeReturn); sum += d.closeReturn;
+          if (buf.length > W) sum -= buf.shift()!;
+          out[dow].push({ time: d.date, value: sum / buf.length, n: buf.length });
+        }
+      }
+      return out;
     }
-    const years = Array.from(new Set(days.map(d => d.year))).sort((a, b) => a - b);
-    const series: Record<number, { year: number; mean: number; n: number }[]> = {};
+
+    // bucket モード: 各営業日を排他バケットに割り当て、その代表日(バケット先頭日)を time にする。
+    const bucketOf = (d: DayData): { key: string; time: string } => {
+      if (trendRes === "year") return { key: `${d.year}`, time: `${d.year}-01-01` };
+      if (trendRes === "quarter") { const q = Math.floor(d.month / 3); return { key: `${d.year}-Q${q}`, time: `${d.year}-${pad2(q * 3 + 1)}-01` }; }
+      if (trendRes === "month") return { key: `${d.year}-${d.month}`, time: `${d.year}-${pad2(d.month + 1)}-01` };
+      // week: その週の月曜日を代表日にする ((dayOfWeek+6)%7 = 月曜からの経過日数, 日=6)
+      const dt = new Date(`${d.date}T00:00:00`);
+      dt.setDate(dt.getDate() - ((d.dayOfWeek + 6) % 7));
+      const t = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+      return { key: t, time: t };
+    };
     for (const dow of DOW_TRADING) {
-      series[dow] = years
-        .filter(y => map[dow][y]?.length)
-        .map(y => ({ year: y, mean: mean(map[dow][y]), n: map[dow][y].length }));
+      const agg = new Map<string, { time: string; sum: number; n: number }>();
+      for (const d of days) {
+        if (d.dayOfWeek !== dow) continue;
+        const { key, time } = bucketOf(d);
+        const b = agg.get(key) || { time, sum: 0, n: 0 };
+        b.sum += d.closeReturn; b.n++;
+        agg.set(key, b);
+      }
+      let arr = Array.from(agg.values())
+        .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0))
+        .map(b => ({ time: b.time, value: b.sum / b.n, n: b.n }));
+      // 平滑化: 分解能を上げたときのノイズを、連続する trendSmooth バケットの移動平均で緩和する。
+      const W = Math.floor(trendSmooth);
+      if (W > 1 && arr.length) {
+        const raw = arr.map(p => p.value);
+        arr = arr.map((p, i) => {
+          const win = raw.slice(Math.max(0, i - W + 1), i + 1);
+          return { ...p, value: win.reduce((s, v) => s + v, 0) / win.length };
+        });
+      }
+      out[dow] = arr;
     }
-    return { years, series };
-  }, [days]);
+    return out;
+  }, [days, trendMode, trendRes, trendSmooth, trendWindow]);
 
   // === 曜日トレード: 各戦略の結果 / バイ&ホールド / 全組合せマトリクス ===
   const tradeResults = useMemo<StrategyResult[]>(
@@ -957,55 +1012,6 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     for (const k of keys) { const pts = seriesData[k]; if (pts.length < 2) continue; ctx.strokeStyle = colors[k]; ctx.lineWidth = 1.5; ctx.beginPath(); for (let i = 0; i < pts.length; i++) { const x = pad.left + (pts[i].idx / allMaxIdx) * plotW; const y = pad.top + plotH * (1 - (pts[i].cumRet - allMin) / range); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke(); }
     ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
     for (const k of keys) { if (!seriesData[k] || seriesData[k].length === 0) continue; ctx.fillStyle = colors[k]; ctx.fillRect(lx, height - 12, 12, 3); ctx.fillStyle = "#666"; ctx.fillText(labels[k], lx + 15, height - 7); lx += ctx.measureText(labels[k]).width + 25; }
-  }, []);
-
-  // 年次推移ライン (x=年, y=平均リターン, 系列=曜日)
-  const drawYearlyTrend = useCallback((
-    canvas: HTMLCanvasElement,
-    series: Record<number, { year: number; mean: number; n: number }[]>,
-    years: number[],
-    colors: string[], labels: string[], keys: number[],
-  ) => {
-    const r = initCanvas(canvas, 220); if (!r) return;
-    const { ctx, width, height } = r;
-    if (years.length < 2) return;
-    const pad = { top: 15, bottom: 28, left: 52, right: 15 };
-    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
-    let minV = 0, maxV = 0;
-    for (const k of keys) for (const pt of series[k]) { minV = Math.min(minV, pt.mean); maxV = Math.max(maxV, pt.mean); }
-    const range = maxV - minV || 0.01;
-    const y0 = years[0], y1 = years[years.length - 1], yr = y1 - y0 || 1;
-    const toX = (y: number) => pad.left + ((y - y0) / yr) * plotW;
-    const toY = (v: number) => pad.top + plotH * (1 - (v - minV) / range);
-
-    // zero line + y grid
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
-    for (let i = 0; i <= 4; i++) {
-      const val = minV + (range * i) / 4, y = pad.top + plotH * (1 - i / 4);
-      ctx.fillText((val * 100).toFixed(2) + "%", pad.left - 5, y + 3);
-      ctx.strokeStyle = Math.abs(val) < 1e-9 ? "#d1d5db" : "#f0f0f0"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
-    }
-    const zeroY = toY(0);
-    if (minV < 0 && maxV > 0) { ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke(); }
-
-    // x labels (years)
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
-    const step = Math.max(1, Math.ceil(years.length / 8));
-    for (let i = 0; i < years.length; i += step) { const x = toX(years[i]); ctx.fillText(String(years[i]), x, height - 14); }
-
-    // lines per weekday
-    for (const k of keys) {
-      const pts = series[k]; if (!pts || pts.length < 2) continue;
-      ctx.strokeStyle = colors[k]; ctx.lineWidth = 1.5; ctx.beginPath();
-      pts.forEach((p, i) => { const x = toX(p.year), y = toY(p.mean); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-      ctx.stroke();
-      for (const p of pts) { ctx.fillStyle = colors[k]; ctx.beginPath(); ctx.arc(toX(p.year), toY(p.mean), 2, 0, Math.PI * 2); ctx.fill(); }
-    }
-
-    // legend
-    ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
-    for (const k of keys) { ctx.fillStyle = colors[k]; ctx.fillRect(lx, height - 6, 12, 3); ctx.fillStyle = "#666"; ctx.fillText(labels[k], lx + 15, height - 3); lx += ctx.measureText(labels[k]).width + 24; }
   }, []);
 
   // Day-of-month bar chart
@@ -1361,8 +1367,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
     if (domBarRef.current) drawDomBar(domBarRef.current, domStats);
     if (seasonRef.current) drawSeasonality(seasonRef.current, seasonality);
-    if (yearlyDowRef.current) drawYearlyTrend(yearlyDowRef.current, yearlyDowTrend.series, yearlyDowTrend.years, DOW_COLORS, DOW_LABELS, DOW_TRADING);
-  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, yearlyDowTrend, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, drawYearlyTrend, getBarData, getBoxData]);
+  }, [days, dowRaw, monthRaw, crossStats, crossMaxAbs, yearMonthData, womStats, dowCumulative, monthCumulative, domStats, seasonality, returnTab, drawGroupedBar, drawBoxPlot, drawCrossHeatmap, drawYearMonth, drawWomBar, drawLineChart, drawDomBar, drawSeasonality, getBarData, getBoxData]);
 
   // === Draw interactive distribution explorer ===
   useEffect(() => {
@@ -1438,6 +1443,54 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     }
     chart.timeScale().fitContent();
   }, [bhEquity, equitySeriesData]);
+
+  // === 曜日別 平均リターンの推移チャートの生成（コンテナ出現後に1度だけ）===
+  useEffect(() => {
+    if (days.length === 0 || !trendContainerRef.current) return;
+    const chart = createChart(trendContainerRef.current, {
+      layout: { background: { color: "#ffffff" }, textColor: "#333" },
+      grid: { vertLines: { color: "#f5f5f5" }, horzLines: { color: "#f0f0f0" } },
+      width: trendContainerRef.current.clientWidth,
+      height: 240,
+      crosshair: { mode: 0 },
+      rightPriceScale: { visible: true },
+      localization: { priceFormatter: (v: number) => `${(v * 100).toFixed(2)}%` },
+      timeScale: { timeVisible: false, secondsVisible: false },
+    });
+    trendChartRef.current = chart;
+    const onResize = () => {
+      if (trendContainerRef.current) chart.applyOptions({ width: trendContainerRef.current.clientWidth });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.remove();
+      trendChartRef.current = null;
+      trendSeriesRef.current = [];
+    };
+  }, [days.length]);
+
+  // === 曜日別 平均リターンの推移データ更新（モード/分解能/平滑化の変更で系列を張り替え）===
+  useEffect(() => {
+    const chart = trendChartRef.current;
+    if (!chart) return;
+    for (const s of trendSeriesRef.current) chart.removeSeries(s);
+    trendSeriesRef.current = [];
+    for (const dow of DOW_TRADING) {
+      const pts = dowTrend[dow];
+      if (!pts || pts.length < 2) continue;
+      const ls = chart.addSeries(LineSeries, {
+        color: DOW_COLORS_DIST[dow], lineWidth: 2, title: DOW_LABELS[dow],
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      ls.setData(pts.map(p => ({ time: p.time as Time, value: p.value })));
+      trendSeriesRef.current.push(ls);
+    }
+    if (trendContainerRef.current && trendContainerRef.current.clientWidth > 0) {
+      chart.applyOptions({ width: trendContainerRef.current.clientWidth });
+    }
+    chart.timeScale().fitContent();
+  }, [dowTrend]);
 
   // === Draw 曜日トレード・シミュレータ（全組合せヒートマップ） ===
   useEffect(() => {
@@ -1687,18 +1740,63 @@ export default function SpiralHeatmap({ prices, period }: Props) {
       </div>
 
 
-      {/* ===== 曜日別 平均リターンの年次推移 (新規: アノマリーの持続/減衰) ===== */}
+      {/* ===== 曜日別 平均リターンの推移 (分解能可変 + 拡大表示) ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">
-          曜日別 平均リターンの年次推移
-          <span className="text-gray-400 ml-1">※各年・各曜日の前C→当C平均。アノマリーが続いているか減衰したかを見る</span>
+          曜日別 平均リターンの推移
+          <span className="text-gray-400 ml-1">※各曜日の前C→当C平均を時系列に。分解能を上げ、ホイールでズーム/ドラッグでパンして詳細の変化を追える</span>
         </div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={yearlyDowRef} /></div>
-        <AnalysisGuide title="解説: 曜日別 平均リターンの年次推移">
-          <p><span className="font-medium">何を明らかにするか:</span> 他の図は全期間を1つに集計するため「いつ効いていたか」が消えます。本図は<span className="font-medium">曜日効果が時間とともに持続しているか/減衰・反転したか</span>を年単位で可視化します。アノマリーは発見後に裁定で消えることが多く、その兆候を掴むためのものです。</p>
-          <p><span className="font-medium">使う数字・数式:</span> 各年 y・各曜日 d について、その年のその曜日の前C→当C リターンの平均 μ(d,y) = (1/N) Σ r を折れ線にします。横軸=年、縦軸=平均リターン(%)、線の色=曜日。</p>
-          <p><span className="font-medium">読み方:</span> ある曜日の線が一貫して0より上(下)=その効果が長期的に持続。年々0へ近づく=アノマリーの減衰(裁定消滅)。プラスとマイナスを行き来=不安定で再現性が低い。直近数年の符号が過去と逆=レジーム変化の疑い。</p>
-          <p><span className="font-medium">注意:</span> 1年=約50サンプルなので単年の値はばらつきます。点の上下動より「複数年の傾き・水準」を見てください。</p>
+        {/* モード切替 + 分解能/平滑化コントロール */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-1.5">
+          <div className="flex gap-1">
+            {([["bucket", "バケット集計"], ["rolling", "移動平均"]] as [typeof trendMode, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTrendMode(key)}
+                className={`px-2.5 py-1 text-xs rounded transition-colors ${trendMode === key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {trendMode === "bucket" ? (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-gray-500">分解能</span>
+                {([["year", "年"], ["quarter", "四半期"], ["month", "月"], ["week", "週"]] as [typeof trendRes, string][]).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setTrendRes(key)}
+                    className={`px-2 py-0.5 text-[11px] rounded transition-colors ${trendRes === key ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                平滑化 <span className="text-gray-700 tabular-nums w-14">{trendSmooth <= 1 ? "なし" : `${trendSmooth}点平均`}</span>
+                <input type="range" min={1} max={12} step={1} value={trendSmooth} onChange={e => setTrendSmooth(Number(e.target.value))} className="w-24" />
+              </label>
+            </>
+          ) : (
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              窓(直近N回) <span className="text-gray-700 tabular-nums w-8">{trendWindow}</span>
+              <input type="range" min={4} max={104} step={1} value={trendWindow} onChange={e => setTrendWindow(Number(e.target.value))} className="w-32" />
+              <span className="text-gray-400">≒{(trendWindow / 52).toFixed(1)}年</span>
+            </label>
+          )}
+        </div>
+        <div ref={trendContainerRef} className="w-full rounded border border-gray-100 overflow-hidden" />
+        <AnalysisGuide title="解説: 曜日別 平均リターンの推移">
+          <p><span className="font-medium">何を明らかにするか:</span> 他の図は全期間を1つに集計するため「いつ効いていたか」が消えます。本図は<span className="font-medium">曜日効果が時間とともに持続しているか/減衰・反転したか</span>を可視化します。アノマリーは発見後に裁定で消えることが多く、その兆候を掴むためのものです。<span className="font-medium">分解能を上げてグラフをホイール拡大/ドラッグ移動</span>すれば、特定期間の細かな変化まで追えます。</p>
+          <p><span className="font-medium">2つのモード:</span></p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li><span className="font-medium">バケット集計:</span> 期間を<span className="font-medium">年/四半期/月/週</span>の排他区間に区切り、各区間・各曜日の平均リターン μ = (1/N)Σr を点にします。横軸=時間、縦軸=平均(%)、色=曜日。細かくするほど「いつ効いたか」の分解能が上がります。</li>
+            <li><span className="font-medium">移動平均:</span> 各曜日の出現ごとに<span className="font-medium">直近N回</span>の平均を毎回プロット。N=平滑の強さで、点の密度(=分解能)を落とさずノイズだけを調整できます。Nを小さくすると細部が、大きくすると長期トレンドが見えます。</li>
+          </ul>
+          <p><span className="font-medium">分解能とノイズ:</span> 区間を細かくするほど1点あたりのサンプルNが減り(週なら各曜日N=1で生の日次リターンそのもの)、値は激しく揺れます。バケット集計の<span className="font-medium">平滑化(連続K点の移動平均)</span>で、xの細かさを保ったままノイズを抑えられます。</p>
+          <p><span className="font-medium">読み方:</span> ある曜日の線が一貫して0より上(下)=その効果が長期的に持続。時間とともに0へ近づく=アノマリーの減衰(裁定消滅)。プラスとマイナスを行き来=不安定で再現性が低い。直近の符号が過去と逆=レジーム変化の疑い。</p>
+          <p><span className="font-medium">注意:</span> 細かい区間では1点のサンプルが少なくばらつきます。個々の点の上下より「複数点の傾き・水準」を見てください。平滑化/大きな窓Nは反応が遅れる(ラグ)ため、直近の転換点は割り引いて解釈します。</p>
         </AnalysisGuide>
       </div>
 
