@@ -650,6 +650,10 @@ const WeekdayIntradayEdgeChart = dynamic(
   () => import("./components/analysis/WeekdayIntradayEdgeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const SectorBasketWeekdayChart = dynamic(
+  () => import("./components/analysis/SectorBasketWeekdayChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const UsAbsorptionChart = dynamic(
   () => import("./components/analysis/UsAbsorptionChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1448,6 +1452,7 @@ export default function AnalysisPage() {
                   <MondayGapChart prices={allPrices} />
                   <RegimeUsPathChart ticker={data.ticker} />
                   <WeekdayIntradayEdgeChart ticker={data.ticker} />
+                  <SectorBasketWeekdayChart ticker={data.ticker} />
                   <HighLowTimingChart ticker={data.ticker} />
                   <ExecutionTimingChart ticker={data.ticker} />
                   <EdgeDiscountChart prices={allPrices} ticker={data.ticker} />
