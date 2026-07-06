@@ -962,8 +962,7 @@ export default function AnalysisPage() {
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
   const [tickerInput, setTickerInput] = useState("");
-  // 折りたたみ節: タイトル絞り込みと一括開閉（アクティブ節で共有）
-  const [sectionFilter, setSectionFilter] = useState("");
+  // 折りたたみ節: 一括開閉（アクティブ節で共有）
   const [sectionBulk, setSectionBulk] = useState<{ nonce: number; open: boolean }>({
     nonce: 0,
     open: false,
@@ -973,11 +972,12 @@ export default function AnalysisPage() {
     []
   );
   // 上部固定バーの自動隠し。3状態:
-  //  - 最上部: 検索行 + タブ全表示 (barHidden=false, tabsVisible=true)
+  //  - 最上部: 銘柄検索 + 期間/系列 + タブを全表示 (barHidden=false, atTop=true)
   //  - 下スクロール中: 全部隠す (barHidden=true)
-  //  - 上スクロール中(途中): 検索行だけ表示 (barHidden=false, tabsVisible=false)
+  //  - 上スクロール中(途中): 銘柄検索窓のみ表示 (barHidden=false, atTop=false)
+  //    期間/系列/タブは画面を占有しページを揺らすため、最上部以外では出さない。
   const [barHidden, setBarHidden] = useState(false);
-  const [tabsVisible, setTabsVisible] = useState(true);
+  const [atTop, setAtTop] = useState(true);
 
   // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
   const restoredRef = useRef(false);
@@ -1040,10 +1040,10 @@ export default function AnalysisPage() {
         if (y <= 4) {
           // 最上部: 全表示
           setBarHidden(false);
-          setTabsVisible(true);
+          setAtTop(true);
         } else {
-          // 最上部から十分離れたらタブ行を畳む（戻すのは最上部のみ＝ヒステリシス）
-          if (y > 120) setTabsVisible(false);
+          // 最上部から十分離れたら期間/系列/タブを畳む（戻すのは最上部のみ＝ヒステリシス）
+          if (y > 120) setAtTop(false);
           if (dy > 6) setBarHidden(true);        // 下スクロール → 全部隠す
           else if (dy < -6) setBarHidden(false); // 上スクロール → 検索行を表示
         }
@@ -1065,7 +1065,6 @@ export default function AnalysisPage() {
       try { localStorage.setItem(`sa:open:${anchor}`, "1"); } catch {}
     }
     pendingScrollRef.current = anchor ?? null;
-    setSectionFilter("");
     setActiveSection(section as SectionKey);
   }, []);
   useEffect(() => {
@@ -1123,7 +1122,8 @@ export default function AnalysisPage() {
             barHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
-          {/* 入力エリア */}
+          {/* 入力エリア。スクロール中(最上部以外)は銘柄検索窓のみを残し、
+              画面を占有する期間/系列/ウォッチリスト/銘柄名は最上部でのみ表示する。 */}
           <div className="flex items-center gap-3 flex-wrap">
             <TickerSearchInput
               value={tickerInput}
@@ -1131,36 +1131,40 @@ export default function AnalysisPage() {
               onSubmit={fetchStock}
               loading={loading}
             />
-            <WatchlistPanel
-              currentTicker={data?.ticker ?? null}
-              currentName={data?.name ?? null}
-              onSelect={(ticker) => {
-                setTickerInput(ticker);
-                fetchStock(ticker);
-              }}
-            />
-            {data && (
+            {atTop && (
               <>
-                <span className="text-gray-600 text-sm font-medium">
-                  {data.name}
-                </span>
-                <PeriodSelector current={period} onChange={setPeriod} />
-                <SeriesModeSelector
-                  current={seriesMode}
-                  onChange={setSeriesMode}
-                  disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
+                <WatchlistPanel
+                  currentTicker={data?.ticker ?? null}
+                  currentName={data?.name ?? null}
+                  onSelect={(ticker) => {
+                    setTickerInput(ticker);
+                    fetchStock(ticker);
+                  }}
                 />
+                {data && (
+                  <>
+                    <span className="text-gray-600 text-sm font-medium">
+                      {data.name}
+                    </span>
+                    <PeriodSelector current={period} onChange={setPeriod} />
+                    <SeriesModeSelector
+                      current={seriesMode}
+                      onChange={setSeriesMode}
+                      disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
+                    />
+                  </>
+                )}
               </>
             )}
           </div>
 
-          {/* セクションタブ（最上部でのみ表示。読書中は畳んで検索行だけ残す） */}
-          {tabsVisible && data && filteredPrices.length > 0 && (
+          {/* セクションタブ（最上部でのみ表示。読書中は畳んで検索窓だけ残す） */}
+          {atTop && data && filteredPrices.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {SECTIONS.map(({ key, label, description }) => (
                 <button
                   key={key}
-                  onClick={() => { setActiveSection(key); setSectionFilter(""); }}
+                  onClick={() => setActiveSection(key)}
                   title={description}
                   className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                     activeSection === key
@@ -1225,8 +1229,6 @@ export default function AnalysisPage() {
                   {/* Series Explorer は常時表示のヒーローチャート（ジャンプの起点） */}
                   <UnifiedChart prices={allPrices} period={period} onNavigate={navigateToSection} />
                   <AccordionSection
-                    filter={sectionFilter}
-                    onFilterChange={setSectionFilter}
                     bulk={sectionBulk}
                     onBulk={bumpBulk}
                     groups={[
@@ -1277,8 +1279,6 @@ export default function AnalysisPage() {
 
               {activeSection === "technical" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1299,8 +1299,6 @@ export default function AnalysisPage() {
 
               {activeSection === "ohlc" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1342,8 +1340,6 @@ export default function AnalysisPage() {
 
               {activeSection === "risk" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1381,8 +1377,6 @@ export default function AnalysisPage() {
 
               {activeSection === "transform" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1400,8 +1394,6 @@ export default function AnalysisPage() {
 
               {activeSection === "distribution" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1442,8 +1434,6 @@ export default function AnalysisPage() {
 
               {activeSection === "volatility" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1474,8 +1464,6 @@ export default function AnalysisPage() {
 
               {activeSection === "frequency" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1505,8 +1493,6 @@ export default function AnalysisPage() {
 
               {activeSection === "nonlinear" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1546,8 +1532,6 @@ export default function AnalysisPage() {
 
               {activeSection === "entropy" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1577,8 +1561,6 @@ export default function AnalysisPage() {
 
               {activeSection === "fractal" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1595,8 +1577,6 @@ export default function AnalysisPage() {
 
               {activeSection === "network" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1614,8 +1594,6 @@ export default function AnalysisPage() {
 
               {activeSection === "regime" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1636,8 +1614,6 @@ export default function AnalysisPage() {
 
               {activeSection === "causal" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1654,8 +1630,6 @@ export default function AnalysisPage() {
 
               {activeSection === "tailrisk" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1672,8 +1646,6 @@ export default function AnalysisPage() {
 
               {activeSection === "conditional" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1703,8 +1675,6 @@ export default function AnalysisPage() {
 
               {activeSection === "edge" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1722,8 +1692,6 @@ export default function AnalysisPage() {
 
               {activeSection === "calendar" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1796,8 +1764,6 @@ export default function AnalysisPage() {
 
               {activeSection === "simulation" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[
@@ -1851,8 +1817,6 @@ export default function AnalysisPage() {
 
               {activeSection === "quantum" && (
                 <AccordionSection
-                  filter={sectionFilter}
-                  onFilterChange={setSectionFilter}
                   bulk={sectionBulk}
                   onBulk={bumpBulk}
                   groups={[

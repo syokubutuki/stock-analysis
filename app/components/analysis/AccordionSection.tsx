@@ -19,52 +19,27 @@ export interface AccordionGroup {
 
 interface Props {
   groups: AccordionGroup[];
-  filter: string;
-  onFilterChange: (v: string) => void;
   bulk: { nonce: number; open: boolean };
   onBulk: (open: boolean) => void;
 }
 
 /**
  * 分析セクションを折りたたみパネルのリストとして描画する共通コンポーネント。
- * タイトル絞り込み・すべて開く/閉じる・件数表示のツールバー付き。
+ * すべて開く/閉じる・件数表示のツールバー付き。
  */
 export default function AccordionSection({
   groups,
-  filter,
-  onFilterChange,
   bulk,
   onBulk,
 }: Props) {
-  const q = filter.trim().toLowerCase();
-  const filtered = groups
-    .map((g) => ({
-      ...g,
-      items: q ? g.items.filter((it) => it.title.toLowerCase().includes(q)) : g.items,
-    }))
-    .filter((g) => g.items.length > 0);
+  const filtered = groups.filter((g) => g.items.length > 0);
   const total = filtered.reduce((s, g) => s + g.items.length, 0);
 
   return (
     <>
-      {/* ツールバー: 絞り込み + 一括開閉 */}
+      {/* ツールバー: 一括開閉 */}
       <div className="flex flex-wrap items-center gap-2 bg-white rounded-lg border border-gray-200 px-3 py-2">
-        <input
-          type="text"
-          value={filter}
-          onChange={(e) => onFilterChange(e.target.value)}
-          placeholder="分析名で絞り込み"
-          className="flex-1 min-w-[180px] text-sm border border-gray-300 rounded px-2 py-1"
-        />
-        {filter && (
-          <button
-            onClick={() => onFilterChange("")}
-            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-          >
-            クリア
-          </button>
-        )}
-        <span className="text-xs text-gray-400">{total}件</span>
+        <span className="text-xs text-gray-400 mr-auto">{total}件</span>
         <button
           onClick={() => onBulk(true)}
           className="text-xs text-blue-600 hover:bg-blue-50 border border-blue-200 rounded px-2 py-1"
@@ -99,12 +74,6 @@ export default function AccordionSection({
           ))}
         </div>
       ))}
-
-      {total === 0 && (
-        <div className="text-sm text-gray-400 py-8 text-center">
-          「{filter}」に一致する分析はありません。
-        </div>
-      )}
     </>
   );
 }
