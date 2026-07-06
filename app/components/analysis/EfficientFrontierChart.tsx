@@ -120,6 +120,7 @@ const HEIGHT = 420;
 export default function EfficientFrontierChart({ data, window: win = 250 }: Props) {
   const [open, setOpen] = useState(true);
   const [rfPct, setRfPct] = useState(0.5); // 年率Rf(%)
+  const [showShort, setShowShort] = useState(false); // 空売り可(閉形式)レイヤの表示。既定オフ。
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number; vol: number; ret: number } | null>(null);
 
@@ -151,6 +152,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     result.cloud.forEach((p) => push(p.sigma, p.mu));
     result.assets.forEach((p) => push(p.sigma, p.mu));
     result.curve.forEach((p) => push(p.sigma, p.mu));
+    if (result.tangencyLongOnly) push(result.tangencyLongOnly.sigma, result.tangencyLongOnly.mu);
     if (result.tangency) push(result.tangency.sigma, result.tangency.mu);
     push(result.gmv.sigma, result.gmv.mu);
     const xMin = Math.min(...xs);
@@ -228,38 +230,44 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.fill();
     }
 
-    // A: 効率的フロンティア双曲線(効率的枝=実線緑, 非効率枝=破線灰)
-    const drawCurve = (eff: boolean, color: string, dash: number[]) => {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = eff ? 2.5 : 1.5;
-      ctx.setLineDash(dash);
-      ctx.beginPath();
-      let started = false;
-      for (const p of result.curve) {
-        if (p.efficient !== eff) {
-          started = false;
-          continue;
+    // A: 効率的フロンティア双曲線(空売り可・閉形式)。効率的枝=実線緑, 非効率枝=破線灰。
+    // 空売り可は現実的でないため既定では非表示。トグルで参照用に重ねられる。
+    if (showShort) {
+      const drawCurve = (eff: boolean, color: string, dash: number[]) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = eff ? 2.5 : 1.5;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        let started = false;
+        for (const p of result.curve) {
+          if (p.efficient !== eff) {
+            started = false;
+            continue;
+          }
+          const x = sx(p.sigma), y = sy(p.mu);
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else ctx.lineTo(x, y);
         }
-        const x = sx(p.sigma), y = sy(p.mu);
-        if (!started) {
-          ctx.moveTo(x, y);
-          started = true;
-        } else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-    };
-    drawCurve(false, "#9ca3af", [4, 3]);
-    drawCurve(true, "#059669", []);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      };
+      drawCurve(false, "#9ca3af", [4, 3]);
+      drawCurve(true, "#059669", []);
+    }
 
-    // CML(資本市場線)
-    if (result.cml.length === 2) {
+    // CML(資本市場線): Rf点から空売り無しの接点へ引く。傾き=接点の最大シャープ比。
+    const tanLO = result.tangencyLongOnly;
+    if (tanLO && tanLO.sigma > 0) {
+      const slope = (tanLO.mu - result.riskFree) / tanLO.sigma;
+      const sigMax = bounds.xMax;
       ctx.strokeStyle = "#f59e0b";
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
-      ctx.moveTo(sx(result.cml[0].sigma), sy(result.cml[0].mu));
-      ctx.lineTo(sx(result.cml[1].sigma), sy(result.cml[1].mu));
+      ctx.moveTo(sx(0), sy(result.riskFree));
+      ctx.lineTo(sx(sigMax), sy(result.riskFree + slope * sigMax));
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -330,12 +338,12 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.fillText(text, bx + padX, by + bh / 2 + 0.5);
     };
 
-    // ロングオンリー最適(雲の代表点)。形状: ▲最大Sharpe / ■最小分散
+    // ロングオンリー最小分散(雲の代表点)。形状: ■
     marker(result.cloudMinVol, "#0ea5e9", "square", "最小分散(LO)", "sw");
-    marker(result.cloudBestSharpe, "#7c3aed", "triangle", "最大Sharpe(LO)", "se");
-    // 閉形式の特異点。形状: ◆GMV / ★接点
-    marker(result.gmv, "#2563eb", "diamond", "GMV", "nw");
-    if (result.tangency) marker(result.tangency, "#dc2626", "star", "接点(市場)", "ne");
+    // 空売り無しの接点=市場ポートフォリオ。形状: ★(既定の主役)
+    if (result.tangencyLongOnly) marker(result.tangencyLongOnly, "#dc2626", "star", "接点(市場)", "ne");
+    // 空売り可(閉形式)の特異点。形状: ◆GMV。トグル時のみ参照表示。
+    if (showShort) marker(result.gmv, "#2563eb", "diamond", "GMV(空売り可)", "nw");
 
     // ホバー十字
     if (hover) {
@@ -350,7 +358,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [result, bounds, hover]);
+  }, [result, bounds, hover, showShort]);
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -410,8 +418,16 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   className="w-48"
                 />
                 <span className="tabular-nums w-12">{rfPct.toFixed(1)}%</span>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none ml-2">
+                  <input
+                    type="checkbox"
+                    checked={showShort}
+                    onChange={(e) => setShowShort(e.target.checked)}
+                  />
+                  <span>空売り可(閉形式)を重ねる</span>
+                </label>
                 <span className="text-gray-400">
-                  CML はこの Rf 点から接点へ引いた線。Rf を上げると接点(市場ポートフォリオ)が移動します。
+                  CML はこの Rf 点から接点(空売り無し)へ引いた線。Rf を上げると接点が移動します。
                 </span>
               </div>
 
@@ -433,22 +449,22 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
 
               {/* 凡例 */}
               <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-gray-500 items-center">
-                <LineLegend color="#059669" label="効率的フロンティア(空売り可)" />
-                <LineLegend color="#9ca3af" label="非効率枝" dashed />
                 <LineLegend color="#f59e0b" label="資本市場線 CML" dashed />
-                <PointLegend shape="star" color="#dc2626" label="接点=市場ポートフォリオ" />
-                <PointLegend shape="triangle" color="#7c3aed" label="最大Sharpe(ロングオンリー)" />
-                <PointLegend shape="diamond" color="#2563eb" label="GMV(大域最小分散)" />
-                <PointLegend shape="square" color="#0ea5e9" label="最小分散(ロングオンリー)" />
+                <PointLegend shape="star" color="#dc2626" label="接点=市場ポートフォリオ(空売り無し)" />
+                <PointLegend shape="square" color="#0ea5e9" label="最小分散(空売り無し)" />
+                {showShort && <LineLegend color="#059669" label="効率的フロンティア(空売り可)" />}
+                {showShort && <LineLegend color="#9ca3af" label="非効率枝" dashed />}
+                {showShort && <PointLegend shape="diamond" color="#2563eb" label="GMV(空売り可)" />}
                 <span className="text-gray-400">点群=ランダム配分(色=シャープ比 青低→緑→赤高)</span>
               </div>
 
               {/* 代表ポートフォリオの構成(チャートのマーカーと色・形で対応) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                <WeightTable shape="star" color="#dc2626" title="接点(市場)ポートフォリオ" subtitle="最大シャープ・空売り可" point={result.tangency} tickers={result.tickers} names={names} riskFree={result.riskFree} />
-                <WeightTable shape="triangle" color="#7c3aed" title="最大Sharpe(ロングオンリー)" subtitle="空売り無し・実装可能" point={result.cloudBestSharpe} tickers={result.tickers} names={names} riskFree={result.riskFree} />
-                <WeightTable shape="diamond" color="#2563eb" title="GMV(大域最小分散)" subtitle="期待リターン推定に頑健・空売り可" point={result.gmv} tickers={result.tickers} names={names} riskFree={result.riskFree} />
-                <WeightTable shape="square" color="#0ea5e9" title="最小分散(ロングオンリー)" subtitle="空売り無し・低リスク重視" point={result.cloudMinVol} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <WeightTable shape="star" color="#dc2626" title="接点(市場)ポートフォリオ" subtitle="最大シャープ・空売り無し(実装可能)" point={result.tangencyLongOnly} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                <WeightTable shape="square" color="#0ea5e9" title="最小分散" subtitle="空売り無し・低リスク重視" point={result.cloudMinVol} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                {showShort && (
+                  <WeightTable shape="diamond" color="#2563eb" title="GMV(大域最小分散)" subtitle="期待リターン推定に頑健・空売り可" point={result.gmv} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                )}
               </div>
 
               <AnalysisGuide title="効率的フロンティア・資本市場線(CAPM)の詳細理論">
@@ -485,13 +501,14 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   <li>緑の実線(効率的フロンティア)に近い点ほど効率的。線より内側の点(雲の大半)は「無駄なリスクを取っている」。</li>
                   <li>個別銘柄の点が線より右下にある=単独保有は非効率。混ぜることで左上(低リスク高リターン)へ動かせる。</li>
                   <li>CML(橙線)より上の領域は到達不可能。CML上の点(Rfと接点の配合)が最も効率的な選択肢。</li>
-                  <li>本実装は2種類を重ねて表示: <strong>緑線=空売り可の理論縁</strong>、<strong>雲=空売り無しの現実的領域</strong>。両者の差が「空売り制約のコスト」。</li>
+                  <li>既定表示は<strong>空売り無し(ロングオンリー)</strong>に統一: 雲=実現可能領域、★接点=その中で最大シャープの市場ポートフォリオ(射影勾配法で厳密最適化)、CMLは Rf からこの接点へ引く。負のウェイトを含まないので現物でそのまま実装できる。</li>
+                  <li>「空売り可(閉形式)を重ねる」をオンにすると、教科書的な<strong>緑線=空売り可の理論縁</strong>と GMV を参照用に重ねられる。緑線と雲の上端の差が「空売り制約のコスト」。空売り可は現実的でないため既定では隠している。</li>
                 </ul>
 
                 <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
                 <ul className="list-disc pl-4 space-y-1">
-                  <li>「最大Sharpe(ロングオンリー)」の構成比を、実際のリバランス目標として使える(空売り不要で実装可能)。</li>
-                  <li>リスクを抑えたい局面では GMV の構成比を採用。期待リターン推定に依存せず安定。</li>
+                  <li>「接点(市場)ポートフォリオ」(空売り無し・最大シャープ)の構成比を、実際のリバランス目標として使える(空売り不要で実装可能)。</li>
+                  <li>リスクを抑えたい局面では「最小分散」の構成比を採用。期待リターン推定に依存せず安定。</li>
                   <li>現在の保有が雲の内側にあるなら、同じリスクでフロンティアまでリターンを引き上げる余地がある。</li>
                   <li>Rf スライダーを動かし、金利環境の変化で最適配分(接点)がどう動くかを確認できる。</li>
                 </ul>

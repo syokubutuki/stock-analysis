@@ -48,6 +48,10 @@ export interface EfficientFrontierResult {
   cloud: CloudPoint[];
   cloudBestSharpe: PortfolioPoint; // 雲の中の最大シャープ(ロングオンリー接点近似)
   cloudMinVol: PortfolioPoint; // 雲の中の最小分散(ロングオンリーGMV近似)
+
+  // 空売り無し(ロングオンリー)接点=市場ポートフォリオ。射影勾配法で厳密最適化。
+  // 超過リターンが全て非正で正のシャープが得られない場合は null。
+  tangencyLongOnly: PortfolioPoint | null;
 }
 
 // --- 数値ユーティリティ ---------------------------------------------------
@@ -96,6 +100,68 @@ function dot(a: number[], b: number[]): number {
 // wᵀ Σ w
 function quad(Sigma: number[][], w: number[]): number {
   return dot(w, matVec(Sigma, w));
+}
+
+// 確率単体 {w≥0, Σw=1} へのユークリッド射影 (Wang & Carreira-Perpiñán 2013)。
+function projectSimplex(v: number[]): number[] {
+  const n = v.length;
+  const u = [...v].sort((a, b) => b - a);
+  let cssum = 0;
+  let theta = 0;
+  for (let j = 0; j < n; j++) {
+    cssum += u[j];
+    const t = (cssum - 1) / (j + 1);
+    if (u[j] - t > 0) theta = t;
+  }
+  return v.map((x) => Math.max(x - theta, 0));
+}
+
+// 空売り無し(w≥0, Σw=1)でシャープ比を最大化する接点ポートフォリオ。
+// 射影勾配上昇(バックトラッキング)を複数初期値から回して最良を採る。
+// この長期制約付き問題は擬凹だが、等配分・単一銘柄の各頂点・MC最良を初期値にすれば実用上大域最適へ収束する。
+function maxSharpeLongOnly(
+  mu: number[],
+  S: number[][],
+  rf: number,
+  inits: number[][]
+): PortfolioPoint | null {
+  const evalW = (w: number[]) => {
+    const sg = Math.sqrt(Math.max(quad(S, w), 0));
+    const m = dot(w, mu);
+    return { sh: sg > 0 ? (m - rf) / sg : -Infinity, sg, m };
+  };
+  let best: PortfolioPoint | null = null;
+  for (const init of inits) {
+    let w = projectSimplex(init.slice());
+    let cur = evalW(w);
+    let lr = 1;
+    for (let iter = 0; iter < 400; iter++) {
+      const sg = cur.sg;
+      if (sg <= 0) break;
+      const exc = cur.m - rf;
+      const Sw = matVec(S, w);
+      // ∂S/∂wᵢ = μᵢ/σ − (μᵀw−Rf)(Σw)ᵢ/σ³
+      const grad = mu.map((mi, i) => mi / sg - (exc * Sw[i]) / (sg * sg * sg));
+      let improved = false;
+      for (let bt = 0; bt < 30; bt++) {
+        const cand = projectSimplex(w.map((wi, i) => wi + lr * grad[i]));
+        const cs = evalW(cand);
+        if (cs.sh > cur.sh + 1e-12) {
+          w = cand;
+          cur = cs;
+          lr *= 1.3;
+          improved = true;
+          break;
+        }
+        lr *= 0.5;
+      }
+      if (!improved || lr < 1e-10) break;
+    }
+    if (cur.sh > 0 && cur.sg > 0 && (!best || cur.sh > best.sharpe)) {
+      best = { weights: w.slice(), mu: cur.m, sigma: cur.sg, sharpe: cur.sh };
+    }
+  }
+  return best;
 }
 
 // 乱数 (seeded, 再現性のため)
@@ -262,6 +328,15 @@ export function efficientFrontier(
     }
   }
 
+  // --- 空売り無しの接点(最大シャープ)を厳密最適化 ---
+  const loInits: number[][] = [new Array(k).fill(1 / k), bestSharpe.weights.slice()];
+  for (let i = 0; i < k; i++) {
+    const e = new Array(k).fill(0);
+    e[i] = 1;
+    loInits.push(e);
+  }
+  const tangencyLongOnly = maxSharpeLongOnly(mu, S, riskFreeRate, loInits);
+
   return {
     tickers,
     riskFree: riskFreeRate,
@@ -275,5 +350,6 @@ export function efficientFrontier(
     cloud,
     cloudBestSharpe: bestSharpe,
     cloudMinVol: minVol,
+    tangencyLongOnly,
   };
 }
