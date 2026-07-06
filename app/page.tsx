@@ -1276,17 +1276,25 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "technical" && (
-                <>
-                  <div id="sa-technical" className="scroll-mt-20">
-                    <TechnicalIndicators prices={allPrices} period={period} />
-                  </div>
-                  <ADXChart prices={allPrices} period={period} />
-                  <StochasticsChart prices={allPrices} period={period} />
-                  <OBVVWAPChart prices={allPrices} period={period} />
-                  <VolumeWeightedTechChart prices={filteredPrices} />
-                  <ExtraTechnicalChart prices={filteredPrices} />
-                  <BreakoutStatsChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "sa-technical", title: "テクニカル指標（RSI/MACD/BB ほか）", node: <TechnicalIndicators prices={allPrices} period={period} /> },
+                        { id: "tech-adx", title: "ADX（Average Directional Index）", node: <ADXChart prices={allPrices} period={period} /> },
+                        { id: "tech-stoch", title: "ストキャスティクス", node: <StochasticsChart prices={allPrices} period={period} /> },
+                        { id: "tech-obvvwap", title: "OBV・VWAP", node: <OBVVWAPChart prices={allPrices} period={period} /> },
+                        { id: "tech-vw", title: "出来高加重テクニカル指標", node: <VolumeWeightedTechChart prices={filteredPrices} /> },
+                        { id: "tech-extra", title: "追加テクニカル指標", node: <ExtraTechnicalChart prices={filteredPrices} /> },
+                        { id: "tech-breakout", title: "ブレイクアウト統計（ドンチャン・前日高安）", node: <BreakoutStatsChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "ohlc" && (
@@ -1333,214 +1341,383 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "risk" && (
-                <>
-                  <div id="sa-risk" className="scroll-mt-20">
-                    <RiskMetricsPanel prices={allPrices} period={period} />
-                  </div>
-                  <ForecastRangeChart prices={filteredPrices} />
-                  <DrawdownChart prices={allPrices} period={period} />
-                  <GarchVarChart prices={filteredPrices} />
-                  <CornishFisherChart prices={filteredPrices} />
-                  <FinanceTheoryChart prices={filteredPrices} />
-                  <VolSmileChart prices={filteredPrices} />
-                  <SpreadEstimatorChart prices={filteredPrices} />
-                  <DrawdownDistChart prices={filteredPrices} />
-                  <RiskRatiosChart prices={filteredPrices} />
-                  <RollingVaRChart prices={filteredPrices} />
-                  <DownsideDecompChart prices={filteredPrices} />
-                  <ConditionalBetaChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "指標・ドローダウン",
+                      items: [
+                        { id: "sa-risk", title: "リスク指標", node: <RiskMetricsPanel prices={allPrices} period={period} /> },
+                        { id: "risk-forecast-range", title: "短期予測レンジ（1〜3日）", node: <ForecastRangeChart prices={filteredPrices} /> },
+                        { id: "risk-drawdown", title: "ドローダウン分析", node: <DrawdownChart prices={allPrices} period={period} /> },
+                        { id: "risk-dd-dist", title: "ドローダウン期間・回復時間の分布", node: <DrawdownDistChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "VaR・テイル・裾",
+                      items: [
+                        { id: "risk-garch-var", title: "GARCH VaR予測", node: <GarchVarChart prices={filteredPrices} /> },
+                        { id: "risk-cornish", title: "Cornish-Fisher VaR / オメガレシオ", node: <CornishFisherChart prices={filteredPrices} /> },
+                        { id: "risk-rolling-var", title: "ローリング VaR / CVaR（historical / EVT / Cornish-Fisher）", node: <RollingVaRChart prices={filteredPrices} /> },
+                        { id: "risk-volsmile", title: "ボラティリティスマイル", node: <VolSmileChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "調整指標・下方リスク・その他",
+                      items: [
+                        { id: "risk-finance-theory", title: "Kelly基準 / Black-Scholes / Variance Swap", node: <FinanceTheoryChart prices={filteredPrices} /> },
+                        { id: "risk-ratios", title: "リスク調整指標の拡充", node: <RiskRatiosChart prices={filteredPrices} /> },
+                        { id: "risk-downside", title: "下方リスク分解（半偏差・損失寄与・連敗分布）", node: <DownsideDecompChart prices={filteredPrices} /> },
+                        { id: "risk-cond-beta", title: "条件付きベータ・下方ベータ（地合い別の感応度）", node: <ConditionalBetaChart prices={filteredPrices} /> },
+                        { id: "risk-spread", title: "高安スプレッド推定（取引コスト・流動性の代理）", node: <SpreadEstimatorChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "transform" && (
-                <>
-                  <div id="sa-transform" className="scroll-mt-20">
-                    <TransformCharts prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <OvernightIntradayChart prices={filteredPrices} />
-                  <ExecutionTimingScanChart prices={filteredPrices} />
-                  <WeekdayDecompChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "sa-transform", title: "スケール・変換（対数/順位/ボラ正規化 ほか）", node: <TransformCharts prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "transform-overnight", title: "オーバーナイト vs 日中エクイティ（リターンの時間帯分解）", node: <OvernightIntradayChart prices={filteredPrices} /> },
+                        { id: "transform-exec-scan", title: "売買時刻スキャン（始値/終値・保有日数の最適エッジ探索）", node: <ExecutionTimingScanChart prices={filteredPrices} /> },
+                        { id: "transform-weekday-decomp", title: "曜日別 夜間/日中エクイティ分解", node: <WeekdayDecompChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "distribution" && (
-                <>
-                  <div id="sa-distribution" className="scroll-mt-20">
-                    <ReturnDistribution prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <DistributionShapeChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ACFChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ACFExtendedChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <RollingMomentsChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <LagDependenceChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ConditionalViolinChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <CrossCorrelogramChart prices={filteredPrices} />
-                  <IndependenceTestsChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <DistributionSurfaceChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <PredictionAccuracyChart prices={filteredPrices} />
-                  <InfoRatioDashboard prices={filteredPrices} />
-                  <UnitRootChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <StylizedFactsChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <VarianceRatioChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <RollingVarianceRatioChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "分布形状",
+                      items: [
+                        { id: "sa-distribution", title: "リターン分布", node: <ReturnDistribution prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-shape", title: "分布形状の詳細分析", node: <DistributionShapeChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-rolling-moments", title: "ローリング高次モーメント", node: <RollingMomentsChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-violin", title: "条件付き分布・バイオリンプロット", node: <ConditionalViolinChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-surface", title: "分布のダイナミクス（ローリング密度サーフェス）", node: <DistributionSurfaceChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-stylized", title: "Stylized Facts（定型化された事実）", node: <StylizedFactsChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                    {
+                      group: "自己相関・依存性・独立性",
+                      items: [
+                        { id: "dist-acf", title: "自己相関分析", node: <ACFChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-acf-ext", title: "自己相関分析（拡張）", node: <ACFExtendedChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-lag", title: "ラグ構造・非線形依存性分析", node: <LagDependenceChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-crosscorr", title: "クロスコレログラム（夜間↔日中）", node: <CrossCorrelogramChart prices={filteredPrices} /> },
+                        { id: "dist-independence", title: "独立性・ランダム性検定", node: <IndependenceTestsChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                    {
+                      group: "予測可能性・単位根・分散比",
+                      items: [
+                        { id: "dist-pred-accuracy", title: "ローリング予測精度", node: <PredictionAccuracyChart prices={filteredPrices} /> },
+                        { id: "dist-inforatio", title: "情報比率ダッシュボード", node: <InfoRatioDashboard prices={filteredPrices} /> },
+                        { id: "dist-unitroot", title: "単位根検定", node: <UnitRootChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-vr", title: "分散比検定", node: <VarianceRatioChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "dist-rolling-vr", title: "分散比のローリングと有意性（トレンド/回帰の切替監視）", node: <RollingVarianceRatioChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "volatility" && (
-                <>
-                  <div id="sa-volatility" className="scroll-mt-20">
-                    <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <GarchChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ATRChart prices={filteredPrices} />
-                  <VolTermStructureChart prices={filteredPrices} />
-                  <AsymmetricGarchChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <VolConeChart prices={filteredPrices} />
-                  <RangeVolConeChart prices={filteredPrices} />
-                  <HestonChart prices={filteredPrices} />
-                  <RangeContractionChart prices={filteredPrices} />
-                  <HARChart prices={filteredPrices} />
-                  <VolLeverageChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "推定・モデル",
+                      items: [
+                        { id: "sa-volatility", title: "ボラティリティ分析", node: <VolatilityChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "vol-garch", title: "GARCH / レバレッジ効果 / ジャンプ検出", node: <GarchChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "vol-agarch", title: "非対称GARCHモデル", node: <AsymmetricGarchChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "vol-heston", title: "Hestonモデル", node: <HestonChart prices={filteredPrices} /> },
+                        { id: "vol-har", title: "HARモデル（日/週/月の実現ボラでボラ予測）", node: <HARChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "期間構造・コーン・レンジ",
+                      items: [
+                        { id: "vol-atr", title: "ATR / ケルトナーチャネル", node: <ATRChart prices={filteredPrices} /> },
+                        { id: "vol-term", title: "ボラティリティ期間構造", node: <VolTermStructureChart prices={filteredPrices} /> },
+                        { id: "vol-cone", title: "ボラティリティ・コーン", node: <VolConeChart prices={filteredPrices} /> },
+                        { id: "vol-range-cone", title: "レンジ由来ボラコーン（Yang-Zhang）", node: <RangeVolConeChart prices={filteredPrices} /> },
+                        { id: "vol-range-contract", title: "レンジ収縮 → ブレイク（NR7・inside・スクイーズ）", node: <RangeContractionChart prices={filteredPrices} /> },
+                        { id: "vol-leverage", title: "ボラのレバレッジ効果（下落→翌日ボラ拡大の非対称性）", node: <VolLeverageChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "frequency" && (
-                <>
-                  <PowerSpectrum prices={filteredPrices} seriesMode={seriesMode} />
-                  <WaveletChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <div id="sa-frequency-coherence" className="scroll-mt-20">
-                    <WaveletCoherenceChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <EMDChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ComplexPlaneChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <PhaseClockChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <LombScargleChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <div id="sa-frequency-ssa" className="scroll-mt-20">
-                    <SSAChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "スペクトル・ウェーブレット",
+                      items: [
+                        { id: "freq-power", title: "パワースペクトル（FFT）", node: <PowerSpectrum prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-wavelet", title: "ウェーブレットスカログラム（Morlet CWT）", node: <WaveletChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "sa-frequency-coherence", title: "ウェーブレットコヒーレンス", node: <WaveletCoherenceChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-lombscargle", title: "Lomb-Scargleペリオドグラム", node: <LombScargleChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "sa-frequency-ssa", title: "特異スペクトル分析（SSA）", node: <SSAChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                    {
+                      group: "EMD・解析信号・位相",
+                      items: [
+                        { id: "freq-emd", title: "EMD / Hilbert-Huang変換", node: <EMDChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-analytic", title: "解析信号と瞬時周波数", node: <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-complex", title: "複素平面表現", node: <ComplexPlaneChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-phaseclock", title: "位相時計（Cycle Phase Clock）", node: <PhaseClockChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-hhs", title: "Hilbert-Huang Spectrum / STFT / スペクトルエントロピー", node: <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "nonlinear" && (
-                <>
-                  <div id="sa-nonlinear" className="scroll-mt-20">
-                    <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} />
-                  <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} />
-                  <WeeklyPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <PeriodicPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <WeeklyPhaseSyncChart />
-                  <RollingRQAChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <LocalLyapunovChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <LyapunovSpectrumChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <SimplexPredictionChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} />
-                  <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <PotentialLandscapeChart prices={filteredPrices} />
-                  <div id="sa-nonlinear-tda" className="scroll-mt-20">
-                    <TDAChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <RollingTDAChart prices={filteredPrices} seriesMode={seriesMode} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "アトラクタ・埋め込み・位相",
+                      items: [
+                        { id: "sa-nonlinear", title: "投資シグナル統合ダッシュボード", node: <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-embedding", title: "埋め込みパラメータ最適化", node: <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-attractor", title: "アトラクタ探索（Takens埋め込み）", node: <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-weekly-phase", title: "週内位相アトラクタ（動力学的週内アノマリー）", node: <WeeklyPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-periodic-phase", title: "一般周期 位相アトラクタ（月内・四半期内）", node: <PeriodicPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-phase-sync", title: "週次位相同期（マルチ銘柄 Kuramoto）", node: <WeeklyPhaseSyncChart /> },
+                      ],
+                    },
+                    {
+                      group: "RQA・Lyapunov・予測",
+                      items: [
+                        { id: "nl-rqa", title: "ローリングRQA", node: <RollingRQAChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-local-lyap", title: "局所Lyapunov指数・位相空間密度", node: <LocalLyapunovChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-lyap-spectrum", title: "リアプノフスペクトル・KY次元・ベクトル分解", node: <LyapunovSpectrumChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-simplex", title: "位相空間予測（Simplex / S-map）", node: <SimplexPredictionChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-recurrence", title: "Recurrence Plot & Lyapunov指数", node: <RecurrencePlot prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                    {
+                      group: "ポテンシャル・TDA",
+                      items: [
+                        { id: "nl-km", title: "Kramers-Moyal係数 / ポテンシャル関数", node: <KramersMoyalChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-potential", title: "ポテンシャル地形（Potential / Drift Landscape）", node: <PotentialLandscapeChart prices={filteredPrices} /> },
+                        { id: "sa-nonlinear-tda", title: "位相的データ解析（TDA）/ Fisher-Rao距離", node: <TDAChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "nl-rolling-tda", title: "ローリングTDA", node: <RollingTDAChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "entropy" && (
-                <>
-                  <div id="sa-entropy" className="scroll-mt-20">
-                    <EntropyDisplay prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <EntropyExtendedChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ConditionalEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <MultiscaleEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <EntropyHeatmapChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <ComplexityEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <InformationStorageChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <RollingTransferEntropyChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <SymbolicInfoFlowChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <EntropyRegimeChart prices={filteredPrices} seriesMode={seriesMode} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "エントロピー指標",
+                      items: [
+                        { id: "sa-entropy", title: "情報理論 / エントロピー", node: <EntropyDisplay prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-extended", title: "拡張エントロピー指標", node: <EntropyExtendedChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-conditional", title: "条件付きエントロピー / エントロピー率", node: <ConditionalEntropyChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-multiscale", title: "マルチスケール解析", node: <MultiscaleEntropyChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-heatmap", title: "エントロピーヒートマップ / パターン分布", node: <EntropyHeatmapChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-complexity", title: "複雑度-エントロピー平面", node: <ComplexityEntropyChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                    {
+                      group: "情報フロー・レジーム",
+                      items: [
+                        { id: "ent-storage", title: "情報蓄積 / 予測可能性", node: <InformationStorageChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-rolling-te", title: "ローリング移転エントロピー / 相互情報量", node: <RollingTransferEntropyChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-symbolic", title: "シンボル情報フロー / 情報分解", node: <SymbolicInfoFlowChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "ent-regime", title: "エントロピーレジーム検出", node: <EntropyRegimeChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "fractal" && (
-                <>
-                  <div id="sa-fractal" className="scroll-mt-20">
-                    <DFAChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <RollingHurstChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <FractalExtChart prices={filteredPrices} seriesMode={seriesMode} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "sa-fractal", title: "フラクタル / スケーリング（DFA・Hurst）", node: <DFAChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "frac-rolling-hurst", title: "ローリングHurst指数 + サロゲート帯", node: <RollingHurstChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "frac-ext", title: "フラクタル拡張解析（MF-DFA・R/S・DCCA ほか）", node: <FractalExtChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "network" && (
-                <>
-                  <div id="sa-network" className="scroll-mt-20">
-                    <VisibilityGraphChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <HVGChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <OrdinalNetwork prices={filteredPrices} seriesMode={seriesMode} />
-                  <RecurrenceNetworkChart prices={filteredPrices} seriesMode={seriesMode} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "sa-network", title: "Visibility Graph（NVG）", node: <VisibilityGraphChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "net-hvg", title: "Horizontal Visibility Graph（HVG）", node: <HVGChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "net-ordinal", title: "Ordinal Pattern Transition Network", node: <OrdinalNetwork prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "net-recurrence", title: "Recurrence Network", node: <RecurrenceNetworkChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "regime" && (
-                <>
-                  <div id="sa-regime" className="scroll-mt-20">
-                    <MarketStateDashboard prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <RegimeChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <RegimeTechnicalChart prices={filteredPrices} />
-                  <RegimeDistributionChart prices={filteredPrices} />
-                  <RegimeTransitionChart prices={filteredPrices} />
-                  <div id="sa-regime-break" className="scroll-mt-20">
-                    <StructuralBreakChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <BOCPDChart prices={filteredPrices} seriesMode={seriesMode} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "sa-regime", title: "市場状態ダッシュボード", node: <MarketStateDashboard prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "regime-main", title: "レジーム分析（3状態カルマン・スムーザー・HMM）", node: <RegimeChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "regime-technical", title: "レジーム別テクニカル指標有効性", node: <RegimeTechnicalChart prices={filteredPrices} /> },
+                        { id: "regime-distribution", title: "レジーム別分布特性", node: <RegimeDistributionChart prices={filteredPrices} /> },
+                        { id: "regime-transition", title: "レジーム遷移分析", node: <RegimeTransitionChart prices={filteredPrices} /> },
+                        { id: "sa-regime-break", title: "構造変化検定", node: <StructuralBreakChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "regime-bocpd", title: "ベイズ変化点検出（BOCPD）", node: <BOCPDChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "causal" && (
-                <>
-                  <EventStudyChart prices={allPrices} />
-                  <div id="sa-causal" className="scroll-mt-20">
-                    <CausalChart prices={filteredPrices} seriesMode={seriesMode} />
-                  </div>
-                  <CCMChart prices={filteredPrices} seriesMode={seriesMode} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "causal-event", title: "条件付きイベントスタディ（始点重ね描き）", node: <EventStudyChart prices={allPrices} /> },
+                        { id: "sa-causal", title: "因果・情報伝達解析（Transfer Entropy・Granger）", node: <CausalChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "causal-ccm", title: "CCM非線形因果分析", node: <CCMChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "tailrisk" && (
-                <>
-                  <TailRiskChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <CopulaChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <HillEstimatorChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "tail-main", title: "テイルリスク解析（極値統計・高次キュムラント）", node: <TailRiskChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "tail-copula", title: "コピュラ分析", node: <CopulaChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "tail-hill", title: "Hillテール指数推定", node: <HillEstimatorChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "conditional" && (
-                <>
-                  <ConditionalForwardChart prices={filteredPrices} />
-                  <ConditionalSegmentEdgeChart prices={filteredPrices} />
-                  <CustomBucketChart prices={filteredPrices} />
-                  <ReturnBinHeatmapChart prices={filteredPrices} />
-                  <ConditionMarkerChart prices={filteredPrices} />
-                  <TrendMomentumChart prices={filteredPrices} />
-                  <ShortTermReversalChart prices={filteredPrices} />
-                  <TwoFactorHeatmapChart prices={filteredPrices} />
-                  <StatePredictabilityChart prices={filteredPrices} />
-                  <PersistenceChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "状態 → 先行きリターン",
+                      items: [
+                        { id: "cond-forward", title: "状態→先行きリターン表（RSI/ボラ/トレンド別）", node: <ConditionalForwardChart prices={filteredPrices} /> },
+                        { id: "cond-segment-edge", title: "条件付きエッジ：日中 vs 夜間（状態別にどちらの執行が有利か）", node: <ConditionalSegmentEdgeChart prices={filteredPrices} /> },
+                        { id: "cond-custom-bucket", title: "カスタム条件ビルダー（任意の指標・閾値・分位）", node: <CustomBucketChart prices={filteredPrices} /> },
+                        { id: "cond-return-bin", title: "状態 × 先行きリターンビン 分布ヒートマップ", node: <ReturnBinHeatmapChart prices={filteredPrices} /> },
+                        { id: "cond-marker", title: "条件発生マーカー & 区間クロスフィルタ", node: <ConditionMarkerChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "順張り/逆張り・複合・持続性",
+                      items: [
+                        { id: "cond-trend-momentum", title: "トレンド・モメンタムの先行きリターン（順張りアノマリー検証）", node: <TrendMomentumChart prices={filteredPrices} /> },
+                        { id: "cond-reversal", title: "短期リバーサル・エッジ（押し目買い/戻り売りの定量化）", node: <ShortTermReversalChart prices={filteredPrices} /> },
+                        { id: "cond-2factor", title: "2変数コンディショニング・ヒートマップ（複合エッジ）", node: <TwoFactorHeatmapChart prices={filteredPrices} /> },
+                        { id: "cond-state-pred", title: "状態別の予測可能性（方向的中率・情報係数IC）", node: <StatePredictabilityChart prices={filteredPrices} /> },
+                        { id: "cond-persistence", title: "持続性・サンプル外検証（前半/後半の再現性）", node: <PersistenceChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "edge" && (
-                <>
-                  <InteractionScanChart prices={filteredPrices} />
-                  <RegimeEdgeMapChart prices={filteredPrices} />
-                  <WalkForwardChart prices={filteredPrices} />
-                  <SignalStackingChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "edge-interaction", title: "条件ペア交互作用スキャナ", node: <InteractionScanChart prices={filteredPrices} /> },
+                        { id: "edge-regime-map", title: "レジーム別エッジマップ", node: <RegimeEdgeMapChart prices={filteredPrices} /> },
+                        { id: "edge-walkforward", title: "ウォークフォワード頑健性（DSR + PBO）", node: <WalkForwardChart prices={filteredPrices} /> },
+                        { id: "edge-signal-stack", title: "シグナル合成", node: <SignalStackingChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
 
               {activeSection === "calendar" && (
@@ -1673,14 +1850,24 @@ export default function AnalysisPage() {
               )}
 
               {activeSection === "quantum" && (
-                <>
-                  <PropagatorChart prices={filteredPrices} />
-                  <PathIntegralChart prices={filteredPrices} />
-                  <DMDChart prices={filteredPrices} seriesMode={seriesMode} />
-                  <DecoherenceChart prices={filteredPrices} />
-                  <MarketTimeChart prices={filteredPrices} />
-                  <DensityMatrixChart prices={filteredPrices} />
-                </>
+                <AccordionSection
+                  filter={sectionFilter}
+                  onFilterChange={setSectionFilter}
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      items: [
+                        { id: "quantum-propagator", title: "価格伝播関数（プロパゲータ）", node: <PropagatorChart prices={filteredPrices} /> },
+                        { id: "quantum-pathintegral", title: "経路積分シミュレーション", node: <PathIntegralChart prices={filteredPrices} /> },
+                        { id: "quantum-dmd", title: "動的モード分解（DMD）", node: <DMDChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "quantum-decoherence", title: "デコヒーレンス分析", node: <DecoherenceChart prices={filteredPrices} /> },
+                        { id: "quantum-markettime", title: "市場時間の再定義", node: <MarketTimeChart prices={filteredPrices} /> },
+                        { id: "quantum-density", title: "密度行列分析", node: <DensityMatrixChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
               )}
             </div>
           </>
