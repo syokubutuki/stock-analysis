@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>プロジェクト運用方針 — 北極星</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --bg2: #151a2e;
+    --card: #1b2138;
+    --card2: #232a45;
+    --ink: #e8ecf6;
+    --ink-dim: #a3aac4;
+    --ink-faint: #6f7797;
+    --line: #2c3452;
+    --gold: #f4c65a;
+    --gold-dim: #b8923a;
+    --indigo: #7c8cff;
+    --teal: #4fd1c5;
+    --rose: #ff8ba7;
+    --green: #56d97e;
+    --radius: 16px;
+    --shadow: 0 10px 40px rgba(0,0,0,.45);
+    --font: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(124,140,255,.18), transparent 60%),
+      radial-gradient(900px 500px at 0% 10%, rgba(79,209,197,.12), transparent 55%),
+      var(--bg);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px 120px; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    padding: 88px 0 40px;
+    text-align: center;
+    position: relative;
+  }
+  .star { font-size: 40px; filter: drop-shadow(0 0 18px rgba(244,198,90,.55)); }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 46px);
+    margin: 14px 0 6px;
+    letter-spacing: .02em;
+    background: linear-gradient(120deg, #fff 20%, var(--gold) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero .sub { color: var(--ink-dim); font-size: 16px; }
+  .northstar {
+    margin: 34px auto 0; max-width: 760px;
+    background: linear-gradient(135deg, rgba(244,198,90,.10), rgba(124,140,255,.08));
+    border: 1px solid rgba(244,198,90,.35);
+    border-radius: var(--radius);
+    padding: 26px 30px;
+    box-shadow: var(--shadow);
+  }
+  .northstar .label {
+    font-size: 12px; letter-spacing: .3em; color: var(--gold);
+    text-transform: uppercase; font-weight: 700;
+  }
+  .northstar p { font-size: 20px; margin: 10px 0 0; font-weight: 600; }
+  .northstar .why { font-size: 14px; color: var(--ink-dim); margin-top: 12px; font-weight: 400; }
+
+  /* ---------- Sections ---------- */
+  section { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+  .sec-num {
+    font-size: 13px; font-weight: 800; color: var(--bg);
+    background: var(--gold); border-radius: 8px; padding: 3px 9px; letter-spacing: .05em;
+  }
+  .sec-head h2 { font-size: 24px; margin: 0; }
+  .sec-head .en { color: var(--ink-faint); font-size: 13px; letter-spacing: .18em; text-transform: uppercase; }
+
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 760px){ .g2,.g3 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--bg2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 17px; }
+  .card p { margin: 0; color: var(--ink-dim); font-size: 14px; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; margin-bottom:10px; letter-spacing:.05em; }
+  .tag.a { background: rgba(124,140,255,.16); color: var(--indigo); border:1px solid rgba(124,140,255,.4);}
+  .tag.b { background: rgba(79,209,197,.16); color: var(--teal); border:1px solid rgba(79,209,197,.4);}
+
+  /* ---------- Positioning ---------- */
+  .cross {
+    text-align:center; padding: 34px; border-radius: var(--radius);
+    background: radial-gradient(600px 300px at 50% 0%, rgba(244,198,90,.12), transparent), var(--card);
+    border: 1px solid var(--line);
+  }
+  .cross .eq { font-size: clamp(15px,2.4vw,20px); font-weight:700; line-height:2; }
+  .cross .eq b.g { color: var(--gold); }
+  .cross .eq b.i { color: var(--indigo); }
+  .cross .note { color: var(--ink-dim); font-size:13px; margin-top:12px; }
+
+  /* ---------- Revenue pillars ---------- */
+  .pillar { position: relative; overflow: hidden; }
+  .pillar .bar { position:absolute; left:0; top:0; bottom:0; width:4px; }
+  .pillar.p1 .bar{background:var(--green);} .pillar.p2 .bar{background:var(--indigo);}
+  .pillar.p3 .bar{background:var(--gold);} .pillar.p4 .bar{background:var(--teal);}
+  .pillar.p5 .bar{background:var(--rose);} .pillar.p6 .bar{background:#9a8cff;}
+  .pillar .meta { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .chip { font-size:11px; color:var(--ink-faint); border:1px solid var(--line); border-radius:999px; padding:2px 9px; }
+
+  /* ---------- Pyramid ---------- */
+  .pyramid { display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:8px; }
+  .layer { border-radius:12px; padding:16px 20px; text-align:center; border:1px solid var(--line); }
+  .layer .pct { font-weight:800; font-size:18px; }
+  .layer .lb { font-size:13px; color:var(--ink-dim); }
+  .l-top{ width:52%; background:linear-gradient(180deg, rgba(244,198,90,.22), rgba(244,198,90,.06)); }
+  .l-mid{ width:74%; background:linear-gradient(180deg, rgba(255,139,167,.18), rgba(255,139,167,.05)); }
+  .l-bot{ width:100%; background:linear-gradient(180deg, rgba(79,209,197,.18), rgba(79,209,197,.05)); }
+  @media (max-width:760px){ .l-top,.l-mid,.l-bot{ width:100%; } }
+
+  /* ---------- Funnel ---------- */
+  .funnel { display:flex; flex-direction:column; gap:0; }
+  .fstep { display:flex; align-items:center; gap:16px; padding:14px 0; }
+  .fdot { width:12px; height:12px; border-radius:50%; background:var(--gold); flex:none; box-shadow:0 0 0 5px rgba(244,198,90,.14); }
+  .fstep:not(:last-child)::after{ content:""; }
+  .fline { position:relative; }
+  .fbody b { color:var(--ink); }
+  .fbody span { color:var(--ink-dim); font-size:13px; }
+  .farrow { color:var(--ink-faint); text-align:center; font-size:18px; }
+
+  /* ---------- Roadmap w/ checkboxes ---------- */
+  .phase { border-left: 2px solid var(--line); padding-left: 22px; margin-left: 6px; }
+  .phase .pnode { position: relative; padding: 6px 0 22px; }
+  .phase .pnode::before {
+    content:""; position:absolute; left:-29px; top:10px; width:12px; height:12px; border-radius:50%;
+    background:var(--bg); border:2px solid var(--gold);
+  }
+  .phase .pnode h3 { margin:0 0 4px; font-size:16px; }
+  .phase .pnode h3 .t { color:var(--ink-faint); font-size:12px; font-weight:500; margin-left:8px; }
+  .todo { list-style:none; padding:0; margin:10px 0 0; }
+  .todo li { display:flex; align-items:flex-start; gap:10px; padding:5px 0; font-size:14px; color:var(--ink-dim); }
+  .todo input { margin-top:5px; width:16px; height:16px; accent-color: var(--gold); cursor:pointer; flex:none; }
+  .todo label { cursor:pointer; }
+  .todo input:checked + label { color:var(--ink-faint); text-decoration: line-through; }
+  .progress { margin-top:8px; height:8px; background:var(--bg2); border-radius:999px; overflow:hidden; border:1px solid var(--line); }
+  .progress > i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--gold),var(--teal)); transition:width .4s ease; }
+  .progress-label { font-size:12px; color:var(--ink-faint); margin-top:6px; }
+
+  /* ---------- Guardrails ---------- */
+  .guard { border:1px solid rgba(255,139,167,.4); background:rgba(255,139,167,.07); border-radius:var(--radius); padding:20px 24px; }
+  .guard h3 { margin:0 0 10px; color:var(--rose); font-size:16px; }
+  .guard ul { margin:0; padding-left:20px; }
+  .guard li { color:var(--ink-dim); font-size:14px; margin:6px 0; }
+  .guard b.ok { color:var(--green); } .guard b.ng { color:var(--rose); }
+
+  /* ---------- Post drafts ---------- */
+  .post {
+    background: linear-gradient(180deg, var(--card), var(--bg2));
+    border: 1px solid var(--line); border-left: 3px solid var(--gold);
+    border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px;
+  }
+  .post .ptype { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .post .ptype .no { font-size:12px; font-weight:800; color:var(--bg); background:var(--gold); border-radius:6px; padding:2px 8px; }
+  .post .ptype .kind { font-size:12px; color:var(--gold); letter-spacing:.08em; }
+  .post .ptype .feat { font-size:11px; color:var(--ink-faint); border:1px solid var(--line); border-radius:999px; padding:2px 9px; margin-left:auto; }
+  .post .draft {
+    background: var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; font-size:14px; color:var(--ink); white-space:pre-wrap;
+    line-height:1.9; position:relative;
+  }
+  .post .draft .vis { color:var(--teal); }
+  .post .draft .cta { color:var(--ink-faint); }
+  .post .why2 { margin:12px 0 0; padding:0; list-style:none; }
+  .post .why2 li { font-size:13px; color:var(--ink-dim); padding:3px 0 3px 18px; position:relative; }
+  .post .why2 li::before { content:"›"; position:absolute; left:2px; color:var(--gold); font-weight:800; }
+  .copyhint { font-size:12px; color:var(--ink-faint); margin-top:2px; }
+
+  /* ---------- Bio / pinned ---------- */
+  .biopick { border-left-color: var(--teal) !important; }
+  .biopick .ptype .no { background: var(--teal); }
+  .biopick .ptype .kind { color: var(--teal); }
+  .biobox {
+    background: var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; font-size:14px; color:var(--ink); white-space:pre-wrap; line-height:1.9;
+  }
+  .biobox .hi { color: var(--gold); }
+  .biobox .dim { color: var(--ink-dim); }
+  .fieldrow { display:flex; gap:10px; margin-bottom:10px; align-items:baseline; }
+  .fieldrow .fk { font-size:11px; color:var(--ink-faint); border:1px solid var(--line); border-radius:6px; padding:2px 8px; flex:none; letter-spacing:.06em; }
+  .fieldrow .fv { font-size:13px; color:var(--ink-dim); }
+
+  /* ---------- Tier table ---------- */
+  .vtable { width:100%; border-collapse:collapse; font-size:13px; margin-top:4px; }
+  .vtable th, .vtable td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .vtable th { color:var(--ink-faint); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+  .vtable td { color:var(--ink-dim); }
+  .vtable td b { color:var(--ink); }
+  .vtable code { background:var(--bg2); border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:12px; color:var(--teal); }
+  .tier { display:inline-block; font-size:10px; font-weight:800; border-radius:5px; padding:2px 7px; letter-spacing:.05em; }
+  .tier.b { background:rgba(79,209,197,.16); color:var(--teal); }
+  .tier.a { background:rgba(124,140,255,.16); color:var(--indigo); }
+  .method { counter-reset: m; list-style:none; padding:0; margin:8px 0 0; }
+  .method li { position:relative; padding:8px 0 8px 40px; border-bottom:1px solid var(--line); font-size:14px; color:var(--ink-dim); }
+  .method li:last-child { border-bottom:none; }
+  .method li::before { counter-increment:m; content:counter(m); position:absolute; left:0; top:8px; width:24px; height:24px; border-radius:50%; background:var(--card2); border:1px solid var(--line); color:var(--gold); font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center; }
+  .method li b { color:var(--ink); }
+  .do3 { list-style:none; padding:0; margin:8px 0 0; }
+  .do3 li { display:flex; gap:12px; align-items:flex-start; padding:8px 0; }
+  .do3 .n { flex:none; width:26px; height:26px; border-radius:8px; background:var(--gold); color:var(--bg); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .do3 .t { font-size:14px; color:var(--ink-dim); }
+  .do3 .t b { color:var(--ink); }
+  .warnline { font-size:12px; color:var(--rose); background:rgba(255,139,167,.07); border:1px solid rgba(255,139,167,.3); border-radius:8px; padding:8px 12px; margin-top:12px; }
+
+  /* ---------- Post stock ---------- */
+  .done { border-left-color: var(--green) !important; }
+  .done .ptype .no { background: var(--green); }
+  .done .ptype .kind { color: var(--green); }
+  .thread { display:flex; flex-direction:column; gap:8px; }
+  .tw { background: var(--bg); border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:13.5px; color:var(--ink); white-space:pre-wrap; line-height:1.85; position:relative; }
+  .tw .cnt { position:absolute; top:8px; right:10px; font-size:10px; color:var(--ink-faint); }
+  .tw .gi { color:var(--teal); }
+  .tw .dim { color:var(--ink-faint); }
+  .datacap { font-size:11px; color:var(--ink-faint); margin-top:8px; }
+  .wklabel { font-size:12px; letter-spacing:.2em; color:var(--gold); font-weight:800; margin:22px 0 10px; text-transform:uppercase; }
+  .srow { display:flex; gap:12px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg,var(--card),var(--bg2)); margin-bottom:10px; align-items:flex-start; }
+  .srow .lc { flex:none; font-size:10px; font-weight:800; border-radius:5px; padding:2px 6px; letter-spacing:.03em; height:fit-content; }
+  .lc60 { background:rgba(79,209,197,.16); color:var(--teal); }
+  .lc30 { background:rgba(255,139,167,.16); color:var(--rose); }
+  .lc10 { background:rgba(244,198,90,.18); color:var(--gold); }
+  .srow .sbody { flex:1; min-width:0; }
+  .srow .smeta { font-size:11px; color:var(--ink-faint); margin-bottom:5px; }
+  .srow .smeta b { color:var(--ink-dim); }
+  .srow .stext { font-size:13px; color:var(--ink-dim); white-space:pre-wrap; line-height:1.8; }
+  .srow .stext .ph { color:var(--gold); }
+
+  /* ---------- Principles ---------- */
+  .principle { display:flex; gap:14px; align-items:flex-start; }
+  .principle .k { font-size:22px; flex:none; }
+  .principle .v b { display:block; margin-bottom:2px; }
+  .principle .v span { color:var(--ink-dim); font-size:13px; }
+
+  footer { margin-top:70px; text-align:center; color:var(--ink-faint); font-size:12px; }
+  .reset { background:none;border:1px solid var(--line);color:var(--ink-faint);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:inherit;font-size:12px;margin-top:14px; }
+  .reset:hover{ color:var(--ink); border-color:var(--ink-faint); }
+
+  ::selection { background: rgba(244,198,90,.3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="star">✦</div>
+    <h1>プロジェクト運用方針</h1>
+    <div class="sub">Stock Analysis — 分析の深化ではなく、「これで何を成すか」の地図</div>
+
+    <div class="northstar">
+      <div class="label">North Star ・ 北極星</div>
+      <p>この分析力を、複数の収益源へ変換し、<br />特定の相場・仕事に依存しない「安定した自立」をつくる。</p>
+      <div class="why">株で勝つことは目的の一部にすぎない。作ってきた知識と技術は、
+      「儲け」「発信」「教育」「プロダクト」「受託」という<b>独立した複数の柱</b>に化ける。
+      柱が複数あるほど、どれか一本が折れても倒れない。</div>
+    </div>
+  </header>
+
+  <!-- 1. 現在地 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>現在地</h2><span class="en">Where I stand</span></div>
+    <div class="grid g3">
+      <div class="card"><h3>25歳 / 運用 1900万</h3><p>同年代で桁違いの実績。これは「若さ×金額×スピード」という強いフックであり、発信の入口になる資本。</p></div>
+      <div class="card"><h3>実装資産</h3><p>18分析セクション・117コンポーネント・80ライブラリ（約2万行）。難解な定量手法を「触れる可視化」に落とした稀少な蓄積。</p></div>
+      <div class="card"><h3>掛け算の希少性</h3><p>実績を<b>定量的に説明できる</b>人はほぼいない。「見せられる実績 × 説明できる中身」が唯一の立ち位置。</p></div>
+    </div>
+  </section>
+
+  <!-- 2. 2つの換金資産 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>2つの換金資産</h2><span class="en">Two monetizable assets</span></div>
+    <div class="grid g2">
+      <div class="card">
+        <span class="tag a">Asset A</span>
+        <h3>定量金融のドメイン知識</h3>
+        <p>Hurst・GARCH・Kalman・SARIMA・wavelet・Heston、カレンダー/日中エッジ検出。「実装して初めて分かった知見」は一次情報として強い。</p>
+      </div>
+      <div class="card">
+        <span class="tag b">Asset B</span>
+        <h3>エンジニアリング力</h3>
+        <p>Next.js × lightweight-charts × Canvas で、統計を"動く可視化"に変える力。金融に限らず売れる、希少で汎用的なスキル。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. ポジショニング -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>ポジショニング</h2><span class="en">The intersection</span></div>
+    <div class="cross">
+      <div class="eq"><b class="g">見せられる実績（25歳/1900万）</b> × <b class="i">説明できる中身（定量分析）</b></div>
+      <div class="note">投資インフルエンサーの多くは実績を語れても裏付けられない。エンジニアの多くは実績を持たない。<br />その交差点に立てる人はほとんどいない。ここが差別化の核。</div>
+    </div>
+  </section>
+
+  <!-- 4. 収益ポートフォリオ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>収益ポートフォリオ</h2><span class="en">Revenue pillars</span></div>
+    <div class="grid g2">
+      <div class="card pillar p1"><div class="bar"></div><h3>① 自己資金運用</h3><p>本線。分析力を直接リターンに変える。</p><div class="meta"><span class="chip">フロー</span><span class="chip">本業</span></div></div>
+      <div class="card pillar p2"><div class="bar"></div><h3>② 情報発信（記事）</h3><p>実装の副産物が商品に。Zenn/note。検索資産＋信頼を蓄積するストック型。</p><div class="meta"><span class="chip">ストック</span><span class="chip">低リスク</span><span class="chip">まず着手</span></div></div>
+      <div class="card pillar p3"><div class="bar"></div><h3>③ 教育・講座</h3><p>Udemy・同人誌・メンタリング。A×Bの掛け算はほぼ競合なし。単価が高い。</p><div class="meta"><span class="chip">ストック/フロー</span><span class="chip">高単価</span></div></div>
+      <div class="card pillar p4"><div class="bar"></div><h3>④ 受託・フリーランス</h3><p>データ可視化ダッシュボード受託。即金性が高く、金融以外にも需要が広い。</p><div class="meta"><span class="chip">フロー</span><span class="chip">即金</span></div></div>
+      <div class="card pillar p5"><div class="bar"></div><h3>⑤ プロダクト（SaaS/OSS）</h3><p>ツールのSaaS化、libのOSS化＋Sponsors。時間はかかるが上限が最も高い。</p><div class="meta"><span class="chip">ストック</span><span class="chip">上振れ</span></div></div>
+      <div class="card pillar p6"><div class="bar"></div><h3>⑥ B2B・技術顧問</h3><p>投資顧問・運用会社への提供／内製支援。信頼が育った後の高単価領域。</p><div class="meta"><span class="chip">フロー</span><span class="chip">最高単価</span></div></div>
+    </div>
+  </section>
+
+  <!-- 5. 集客ファネル -->
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>集客の全体構造</h2><span class="en">The funnel</span></div>
+    <div class="card fline">
+      <div class="funnel">
+        <div class="fstep"><span class="fdot"></span><div class="fbody"><b>X（旧Twitter）</b> <span>— 毎日の入口。小ネタ・可視化GIFで母数を育てる</span></div></div>
+        <div class="farrow">↓</div>
+        <div class="fstep"><span class="fdot"></span><div class="fbody"><b>記事（Zenn / note）</b> <span>— 信頼と検索資産の蓄積。Xで初速、はてブで二次拡散</span></div></div>
+        <div class="farrow">↓</div>
+        <div class="fstep"><span class="fdot"></span><div class="fbody"><b>本命の収益</b> <span>— 講座・受託・OSS/SaaS へ流す</span></div></div>
+      </div>
+      <p style="color:var(--ink-faint);font-size:13px;margin-top:10px;">Xは「毎日の入口」、記事は「貯まる資産」。役割が違うので両輪で回す。動画は記事で当たりを引いてから投資する。</p>
+    </div>
+  </section>
+
+  <!-- 6. コンテンツ・ピラミッド -->
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>コンテンツ配分</h2><span class="en">60 / 30 / 10</span></div>
+    <div class="card">
+      <div class="pyramid">
+        <div class="layer l-top"><div class="pct">10%</div><div class="lb">深い分析・実装 — 権威と信頼（本命導線）</div></div>
+        <div class="layer l-mid"><div class="pct">30%</div><div class="lb">実績・資産推移・物語 — 注目と共感（拡散の主力）</div></div>
+        <div class="layer l-bot"><div class="pct">60%</div><div class="lb">分かりやすい小ネタ・気づき — 頻度と母数（毎日の入口）</div></div>
+      </div>
+      <p style="color:var(--ink-faint);font-size:13px;margin-top:16px;text-align:center;">難しい話（10%）だけを投稿して伸び悩むのが典型。頻度と分かりやすさを担うのは土台の60%。</p>
+    </div>
+  </section>
+
+  <!-- 7. 初弾ドラフト -->
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>初弾ドラフト</h2><span class="en">First posts</span></div>
+    <p style="color:var(--ink-dim);font-size:14px;margin:-8px 0 18px;">実装済み手法に紐づけた最初の3本。<b>足を止める問い → 可視化 → 手法名で信頼 → 記事へ</b>の4層構造。<span style="color:var(--gold);">リンクは本文でなく返信欄に置く</span>（アルゴリズム上不利なため）。</p>
+
+    <div class="post">
+      <div class="ptype"><span class="no">01</span><span class="kind">通説の解剖 ・ ミスバスティング（最も拡散しやすい）</span><span class="feat">MondayGapChart</span></div>
+      <div class="draft">「月曜は下げて始まる」ってよく聞くけど、本当か？
+
+過去10年の始値ギャップを、"前週末の値動き・前夜の米国市場・地合い"で層別して解剖してみた。
+通説が成り立つのは <b>特定の条件が揃った月曜だけ</b> だった。無条件で信じると逆にやられる。
+
+<span class="vis">【条件別ギャップのヒートマップGIF】</span>
+
+<span class="cta">↓ 5つの視点で分解した詳細（返信に記事）</span></div>
+      <ul class="why2">
+        <li>誰もが持つ通説への疑問＝万人が足を止める。「実データで解剖」で専門性が立つ</li>
+        <li>売買推奨ゼロで規制安全。添える図は条件別ヒートマップ or 木金→月ベクトル</li>
+      </ul>
+    </div>
+
+    <div class="post">
+      <div class="ptype"><span class="no">02</span><span class="kind">一枚で驚かせる ・ 意外性の可視化（Shorts転用可）</span><span class="feat">WeekdayIntradayEdgeChart</span></div>
+      <div class="draft">もし「曜日と時刻」だけでエントリー/イグジットを縛るなら、どこが一番おいしいのか？
+
+曜日 × 日中の時刻を総当たりで回して、ロングの期待リターンをヒートマップにした。
+明るいマスほど過去有利だった帯。<b>特定の曜日の特定の時間に、はっきり色が寄る。</b>
+
+<span class="vis">【曜日×時刻ヒートマップGIF ＋ 累積エクイティ】</span>
+
+<span class="cta">↓ 総当たりの方法と過学習の注意点（返信）</span></div>
+      <ul class="why2">
+        <li>ヒートマップは無言でも成立＝Xで自動再生され流し見で刺さる</li>
+        <li>「過学習に注意」を一言添えると煽り系と一線を画し信頼が上がる</li>
+      </ul>
+    </div>
+
+    <div class="post">
+      <div class="ptype"><span class="no">03</span><span class="kind">物語 × 実績 × 専門性（あなただけの主砲）</span><span class="feat">WeekdayUsPathChart</span></div>
+      <div class="draft">25歳で運用1900万まで来たけど、勝因は"勘"じゃない。
+
+例えばこれ。前夜の米国市場が当日の日本株の"日中の歩き方"をどれだけ引きずるか、中央値パスで見える化したもの。
+「米国が○○だった翌日は、寄りから昼にかけてこう動きやすい」という<b>偏りを数字で掴む</b>のが自分のやり方。
+
+<span class="vis">【前夜米国で層別した日内累積パスGIF】</span>
+
+<span class="cta">↓ 手法の中身（返信）</span></div>
+      <ul class="why2">
+        <li>「見せられる実績 × 説明できる中身」の交差点を1投稿に凝縮</li>
+        <li>1900万は"自己紹介の節目"としてここで使う（毎回の看板にはしない＝ガードレール準拠）</li>
+        <li>③ばかりだと妬み・アンチが増える。①②で母数を作り、③は時々の主砲として撃つ</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 8. アカウントの顔 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">08</span><h2>アカウントの顔（着地点）</h2><span class="en">Bio &amp; pinned</span></div>
+    <p style="color:var(--ink-dim);font-size:14px;margin:-8px 0 18px;">リプで足を止めた人が最初に見る場所。<b>リプ=広告、プロフ=着地、固定ポスト=クロージング</b>。ここが未完成だと訪問者は帰る。</p>
+
+    <div class="grid g3" style="margin-bottom:18px;">
+      <div class="card"><div class="fieldrow"><span class="fk">名乗り</span></div><p style="color:var(--ink-dim);font-size:13px;margin:0;">「名前｜<b style="color:var(--teal)">株の定量分析</b>」の形。"投資家"だけだと煽り系と同化するので<b style="color:var(--ink)">"定量・可視化"を必ず入れる</b>。</p></div>
+      <div class="card"><div class="fieldrow"><span class="fk">ヘッダー</span></div><p style="color:var(--ink-dim);font-size:13px;margin:0;">代表的な<b style="color:var(--ink)">可視化GIFの静止画</b>。一瞬で「何を見せる人か」が伝わる。</p></div>
+      <div class="card"><div class="fieldrow"><span class="fk">免責</span></div><p style="color:var(--ink-dim);font-size:13px;margin:0;">bioに<b style="color:var(--ink)">「個別助言はしない」</b>と明記＝規制対策＆"釣り方を売る人"宣言。</p></div>
+    </div>
+
+    <div class="post biopick">
+      <div class="ptype"><span class="no">Bio</span><span class="kind">プロフィール文（コピペ可・推奨案）</span><span class="feat">160字以内</span></div>
+      <div class="biobox">25歳／株を<span class="hi">定量分析</span>で運用（現在1900万）。曜日・日中・前夜米国の"偏り"をデータで<span class="hi">可視化</span>📊 手法と検証だけを共有します。<span class="dim">※個別銘柄の売買助言はしません。</span></div>
+    </div>
+
+    <div class="post biopick">
+      <div class="ptype"><span class="no">Pin</span><span class="kind">固定ポスト（自己紹介・コピペ可）</span><span class="feat">初弾③に接続</span></div>
+      <div class="biobox">はじめまして。25歳、株を"勘"ではなく<span class="hi">定量分析</span>で運用しています（現在1900万）。
+
+このアカウントでやること：
+📊 「月曜は下げる」等の通説をデータで検証
+📈 曜日・日中・前夜米国の"偏り"を可視化
+🧪 分析を実装して気づいたことの共有
+
+売買推奨はしません。"魚の釣り方"だけ置いていきます。
+例えばこれ→<span style="color:var(--teal)">【代表的な可視化GIF】</span></div>
+      <ul class="why2">
+        <li>実績（1900万）で足を止め、"やること3つ"で価値を約束し、GIFで証明する</li>
+        <li>「売買推奨はしない」を固定ポストにも置く＝訪問者と規制の両方に効く</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 9. 絡む相手リスト -->
+  <section>
+    <div class="sec-head"><span class="sec-num">09</span><h2>絡む相手リスト＆発見メソッド</h2><span class="en">Engage list</span></div>
+    <p style="color:var(--ink-dim);font-size:14px;margin:-8px 0 18px;">0→1,000人の露出源は<b>投稿ではなくリプ</b>。あなたは<b style="color:var(--gold)">「株クラ(実績)」と「クオンツ/データ(理論)」の橋</b>に立つ＝競合が薄い白地。両界隈に仕込む。</p>
+
+    <table class="vtable">
+      <thead><tr><th>層</th><th>アカウント / 探し方</th><th>絡み方</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tier b">本丸 B</span></td><td><b>Quant College / QDくん</b> <code>@developer_quant</code><br /><span class="dim">金融工学を数式なしで発信＝手本かつ最重要ハブ</span></td><td>手法解説に<b>データ・可視化を一言足す</b>リプ</td></tr>
+        <tr><td><span class="tier b">本丸 B</span></td><td><b>QuantX Factory</b> <code>@quantx_factory</code><br /><span class="dim">アルゴ/システムトレード基盤</span></td><td>検証・実装視点のリプ</td></tr>
+        <tr><td><span class="tier b">同格 B</span></td><td><b>Zenn/noteのデータ投資勢</b>（gamella / TAT / stockdatalab 等）</td><td>引用RTで自分の可視化を添える</td></tr>
+        <tr><td><span class="tier a">拡散 A</span></td><td><b>大手トレーダー</b>（テスタ / 井村俊哉 / Ken 等・本人認証を確認）</td><td>バズ投稿への<b>一次リプで割り込む</b>（深追いしない）</td></tr>
+        <tr><td><span class="tier a">主戦場 A</span></td><td><b>検証好きの中堅</b>（"株クラ おすすめ"まとめから抽出）</td><td>ここが本命。データ視点で<b>常連化</b></td></tr>
+      </tbody>
+    </table>
+    <div class="warnline">⚠ ハンドル・数字は変動する。上は"出発点"。必ず本人プロフ・認証を確認し、下のメソッドで自分の目で増やす。</div>
+
+    <h3 style="font-size:15px;margin:22px 0 4px;color:var(--ink);">発見メソッド（毎週10人ずつ足す）</h3>
+    <ol class="method">
+      <li><b>手本の"よく絡む相手"を辿る</b> — <code>@developer_quant</code>等がリプし合う相手＝同界隈の中堅が芋づる式に出る</li>
+      <li><b>キーワード定点観測</b> — 「バックテスト」「アノマリー 検証」「曜日 リターン」「ボラティリティ 可視化」で最近投稿した人</li>
+      <li><b>"実力者にフォローされてるか"で選別</b> — フォロワー数でなく誰にフォローされてるかで本物を判別</li>
+      <li><b>ハッシュタグの常連</b> — <code>#株クラ</code> <code>#システムトレード</code> <code>#Python</code> からデータ寄りの人だけ拾う</li>
+      <li><b>まとめ記事を起点に</b> — 「25選」等からデータ・検証系だけ抜き出す</li>
+    </ol>
+
+    <h3 style="font-size:15px;margin:22px 0 4px;color:var(--ink);">Xリストで戦場を可視化（非公開3つ）</h3>
+    <div class="grid g3">
+      <div class="card"><h3 style="font-size:14px;">📋 本丸(B)</h3><p style="font-size:13px;">クオンツ/データ界隈。毎日必ず巡回してリプ</p></div>
+      <div class="card"><h3 style="font-size:14px;">📋 主戦場(中堅A)</h3><p style="font-size:13px;">検証好きの中堅。常連化を狙う</p></div>
+      <div class="card"><h3 style="font-size:14px;">📋 大手(拡散)</h3><p style="font-size:13px;">バズ監視用。一次リプのタイミングを取る</p></div>
+    </div>
+
+    <h3 style="font-size:15px;margin:22px 0 4px;color:var(--ink);">🚀 今日やる3アクション</h3>
+    <ul class="do3">
+      <li><span class="n">1</span><span class="t"><b>Xリストを3つ作る</b>（上の分類で・非公開でOK）</span></li>
+      <li><span class="n">2</span><span class="t"><b>シードを分類して入れる</b>：<code>@developer_quant</code> <code>@quantx_factory</code> を本丸へ。メソッド②で中堅5人を見つけ主戦場へ</span></li>
+      <li><span class="n">3</span><span class="t"><b>今日の初リプを1件打つ</b>：本丸の直近投稿に下のテンプレで価値を足す</span></li>
+    </ul>
+    <div class="post" style="margin-top:12px;">
+      <div class="ptype"><span class="no">Reply</span><span class="kind">初リプのテンプレ（コピペ改変用）</span></div>
+      <div class="biobox">面白いですね。これ、過去◯年の日本株で同じことを見たら〔データの一言〕でした。〔曜日／前夜米国 等〕で層別するとさらに偏りが出そうです。</div>
+      <ul class="why2"><li>「データを足せる人」として本丸界隈に認知され始める。<b>プロフィール完成が前提</b>（着地点）</li></ul>
+    </div>
+  </section>
+
+  <!-- 10. 投稿ストック -->
+  <section>
+    <div class="sec-head"><span class="sec-num">10</span><h2>投稿ストック（2週間分）</h2><span class="en">Content bank</span></div>
+    <p style="color:var(--ink-dim);font-size:14px;margin:-8px 0 6px;">上から消化する運用台帳。配分は <span style="color:var(--teal)">60%=8本</span> / <span style="color:var(--rose)">30%=3本</span> / <span style="color:var(--gold)">10%=3本</span>。</p>
+    <div class="warnline">⚠ 数字の <span style="color:var(--gold)">〔 〕</span> はアプリで実データを確認してから埋める。検証していない数字は絶対に出さない（信頼の生命線）。</div>
+
+    <!-- 完成品 -->
+    <div class="post done" style="margin-top:18px;">
+      <div class="ptype"><span class="no">✅ 完成</span><span class="kind">③を実データで完成（日経225・過去10年）— そのまま投稿可のスレッド</span><span class="feat">10%・主砲</span></div>
+      <div class="thread">
+        <div class="tw"><span class="cnt">1/4</span>「月曜は下げて始まる」を日経225の過去10年で検証した。
+
+結果、通説はむしろ逆。
+月曜が下げて始まったのは <b>42.8%</b>。実は <b>約57%は"上げて"始まってる</b>。
+
+ただし「金曜がどう終わったか」で表情が変わる👇
+<span class="gi">【条件別ギャップのヒートマップGIF】</span></div>
+        <div class="tw"><span class="cnt">2/4</span>金曜が<b>高値圏で強く引けた</b>翌月曜 → 下げ寄りは <b>39%</b>（さらに上げ寄りに傾く）
+金曜が<b>安値圏で弱く引けた</b>翌月曜 → 下げ寄りは <b>45%</b>まで上昇
+
+"月曜の弱さ"が顔を出すのは前週末が弱かった時だけ。それでも半分は上げて始まる。</div>
+        <div class="tw"><span class="cnt">3/4</span>むしろ実務で効くのはこっち。
+一度<b>"下げて"始まった月曜</b>は、その日のうちに取り返しにくい。
+・寄りの窓を当日埋めた確率：<b>37.5%</b>
+・その日の日中リターン：平均 <b>-0.24%</b>
+下げ寄り＝その日ずっと弱い、が過去の傾向。</div>
+        <div class="tw"><span class="cnt">4/4</span><span class="dim">※先読み防止：条件（金曜の値動き）は全部"月曜の寄り前に確定してる情報"だけを使用。後知恵で勝ってるフリはしていない。
+※日経225の例。個別株だと表情は変わる。</span>
+
+こういう「通説の検証」を淡々とやってます。</div>
+      </div>
+      <div class="datacap">データ: Yahoo ^N225 日足 2016-07〜2026-07（月曜 n=449）。平均gap=+6.0bp / t=1.53（＝統計的にはゼロ近傍で "特別上げも下げもしない"、ただし下げ寄りは少数派）。app/lib/monday-gap.ts の定義に忠実に集計。</div>
+    </div>
+
+    <!-- 完成品 ⑦ -->
+    <div class="post done">
+      <div class="ptype"><span class="no">✅ 完成</span><span class="kind">⑦を実データで完成（日経225・60m・約3年）— "総当たりの罠"を教える主砲</span><span class="feat">10%・主砲</span></div>
+      <div class="thread">
+        <div class="tw"><span class="cnt">1/4</span>曜日 ×「何時に建てて何時に外すか」を日本株で総当たり（105通り）して、一番おいしい枠を探した。
+
+出た答え：<b>金曜 13:00→15:00</b>
+平均 <b>+0.07%</b>/トレード・勝率 <b>53%</b>・t=2.45。
+おっ、勝てるじゃん？…と思うよね。
+<span class="gi">【曜日×時刻ヒートマップGIF】</span></div>
+        <div class="tw"><span class="cnt">2/4</span>でも待って。<b>105通りも試せば、偶然"良く見える枠"は必ず出る。</b>
+
+そこで多重検定補正（FDR）をかけると──
+金曜午後の枠：補正後p = <b>0.79</b>。
+統計的には<b>消える</b>。t=2.45も、数を打った結果のまぐれの範囲。</div>
+        <div class="tw"><span class="cnt">3/4</span>全曜日でやっても、補正後に生き残る枠は<b>ゼロ</b>だった。
+
+「総当たりで見つけた必勝パターン」の正体は、だいたいこれ（＝過学習）。
+バックテストで綺麗な右肩上がりを見せる人ほど、この工程を飛ばしてる。</div>
+        <div class="tw"><span class="cnt">4/4</span>だから自分は、総当たり系は<b>必ず補正して"消えなかったものだけ"</b>を見る。
+そして<b>消えたことも含めて正直に出す</b>。
+
+負けの検証こそ価値がある。
+<span class="dim">※日経225・60m足・約3年（729立会日／各曜日150前後）。</span></div>
+      </div>
+      <div class="datacap">データ: Yahoo ^N225 60m 2023-07〜2026-07。検定ウィンドウ105、全曜日の最良枠が pAdj≥0.79（FDR未通過）。weekday-intraday-edge.ts の computeWeekdayIntradayEdge と同一ロジックで集計。<b style="color:var(--rose)">当初ドラフト⑦「はっきり色が寄る」は誤り</b>——実データでは"寄って見えるが有意ではない"が正しかった。</div>
+    </div>
+
+    <!-- Week 1 -->
+    <div class="wklabel">Week 1</div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">数字クイズ ・ <b>MondayGapChart</b></div><div class="stext">「月曜は下げて始まる」ってよく言うけど、過去10年の日本株で月曜の寄りが前週末より下だった確率、何%だと思う？ 答えは夜に。予想をリプで。</div></div></div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">気づきメモ ・ <b>WeekdayIntradayEdgeChart</b></div><div class="stext">曜日アノマリーを雰囲気で語らないために、曜日×"何時に建てて何時に外すか"を総当たりで検証する仕組みを作った。ポイントは寄り前に確定してる情報しか使わない（後知恵で勝ってるフリをしない）こと。</div></div></div>
+    <div class="srow"><span class="lc lc10">10%</span><div class="sbody"><div class="smeta">主砲/通説検証 ・ <b>MondayGapChart</b> → ✅上の完成品スレッド</div><div class="stext">③は完成済み（上）。クイズ①の答え合わせとしてこのスレッドを投下。</div></div></div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">気づきメモ ・ <b>MondayGapChart（friClv）</b></div><div class="stext">地味だが効く話。金曜の"引けの位置"（高値圏で終わったか安値圏で終わったか）が月曜の寄りとどう関係するか。金曜を高値引け＝強く終わった週の翌月曜は<span class="ph">〔上げ寄りに傾く〕</span>。</div></div></div>
+    <div class="srow"><span class="lc lc30">30%</span><div class="sbody"><div class="smeta">物語/実績</div><div class="stext">25歳。株の運用資産はいま1900万。でも勝因は"勘"じゃなく、「月曜は下げる」みたいな通説を全部データで検証して、本当に偏ってる所だけ張ることに切り替えたから。その検証過程を公開していきます。</div></div></div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">数字クイズ ・ <b>WeekdayIntradayEdgeChart</b></div><div class="stext">日本株、日中（寄り→引け）のリターンがプラスになりやすい曜日ってどれだと思う？ 月/火/水/木/金でリプ投票。夜にヒートマップで答え合わせ。</div></div></div>
+    <div class="srow"><span class="lc lc10">10%</span><div class="sbody"><div class="smeta">主砲/通説検証 ・ <b>WeekdayIntradayEdgeChart</b> → ✅上の完成品スレッド</div><div class="stext">⑦は完成済み（上）。「総当たりで見つけた必勝枠は、FDR補正で消える＝過学習」を教える主砲。⑥のクイズ（何曜が有利？）の答え合わせとして投下。</div></div></div>
+
+    <!-- Week 2 -->
+    <div class="wklabel">Week 2</div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">気づきメモ ・ <b>SessionGap / MondayGap</b></div><div class="stext">"月曜"を一括りにするのは雑だった。連休明けの月曜（3連休の翌日）は、普通の月曜とギャップの出方が<span class="ph">〔○○〕</span>違う。休みの長さでちゃんと分けると景色が変わる。</div></div></div>
+    <div class="srow"><span class="lc lc30">30%</span><div class="sbody"><div class="smeta">物語/資産推移</div><div class="stext">【今月の資産推移グラフ】数字そのものより"増え方"を見せたい。派手な一発じゃなく、検証した小さい偏りの積み重ね。今月効いたのは<span class="ph">〔○○〕</span>でした。</div></div></div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">通説検証 ・ <b>us-spillover</b></div><div class="stext">「昨日の米国が上げたら今日の日本も上げる」ってどこまで本当？ 前夜の米国の動きが当日の日本株の"日中の歩き方"をどれだけ引きずるか測った。引きずるのは<span class="ph">〔寄り〜○時〕</span>で、そこから先は<span class="ph">〔○○〕</span>。</div></div></div>
+    <div class="srow"><span class="lc lc10">10%</span><div class="sbody"><div class="smeta">主砲/一枚図 ・ <b>WeekdayUsPathChart</b></div><div class="stext">前夜の米国で層別した、当日の日中の中央値パス（1日の値動きの型）。「米国が○○だった翌日は、寄りから昼にかけてこう動きやすい」という偏りが見える。【前夜米国別・日内累積パスGIF】</div></div></div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">気づきメモ ・ <b>MondayGap（gapFilled）※実データ反映</b></div><div class="stext">下げて始まった月曜、その日のうちに窓を埋める確率は37.5%しかない（日経225・10年）。日中も平均-0.24%。"下げ寄り＝その日ずっと弱い"はむしろ過去の傾向どおりだった。</div></div></div>
+    <div class="srow"><span class="lc lc30">30%</span><div class="sbody"><div class="smeta">実績/検証 ・ <b>WeekdayTradeSimulator</b></div><div class="stext">「曜日で買って曜日で売る」だけのプランを週内で最適化してバックテスト。過去は<span class="ph">〔○○〕</span>。ただしこれは過学習の見本でもあるので、"そのまま真似すると危ない理由"も添えて解説→（返信）</div></div></div>
+    <div class="srow"><span class="lc lc60">60%</span><div class="sbody"><div class="smeta">返信テンプレ（常用）</div><div class="stext">面白いですね。これ過去<span class="ph">〔○年〕</span>の日本株で見ると<span class="ph">〔データ一言〕</span>でした。〔曜日/前夜米国〕で層別するともっと偏りが出そうです。</div></div></div>
+  </section>
+
+  <!-- 11. ロードマップ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">11</span><h2>ロードマップ</h2><span class="en">Phased plan</span></div>
+    <div class="progress-label" id="globalLabel">全体の進捗</div>
+    <div class="progress"><i id="globalBar"></i></div>
+
+    <div class="phase" style="margin-top:26px;">
+      <div class="pnode">
+        <h3>Phase 0 — 土台づくり<span class="t">今すぐ・記事を待たずに</span></h3>
+        <ul class="todo" data-phase="p0">
+          <li><input type="checkbox" id="p0a"><label for="p0a">Xアカウントを立ち上げ、プロフィール（何屋を名乗るか）を設計</label></li>
+          <li><input type="checkbox" id="p0b"><label for="p0b">日々の小ネタ・気づきの投稿を開始し母数を育て始める</label></li>
+          <li><input type="checkbox" id="p0c"><label for="p0c">"GIFで映える"実装済み手法を3〜5個ピックアップ</label></li>
+        </ul>
+      </div>
+      <div class="pnode">
+        <h3>Phase 1 — 発信で当たりを探す<span class="t">低コストで検証</span></h3>
+        <ul class="todo" data-phase="p1">
+          <li><input type="checkbox" id="p1a"><label for="p1a">記事1本目を公開（刺さる手法・切り口を検証）</label></li>
+          <li><input type="checkbox" id="p1b"><label for="p1b">記事の"おいしい所"＋GIFをXに投稿し初速をつける</label></li>
+          <li><input type="checkbox" id="p1c"><label for="p1c">月次の資産推移グラフを定期投稿の型にする</label></li>
+          <li><input type="checkbox" id="p1d"><label for="p1d">反応の良かったテーマを記録・分析する</label></li>
+        </ul>
+      </div>
+      <div class="pnode">
+        <h3>Phase 2 — 現金化と信頼の拡張<span class="t">育った信頼を換金</span></h3>
+        <ul class="todo" data-phase="p2">
+          <li><input type="checkbox" id="p2a"><label for="p2a">伸びた記事テーマを短尺動画（Shorts）に展開</label></li>
+          <li><input type="checkbox" id="p2b"><label for="p2b">受託・技術顧問の受け皿（問い合わせ導線）を用意</label></li>
+          <li><input type="checkbox" id="p2c"><label for="p2c">講座 or 同人誌の企画を1本立てる</label></li>
+        </ul>
+      </div>
+      <div class="pnode">
+        <h3>Phase 3 — 上振れに賭ける<span class="t">時間はかかるが上限が高い</span></h3>
+        <ul class="todo" data-phase="p3">
+          <li><input type="checkbox" id="p3a"><label for="p3a">有用なlibを「TypeScript製 quant toolkit」としてOSS切り出し</label></li>
+          <li><input type="checkbox" id="p3b"><label for="p3b">分析ダッシュボードのSaaS化（認証＋課金）を検討</label></li>
+        </ul>
+      </div>
+    </div>
+    <button class="reset" onclick="resetProgress()">進捗をリセット</button>
+  </section>
+
+  <!-- 8. ガードレール -->
+  <section>
+    <div class="sec-head"><span class="sec-num">12</span><h2>ガードレール</h2><span class="en">Guardrails</span></div>
+    <div class="guard">
+      <h3>⚠ 越えてはいけない線</h3>
+      <ul>
+        <li><b class="ok">✅ OK（登録不要）</b>：分析<b>手法</b>の解説・教育、過去データの一般的分析、ツール/ライブラリ提供、可視化の受託。</li>
+        <li><b class="ng">❌ NG（要登録・無登録は違法）</b>：対価を得て「この銘柄を今買え/売れ」という<b>個別・具体の売買助言</b>。金融商品取引法上の登録が必要。</li>
+        <li><b>方針</b>：<b>「魚の釣り方」を売り、「どの魚を釣れ」は売らない</b>。仕組み（手法・実装・可視化）を売れば常に安全側。</li>
+        <li><b>資産額の扱い</b>：1900万は自己紹介・節目で使い、毎回の看板にはしない。額そのものより「増え方（推移グラフ）」を見せる方が安全。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 9. 原則 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">13</span><h2>やる気を保つ原則</h2><span class="en">Principles</span></div>
+    <div class="grid g2">
+      <div class="card"><div class="principle"><div class="k">🧭</div><div class="v"><b>柱は複数、依存はゼロ</b><span>一本折れても倒れない。分散こそが安定。</span></div></div></div>
+      <div class="card"><div class="principle"><div class="k">🔁</div><div class="v"><b>資産は互いに燃料を供給する</b><span>発信が受託を呼び、実績が講座の信頼になり、OSSがSaaSの入口になる。</span></div></div></div>
+      <div class="card"><div class="principle"><div class="k">🌱</div><div class="v"><b>ストックを毎日少しずつ積む</b><span>記事・フォロワー・OSSは複利。今日の一投稿が半年後に効く。</span></div></div></div>
+      <div class="card"><div class="principle"><div class="k">🎯</div><div class="v"><b>戦う土俵を間違えない</b><span>「株で儲ける」ではなく「定量・実装・可視化」で戦えば競合が消える。</span></div></div></div>
+    </div>
+  </section>
+
+  <footer>
+    ✦ 迷ったらこのページを開く。北極星は動かない。 ✦<br />
+    <span id="stamp"></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var KEY = "vision-progress-v1";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.todo input[type=checkbox]'));
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch(e){}
+
+  boxes.forEach(function(b){
+    if (saved[b.id]) b.checked = true;
+    b.addEventListener('change', function(){
+      saved[b.id] = b.checked;
+      localStorage.setItem(KEY, JSON.stringify(saved));
+      render();
+    });
+  });
+
+  function render(){
+    var done = boxes.filter(function(b){return b.checked;}).length;
+    var pct = boxes.length ? Math.round(done/boxes.length*100) : 0;
+    document.getElementById('globalBar').style.width = pct + "%";
+    document.getElementById('globalLabel').textContent = "全体の進捗 — " + done + " / " + boxes.length + " (" + pct + "%)";
+  }
+  render();
+
+  window.resetProgress = function(){
+    saved = {};
+    localStorage.removeItem(KEY);
+    boxes.forEach(function(b){ b.checked = false; });
+    render();
+  };
+
+  var d = new Date();
+  document.getElementById('stamp').textContent =
+    "最終閲覧: " + d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
+})();
+</script>
+</body>
+</html>

@@ -53,8 +53,23 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   const [minTrades, setMinTrades] = useState(12);
   const [sort, setSort] = useState<ScanSort>("pAdj");
   const [onlySignificant, setOnlySignificant] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
 
+  // 週内クロック/スペクトルの対象期間: 最新から直近 winLen 本の日足に絞る(0=全期間)。
+  // 銘柄・期間の切替でデータ長が変わったら全期間に戻す。
+  const [winLen, setWinLen] = useState(0);
+  useEffect(() => { setWinLen(prices.length); }, [prices.length]);
+  const effWinLen = winLen > 0 ? Math.min(winLen, prices.length) : prices.length;
+  const windowedPrices = useMemo(
+    () => (effWinLen >= prices.length ? prices : prices.slice(prices.length - effWinLen)),
+    [prices, effWinLen],
+  );
+  const isFullWindow = effWinLen >= prices.length;
+
+  // 全期間の素片分析(素片×年ヒートマップ用: 年次推移は全履歴が前提)
   const atomAnalysis = useMemo(() => analyzeAtoms(prices), [prices]);
+  // 対象期間に絞った素片分析(エッジ・スペクトル / 週内クロック / 最良窓 用)
+  const windowAnalysis = useMemo(() => analyzeAtoms(windowedPrices), [windowedPrices]);
   const scan = useMemo(
     () => scanWeekdayEdges(prices, { compound, minTrades, sort, bootstrapB: 800, bootstrapTopN: 40 }),
     [prices, compound, minTrades, sort],
@@ -69,10 +84,10 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
   // 週内クロックの標本規模: 各曜日(夜間素片)のnが対象週数、その総和が対象営業日数
   const clockSample = useMemo(() => {
-    const counts = atomAnalysis.atoms.filter((a) => a.kind === "overnight").map((a) => a.n);
+    const counts = windowAnalysis.atoms.filter((a) => a.kind === "overnight").map((a) => a.n);
     const totalDays = counts.reduce((s, v) => s + v, 0);
     return { totalDays, minN: Math.min(...counts), maxN: Math.max(...counts) };
-  }, [atomAnalysis]);
+  }, [windowAnalysis]);
 
   // === エッジ・スペクトル(10素片の平均±SEと有意性) ===
   const drawSpectrum = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[]) => {
@@ -236,17 +251,17 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   }, []);
 
   useEffect(() => {
-    if (spectrumRef.current) drawSpectrum(spectrumRef.current, atomAnalysis.atoms);
-    if (clockRef.current) drawClock(clockRef.current, atomAnalysis.cumulative, atomAnalysis.atoms, atomAnalysis.bestLong);
+    if (spectrumRef.current) drawSpectrum(spectrumRef.current, windowAnalysis.atoms);
+    if (clockRef.current) drawClock(clockRef.current, windowAnalysis.cumulative, windowAnalysis.atoms, windowAnalysis.bestLong);
     if (atomYearRef.current) drawAtomYear(atomYearRef.current, atomAnalysis.atoms, atomAnalysis.yearly);
-  }, [atomAnalysis, drawSpectrum, drawClock, drawAtomYear]);
+  }, [atomAnalysis, windowAnalysis, drawSpectrum, drawClock, drawAtomYear]);
 
   if (prices.length < 60) {
     return <div className="text-xs text-gray-400 p-3">データが不足しています(60営業日以上必要)。</div>;
   }
 
-  const bl = atomAnalysis.bestLong;
-  const bs = atomAnalysis.bestShort;
+  const bl = windowAnalysis.bestLong;
+  const bs = windowAnalysis.bestShort;
 
   return (
     <div className="space-y-5">
@@ -262,6 +277,48 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             {[8, 12, 20, 30, 50].map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
         </label>
+      </div>
+
+      {/* ===== 対象期間スライダー(スペクトル・週内クロック) ===== */}
+      <div className="rounded border border-gray-100 bg-gray-50/60 p-2.5 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="text-gray-600 font-medium">対象期間（スペクトル・週内クロック）</span>
+          <span className="text-gray-500">
+            最新から直近{" "}
+            <span className="font-mono text-gray-700">{effWinLen.toLocaleString()}</span> 本
+            <span className="text-gray-400">（≈{(effWinLen / 252).toFixed(1)}年 / {clockSample.totalDays.toLocaleString()}営業日）</span>
+            {isFullWindow && <span className="text-gray-400"> ・全期間</span>}
+          </span>
+          <div className="flex items-center gap-1 ml-auto">
+            {([["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504], ["3Y", 756]] as [string, number][])
+              .filter(([, n]) => n < prices.length)
+              .map(([lbl, n]) => (
+                <button
+                  key={lbl}
+                  type="button"
+                  onClick={() => setWinLen(n)}
+                  className={`px-1.5 py-0.5 rounded text-[11px] ${!isFullWindow && effWinLen === n ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+                >{lbl}</button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setWinLen(prices.length)}
+              className={`px-1.5 py-0.5 rounded text-[11px] ${isFullWindow ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+            >全期間</button>
+          </div>
+        </div>
+        <input
+          type="range"
+          min={60}
+          max={prices.length}
+          step={1}
+          value={effWinLen}
+          onChange={(e) => setWinLen(Number(e.target.value))}
+          className="w-full accent-blue-600"
+        />
+        <p className="text-[10px] text-gray-400">
+          スライダーを左に動かすほど新しい期間だけで集計し直します。曲線の形が期間で大きく変わる＝そのエッジは不安定。素片×年ヒートマップは全履歴のまま（年次推移を見るため）。
+        </p>
       </div>
 
       {/* ===== (A) エッジ・スペクトル ===== */}
@@ -307,23 +364,34 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
       {/* ===== (B) 戦略ランキング ===== */}
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-          <div className="text-xs text-gray-500">
+          <button
+            type="button"
+            onClick={() => setRankingOpen((v) => !v)}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+          >
+            <span className="text-gray-400">{rankingOpen ? "▼" : "▶"}</span>
             戦略ランキング: 全{scan.nTested}組合せ(N≥{scan.minTrades})を検定・
             <span className="text-blue-600 font-medium">FDR補正後に有意なのは {nSignificant} 件</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <label className="flex items-center gap-1">
-              並べ替え
-              <select className="border rounded px-1 py-0.5" value={sort} onChange={(e) => setSort(e.target.value as ScanSort)}>
-                {(Object.keys(SORT_LABELS) as ScanSort[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
-              </select>
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="checkbox" checked={onlySignificant} onChange={(e) => setOnlySignificant(e.target.checked)} />
-              有意のみ
-            </label>
-          </div>
+          </button>
+          {rankingOpen && (
+            <div className="flex items-center gap-2 text-xs">
+              <label className="flex items-center gap-1">
+                並べ替え
+                <select className="border rounded px-1 py-0.5" value={sort} onChange={(e) => setSort(e.target.value as ScanSort)}>
+                  {(Object.keys(SORT_LABELS) as ScanSort[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-1">
+                <input type="checkbox" checked={onlySignificant} onChange={(e) => setOnlySignificant(e.target.checked)} />
+                有意のみ
+              </label>
+            </div>
+          )}
         </div>
+        {!rankingOpen && (
+          <p className="text-[10px] text-gray-400">上のタイトルをクリックすると全戦略のランキング表を表示します。</p>
+        )}
+        {rankingOpen && (<>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -368,6 +436,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         <p className="text-[10px] text-gray-400 mt-1">
           ブートCIは|t|上位40戦略のみ算出(移動ブロック・ブートストラップ800回)。CIが0をまたがない=平均が頑健に非ゼロ。
         </p>
+        </>)}
       </div>
 
       <AnalysisGuide title="曜日タイミング好機スキャンの詳細理論">
