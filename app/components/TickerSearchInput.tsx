@@ -134,7 +134,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
               if (suggestions.length > 0) setOpen(true);
             }}
             placeholder="コード or 社名 (例: 9984, トヨタ, AAPL)"
-            className="px-4 py-2 border border-gray-300 rounded-lg text-base w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg text-base w-52 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {searching && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -145,7 +145,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
         <button
           type="submit"
           disabled={loading}
-          className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium whitespace-nowrap shrink-0 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "取得中..." : "分析開始"}
         </button>

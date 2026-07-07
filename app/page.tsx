@@ -1158,15 +1158,17 @@ export default function AnalysisPage() {
             )}
           </div>
 
-          {/* セクションタブ（最上部でのみ表示。読書中は畳んで検索窓だけ残す） */}
+          {/* セクションタブ（最上部でのみ表示。読書中は畳んで検索窓だけ残す）。
+              スマホは横1行のスクロール帯にして縦に伸ばさず、下段タブへ届くための
+              縦スクロール(=バーが隠れる)を不要にする。PCは従来通り折り返し。 */}
           {atTop && data && filteredPrices.length > 0 && (
-            <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-1 overflow-x-auto sm:flex-wrap sm:overflow-visible pb-0.5">
               {SECTIONS.map(({ key, label, description }) => (
                 <button
                   key={key}
                   onClick={() => setActiveSection(key)}
                   title={description}
-                  className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1 text-sm rounded font-medium transition-colors ${
                     activeSection === key
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
