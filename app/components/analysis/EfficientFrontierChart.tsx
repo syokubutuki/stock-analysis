@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
+import { useBenchmarkPrices, BENCHMARK_PRESETS } from "../../hooks/useBenchmarkPrices";
 import { alignReturns } from "../../lib/portfolio-risk";
 import {
   efficientFrontier,
@@ -121,6 +122,11 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
   const [open, setOpen] = useState(true);
   const [rfPct, setRfPct] = useState(0.5); // 年率Rf(%)
   const [showShort, setShowShort] = useState(false); // 空売り可(閉形式)レイヤの表示。既定オフ。
+  const [benchTicker, setBenchTicker] = useState<string | null>("^N225"); // ベンチマーク指数(nullで非表示)
+  const [useLW, setUseLW] = useState(true); // Ledoit-Wolf 共分散収縮
+  const [useMuShrink, setUseMuShrink] = useState(true); // μ の Bayes-Stein 収縮
+  const [maxWeightPct, setMaxWeightPct] = useState(100); // 1銘柄上限(%)。100=制約なし
+  const [showBaselines, setShowBaselines] = useState(true); // 比較ベースラインの表示
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number; vol: number; ret: number } | null>(null);
 
@@ -137,8 +143,33 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     if (series.length < 2) return null;
     const aligned = alignReturns(series, win);
     if (aligned.tickers.length < 2) return null;
-    return efficientFrontier(aligned, rfPct / 100, { monteCarlo: 4000, seed: 12345 });
-  }, [data, win, rfPct]);
+    return efficientFrontier(aligned, rfPct / 100, {
+      monteCarlo: 4000,
+      seed: 12345,
+      covShrinkage: useLW,
+      muShrinkage: useMuShrink,
+      maxWeight: maxWeightPct / 100,
+    });
+  }, [data, win, rfPct, useLW, useMuShrink, maxWeightPct]);
+
+  // ベンチマーク指数の単独リスク/リターン点(σ-μ平面への参照重ね)。
+  // 最適化には混ぜず、指数自身の直近 win 本から年率化する。
+  const bench = useBenchmarkPrices(benchTicker ?? "^N225");
+  const benchPoint = useMemo(() => {
+    if (!benchTicker || !bench.prices || bench.prices.length < 13) return null;
+    const closes = bench.prices.filter((p) => p.close > 0).map((p) => p.close);
+    let rets = closes.slice(1).map((c, i) => Math.log(c / closes[i]));
+    if (rets.length > win) rets = rets.slice(rets.length - win);
+    if (rets.length < 12) return null;
+    const m = rets.reduce((s, v) => s + v, 0) / rets.length;
+    let vv = 0;
+    for (const r of rets) vv += (r - m) * (r - m);
+    vv /= rets.length - 1;
+    const mu = m * 252;
+    const sigma = Math.sqrt(Math.max(vv, 0) * 252);
+    const sharpe = sigma > 0 ? (mu - rfPct / 100) / sigma : 0;
+    return { name: bench.name, mu, sigma, sharpe };
+  }, [benchTicker, bench.prices, bench.name, win, rfPct]);
 
   // 描画範囲(全プロット点を内包)
   const bounds = useMemo(() => {
@@ -153,7 +184,10 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     result.assets.forEach((p) => push(p.sigma, p.mu));
     result.curve.forEach((p) => push(p.sigma, p.mu));
     if (result.tangencyLongOnly) push(result.tangencyLongOnly.sigma, result.tangencyLongOnly.mu);
+    if (result.minVarLongOnly) push(result.minVarLongOnly.sigma, result.minVarLongOnly.mu);
     if (result.tangency) push(result.tangency.sigma, result.tangency.mu);
+    if (benchPoint) push(benchPoint.sigma, benchPoint.mu);
+    result.baselines.forEach((b) => push(b.point.sigma, b.point.mu));
     push(result.gmv.sigma, result.gmv.mu);
     const xMin = Math.min(...xs);
     let xMax = Math.max(...xs);
@@ -164,7 +198,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     const xPad = (xMax - xMin) * 0.05 || 0.01;
     const yPad = (yMax - yMin) * 0.08 || 0.01;
     return { xMin: Math.max(0, xMin - xPad), xMax: xMax + xPad, yMin: yMin - yPad, yMax: yMax + yPad };
-  }, [result]);
+  }, [result, benchPoint]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -294,6 +328,25 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     ctx.arc(sx(0), sy(result.riskFree), 3, 0, Math.PI * 2);
     ctx.fill();
 
+    // ベンチマーク指数(市場)点。最適化には混ぜない参照点。●濃青+ラベル。
+    if (benchPoint) {
+      const bx = sx(benchPoint.sigma), by = sy(benchPoint.mu);
+      if (bx >= PAD.left && bx <= width - PAD.right) {
+        ctx.fillStyle = "#1d4ed8";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(bx, by, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#1d4ed8";
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(benchPoint.name, bx + 8, by - 4);
+      }
+    }
+
     // マーカー描画ヘルパ。形状で種別を区別し、ラベルは白背景ピルで読みやすく、
     // 方向(dir)を散らして近接点でのラベル衝突を避ける。
     const marker = (
@@ -338,8 +391,30 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.fillText(text, bx + padX, by + bh / 2 + 0.5);
     };
 
-    // ロングオンリー最小分散(雲の代表点)。形状: ■
-    marker(result.cloudMinVol, "#0ea5e9", "square", "最小分散(LO)", "sw");
+    // 比較ベースライン(素朴な配分則)を小さな白丸で。1/N=等加重, RP=リスクパリティ, IV=逆ボラ。
+    if (showBaselines) {
+      ctx.font = "9px sans-serif";
+      for (const b of result.baselines) {
+        const x = sx(b.point.sigma), y = sy(b.point.mu);
+        if (x < PAD.left || x > width - PAD.right) continue;
+        ctx.strokeStyle = "#94a3b8";
+        ctx.fillStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#64748b";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const short = b.key === "equal" ? "1/N" : b.key === "riskparity" ? "RP" : "IV";
+        ctx.fillText(short, x + 5, y);
+      }
+    }
+
+    // ロングオンリー(上限付き)最小分散。形状: ■
+    const minVolPt = result.minVarLongOnly ?? result.cloudMinVol;
+    marker(minVolPt, "#0ea5e9", "square", "最小分散(LO)", "sw");
     // 空売り無しの接点=市場ポートフォリオ。形状: ★(既定の主役)
     if (result.tangencyLongOnly) marker(result.tangencyLongOnly, "#dc2626", "star", "接点(市場)", "ne");
     // 空売り可(閉形式)の特異点。形状: ◆GMV。トグル時のみ参照表示。
@@ -358,7 +433,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [result, bounds, hover, showShort]);
+  }, [result, bounds, hover, showShort, benchPoint, showBaselines]);
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -393,7 +468,13 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
         </span>
         <span className="font-semibold text-gray-800">効率的フロンティア・資本市場線(CAPM)</span>
         <span className="text-xs text-gray-400">
-          {result ? `(${result.tickers.length}銘柄 / ${result.nObs}本${result.shrinkage > 0 ? ` / 収縮λ=${result.shrinkage}` : ""})` : ""}
+          {result
+            ? `(${result.tickers.length}銘柄 / ${result.nObs}本` +
+              (result.lwShrinkage > 0 ? ` / LW δ=${result.lwShrinkage.toFixed(2)}` : "") +
+              (result.muShrinkFactor > 0 ? ` / μ収縮 φ=${result.muShrinkFactor.toFixed(2)}` : "") +
+              (result.shrinkage > 0 ? ` / リッジλ=${result.shrinkage}` : "") +
+              ")"
+            : ""}
         </span>
       </button>
 
@@ -426,8 +507,57 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   />
                   <span>空売り可(閉形式)を重ねる</span>
                 </label>
+              </div>
+
+              {/* ベンチマーク指数の重ね(参照点。最適化には混ぜない) */}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                <span className="font-medium">指数を重ねる</span>
+                <button
+                  onClick={() => setBenchTicker(null)}
+                  className={`px-2 py-0.5 rounded ${benchTicker === null ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                >
+                  なし
+                </button>
+                {BENCHMARK_PRESETS.map((p) => (
+                  <button
+                    key={p.ticker}
+                    onClick={() => setBenchTicker(p.ticker)}
+                    className={`px-2 py-0.5 rounded ${benchTicker === p.ticker ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
                 <span className="text-gray-400">
-                  CML はこの Rf 点から接点(空売り無し)へ引いた線。Rf を上げると接点が移動します。
+                  ● 指数は「単独で持った場合」の位置。雲や接点より左上にあれば分散の余地あり。CML はこの Rf 点から接点(空売り無し)へ引いた線。
+                </span>
+              </div>
+
+              {/* 推定の頑健化・制約・比較 */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={useLW} onChange={(e) => setUseLW(e.target.checked)} />
+                  <span>Ledoit-Wolf 収縮(Σ安定化)</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={useMuShrink} onChange={(e) => setUseMuShrink(e.target.checked)} />
+                  <span>μ の Bayes-Stein 収縮</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={showBaselines} onChange={(e) => setShowBaselines(e.target.checked)} />
+                  <span>ベースライン(1/N・RP・IV)</span>
+                </label>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-medium">1銘柄上限</span>
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    step={5}
+                    value={maxWeightPct}
+                    onChange={(e) => setMaxWeightPct(parseInt(e.target.value))}
+                    className="w-28"
+                  />
+                  <span className="tabular-nums w-10">{maxWeightPct === 100 ? "なし" : `${maxWeightPct}%`}</span>
                 </span>
               </div>
 
@@ -452,6 +582,18 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                 <LineLegend color="#f59e0b" label="資本市場線 CML" dashed />
                 <PointLegend shape="star" color="#dc2626" label="接点=市場ポートフォリオ(空売り無し)" />
                 <PointLegend shape="square" color="#0ea5e9" label="最小分散(空売り無し)" />
+                {benchPoint && (
+                  <span className="flex items-center gap-1.5">
+                    <svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#1d4ed8" /></svg>
+                    指数(単独){benchPoint.name}
+                  </span>
+                )}
+                {showBaselines && (
+                  <span className="flex items-center gap-1.5">
+                    <svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="#ffffff" stroke="#94a3b8" strokeWidth="1.5" /></svg>
+                    ベースライン(1/N・RP・IV)
+                  </span>
+                )}
                 {showShort && <LineLegend color="#059669" label="効率的フロンティア(空売り可)" />}
                 {showShort && <LineLegend color="#9ca3af" label="非効率枝" dashed />}
                 {showShort && <PointLegend shape="diamond" color="#2563eb" label="GMV(空売り可)" />}
@@ -461,11 +603,26 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
               {/* 代表ポートフォリオの構成(チャートのマーカーと色・形で対応) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 <WeightTable shape="star" color="#dc2626" title="接点(市場)ポートフォリオ" subtitle="最大シャープ・空売り無し(実装可能)" point={result.tangencyLongOnly} tickers={result.tickers} names={names} riskFree={result.riskFree} />
-                <WeightTable shape="square" color="#0ea5e9" title="最小分散" subtitle="空売り無し・低リスク重視" point={result.cloudMinVol} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                <WeightTable shape="square" color="#0ea5e9" title="最小分散" subtitle="空売り無し・低リスク重視" point={result.minVarLongOnly ?? result.cloudMinVol} tickers={result.tickers} names={names} riskFree={result.riskFree} />
                 {showShort && (
                   <WeightTable shape="diamond" color="#2563eb" title="GMV(大域最小分散)" subtitle="期待リターン推定に頑健・空売り可" point={result.gmv} tickers={result.tickers} names={names} riskFree={result.riskFree} />
                 )}
               </div>
+
+              {/* ベースラインとの比較(在サンプル位置) */}
+              {showBaselines && (
+                <BaselineTable
+                  rows={[
+                    result.tangencyLongOnly
+                      ? { label: "接点(空売り無し)", point: result.tangencyLongOnly, accent: "#dc2626" }
+                      : null,
+                    result.minVarLongOnly
+                      ? { label: "最小分散(空売り無し)", point: result.minVarLongOnly, accent: "#0ea5e9" }
+                      : null,
+                    ...result.baselines.map((b) => ({ label: b.label, point: b.point, accent: "#64748b" })),
+                  ].filter((r): r is { label: string; point: PortfolioPoint; accent: string } => r !== null)}
+                />
+              )}
 
               <AnalysisGuide title="効率的フロンティア・資本市場線(CAPM)の詳細理論">
                 <p className="font-medium text-gray-700">1. 何を見ているか</p>
@@ -513,7 +670,15 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   <li>Rf スライダーを動かし、金利環境の変化で最適配分(接点)がどう動くかを確認できる。</li>
                 </ul>
 
-                <p className="font-medium text-gray-700 mt-3">6. 注意点</p>
+                <p className="font-medium text-gray-700 mt-3">6. 推定の頑健化・制約・比較(このパネルの機能)</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li><strong>Ledoit-Wolf 収縮</strong>: 標本共分散 Σ を「対角(平均分散×単位行列)」へ最適強度 δ で引き寄せ、少標本での暴れを抑える。δ はデータから自動決定(ヘッダ表示)。</li>
+                  <li><strong>μ の Bayes-Stein 収縮(Jorion)</strong>: 不安定な期待リターン μ を GMV リターンへ強度 φ で縮小。接点が極端な銘柄集中になるのを緩和する。</li>
+                  <li><strong>1銘柄上限</strong>: ロングオンリー最適化に上限制約(例 30%)を課し、1〜2銘柄への集中を防いで分散を強制できる。</li>
+                  <li><strong>ベースライン(1/N・RP・IV)</strong>: 等加重・リスクパリティ・逆ボラ加重の位置を重ねる。特に <strong>1/N は理論最適を実運用で上回りやすい</strong>謙虚な基準。</li>
+                </ul>
+
+                <p className="font-medium text-gray-700 mt-3">7. 注意点</p>
                 <ul className="list-disc pl-4 space-y-1">
                   <li><strong>期待リターン μ の推定は極めて不安定</strong>。過去平均をそのまま使うフロンティア(特に接点)は将来に外れやすく、過学習しやすい。実務では GMV やリスクパリティの方が頑健なことが多い。</li>
                   <li>銘柄数が標本数に近い・高相関だと Σ が特異に近づき逆行列が暴れる。本実装は必要時に対角へ収縮(リッジ λ)を加えて安定化する(ヘッダに λ 表示)。</li>
@@ -525,6 +690,49 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// 各配分則の在サンプル位置(σ/μ/Sharpe と有効銘柄数)を並べて比較する表。
+function BaselineTable({ rows }: { rows: { label: string; point: PortfolioPoint; accent: string }[] }) {
+  // 有効銘柄数 = 逆ハーフィンダール指数(集中度の逆数)。分散の効き具合の目安。
+  const effN = (w: number[]) => {
+    const s = w.reduce((a, b) => a + Math.abs(b), 0) || 1;
+    const p = w.map((x) => Math.abs(x) / s);
+    const h = p.reduce((a, x) => a + x * x, 0);
+    return h > 0 ? 1 / h : 0;
+  };
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[11px] tabular-nums">
+        <thead>
+          <tr className="text-gray-400 text-left border-b border-gray-200">
+            <th className="py-1 pr-2 font-medium">配分則</th>
+            <th className="py-1 px-2 font-medium text-right">μ</th>
+            <th className="py-1 px-2 font-medium text-right">σ</th>
+            <th className="py-1 px-2 font-medium text-right">Sharpe</th>
+            <th className="py-1 pl-2 font-medium text-right">有効銘柄数</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-b border-gray-100">
+              <td className="py-1 pr-2 text-gray-700">
+                <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.accent }} />
+                {r.label}
+              </td>
+              <td className="py-1 px-2 text-right text-gray-600">{(r.point.mu * 100).toFixed(1)}%</td>
+              <td className="py-1 px-2 text-right text-gray-600">{(r.point.sigma * 100).toFixed(1)}%</td>
+              <td className="py-1 px-2 text-right font-medium text-gray-800">{r.point.sharpe.toFixed(2)}</td>
+              <td className="py-1 pl-2 text-right text-gray-500">{effN(r.point.weights).toFixed(1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-[10px] text-gray-400 mt-1">
+        在サンプル(過去)での位置。<strong>1/N は理論最適を実運用でしばしば上回る</strong>ため、真の優劣は下のアウトオブサンプル検証で確認を。有効銘柄数=分散が実質何銘柄に効いているか。
+      </p>
     </div>
   );
 }

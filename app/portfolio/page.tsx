@@ -48,6 +48,18 @@ const EfficientFrontierChart = dynamic(
   () => import("../components/analysis/EfficientFrontierChart"),
   { ssr: false }
 );
+const CapmSmlChart = dynamic(
+  () => import("../components/analysis/CapmSmlChart"),
+  { ssr: false }
+);
+const OosBacktestChart = dynamic(
+  () => import("../components/analysis/OosBacktestChart"),
+  { ssr: false }
+);
+const ResampledFrontierChart = dynamic(
+  () => import("../components/analysis/ResampledFrontierChart"),
+  { ssr: false }
+);
 const BadgeTrackRecordPanel = dynamic(
   () => import("../components/analysis/BadgeTrackRecordPanel"),
   { ssr: false }
@@ -388,6 +400,16 @@ export default function PortfolioPage() {
           {Object.keys(data).length >= 2 && (
             <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} />
           )}
+
+          {Object.keys(data).length >= 1 && (
+            <CapmSmlChart data={data} window={HORIZON_CONFIG[horizon].window} />
+          )}
+
+          {Object.keys(data).length >= 2 && (
+            <ResampledFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} />
+          )}
+
+          {Object.keys(data).length >= 2 && <OosBacktestChart data={data} />}
 
           <BadgeTrackRecordPanel
             result={backtest}
