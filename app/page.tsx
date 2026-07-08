@@ -491,6 +491,10 @@ const BehavioralChart = dynamic(
   () => import("./components/analysis/BehavioralChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const InvestorBiasCoach = dynamic(
+  () => import("./components/analysis/InvestorBiasCoach"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const FinanceTheoryChart = dynamic(
   () => import("./components/analysis/FinanceTheoryChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={450} /> }
@@ -1272,6 +1276,7 @@ export default function AnalysisPage() {
                           { id: "basic-holding", title: "最適保有期間分析", node: <HoldingPeriodChart prices={filteredPrices} /> },
                           { id: "basic-mtf", title: "マルチタイムフレーム分析", node: <MultiTimeframeChart prices={filteredPrices} /> },
                           { id: "basic-behavioral", title: "行動ファイナンス指標", node: <BehavioralChart prices={filteredPrices} /> },
+                          { id: "basic-bias-coach", title: "投資家バイアス・コーチ（癖と対策）", node: <InvestorBiasCoach prices={filteredPrices} /> },
                         ],
                       },
                     ]}
