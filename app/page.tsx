@@ -15,6 +15,22 @@ const DiffSeriesChart = dynamic(
   () => import("./components/analysis/DiffSeriesChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={250} /> }
 );
+const BlackScholesLabChart = dynamic(
+  () => import("./components/analysis/BlackScholesLabChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const RealizedVolVrpChart = dynamic(
+  () => import("./components/analysis/RealizedVolVrpChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const FuturesCarryChart = dynamic(
+  () => import("./components/analysis/FuturesCarryChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
+const DeltaHedgeSimChart = dynamic(
+  () => import("./components/analysis/DeltaHedgeSimChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const VolumeAnalysis = dynamic(
   () => import("./components/analysis/VolumeAnalysis"),
   { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
@@ -908,6 +924,7 @@ type SectionKey =
   | "technical"
   | "ohlc"
   | "risk"
+  | "derivatives"
   | "transform"
   | "distribution"
   | "volatility"
@@ -931,6 +948,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "technical", label: "テクニカル", description: "RSI・MACD・BB・ADX・ストキャスティクス・OBV/VWAP" },
   { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
   { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率・ボラティリティスマイル" },
+  { key: "derivatives", label: "デリバティブ", description: "Black-Scholesラボ(ペイオフ/Greeks)・実現Vol/VRP・先物カーブ/ロールイールド・デルタヘッジ" },
   { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化・累積リターン・差分・Box-Cox・ドローダウン・Zスコア" },
   { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF・分散比検定" },
   { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
@@ -1376,6 +1394,34 @@ export default function AnalysisPage() {
                         { id: "risk-downside", title: "下方リスク分解（半偏差・損失寄与・連敗分布）", node: <DownsideDecompChart prices={filteredPrices} /> },
                         { id: "risk-cond-beta", title: "条件付きベータ・下方ベータ（地合い別の感応度）", node: <ConditionalBetaChart prices={filteredPrices} /> },
                         { id: "risk-spread", title: "高安スプレッド推定（取引コスト・流動性の代理）", node: <SpreadEstimatorChart prices={filteredPrices} /> },
+                      ],
+                    },
+                  ]}
+                />
+              )}
+
+              {activeSection === "derivatives" && (
+                <AccordionSection
+                  bulk={sectionBulk}
+                  onBulk={bumpBulk}
+                  groups={[
+                    {
+                      group: "オプション（Black-Scholes）",
+                      items: [
+                        { id: "deriv-bs-lab", title: "Black-Scholes ラボ（ペイオフ・Greeks・パリティ）", node: <BlackScholesLabChart prices={filteredPrices} /> },
+                        { id: "deriv-delta-hedge", title: "デルタヘッジ・シミュレータ（ガンマ・スキャルピング）", node: <DeltaHedgeSimChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "ボラティリティ商品",
+                      items: [
+                        { id: "deriv-rv-vrp", title: "実現ボラティリティ・分散リスクプレミアム(VRP)", node: <RealizedVolVrpChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "先物・フォワード",
+                      items: [
+                        { id: "deriv-futures-carry", title: "先物カーブ・コスト/キャリー・ロールイールド・ヘッジ比率", node: <FuturesCarryChart prices={filteredPrices} /> },
                       ],
                     },
                   ]}
