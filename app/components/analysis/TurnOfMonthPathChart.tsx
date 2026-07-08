@@ -20,6 +20,7 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
   const [windowK, setWindowK] = useState(3);
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
+  const [showDist, setShowDist] = useState(false);
   const { resp, loading, error } = useIntraday(ticker, interval);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -96,8 +97,17 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
 
           {/* ── 月内位置 × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              分布の確認
+            </button>
+            {showDist && (
+            <>
             <div className="text-xs text-gray-600">
-              <span className="font-medium text-gray-700">分布の確認:</span>{" "}
               <span className="text-gray-400">
                 各立会日を月内位置の色（緑=月初/灰=中旬/赤=月末）の●で原系列（日次終値）上にプロット。
                 ホイールでズーム・ドラッグでパン。
@@ -105,6 +115,8 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
             </div>
             <PathLegend stats={result.bins} withN={false} />
             <PathTimeline days={timelineDays} colorOf={colorOf} />
+            </>
+            )}
           </div>
         </>
       )}

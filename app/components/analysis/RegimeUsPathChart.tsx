@@ -49,6 +49,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [showDist, setShowDist] = useState(false);
   const { data, loading, error } = useAlignedDays(ticker, interval, usTicker);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -309,8 +310,17 @@ export default function RegimeUsPathChart({ ticker }: Props) {
 
           {/* ── 基調所属 × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              基調の分布確認
+            </button>
+            {showDist && (
+            <>
             <div className="text-xs text-gray-600">
-              <span className="font-medium text-gray-700">基調の分布確認:</span>{" "}
               <span className="text-gray-400">各立会日を所属基調の色●で原系列上にプロット。特定基調が一部期間に固まっていないか（見かけのエッジ）を確認。ホイールでズーム・ドラッグでパン。</span>
             </div>
             <div className="flex items-center gap-3 flex-wrap text-[11px]">
@@ -322,6 +332,8 @@ export default function RegimeUsPathChart({ ticker }: Props) {
               ))}
             </div>
             <PathTimeline days={timelineDays} colorOf={colorOf} />
+            </>
+            )}
           </div>
         </>
       )}

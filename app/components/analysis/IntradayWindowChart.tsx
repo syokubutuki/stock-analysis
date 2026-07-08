@@ -78,6 +78,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
   const [startMin, setStartMin] = useState<number | null>(null);
   const [endMin, setEndMin] = useState<number | null>(null);
   const [selectedWd, setSelectedWd] = useState<number | null>(null);
+  const [showDist, setShowDist] = useState(false);
 
   // 利用可能ウィンドウ（ビン境界）
   const options = useMemo(() => {
@@ -120,7 +121,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
 
   // タイムラインチャート初期化（コンテナがDOMに出現したら生成）
   useEffect(() => {
-    if (!showResult || !tlContainerRef.current) return;
+    if (!showResult || !showDist || !tlContainerRef.current) return;
     const chart = createChart(tlContainerRef.current, {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
       grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
@@ -146,7 +147,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
       tlSeriesRef.current = null;
       tlMarkersRef.current = null;
     };
-  }, [showResult]);
+  }, [showResult, showDist]);
 
   // タイムラインのデータ＆ビン色マーカー更新
   useEffect(() => {
@@ -173,7 +174,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
       tlChartRef.current?.applyOptions({ width: tlContainerRef.current.clientWidth });
     }
     tlChartRef.current?.timeScale().fitContent();
-  }, [timing]);
+  }, [timing, showDist]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -261,8 +262,17 @@ export default function IntradayWindowChart({ ticker }: Props) {
 
           {/* ── 分位ビン × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              ビン位置の確認
+            </button>
+            {showDist && (
+            <>
             <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
-              <span className="font-medium text-gray-700">ビン位置の確認:</span>
               <select
                 value={effectiveWd ?? ""}
                 onChange={(e) => setSelectedWd(Number(e.target.value))}
@@ -340,6 +350,8 @@ export default function IntradayWindowChart({ ticker }: Props) {
               </>
             ) : (
               <p className="text-xs text-gray-400">この曜日・ウィンドウでは有効な約定日がありません。</p>
+            )}
+            </>
             )}
           </div>
         </>

@@ -89,6 +89,7 @@ export default function UsPathChart({ ticker }: Props) {
   const [scheme, setScheme] = useState<BinScheme>("tercile");
   const [usMode, setUsMode] = useState<UsBinMode>("ret");
   const [showBand, setShowBand] = useState(true);
+  const [showDist, setShowDist] = useState(false);
   const { data, loading, error } = useAlignedDays(ticker, interval, usTicker);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // ビン所属 × 原系列タイムライン(ズーム/パン可能な lightweight-charts)
@@ -111,7 +112,7 @@ export default function UsPathChart({ ticker }: Props) {
 
   // タイムラインチャート初期化(コンテナがDOMに出現したら生成)
   useEffect(() => {
-    if (!showResult || !tlContainerRef.current) return;
+    if (!showResult || !showDist || !tlContainerRef.current) return;
     const chart = createChart(tlContainerRef.current, {
       layout: { background: { color: "#ffffff" }, textColor: "#333" },
       grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
@@ -137,7 +138,7 @@ export default function UsPathChart({ ticker }: Props) {
       tlSeriesRef.current = null;
       tlMarkersRef.current = null;
     };
-  }, [showResult]);
+  }, [showResult, showDist]);
 
   // タイムラインのデータ＆ビン色マーカー更新(前夜米国ビンで各JP立会日を色分け)
   useEffect(() => {
@@ -163,7 +164,7 @@ export default function UsPathChart({ ticker }: Props) {
       tlChartRef.current?.applyOptions({ width: tlContainerRef.current.clientWidth });
     }
     tlChartRef.current?.timeScale().fitContent();
-  }, [result]);
+  }, [result, showDist]);
 
   const usLabel = US_DRIVERS.find((d) => d.ticker === usTicker)?.label ?? usTicker;
   const modeMeta = US_MODES.find((m) => m.value === usMode)!;
@@ -300,8 +301,17 @@ export default function UsPathChart({ ticker }: Props) {
 
           {/* ── ビン所属 × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              ビン所属の確認
+            </button>
+            {showDist && (
+            <>
             <div className="text-xs text-gray-600">
-              <span className="font-medium text-gray-700">ビン所属の確認:</span>{" "}
               <span className="text-gray-400">
                 前夜 {usLabel} の各ビンに属するJP立会日が、原系列（対象銘柄の日次終値）のどこに位置するかを色分け表示。
                 ホイールでズーム・ドラッグでパン。
@@ -324,6 +334,8 @@ export default function UsPathChart({ ticker }: Props) {
               特定色（例 米大幅高）が一部期間に固まっていれば、そのビンの平均パスはその時期のレジームが作った
               見かけのエッジの可能性。全期間に均等に散らばっているほど、米国→日中の連動は時期によらず安定。
             </p>
+            </>
+            )}
           </div>
         </>
       )}
