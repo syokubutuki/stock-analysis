@@ -45,11 +45,17 @@ interface BinInfo {
 }
 
 export default function WeekdayUsPathChart({ ticker }: Props) {
-  const [usTicker, setUsTicker] = useState("^GSPC");
+  const [usTicker, setUsTicker] = useState("^IXIC"); // 既定=NASDAQ
   const [interval, setInterval] = useState("60m");
-  const [scheme, setScheme] = useState<BinScheme>("sign");
-  const [usMode, setUsMode] = useState<UsMode>("ret");
-  const [selBinRaw, setSelBinRaw] = useState(1); // 既定=陰陽の米陽側
+  const [scheme, setScheme] = useState<BinScheme>("tercile"); // 既定=3分位
+  const [usMode, setUsMode] = useState<UsMode>("ret"); // 既定=前日終値比
+  // selBinRaw=null のとき「直近の前夜米国が属するビン」を自動表示。番号を選ぶと手動固定。
+  const [selBinRaw, setSelBinRaw] = useState<number | null>(null);
+
+  // 前夜米国指数・ビン基準・分位を変えたら選択を解除し、その条件での直近ビンを再表示する。
+  const setUsTickerAndReset = useCallback((t: string) => { setUsTicker(t); setSelBinRaw(null); }, []);
+  const setUsModeAndReset = useCallback((m: UsMode) => { setUsMode(m); setSelBinRaw(null); }, []);
+  const setSchemeAndReset = useCallback((s: BinScheme) => { setScheme(s); setSelBinRaw(null); }, []);
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
   const [showDist, setShowDist] = useState(false);
@@ -84,8 +90,10 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
     return { rows, binIdx, meta, binInfos, today };
   }, [data, scheme, usMode]);
 
-  // 選択ビンをスキーム範囲内にクランプ。
-  const selBin = binning ? Math.min(selBinRaw, binning.meta.count - 1) : selBinRaw;
+  // 選択ビン: 未選択(null)なら直近の前夜米国が属するビン、選択済みなら範囲内にクランプ。
+  const selBin = binning
+    ? Math.min(selBinRaw ?? binning.today.bin, binning.meta.count - 1)
+    : (selBinRaw ?? 1);
 
   // 選択した前夜米国ビンの部分集合に対する曜日別パス。
   const result: WeekdayPathResult | null = useMemo(() => {
@@ -120,13 +128,13 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
         <IntervalButtons value={interval} onChange={setInterval} />
       </div>
       <div className="flex items-center gap-4 flex-wrap">
-        <UsDriverButtons value={usTicker} onChange={setUsTicker} />
+        <UsDriverButtons value={usTicker} onChange={setUsTickerAndReset} />
         <div className="flex items-center gap-1 flex-wrap text-xs">
           <span className="text-gray-500">ビン基準:</span>
           {US_MODES.map((m) => (
             <button
               key={m.value}
-              onClick={() => setUsMode(m.value)}
+              onClick={() => setUsModeAndReset(m.value)}
               title={m.formula}
               className={`px-2 py-0.5 rounded font-medium transition-colors ${
                 usMode === m.value ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -136,7 +144,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
             </button>
           ))}
         </div>
-        <BinSchemeButtons value={scheme} onChange={setScheme} />
+        <BinSchemeButtons value={scheme} onChange={setSchemeAndReset} />
       </div>
 
       {/* 前夜米国ビンの選択(このビンの翌日に絞って曜日別パスを描く) */}
