@@ -26,7 +26,11 @@ export function useAnalysisData() {
     if (!ticker.trim()) return;
     setLoading(true);
     setError(null);
-    setData(null);
+    // NOTE: あえて setData(null) しない。取得中に data を空にすると分析コンテンツ
+    // 全体がアンマウントされ、ページ高さがヘッダーだけに潰れてブラウザがスクロール
+    // 位置を最上部に戻してしまう（＝再検索のたびに見ていた分析から引き剥がされる）。
+    // 旧データを表示したまま成功時にだけ差し替えれば、ページが潰れないのでスクロール
+    // 位置が保たれ、ブラウザ標準のスクロールアンカリングも効いて表示中パネルに留まる。
 
     try {
       const res = await fetch(
@@ -34,6 +38,7 @@ export function useAnalysisData() {
       );
       const json = await res.json();
       if (!res.ok) {
+        // 取得失敗時も旧データは残す（画面を潰さずエラーバナーだけ出す）。
         setError(json.error || "Failed to fetch");
         return;
       }
