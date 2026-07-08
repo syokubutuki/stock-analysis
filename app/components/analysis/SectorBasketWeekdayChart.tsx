@@ -38,6 +38,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
   const [rankBy, setRankBy] = useState<EdgeRankBy>("mean");
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
+  const [showDist, setShowDist] = useState(false);
 
   const binMin = intervalToMin(interval);
 
@@ -293,12 +294,21 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
 
           {/* 原系列タイムライン(基準銘柄) */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
-            <div className="text-xs text-gray-600">
-              <span className="font-medium text-gray-700">曜日分布の確認（基準銘柄）:</span>{" "}
-              <span className="text-gray-400">各立会日を曜日色●で基準銘柄の終値ライン上にプロット。特定曜日が一部期間に偏っていないか確認。</span>
-            </div>
-            <PathLegend stats={pathResult.bins} withN={false} />
-            <PathTimeline days={timelineDays} colorOf={colorOf} />
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              曜日分布の確認（基準銘柄）
+            </button>
+            {showDist && (
+              <>
+                <div className="text-xs text-gray-400">各立会日を曜日色●で基準銘柄の終値ライン上にプロット。特定曜日が一部期間に偏っていないか確認。</div>
+                <PathLegend stats={pathResult.bins} withN={false} />
+                <PathTimeline days={timelineDays} colorOf={colorOf} />
+              </>
+            )}
           </div>
         </>
       )}

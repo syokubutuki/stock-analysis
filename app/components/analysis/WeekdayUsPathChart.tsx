@@ -52,6 +52,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
   const [selBinRaw, setSelBinRaw] = useState(1); // 既定=陰陽の米陽側
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
+  const [showDist, setShowDist] = useState(false);
   const { data, loading, error } = useAlignedDays(ticker, interval, usTicker);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -222,12 +223,21 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
           <PairDiffMatrix stats={result.bins} pairDiffs={result.pairDiffs} />
 
           <div className="pt-3 border-t border-gray-100 space-y-3">
-            <div className="text-xs text-gray-600">
-              <span className="font-medium text-gray-700">曜日分布の確認:</span>{" "}
-              <span className="text-gray-400">絞り込み後の各立会日を曜日色●で原系列上にプロット。ホイールでズーム・ドラッグでパン。</span>
-            </div>
-            <PathLegend stats={result.bins} withN={false} />
-            <PathTimeline days={timelineDays} colorOf={colorOf} />
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              曜日分布の確認
+            </button>
+            {showDist && (
+              <>
+                <div className="text-xs text-gray-400">絞り込み後の各立会日を曜日色●で原系列上にプロット。ホイールでズーム・ドラッグでパン。</div>
+                <PathLegend stats={result.bins} withN={false} />
+                <PathTimeline days={timelineDays} colorOf={colorOf} />
+              </>
+            )}
           </div>
         </>
       )}

@@ -17,6 +17,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
   const [interval, setInterval] = useState("15m");
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
+  const [showDist, setShowDist] = useState(false);
   const { resp, loading, error } = useIntraday(ticker, interval);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -79,15 +80,24 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
 
           {/* ── 曜日 × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
-            <div className="text-xs text-gray-600">
-              <span className="font-medium text-gray-700">曜日分布の確認:</span>{" "}
-              <span className="text-gray-400">
-                各立会日を曜日色の●で、原系列（対象銘柄の日次終値ライン）上に直接プロット。ホイールでズーム・ドラッグでパン。
-                特定曜日の平均パスが一部期間のレジームに偏っていないかを確認できる。
-              </span>
-            </div>
-            <PathLegend stats={result.bins} withN={false} />
-            <PathTimeline days={timelineDays} colorOf={colorOf} />
+            <button
+              type="button"
+              onClick={() => setShowDist((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              曜日分布の確認
+            </button>
+            {showDist && (
+              <>
+                <div className="text-xs text-gray-400">
+                  各立会日を曜日色の●で、原系列（対象銘柄の日次終値ライン）上に直接プロット。ホイールでズーム・ドラッグでパン。
+                  特定曜日の平均パスが一部期間のレジームに偏っていないかを確認できる。
+                </div>
+                <PathLegend stats={result.bins} withN={false} />
+                <PathTimeline days={timelineDays} colorOf={colorOf} />
+              </>
+            )}
           </div>
         </>
       )}
