@@ -55,16 +55,52 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   const [onlySignificant, setOnlySignificant] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
 
-  // 週内クロック/スペクトルの対象期間: 最新から直近 winLen 本の日足に絞る(0=全期間)。
-  // 銘柄・期間の切替でデータ長が変わったら全期間に戻す。
-  const [winLen, setWinLen] = useState(0);
-  useEffect(() => { setWinLen(prices.length); }, [prices.length]);
-  const effWinLen = winLen > 0 ? Math.min(winLen, prices.length) : prices.length;
+  // 週内クロック/スペクトルの対象期間。2モード:
+  //  - "latest":  最新起点。窓長 winLen を変え、右端は常に最新。
+  //  - "rolling": 一定期間ローリング。窓長を固定し、右端 winEnd を過去方向へスライド。
+  const [winMode, setWinMode] = useState<"latest" | "rolling">("latest");
+  const [winLen, setWinLen] = useState(0);   // 窓長(本)。0=全期間扱い
+  const [winEnd, setWinEnd] = useState(0);   // 窓の右端インデックス(1..prices.length)。0=最新
+  // 銘柄・期間の切替でデータ長が変わったら全期間・最新起点に戻す。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWinMode("latest");
+    setWinLen(prices.length);
+    setWinEnd(prices.length);
+  }, [prices.length]);
+
+  const effEnd = winEnd > 0 ? Math.min(winEnd, prices.length) : prices.length;
+  const rawLen = winLen > 0 ? winLen : prices.length;
+  const effWinLen = Math.min(rawLen, effEnd);
   const windowedPrices = useMemo(
-    () => (effWinLen >= prices.length ? prices : prices.slice(prices.length - effWinLen)),
-    [prices, effWinLen],
+    () => prices.slice(effEnd - effWinLen, effEnd),
+    [prices, effEnd, effWinLen],
   );
-  const isFullWindow = effWinLen >= prices.length;
+  const isFullWindow = winMode === "latest" && effWinLen >= prices.length;
+  const barsAfter = prices.length - effEnd; // 窓の右端から最新までの本数(ローリング位置)
+  const winStartDate = windowedPrices[0]?.time ?? "";
+  const winEndDate = windowedPrices[windowedPrices.length - 1]?.time ?? "";
+
+  // 固定窓長プリセットを設定(ローリングでも共通)。最新起点では右端を最新に保つ。
+  const setLen = useCallback((n: number) => {
+    setWinLen(n);
+    setWinEnd((prev) => {
+      const end = prev > 0 ? Math.min(prev, prices.length) : prices.length;
+      return Math.max(end, n); // 窓が右端を超えないように
+    });
+  }, [prices.length]);
+
+  // モード切替。ローリングは固定窓長が必要なので、全期間だった場合は既定1年に。
+  const switchMode = useCallback((m: "latest" | "rolling") => {
+    if (m === "rolling") {
+      setWinLen((prev) => {
+        const cur = prev > 0 ? Math.min(prev, prices.length) : prices.length;
+        return cur >= prices.length ? Math.min(252, prices.length - 1) : cur;
+      });
+    }
+    setWinEnd(prices.length);
+    setWinMode(m);
+  }, [prices.length]);
 
   // 全期間の素片分析(素片×年ヒートマップ用: 年次推移は全履歴が前提)
   const atomAnalysis = useMemo(() => analyzeAtoms(prices), [prices]);
@@ -279,46 +315,91 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         </label>
       </div>
 
-      {/* ===== 対象期間スライダー(スペクトル・週内クロック) ===== */}
+      {/* ===== 対象期間コントロール(スペクトル・週内クロック) ===== */}
       <div className="rounded border border-gray-100 bg-gray-50/60 p-2.5 space-y-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <span className="text-gray-600 font-medium">対象期間（スペクトル・週内クロック）</span>
+          {/* モード切替 */}
+          <div className="inline-flex rounded overflow-hidden border border-gray-200">
+            {([["latest", "最新起点"], ["rolling", "ローリング"]] as [typeof winMode, string][]).map(([m, lbl]) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => switchMode(m)}
+                className={`px-2 py-0.5 text-[11px] ${winMode === m ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+              >{lbl}</button>
+            ))}
+          </div>
           <span className="text-gray-500">
-            最新から直近{" "}
-            <span className="font-mono text-gray-700">{effWinLen.toLocaleString()}</span> 本
-            <span className="text-gray-400">（≈{(effWinLen / 252).toFixed(1)}年 / {clockSample.totalDays.toLocaleString()}営業日）</span>
+            <span className="font-mono text-gray-700">{winStartDate}</span> 〜 <span className="font-mono text-gray-700">{winEndDate}</span>
+            <span className="text-gray-400">（{effWinLen.toLocaleString()}本 ≈{(effWinLen / 252).toFixed(1)}年 / {clockSample.totalDays.toLocaleString()}営業日）</span>
             {isFullWindow && <span className="text-gray-400"> ・全期間</span>}
           </span>
-          <div className="flex items-center gap-1 ml-auto">
-            {([["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504], ["3Y", 756]] as [string, number][])
-              .filter(([, n]) => n < prices.length)
-              .map(([lbl, n]) => (
-                <button
-                  key={lbl}
-                  type="button"
-                  onClick={() => setWinLen(n)}
-                  className={`px-1.5 py-0.5 rounded text-[11px] ${!isFullWindow && effWinLen === n ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
-                >{lbl}</button>
-              ))}
+        </div>
+
+        {/* 窓長プリセット(共通) */}
+        <div className="flex flex-wrap items-center gap-1 text-xs">
+          <span className="text-gray-500 mr-0.5">窓長</span>
+          {([["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504], ["3Y", 756]] as [string, number][])
+            .filter(([, n]) => n < prices.length)
+            .map(([lbl, n]) => (
+              <button
+                key={lbl}
+                type="button"
+                onClick={() => setLen(n)}
+                className={`px-1.5 py-0.5 rounded text-[11px] ${!isFullWindow && effWinLen === n ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+              >{lbl}</button>
+            ))}
+          {winMode === "latest" && (
             <button
               type="button"
               onClick={() => setWinLen(prices.length)}
               className={`px-1.5 py-0.5 rounded text-[11px] ${isFullWindow ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
             >全期間</button>
-          </div>
+          )}
         </div>
-        <input
-          type="range"
-          min={60}
-          max={prices.length}
-          step={1}
-          value={effWinLen}
-          onChange={(e) => setWinLen(Number(e.target.value))}
-          className="w-full accent-blue-600"
-        />
-        <p className="text-[10px] text-gray-400">
-          スライダーを左に動かすほど新しい期間だけで集計し直します。曲線の形が期間で大きく変わる＝そのエッジは不安定。素片×年ヒートマップは全履歴のまま（年次推移を見るため）。
-        </p>
+
+        {winMode === "latest" ? (
+          <>
+            <input
+              type="range"
+              min={60}
+              max={prices.length}
+              step={1}
+              value={effWinLen}
+              onChange={(e) => { setWinLen(Number(e.target.value)); setWinEnd(prices.length); }}
+              className="w-full accent-blue-600"
+              aria-label="窓長"
+            />
+            <p className="text-[10px] text-gray-400">
+              スライダーで窓長を変更（右端は常に最新）。左に動かすほど新しい期間だけで集計し直します。曲線の形が期間で大きく変わる＝そのエッジは不安定。素片×年ヒートマップは全履歴のまま（年次推移を見るため）。
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={effWinLen}
+                max={prices.length}
+                step={1}
+                value={effEnd}
+                onChange={(e) => setWinEnd(Number(e.target.value))}
+                className="w-full accent-blue-600"
+                aria-label="窓の位置(右端)"
+              />
+              <button
+                type="button"
+                onClick={() => setWinEnd(prices.length)}
+                disabled={barsAfter === 0}
+                className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${barsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+              >最新へ</button>
+            </div>
+            <p className="text-[10px] text-gray-400">
+              固定した窓長（上のプリセット）を保ったまま、スライダーで<span className="font-medium">窓の位置</span>を過去↔最新に動かします（現在は最新から <span className="font-mono">{barsAfter.toLocaleString()}</span> 本前で終了）。同じ窓長で位置だけずらして、エッジがどの時期に現れ・消えたかを確認できます。素片×年ヒートマップは全履歴のまま。
+            </p>
+          </>
+        )}
       </div>
 
       {/* ===== (A) エッジ・スペクトル ===== */}
