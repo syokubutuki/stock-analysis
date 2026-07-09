@@ -68,6 +68,10 @@ const StopComparePanel = dynamic(
   () => import("../components/analysis/StopComparePanel"),
   { ssr: false }
 );
+const WeekdayUsCrossChart = dynamic(
+  () => import("../components/analysis/WeekdayUsCrossChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -163,6 +167,10 @@ export default function PortfolioPage() {
   }, []);
 
   const tickers = useMemo(() => watchlist.map((w) => w.ticker), [watchlist]);
+  const tickerNames = useMemo(
+    () => Object.fromEntries(watchlist.map((w) => [w.ticker, w.name])),
+    [watchlist]
+  );
   const { data, loading, progress, reload } = usePortfolioData(tickers);
   const { digests, computing } = usePortfolioDigests(data, horizon);
   const { result: backtest, running: btRunning, progress: btProgress, run: runBacktest } =
@@ -426,6 +434,10 @@ export default function PortfolioPage() {
             onRun={runStopCompare}
             horizon={horizon}
           />
+
+          {tickers.length >= 2 && (
+            <WeekdayUsCrossChart tickers={tickers} names={tickerNames} />
+          )}
 
           {(() => {
             const renderRow = (row: Row) => (
