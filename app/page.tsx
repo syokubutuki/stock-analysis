@@ -207,6 +207,10 @@ const WeekdayEdgeScanChart = dynamic(
   () => import("./components/analysis/WeekdayEdgeScanChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const WeekdayVsBuyHoldChart = dynamic(
+  () => import("./components/analysis/WeekdayVsBuyHoldChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const VolatilityChart = dynamic(
   () => import("./components/analysis/VolatilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
@@ -1759,6 +1763,7 @@ export default function AnalysisPage() {
                       { id: "cal-today-bin", title: "今日の値動き → リターンビン即時判断（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
                       { id: "cal-weekday-cond", title: "曜日 × 値動きビン 条件付き分析（インタラクティブ）", node: <WeekdayConditionalChart prices={filteredPrices} /> },
                       { id: "cal-weekday-edge", title: "曜日タイミング好機スキャン", node: <WeekdayEdgeScanChart prices={filteredPrices} /> },
+                      { id: "cal-weekday-vs-bh", title: "月→金戦略 vs バイ&ホールド 統計的優位性検定", node: <WeekdayVsBuyHoldChart prices={filteredPrices} /> },
                       { id: "cal-monday-gap", title: "月曜ギャップ解剖（週初めの「下げて始まる」を層別）", node: <MondayGapChart prices={allPrices} /> },
                     ],
                   },
