@@ -14,6 +14,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import {
   computeStrategy,
   computePlan,
+  computeWalkForward,
   bestCombination,
   buyHoldEquity,
   buyHoldMetrics,
@@ -26,6 +27,7 @@ import {
   type StrategyResult,
   type PlanGapFill,
   type PlanResult,
+  type WalkForwardResult,
   type BestCombination,
 } from "../../lib/weekday-trade";
 
@@ -414,21 +416,17 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const [fitMode, setFitMode] = useState<"latest" | "rolling">("latest");
   const [fitLen, setFitLen] = useState(0);      // 窓長(本)。0=全期間扱い
   const [fitEnd, setFitEnd] = useState(0);      // 窓の右端(1..n)。0=最新
-  const [fitPlaying, setFitPlaying] = useState(false);
-  const [fitSpeed, setFitSpeed] = useState(30); // 再生速度(本/秒)
-  const [fitLoop, setFitLoop] = useState(true);
-  const fitEndRef = useRef(fitEnd);
-  useEffect(() => { fitEndRef.current = fitEnd; }, [fitEnd]);
-  // 検証期間: エクイティ/最大DD/コストを測る対象。
-  //   full   = 全履歴で検証(フィット窓の最適プランのアウトオブサンプル頑健性を見る) / window = フィット窓のみ(イン・サンプル)。
-  const [evalMode, setEvalMode] = useState<"full" | "window">("full");
+  // 評価方法: エクイティ/最大DD/コストの測り方。
+  //   full        = フィット窓の単一最適プランを全履歴で評価(アウトオブサンプル頑健性)
+  //   window      = フィット窓の単一最適プランをその窓のみで評価(イン・サンプルの当てはまり)
+  //   walkforward = 逐次。各週の直前 L 本(=窓長)で最適化した最適プランでその週を売買し、履歴を通して積み上げる(真のOOS運用)
+  const [evalMode, setEvalMode] = useState<"full" | "window" | "walkforward">("full");
   // 銘柄・期間の切替でデータ長が変わったら全期間・最新起点に戻す。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFitMode("latest");
     setFitLen(prices.length);
     setFitEnd(prices.length);
-    setFitPlaying(false);
   }, [prices.length]);
   const addSpec = useCallback(() => {
     setSpecsTouched(true);
@@ -464,39 +462,19 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         const cur = prev > 0 ? Math.min(prev, prices.length) : prices.length;
         return cur >= prices.length ? Math.min(252, prices.length - 1) : cur;
       });
-    } else {
-      setFitPlaying(false);
     }
     setFitEnd(prices.length);
     setFitMode(m);
   }, [prices.length]);
 
-  // フィット窓のアニメーション: 窓の右端(fitEnd)を fitSpeed[本/秒] で前進させ、
-  // ★最適プランと(検証=この期間のみなら)エクイティが移り変わる様子を可視化する。
-  useEffect(() => {
-    if (!fitPlaying || fitMode !== "rolling") return;
-    const startPos = Math.min(fitLen > 0 ? fitLen : prices.length, prices.length);
-    let cur = fitEndRef.current;
-    if (cur >= prices.length) cur = startPos;
-    let raf = 0;
-    let last = performance.now();
-    let acc = 0;
-    const tick = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000); last = now;
-      acc += fitSpeed * dt;
-      if (acc >= 1) {
-        cur += Math.floor(acc); acc -= Math.floor(acc);
-        if (cur >= prices.length) {
-          if (fitLoop) { cur = startPos; }
-          else { setFitEnd(prices.length); setFitPlaying(false); return; }
-        }
-        setFitEnd(cur);
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [fitPlaying, fitMode, fitSpeed, fitLoop, fitLen, prices.length]);
+  // 評価方法の切替。逐次WFは窓の位置(右端)が無意味なので、最新起点・右端最新に固定する。
+  const switchEvalMode = useCallback((m: "full" | "window" | "walkforward") => {
+    if (m === "walkforward") {
+      setFitMode("latest");
+      setFitEnd(prices.length);
+    }
+    setEvalMode(m);
+  }, [prices.length]);
 
   // === core data ===
   const days: DayData[] = useMemo(() => {
@@ -777,6 +755,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const fitStartDate = fitPrices[0]?.time ?? "";
   const fitEndDate = fitPrices[fitPrices.length - 1]?.time ?? "";
   const evalPrices = evalMode === "window" ? fitPrices : prices;
+  const isWF = evalMode === "walkforward";
+
+  // === 逐次(ウォークフォワード): 各週を直前 effFitLen 本の最適プランで売買 ===
+  // 学習窓長 L = effFitLen(窓長プリセット/スライダーで指定)。全履歴を歩いて積み上げる。
+  const walkForward = useMemo<WalkForwardResult | null>(
+    () => isWF ? computeWalkForward(prices, effFitLen, gapFill, costBps, tradeCompound) : null,
+    [isWF, prices, effFitLen, gapFill, costBps, tradeCompound],
+  );
 
   // === 曜日トレード: 各戦略の結果 / バイ&ホールド / 全組合せマトリクス ===
   // 検証期間 evalPrices 上で評価する(full=全履歴 / window=フィット窓のみ)。
@@ -1482,8 +1468,14 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     if (distRef.current) drawDistribution(distRef.current, distGroups, distShowHist, distShowNormal);
   }, [distGroups, distShowHist, distShowNormal, drawDistribution]);
 
-  // 表示中のエクイティ系列（B&H + 戦略 or 連結プラン）をまとめる。
+  // 表示中のエクイティ系列（B&H + 戦略 or 連結プラン or 逐次WF）をまとめる。
   const equitySeriesData = useMemo(() => {
+    if (isWF) {
+      const strategies = walkForward
+        ? [{ label: "逐次WF(週次で再最適化)", color: "#059669", points: walkForward.equity }]
+        : [];
+      return { strategies };
+    }
     const strategies = planMode
       ? [{ label: "週内プラン(連結)", color: "#059669", points: planResult.equity }]
       : tradeResults.map((res, i) => ({
@@ -1492,7 +1484,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           points: res.equity,
         }));
     return { strategies };
-  }, [planMode, planResult, tradeResults, specs]);
+  }, [isWF, walkForward, planMode, planResult, tradeResults, specs]);
 
   // === エクイティ曲線チャートの生成（コンテナ出現後に1度だけ） ===
   useEffect(() => {
@@ -1994,20 +1986,36 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           <span className="text-xs font-normal text-gray-400">（初期表示＝買+売を組合せた最大リターンの週内プラン。任意の曜日・注文タイミングで売買を編集でき、連結モードで複数レグを1本に繋いでB&Hと公平比較）</span>
         </div>
 
-        {/* ★最適プランの算出期間(フィット窓) + 検証期間 */}
+        {/* 評価方法 + 算出/学習期間 */}
         <div className="rounded border border-emerald-100 bg-white/70 p-2.5 space-y-1.5 mb-2">
+          {/* 評価方法(3択) */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-            <span className="text-gray-600 font-medium">★最適プランの算出期間</span>
+            <span className="text-gray-600 font-medium">評価方法</span>
             <div className="inline-flex rounded overflow-hidden border border-gray-200">
-              {([["latest", "最新起点"], ["rolling", "ローリング"]] as [typeof fitMode, string][]).map(([m, lbl]) => (
-                <button key={m} type="button" onClick={() => switchFitMode(m)}
-                  className={`px-2 py-0.5 ${fitMode === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
+              {([["full", "全履歴 (固定プラン・OOS)"], ["window", "この期間のみ (固定プラン・IS)"], ["walkforward", "逐次WF (週次で再最適化)"]] as [typeof evalMode, string][]).map(([m, lbl]) => (
+                <button key={m} type="button" onClick={() => switchEvalMode(m)}
+                  className={`px-2 py-0.5 ${evalMode === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
               ))}
             </div>
+          </div>
+
+          {/* 算出期間(固定プラン) / 学習ルックバック(逐次WF) */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-gray-600 font-medium">{isWF ? "学習ルックバック窓長 L" : "★最適プランの算出期間"}</span>
+            {!isWF && (
+              <div className="inline-flex rounded overflow-hidden border border-gray-200">
+                {([["latest", "最新起点"], ["rolling", "ローリング"]] as [typeof fitMode, string][]).map(([m, lbl]) => (
+                  <button key={m} type="button" onClick={() => switchFitMode(m)}
+                    className={`px-2 py-0.5 ${fitMode === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
+                ))}
+              </div>
+            )}
             <span className="text-gray-500">
-              <span className="font-mono text-gray-700">{fitStartDate}</span> 〜 <span className="font-mono text-gray-700">{fitEndDate}</span>
-              <span className="text-gray-400">（{effFitLen.toLocaleString()}本 ≈{(effFitLen / 252).toFixed(1)}年）</span>
-              {isFullFit && <span className="text-gray-400"> ・全期間</span>}
+              {isWF
+                ? <><span className="font-mono text-gray-700">{effFitLen.toLocaleString()}</span>本 ≈{(effFitLen / 252).toFixed(1)}年 を各週の学習に使用{isFullFit && <span className="text-gray-400"> ・全期間</span>}</>
+                : <><span className="font-mono text-gray-700">{fitStartDate}</span> 〜 <span className="font-mono text-gray-700">{fitEndDate}</span>
+                    <span className="text-gray-400">（{effFitLen.toLocaleString()}本 ≈{(effFitLen / 252).toFixed(1)}年）</span>
+                    {isFullFit && <span className="text-gray-400"> ・全期間</span>}</>}
             </span>
           </div>
 
@@ -2026,61 +2034,47 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             )}
           </div>
 
-          {fitMode === "latest" ? (
+          {(!isWF && fitMode === "rolling") ? (
             <>
-              <input type="range" min={60} max={prices.length} step={1} value={effFitLen}
-                onChange={(e) => { setFitLen(Number(e.target.value)); setFitEnd(prices.length); }}
-                className="w-full accent-emerald-600" aria-label="窓長" />
-              <p className="text-[10px] text-gray-400">スライダーで窓長を変更（右端は常に最新）。左に動かすほど新しい期間だけで★最適プランを組み直します。「ローリング」に切替えると位置を過去↔最新へアニメーションできます。</p>
+              {/* ローリング固定プラン: 窓の位置(右端)を手動で移動 */}
+              <div className="flex items-center gap-2">
+                <input type="range" min={effFitLen} max={prices.length} step={1} value={effFitEnd}
+                  onChange={(e) => setFitEnd(Number(e.target.value))}
+                  className="w-full accent-emerald-600" aria-label="窓の位置(右端)" />
+                <button type="button" onClick={() => setFitEnd(prices.length)} disabled={fitBarsAfter === 0}
+                  className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${fitBarsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>最新へ</button>
+              </div>
+              <p className="text-[10px] text-gray-400">窓長を固定したまま、スライダーで<span className="font-medium">窓の位置</span>を過去↔最新へ動かします（現在は最新から <span className="font-mono">{fitBarsAfter.toLocaleString()}</span> 本前で終了）。同じ窓長で位置だけずらして、★最適プランがどの時期に現れ・消えたかを確認できます。</p>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setFitPlaying((v) => !v)}
-                  className={`px-2 py-0.5 rounded text-[11px] whitespace-nowrap ${fitPlaying ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}
-                  aria-label={fitPlaying ? "停止" : "再生"}>{fitPlaying ? "⏸ 停止" : "▶ 再生"}</button>
-                <input type="range" min={effFitLen} max={prices.length} step={1} value={effFitEnd}
-                  onChange={(e) => { setFitPlaying(false); setFitEnd(Number(e.target.value)); }}
-                  className="w-full accent-emerald-600" aria-label="窓の位置(右端)" />
-                <button type="button" onClick={() => { setFitPlaying(false); setFitEnd(prices.length); }} disabled={fitBarsAfter === 0}
-                  className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${fitBarsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>最新へ</button>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                <label className="flex items-center gap-1 text-gray-500">速度
-                  <select className="border rounded px-1 py-0.5" value={fitSpeed} onChange={(e) => setFitSpeed(Number(e.target.value))}>
-                    {([["ゆっくり(8本/秒)", 8], ["標準(30本/秒)", 30], ["速い(80本/秒)", 80], ["最速(200本/秒)", 200]] as [string, number][])
-                      .map(([lbl, v]) => <option key={v} value={v}>{lbl}</option>)}
-                  </select>
-                </label>
-                <label className="flex items-center gap-1 text-gray-500">
-                  <input type="checkbox" checked={fitLoop} onChange={(e) => setFitLoop(e.target.checked)} />ループ
-                </label>
-                <div className="flex items-center gap-1 flex-1 min-w-[120px]">
-                  <div className="relative h-1 flex-1 rounded bg-gray-200 overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-emerald-500"
-                      style={{ width: `${prices.length > effFitLen ? ((effFitEnd - effFitLen) / (prices.length - effFitLen)) * 100 : 100}%` }} />
-                  </div>
-                  <span className="font-mono text-gray-400 tabular-nums">{fitEndDate}</span>
-                </div>
-              </div>
+              {/* 最新起点(固定プラン) / 逐次WF: 窓長(=学習ルックバック)を変更 */}
+              <input type="range" min={60} max={prices.length} step={1} value={effFitLen}
+                onChange={(e) => { setFitLen(Number(e.target.value)); setFitEnd(prices.length); }}
+                className="w-full accent-emerald-600" aria-label={isWF ? "学習ルックバック窓長" : "窓長"} />
               <p className="text-[10px] text-gray-400">
-                窓長を固定したまま <span className="font-medium">▶再生</span> で位置を過去→最新へスライドし、★最適プランが移り変わる様子を確認できます（最新から <span className="font-mono">{fitBarsAfter.toLocaleString()}</span> 本前で終了）。
-                {specsTouched && <span className="text-amber-700">※手動編集中は最適プランに追従しません。「★最適プランに戻す」で再追従。</span>}
+                {isWF
+                  ? <>スライダーで<span className="font-medium">学習ルックバック窓長 L</span> を変更。各週この本数だけ遡って最適プランを組み直します。短い窓ほど直近の癖に素早く追随し、長い窓ほど安定します。</>
+                  : <>スライダーで窓長を変更（右端は常に最新）。左に動かすほど新しい期間だけで★最適プランを組み直します。</>}
               </p>
             </>
           )}
 
-          {/* 検証期間 */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] border-t border-emerald-100 pt-1.5">
-            <span className="text-gray-600 font-medium">検証期間（エクイティ/DD/コスト）</span>
-            <div className="inline-flex rounded overflow-hidden border border-gray-200">
-              {([["full", "全履歴 (OOS頑健性)"], ["window", "この期間のみ (イン・サンプル)"]] as [typeof evalMode, string][]).map(([m, lbl]) => (
-                <button key={m} type="button" onClick={() => setEvalMode(m)}
-                  className={`px-2 py-0.5 ${evalMode === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
-              ))}
-            </div>
-            {evalMode === "window" && !isFullFit && <span className="text-gray-400">エクイティは <span className="font-mono">{fitStartDate}〜{fitEndDate}</span> のみで評価中（当てはまり＝イン・サンプル）。</span>}
-            {evalMode === "full" && !isFullFit && <span className="text-gray-400">窓で選んだ最適プランを全履歴で評価中（窓外＝アウトオブサンプル）。</span>}
+          {/* 評価方法の説明 */}
+          <div className="border-t border-emerald-100 pt-1.5 text-[10px] text-gray-400">
+            {evalMode === "full" && (
+              <>窓で選んだ<span className="font-medium">単一の最適プラン</span>を<span className="font-medium">全履歴</span>で評価（算出窓の外＝アウトオブサンプル）。過剰適合の頑健性チェック。
+                {specsTouched && <span className="text-amber-700"> ※現在は手動編集プランを評価中（算出期間は★最適プランの参考表示）。</span>}</>
+            )}
+            {evalMode === "window" && (
+              <>窓で選んだ<span className="font-medium">単一の最適プラン</span>を<span className="font-medium">その窓のみ</span>で評価（イン・サンプルの当てはまり）。{!isFullFit && <>対象 <span className="font-mono">{fitStartDate}〜{fitEndDate}</span>。</>}
+                {specsTouched && <span className="text-amber-700"> ※現在は手動編集プランを評価中。</span>}</>
+            )}
+            {isWF && (
+              walkForward && walkForward.firstTradeDate
+                ? <>各週の<span className="font-medium">直前 {effFitLen.toLocaleString()}本(≈{(effFitLen / 252).toFixed(1)}年)</span>だけで最適プランを組み直し、その週を売買して積み上げる<span className="font-medium text-emerald-700">真のアウトオブサンプル運用</span>。売買開始 <span className="font-mono">{walkForward.firstTradeDate}</span>／全{walkForward.nWeeks.toLocaleString()}週中 {walkForward.nActiveWeeks.toLocaleString()}週を運用（学習不足の序盤は待機）。手仕舞い/建て替えのコストは下の「取引コスト」に従う。</>
+                : <span className="text-amber-700">学習データが不足していて売買できる週がありません。ルックバック窓長を長く（3M以上を目安）してください。</span>
+            )}
           </div>
         </div>
 
@@ -2257,7 +2251,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
         <div ref={equityContainerRef} className="w-full rounded border border-gray-100 bg-white overflow-hidden" />
 
         {/* metrics table */}
-        {specs.length > 0 && (
+        {((isWF && walkForward) || (!isWF && specs.length > 0)) && (
           <div className="overflow-x-auto mt-2">
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -2275,7 +2269,21 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {planMode && (
+                {isWF && walkForward && (
+                  <tr className="border-b border-gray-200 bg-emerald-50">
+                    <td className="py-1 px-2 font-medium" style={{ color: "#059669" }}>逐次WF(前{effFitLen.toLocaleString()}本・{walkForward.nActiveWeeks.toLocaleString()}週){gapFill === "hold" ? "・隙間ロング" : ""}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600" title="ポジション変更回数(週次の建て替え含む)">{walkForward.nTurnovers}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.totalReturn)}`}>{pct2(walkForward.totalReturn)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.annualized)}`}>{pct2(walkForward.annualized)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{walkForward.sharpe.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(walkForward.maxDD)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(walkForward.exposure)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.exposure > 0 ? walkForward.totalReturn / walkForward.exposure : 0)}`}>{walkForward.exposure > 0 ? pct2(walkForward.totalReturn / walkForward.exposure) : "-"}</td>
+                  </tr>
+                )}
+                {!isWF && planMode && (
                   <tr className="border-b border-gray-200 bg-emerald-50">
                     <td className="py-1 px-2 font-medium" style={{ color: "#059669" }}>週内プラン(連結){gapFill === "hold" ? "・隙間ロング" : ""}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600" title="ポジション変更回数">{planResult.nTurnovers}</td>
@@ -2289,7 +2297,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                     <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.exposure > 0 ? planResult.totalReturn / planResult.exposure : 0)}`}>{planResult.exposure > 0 ? pct2(planResult.totalReturn / planResult.exposure) : "-"}</td>
                   </tr>
                 )}
-                {tradeResults.map((res, i) => (
+                {!isWF && tradeResults.map((res, i) => (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium" style={{ color: STRAT_COLORS[i % STRAT_COLORS.length] }}>{specLabel(specs[i])}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{res.nTrades}</td>
@@ -2317,7 +2325,13 @@ export default function SpiralHeatmap({ prices, period }: Props) {
                 </tr>
               </tbody>
             </table>
-            {planMode && (
+            {isWF && walkForward && (
+              <div className="text-[11px] text-gray-500 mt-1">
+                グロス(コスト前) {pct2(walkForward.grossReturn)} − コスト {pct2(walkForward.totalCost)} = 純 {pct2(walkForward.totalReturn)}（週次の建て替えを含む回転 {walkForward.nTurnovers} 回 @ {costBps}bps/片道）。
+                各週その週の<span className="font-medium">直前 {effFitLen.toLocaleString()}本のみ</span>で最適化するため、B&Hとの差＝<span className="font-medium">実運用可能な曜日エッジの正味価値</span>（後知恵なし）。序盤の学習待機は{gapFill === "hold" ? "常時ロング" : "ノーポジ(現金)"}。
+              </div>
+            )}
+            {!isWF && planMode && (
               <div className="text-[11px] text-gray-500 mt-1">
                 グロス(コスト前) {pct2(planResult.grossReturn)} − コスト {pct2(planResult.totalCost)} = 純 {pct2(planResult.totalReturn)}（回転 {planResult.nTurnovers} 回 @ {costBps}bps/片道）。
                 {gapFill === "cash"
@@ -2364,8 +2378,13 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             <li><span className="font-medium">スロット独立最適化:</span> 連結プランの富 W = Π(1 + pos_s·r_s) は<span className="font-medium">スロットごとに因数分解</span>できる(各スロットは毎週同じ pos を適用)。よって各スロットで pos∈{"{+1買, −1売, 0無}"} を独立に選び、そのスロットの累積富 max(買W, 売W, 1) を最大化すれば、全体の富も最大になる。買W&lt;1 かつ 売W&lt;1(高ボラでゼロドリフトのボラ引き)なら<span className="font-medium">無ポジ</span>が最良。</li>
             <li><span className="font-medium">レグへ連結:</span> 連続する同符号スロットを環状に連結して1レグ(例: 木終→火始の買い)にまとめ、連結モードで1本のエクイティにする。<span className="font-medium">非重複</span>(同時に2ポジションを持たない)が保証される。</li>
             <li>チップ上の<span className="font-medium">「★ 最適プラン」</span>バッジに買/売スロット数と週内滞在率を表示。期間・複利設定を変えると最適プランも再計算され追従する。手動で「+比較」やヒートマップクリック等をすると固定され、<span className="font-medium">「★ 最適プランに戻す」</span>で復帰できる。</li>
-            <li><span className="font-medium">算出期間（フィット窓）×検証期間:</span> 上部の<span className="font-medium">「★最適プランの算出期間」</span>で、最適プランを<span className="font-medium">任意のローリング期間</span>から求められる。<span className="font-medium">「最新起点」</span>は右端を最新に固定して窓長を可変、<span className="font-medium">「ローリング」</span>は窓長を固定して位置(右端)を過去↔最新へスライド（<span className="font-medium">▶再生</span>でアニメーション）。窓を狭める(1M/2M等)ほど、その時期に効いていた曜日の癖が細かく見える。既定は全期間なので従来表示と一致する。</li>
-            <li><span className="font-medium">検証期間トグル:</span> こうして選んだ最適プランのエクイティ/最大DD/コスト後を、<span className="font-medium">「全履歴」</span>（フィット窓の外＝<span className="font-medium">アウトオブサンプル</span>を含めて頑健性を見る）か<span className="font-medium">「この期間のみ」</span>（イン・サンプルの当てはまり）で測り分けられる。<span className="font-medium">直近の窓で最適化→全履歴で評価</span>し、B&Hや過去区間でも崩れないかを確認するのが実戦的な使い方。</li>
+            <li><span className="font-medium">評価方法（3択）:</span> 上部の<span className="font-medium">「評価方法」</span>で、最適プランのエクイティ/最大DD/コスト後の測り方を選べる。
+              <ul className="list-[circle] pl-4 mt-0.5 space-y-0.5">
+                <li><span className="font-medium">全履歴（固定プラン・OOS）:</span> 「★最適プランの算出期間」で選んだ<span className="font-medium">単一</span>の最適プランを全履歴に当てる。算出窓を直近に絞れば、窓の外＝アウトオブサンプルとして頑健性を見られる。算出期間は<span className="font-medium">「最新起点」</span>（右端最新・窓長可変）／<span className="font-medium">「ローリング」</span>（窓長固定・位置を過去↔最新へ手動移動）で任意のローリング期間を選択可。</li>
+                <li><span className="font-medium">この期間のみ（固定プラン・IS）:</span> 同じ単一プランを算出窓の中だけで評価（イン・サンプルの当てはまり）。</li>
+                <li><span className="font-medium">逐次WF（ウォークフォワード）:</span> <span className="font-medium">各週ごとに、その週の直前 L 本だけで最適プランを組み直し、その週を売買</span>して履歴を通して積み上げる。各週の建玉は「その時点までに観測できた情報」だけで決まるため、<span className="font-medium">後知恵を含まない真のアウトオブサンプル運用結果</span>になる（ルックバック窓長 L は下のスライダーで指定）。学習データが足りない序盤は待機。B&Hや上記の固定プラン(IS/OOS)と累積カーブを見比べれば、「過去最適の見かけ倒し」と「実際に運用できるエッジ」を切り分けられる。</li>
+              </ul>
+            </li>
           </ul>
           <p className="text-[11px] text-gray-400">※ これは<span className="font-medium">過去データ上で</span>最大リターンになる後知恵の組合せ。多数スロットの符号を過去に最適化するため<span className="font-medium">過剰適合(オーバーフィット)</span>しやすく、将来もそのまま効く保証はない点に注意(下の注意点も参照)。</p>
 

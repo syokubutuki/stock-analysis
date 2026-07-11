@@ -226,18 +226,20 @@ export interface Segment {
   ret: number;
   t: number;
   isClose: boolean; // 日中区間(=その日の終値で確定)か
+  days: number; // 持ち越し暦日数(日中=0, オーバーナイト=翌立会日までの暦日数)。信用金利・貸株料の日割り計算用。
 }
 
 function buildSegments(pts: DayPt[]): Segment[] {
   const segs: Segment[] = [];
   for (let i = 0; i < pts.length; i++) {
-    // intraday_i
+    // intraday_i (同日内なので持ち越し0日)
     const o = pts[i].open, c = pts[i].close;
-    segs.push({ ret: o > 0 ? c / o - 1 : 0, t: pts[i].t, isClose: true });
-    // overnight_i (最終日には存在しない)
+    segs.push({ ret: o > 0 ? c / o - 1 : 0, t: pts[i].t, isClose: true, days: 0 });
+    // overnight_i (最終日には存在しない)。金→月は暦日で3日=週末分の金利が乗る。
     if (i < pts.length - 1) {
       const c2 = pts[i + 1].open;
-      segs.push({ ret: c > 0 ? c2 / c - 1 : 0, t: pts[i + 1].t, isClose: false });
+      const days = Math.max(1, Math.round((pts[i + 1].t - pts[i].t) / 86400000));
+      segs.push({ ret: c > 0 ? c2 / c - 1 : 0, t: pts[i + 1].t, isClose: false, days });
     }
   }
   return segs;
@@ -289,16 +291,16 @@ export function buildPositionVector(prices: PricePoint[], legs: TradeSpec[], gap
   return { segs, pos };
 }
 
-export function computePlan(
-  prices: PricePoint[],
-  legs: TradeSpec[],
-  gapFill: PlanGapFill,
+// セグメント列 + 目標ポジションベクトルから富の推移(エクイティ)と諸指標を計算する共通ルーチン。
+// computePlan(固定プラン)と computeWalkForward(逐次)で同一の会計・コスト・年率化を共有する。
+function equityFromPositions(
+  pts: DayPt[],
+  segs: Segment[],
+  pos: number[],
   costBps: number,
   compound: boolean,
 ): PlanResult {
-  const pts = toDayPts(prices);
   const n = pts.length;
-  const { segs, pos } = buildPositionVector(prices, legs, gapFill);
   const nSeg = segs.length;
   const empty: PlanResult = {
     equity: [], totalReturn: 0, grossReturn: 0, annualized: 0, sharpe: 0,
@@ -360,6 +362,94 @@ export function computePlan(
     nTurnovers: nTurn,
     totalCost: gross - total,
     nSegments: nSeg,
+  };
+}
+
+export function computePlan(
+  prices: PricePoint[],
+  legs: TradeSpec[],
+  gapFill: PlanGapFill,
+  costBps: number,
+  compound: boolean,
+): PlanResult {
+  const pts = toDayPts(prices);
+  const { segs, pos } = buildPositionVector(prices, legs, gapFill);
+  return equityFromPositions(pts, segs, pos, costBps, compound);
+}
+
+// =============================================================
+// 逐次(ウォークフォワード)運用
+// -------------------------------------------------------------
+// 各営業週について、その週が始まる直前の「直近 lookback 本」だけで最適プラン
+// (bestCombination の10スロット・サイド)を求め、その週の売買にそのまま適用する。
+// 週が進むごとに学習窓をスライドして再最適化するため、各週の建玉は
+// 「その時点までに観測可能な情報のみ」で決まる真のアウトオブサンプル運用になる。
+// 学習に使える履歴が不足する序盤は建玉なし(cash)/常時ロング(hold)のまま待機する。
+// =============================================================
+export interface WalkForwardResult extends PlanResult {
+  nWeeks: number;         // 履歴中の総営業週数
+  nActiveWeeks: number;   // 実際に最適化して売買した週数(学習データが足りた週)
+  firstTradeDate: string | null; // 最初に売買を開始した週の初日
+  lookback: number;       // 使用した学習窓長(本)
+}
+
+// 週境界の判定: 曜日が前日以下になった位置を新しい週の開始とみなす(祝日で月曜等が飛んでも頑健)。
+function weekStartIndices(pts: DayPt[]): number[] {
+  const starts: number[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (i === 0 || pts[i].dow <= pts[i - 1].dow) starts.push(i);
+  }
+  return starts;
+}
+
+export function computeWalkForward(
+  prices: PricePoint[],
+  lookback: number,     // 学習窓長(本)。<=0 で全利用可能履歴
+  gapFill: PlanGapFill,
+  costBps: number,
+  compound: boolean,
+  minTrainBars = 25,    // 最低学習本数(約5週。これ未満の週は待機)
+): WalkForwardResult {
+  const pts = toDayPts(prices);
+  const n = pts.length;
+  const segs = buildSegments(pts);
+  const nSeg = segs.length;
+  const pos: number[] = new Array(nSeg).fill(gapFill === "hold" ? 1 : 0);
+  const starts = weekStartIndices(pts);
+
+  let nActiveWeeks = 0;
+  let firstTradeIdx = -1;
+  for (let g = 0; g < starts.length; g++) {
+    const startIdx = starts[g];
+    const endIdx = (g + 1 < starts.length ? starts[g + 1] : n) - 1;
+    const from = lookback > 0 ? Math.max(0, startIdx - lookback) : 0;
+    if (startIdx - from < minTrainBars) continue; // 学習データ不足 → この週は待機(既定ポジション)
+
+    const combo = bestCombination(prices.slice(from, startIdx), compound);
+    const sides = combo.slots.map((s) => s.side);
+    nActiveWeeks++;
+    if (firstTradeIdx < 0) firstTradeIdx = startIdx;
+
+    // この週の各営業日の日中/オーバーナイト・セグメントに、学習窓のサイドを書き込む。
+    for (let i = startIdx; i <= endIdx; i++) {
+      const D = pts[i].dow;
+      if (D < 1 || D > 5) continue;
+      const sgn = (slot: number): number => {
+        const sd = sides[slot];
+        return sd === "long" ? 1 : sd === "short" ? -1 : (gapFill === "hold" ? 1 : 0);
+      };
+      pos[2 * i] = sgn(2 * (D - 1));                       // 日中
+      if (2 * i + 1 < nSeg) pos[2 * i + 1] = sgn(2 * (D - 1) + 1); // オーバーナイト(金曜は週末ギャップ)
+    }
+  }
+
+  const base = equityFromPositions(pts, segs, pos, costBps, compound);
+  return {
+    ...base,
+    nWeeks: starts.length,
+    nActiveWeeks,
+    firstTradeDate: firstTradeIdx >= 0 ? prices[firstTradeIdx].time : null,
+    lookback: lookback > 0 ? lookback : n,
   };
 }
 
