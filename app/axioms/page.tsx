@@ -197,7 +197,7 @@ export default function AxiomsPage() {
                   </div>
                 ))}
                 <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[11px] text-gray-400">
-                  C18〜（多資産動的配分・情報の価値 等）は順次追記
+                  C20〜（分散投資の限界・時間分散 等）は順次追記
                 </div>
               </div>
             </div>

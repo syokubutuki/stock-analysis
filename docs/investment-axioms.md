@@ -119,10 +119,12 @@ $q$ を動かすほどコスト $C$ が積み上がる。ゆえに $\Phi$ の最
 | C15 | リスク制約 Kelly（破産/DD制約） | 公理5＋命題2 | 成長率とテール/経路 → **$|q|$ の縮小**（fractional Kelly） | FinanceTheoryChart, DrawdownChart |
 | C16 | ロバスト最適化（min-max） | 公理5＋命題2 | 推定 μ̂ とその標準誤差 → **エッジを誤差ぶん割引いた $|q|$** | /portfolio（収縮）, edge 節 |
 | C17 | レジーム切替下の $\Phi$ | 命題1＋C12＋公準3 | レジーム別 μ_k/σ_k と信念 π_t → **信念加重の $q$**（遷移期に縮小） | RegimeChart, BOCPDChart |
+| C18 | 多資産・多期間の動的配分 | 公準4＋命題2＋公理5 | 時変 μ_t/Σ_t → **Markowitz＋異時点ヘッジ需要** | /portfolio（OOS/Michaud） |
+| C19 | 情報の価値（相互情報量→上界） | 命題4＋命題1＋公準3 | I(Y;r) → **成長率増分 ΔG≤I の天井** | CausalChart, RollingTransferEntropy |
 
-> C1〜C17 は導出鎖つきで `app/lib/axioms/corollaries.ts` に実装済み（`/axioms` ページで可視化）。
-> **未導出（今後 corollary 化する候補）**: C18 多資産・多期間の動的配分（確率的計画法）、
-> C19 情報の価値（相互情報量→エッジ上界）等。
+> C1〜C19 は導出鎖つきで `app/lib/axioms/corollaries.ts` に実装済み（`/axioms` ページで可視化）。
+> **未導出（今後 corollary 化する候補）**: C20 分散投資の限界（相関と実効独立数）、
+> C21 時間分散 vs 時間集中（エルゴード性・成長の非可換性）等。
 
 ---
 

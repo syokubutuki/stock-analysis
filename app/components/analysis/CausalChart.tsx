@@ -13,6 +13,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { mutualInformation, timeLaggedMI, transferEntropy, grangerTest } from "../../lib/causal";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -246,6 +247,8 @@ export default function CausalChart({ prices, seriesMode }: Props) {
           <li><strong>Grangerの線形仮定</strong>: Granger因果性は線形VARモデルが前提。非線形な依存関係を見落とす可能性があるため、TEとの併用が重要</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C19" />
     </div>
   );
 }
