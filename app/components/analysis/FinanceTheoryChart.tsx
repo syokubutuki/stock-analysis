@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { financeTheoryAnalysis } from "../../lib/kelly-bs";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -205,6 +206,8 @@ export default function FinanceTheoryChart({ prices }: Props) {
           <li>VRPの計算はIVデータがないためGARCHで近似（精度に限界）</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C1" />
     </div>
   );
 }

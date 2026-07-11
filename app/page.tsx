@@ -211,6 +211,10 @@ const WeekdayVsBuyHoldChart = dynamic(
   () => import("./components/analysis/WeekdayVsBuyHoldChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const NisaVsTaxableChart = dynamic(
+  () => import("./components/analysis/NisaVsTaxableChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const VolatilityChart = dynamic(
   () => import("./components/analysis/VolatilityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={300} /> }
@@ -1125,6 +1129,12 @@ export default function AnalysisPage() {
           </div>
           <div className="shrink-0 flex items-center gap-2">
             <Link
+              href="/axioms"
+              className="text-sm text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50"
+            >
+              株式原論
+            </Link>
+            <Link
               href="/portfolio"
               className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
             >
@@ -1764,6 +1774,7 @@ export default function AnalysisPage() {
                       { id: "cal-weekday-cond", title: "曜日 × 値動きビン 条件付き分析（インタラクティブ）", node: <WeekdayConditionalChart prices={filteredPrices} /> },
                       { id: "cal-weekday-edge", title: "曜日タイミング好機スキャン", node: <WeekdayEdgeScanChart prices={filteredPrices} /> },
                       { id: "cal-weekday-vs-bh", title: "月→金戦略 vs バイ&ホールド 統計的優位性検定", node: <WeekdayVsBuyHoldChart prices={filteredPrices} /> },
+                      { id: "cal-nisa-vs-taxable", title: "NISA(非課税・持ち切り) vs 現物(課税・曜日戦略) 税引後リターン比較", node: <NisaVsTaxableChart prices={allPrices} /> },
                       { id: "cal-monday-gap", title: "月曜ギャップ解剖（週初めの「下げて始まる」を層別）", node: <MondayGapChart prices={allPrices} /> },
                     ],
                   },

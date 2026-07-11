@@ -10,6 +10,7 @@ import {
   PortfolioPoint,
 } from "../../lib/efficient-frontier";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   data: PortfolioData;
@@ -686,6 +687,8 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   <li>共通営業日でしか整列できないため、上場間もない銘柄があると全体の期間が短くなる。過去≠未来。</li>
                 </ul>
               </AnalysisGuide>
+
+              <AxiomPlacement corollaryId="C2" />
             </>
           )}
         </div>

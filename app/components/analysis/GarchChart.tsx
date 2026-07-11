@@ -12,6 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitGarch, analyzeLeverage, detectJumps } from "../../lib/garch";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -293,6 +294,8 @@ export default function GarchChart({ prices, seriesMode }: Props) {
           <li><strong>ジャンプ閾値の恣意性</strong>: ジャンプ検出の閾値設定（何σ以上をジャンプとするか）には裁量が入る</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C5" />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeOptimalStopping } from "../../lib/optimal-stopping";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -202,6 +203,8 @@ export default function OptimalStoppingChart({ prices }: Props) {
           <li>計算量の都合上、直近500日に制限している</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C3" />
     </div>
   );
 }

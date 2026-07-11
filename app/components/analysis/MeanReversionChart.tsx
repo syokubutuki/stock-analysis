@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { meanReversionAnalysis, simulateOU } from "../../lib/mean-reversion";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -252,6 +253,8 @@ export default function MeanReversionChart({ prices, seriesMode }: Props) {
           <li>R²が低い場合、OUモデルのフィットが不良でパラメータは信頼性が低い</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C4" />
     </div>
   );
 }

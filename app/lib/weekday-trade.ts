@@ -222,7 +222,7 @@ export interface PlanResult {
   nSegments: number;
 }
 
-interface Segment {
+export interface Segment {
   ret: number;
   t: number;
   isClose: boolean; // 日中区間(=その日の終値で確定)か
@@ -269,6 +269,26 @@ function applyLeg(pts: DayPt[], pos: number[], leg: TradeSpec, gapFill: PlanGapF
   }
 }
 
+// セグメント列とセグメント毎の目標ポジション(-1..+1)を構築する。
+// computePlan と後段の税シミュレータ(nisa-vs-taxable.ts)が同一のプレタックス経路を
+// 共有できるよう、ここを唯一の生成源とする。
+export interface PositionVector {
+  segs: Segment[];
+  pos: number[]; // segs と同長。各区間の目標ポジション(-1/0/+1)
+}
+
+export function buildPositionVector(prices: PricePoint[], legs: TradeSpec[], gapFill: PlanGapFill): PositionVector {
+  const pts = toDayPts(prices);
+  const segs = buildSegments(pts);
+  const nSeg = segs.length;
+  // ポジションベクトル: hold は既定+1(常時ロング)を legs が置換、cash は既定0を加算
+  const pos = new Array(nSeg).fill(gapFill === "hold" ? 1 : 0);
+  for (const leg of legs) applyLeg(pts, pos, leg, gapFill);
+  // 加算モードはレバレッジを避けるため [-1,1] にクランプ
+  for (let s = 0; s < nSeg; s++) pos[s] = Math.max(-1, Math.min(1, pos[s]));
+  return { segs, pos };
+}
+
 export function computePlan(
   prices: PricePoint[],
   legs: TradeSpec[],
@@ -278,19 +298,13 @@ export function computePlan(
 ): PlanResult {
   const pts = toDayPts(prices);
   const n = pts.length;
-  const segs = buildSegments(pts);
+  const { segs, pos } = buildPositionVector(prices, legs, gapFill);
   const nSeg = segs.length;
   const empty: PlanResult = {
     equity: [], totalReturn: 0, grossReturn: 0, annualized: 0, sharpe: 0,
     maxDD: 0, exposure: 0, nTurnovers: 0, totalCost: 0, nSegments: nSeg,
   };
   if (n < 2 || nSeg < 1) return empty;
-
-  // ポジションベクトル: hold は既定+1(常時ロング)を legs が置換、cash は既定0を加算
-  const pos = new Array(nSeg).fill(gapFill === "hold" ? 1 : 0);
-  for (const leg of legs) applyLeg(pts, pos, leg, gapFill);
-  // 加算モードはレバレッジを避けるため [-1,1] にクランプ
-  for (let s = 0; s < nSeg; s++) pos[s] = Math.max(-1, Math.min(1, pos[s]));
 
   const costRate = costBps / 10000;
   let W = 1, Wg = 1; // 純資産 / グロス(コスト控除前)
@@ -413,6 +427,13 @@ function mergeSlotsToLegs(slots: ComboSlot[]): TradeSpec[] {
     k += len;
   }
   return legs;
+}
+
+// スロット毎のサイド指定(長さ10, 0=月日中..9=金オーバーナイト)からレグ列を組む。
+// 手動の週内スロット・グリッドUIから戦略を構築する用途。
+export function legsFromSlotSides(sides: (Side | "flat")[]): TradeSpec[] {
+  const padded: (Side | "flat")[] = Array.from({ length: 10 }, (_, i) => sides[i] ?? "flat");
+  return mergeSlotsToLegs(padded.map((side, slot) => ({ slot, side, n: 0, longW: 0, shortW: 0 })));
 }
 
 export function bestCombination(prices: PricePoint[], compound: boolean, minSamples = 5): BestCombination {

@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { rollingVaR } from "../../lib/rolling-var";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -80,6 +81,8 @@ export default function RollingVaRChart({ prices }: Props) {
           <li>過去に起きていない規模の事象は捉えられない。</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C6" />
     </div>
   );
 }
