@@ -38,6 +38,7 @@ import { useBadgeBacktest } from "../hooks/useBadgeBacktest";
 import { useStopCompare } from "../hooks/useStopCompare";
 import { classifySignalEvent, SIGNAL_EVENT_META } from "../lib/signal-digest";
 import { BacktestResult } from "../lib/badge-backtest";
+import AccordionSection, { AccordionItem } from "../components/analysis/AccordionSection";
 import dynamic from "next/dynamic";
 
 const PortfolioRiskPanel = dynamic(
@@ -172,6 +173,9 @@ export default function PortfolioPage() {
     [watchlist]
   );
   const { data, loading, progress, reload } = usePortfolioData(tickers);
+  // 分析パネルの一括開閉(既定は全て折りたたみ)。
+  const [bulk, setBulk] = useState({ nonce: 0, open: false });
+  const onBulk = useCallback((open: boolean) => setBulk((b) => ({ nonce: b.nonce + 1, open })), []);
   const { digests, computing } = usePortfolioDigests(data, horizon);
   const { result: backtest, running: btRunning, progress: btProgress, run: runBacktest } =
     useBadgeBacktest(data, horizon);
@@ -401,43 +405,30 @@ export default function PortfolioPage() {
           </div>
         ) : (
           <>
-          {Object.keys(data).length >= 2 && (
-            <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} />
-          )}
-
-          {Object.keys(data).length >= 2 && (
-            <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} />
-          )}
-
-          {Object.keys(data).length >= 1 && (
-            <CapmSmlChart data={data} window={HORIZON_CONFIG[horizon].window} />
-          )}
-
-          {Object.keys(data).length >= 2 && (
-            <ResampledFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} />
-          )}
-
-          {Object.keys(data).length >= 2 && <OosBacktestChart data={data} />}
-
-          <BadgeTrackRecordPanel
-            result={backtest}
-            running={btRunning}
-            progress={btProgress}
-            onRun={runBacktest}
-            horizon={horizon}
-          />
-
-          <StopComparePanel
-            result={stopCmp}
-            running={scRunning}
-            progress={scProgress}
-            onRun={runStopCompare}
-            horizon={horizon}
-          />
-
-          {tickers.length >= 2 && (
-            <WeekdayUsCrossChart tickers={tickers} names={tickerNames} />
-          )}
+          {(() => {
+            const dn = Object.keys(data).length;
+            const items: AccordionItem[] = [];
+            if (dn >= 2) items.push({ id: "pf-risk", title: "ポートフォリオ・リスク分析", node: <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} /> });
+            if (dn >= 2) items.push({ id: "pf-frontier", title: "効率的フロンティア・CML", node: <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
+            if (dn >= 1) items.push({ id: "pf-capm", title: "CAPM・SML（β / α）", node: <CapmSmlChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
+            if (dn >= 2) items.push({ id: "pf-resampled", title: "リサンプリング・フロンティア（Michaud）", node: <ResampledFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
+            if (dn >= 2) items.push({ id: "pf-oos", title: "OOSウォークフォワード検証", node: <OosBacktestChart data={data} /> });
+            items.push({ id: "pf-badge", title: "バッジ・トラックレコード", node: (
+              <BadgeTrackRecordPanel result={backtest} running={btRunning} progress={btProgress} onRun={runBacktest} horizon={horizon} />
+            ) });
+            items.push({ id: "pf-stop", title: "ストップ手法の比較", node: (
+              <StopComparePanel result={stopCmp} running={scRunning} progress={scProgress} onRun={runStopCompare} horizon={horizon} />
+            ) });
+            if (tickers.length >= 2) items.push({
+              id: "pf-weekday-us-cross",
+              title: "曜日 × 前夜米国ビン 交互作用：ウォッチリスト横断",
+              subtitle: "選んだ前夜米国ビンの翌日に絞り、銘柄×曜日で日内特性を多面比較",
+              node: <WeekdayUsCrossChart tickers={tickers} names={tickerNames} />,
+            });
+            return items.length > 0 ? (
+              <AccordionSection groups={[{ items }]} bulk={bulk} onBulk={onBulk} />
+            ) : null;
+          })()}
 
           {(() => {
             const renderRow = (row: Row) => (
