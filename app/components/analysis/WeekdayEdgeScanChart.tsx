@@ -61,12 +61,19 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   const [winMode, setWinMode] = useState<"latest" | "rolling">("latest");
   const [winLen, setWinLen] = useState(0);   // 窓長(本)。0=全期間扱い
   const [winEnd, setWinEnd] = useState(0);   // 窓の右端インデックス(1..prices.length)。0=最新
+  // ローリング窓のアニメーション再生(窓の位置を過去→最新へ自動スライド)
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(30);   // 再生速度(本/秒)
+  const [loop, setLoop] = useState(true);   // 最新に到達したら先頭へ戻す
+  const winEndRef = useRef(winEnd);
+  useEffect(() => { winEndRef.current = winEnd; }, [winEnd]);
   // 銘柄・期間の切替でデータ長が変わったら全期間・最新起点に戻す。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setWinMode("latest");
     setWinLen(prices.length);
     setWinEnd(prices.length);
+    setPlaying(false);
   }, [prices.length]);
 
   const effEnd = winEnd > 0 ? Math.min(winEnd, prices.length) : prices.length;
@@ -97,10 +104,42 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         const cur = prev > 0 ? Math.min(prev, prices.length) : prices.length;
         return cur >= prices.length ? Math.min(252, prices.length - 1) : cur;
       });
+    } else {
+      setPlaying(false); // 最新起点モードでは位置アニメーションは無効
     }
     setWinEnd(prices.length);
     setWinMode(m);
   }, [prices.length]);
+
+  // ローリング窓のアニメーション: 窓の右端(winEnd)を speed[本/秒] で前進させる。
+  // フレーム落ちに依存しないよう経過時間で歩幅を決める(requestAnimationFrame)。
+  useEffect(() => {
+    if (!playing || winMode !== "rolling") return;
+    const startPos = Math.min(winLen > 0 ? winLen : prices.length, prices.length);
+    let cur = winEndRef.current;
+    if (cur >= prices.length) cur = startPos; // 端で再生した場合は先頭から
+    let raf = 0;
+    let last = performance.now();
+    let acc = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      acc += speed * dt;
+      if (acc >= 1) {
+        cur += Math.floor(acc); acc -= Math.floor(acc);
+        if (cur >= prices.length) {
+          if (loop) {
+            cur = startPos;
+          } else {
+            setWinEnd(prices.length); setPlaying(false); return;
+          }
+        }
+        setWinEnd(cur);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, winMode, speed, loop, winLen, prices.length]);
 
   // 全期間の素片分析(素片×年ヒートマップ用: 年次推移は全履歴が前提)
   const atomAnalysis = useMemo(() => analyzeAtoms(prices), [prices]);
@@ -340,7 +379,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         {/* 窓長プリセット(共通) */}
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <span className="text-gray-500 mr-0.5">窓長</span>
-          {([["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504], ["3Y", 756]] as [string, number][])
+          {([["1M", 21], ["2M", 42], ["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504], ["3Y", 756]] as [string, number][])
             .filter(([, n]) => n < prices.length)
             .map(([lbl, n]) => (
               <button
@@ -378,25 +417,54 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         ) : (
           <>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPlaying((v) => !v)}
+                className={`px-2 py-0.5 rounded text-[11px] whitespace-nowrap ${playing ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                aria-label={playing ? "停止" : "再生"}
+              >{playing ? "⏸ 停止" : "▶ 再生"}</button>
               <input
                 type="range"
                 min={effWinLen}
                 max={prices.length}
                 step={1}
                 value={effEnd}
-                onChange={(e) => setWinEnd(Number(e.target.value))}
+                onChange={(e) => { setPlaying(false); setWinEnd(Number(e.target.value)); }}
                 className="w-full accent-blue-600"
                 aria-label="窓の位置(右端)"
               />
               <button
                 type="button"
-                onClick={() => setWinEnd(prices.length)}
+                onClick={() => { setPlaying(false); setWinEnd(prices.length); }}
                 disabled={barsAfter === 0}
                 className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${barsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
               >最新へ</button>
             </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              <label className="flex items-center gap-1 text-gray-500">
+                速度
+                <select className="border rounded px-1 py-0.5" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+                  {([["ゆっくり(8本/秒)", 8], ["標準(30本/秒)", 30], ["速い(80本/秒)", 80], ["最速(200本/秒)", 200]] as [string, number][])
+                    .map(([lbl, v]) => <option key={v} value={v}>{lbl}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-1 text-gray-500">
+                <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
+                ループ
+              </label>
+              {/* 進捗バー(窓の位置) */}
+              <div className="flex items-center gap-1 flex-1 min-w-[120px]">
+                <div className="relative h-1 flex-1 rounded bg-gray-200 overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-blue-500"
+                    style={{ width: `${prices.length > effWinLen ? ((effEnd - effWinLen) / (prices.length - effWinLen)) * 100 : 100}%` }}
+                  />
+                </div>
+                <span className="font-mono text-gray-400 tabular-nums">{winEndDate}</span>
+              </div>
+            </div>
             <p className="text-[10px] text-gray-400">
-              固定した窓長（上のプリセット）を保ったまま、スライダーで<span className="font-medium">窓の位置</span>を過去↔最新に動かします（現在は最新から <span className="font-mono">{barsAfter.toLocaleString()}</span> 本前で終了）。同じ窓長で位置だけずらして、エッジがどの時期に現れ・消えたかを確認できます。素片×年ヒートマップは全履歴のまま。
+              固定した窓長（上のプリセット。<span className="font-medium">1M/2M</span> など短い窓ほど変化が細かく見えます）を保ったまま、<span className="font-medium">▶ 再生</span>で窓の位置を過去→最新へ自動スライドし、曜日リターン（スペクトル・週内クロック）の移り変わりをアニメーションで確認できます。スライダーを掴む／「最新へ」で一時停止（現在は最新から <span className="font-mono">{barsAfter.toLocaleString()}</span> 本前で終了）。素片×年ヒートマップは全履歴のまま。
             </p>
           </>
         )}
