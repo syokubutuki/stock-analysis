@@ -12,6 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitHMM, detectChangePoints, kalmanFilter } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -332,6 +333,8 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
           <li><strong>カルマンフィルタの仮定</strong>: Local Levelモデルは最も単純な状態空間モデルであり、トレンドの傾きの変化は捉えられない</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C17" />
     </div>
   );
 }

@@ -114,9 +114,15 @@ $q$ を動かすほどコスト $C$ が積み上がる。ゆえに $\Phi$ の最
 | C10 | 取引コスト/スプレッド推定 | 公準5＋命題5 | 実効スプレッド → **$q$ 変更頻度の抑制** | SpreadEstimatorChart |
 | C11 | ドローダウン管理 | 公理5 | 資本経路のテール → **$q$ の縮退規則** | DrawdownChart, DrawdownDist |
 | C12 | 条件付き期待リターン | 命題1＋命題3 | 状態→先行きリターン → **状態依存の $q$ 規則 $\Phi$** | conditional 節, edge 節 |
+| C13 | 最適執行（Almgren-Chriss） | 公準5＋命題5＋公準2 | インパクト/ボラ → **建玉変更の時間経路**（sinh型） | MicrostructureChart |
+| C14 | 確率的最適制御（HJB/Merton） | 公準4＋命題2＋公理5 | 超過ドリフト/分散/γ → **建玉比率** $\pi^*=(\mu-r)/\gamma\sigma^2$ | FinanceTheoryChart, /portfolio |
+| C15 | リスク制約 Kelly（破産/DD制約） | 公理5＋命題2 | 成長率とテール/経路 → **$|q|$ の縮小**（fractional Kelly） | FinanceTheoryChart, DrawdownChart |
+| C16 | ロバスト最適化（min-max） | 公理5＋命題2 | 推定 μ̂ とその標準誤差 → **エッジを誤差ぶん割引いた $|q|$** | /portfolio（収縮）, edge 節 |
+| C17 | レジーム切替下の $\Phi$ | 命題1＋C12＋公準3 | レジーム別 μ_k/σ_k と信念 π_t → **信念加重の $q$**（遷移期に縮小） | RegimeChart, BOCPDChart |
 
-> **未導出（今後 corollary 化する候補）**: 最適執行（Almgren-Chriss）、確率的最適制御（HJB）、
-> ロバスト最適化、レジーム切替下の $\Phi$、多期間 Kelly の破産制約付き版 等。
+> C1〜C17 は導出鎖つきで `app/lib/axioms/corollaries.ts` に実装済み（`/axioms` ページで可視化）。
+> **未導出（今後 corollary 化する候補）**: C18 多資産・多期間の動的配分（確率的計画法）、
+> C19 情報の価値（相互情報量→エッジ上界）等。
 
 ---
 

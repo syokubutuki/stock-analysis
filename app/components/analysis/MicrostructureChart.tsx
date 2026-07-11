@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { microstructureAnalysis } from "../../lib/microstructure";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -157,6 +158,8 @@ export default function MicrostructureChart({ prices }: Props) {
           <li>Amihudは出来高の通貨単位に依存するため、銘柄間比較にはlog変換を使用</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C13" />
     </div>
   );
 }
