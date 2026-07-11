@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 import {
   analyzeAtoms,
   scanWeekdayEdges,
@@ -641,6 +642,8 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           <li><span className="font-medium">独立性の近似:</span> ブロック・ブートストラップは系列相関を緩和するが完全ではなく、構造変化(レジーム転換)は捉えない。</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C9" />
     </div>
   );
 }

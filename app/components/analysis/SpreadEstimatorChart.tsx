@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { estimateSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -130,6 +131,8 @@ export default function SpreadEstimatorChart({ prices }: Props) {
           <li>Amihudは銘柄の価格・出来高水準に依存するため、絶対値より時系列の変化を見る。</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C10" />
     </div>
   );
 }

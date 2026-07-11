@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { conditionalBeta } from "../../lib/conditional-beta";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -95,6 +96,8 @@ export default function ConditionalBetaChart({ prices }: Props) {
           <li>ベンチの選択で結論が変わる。</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C7" />
     </div>
   );
 }

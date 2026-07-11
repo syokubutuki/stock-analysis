@@ -15,6 +15,7 @@ import {
   computeDrawdownStats,
 } from "../../lib/drawdown";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 
@@ -263,6 +264,8 @@ export default function DrawdownChart({ prices, period }: Props) {
           80%以上は構造的な弱さを示す場合がある。
         </p>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C11" />
     </div>
   );
 }

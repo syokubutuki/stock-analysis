@@ -407,6 +407,29 @@ export default function SpiralHeatmap({ prices, period }: Props) {
   const [planMode, setPlanMode] = useState(true);
   const [gapFill, setGapFill] = useState<PlanGapFill>("cash");
   const [costBps, setCostBps] = useState(0);
+  // === 最適プラン算出期間(フィット窓) + 検証期間 ===
+  // フィット窓: ★最適プラン(bestCombination)を算出する対象期間。
+  //   latest  = 右端を最新に固定し窓長を可変 / rolling = 窓長を固定し位置(右端)を過去↔最新へスライド。
+  // 既定は latest・全期間なので、従来どおり「全期間の最適プランを全履歴で検証」と一致する。
+  const [fitMode, setFitMode] = useState<"latest" | "rolling">("latest");
+  const [fitLen, setFitLen] = useState(0);      // 窓長(本)。0=全期間扱い
+  const [fitEnd, setFitEnd] = useState(0);      // 窓の右端(1..n)。0=最新
+  const [fitPlaying, setFitPlaying] = useState(false);
+  const [fitSpeed, setFitSpeed] = useState(30); // 再生速度(本/秒)
+  const [fitLoop, setFitLoop] = useState(true);
+  const fitEndRef = useRef(fitEnd);
+  useEffect(() => { fitEndRef.current = fitEnd; }, [fitEnd]);
+  // 検証期間: エクイティ/最大DD/コストを測る対象。
+  //   full   = 全履歴で検証(フィット窓の最適プランのアウトオブサンプル頑健性を見る) / window = フィット窓のみ(イン・サンプル)。
+  const [evalMode, setEvalMode] = useState<"full" | "window">("full");
+  // 銘柄・期間の切替でデータ長が変わったら全期間・最新起点に戻す。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFitMode("latest");
+    setFitLen(prices.length);
+    setFitEnd(prices.length);
+    setFitPlaying(false);
+  }, [prices.length]);
   const addSpec = useCallback(() => {
     setSpecsTouched(true);
     setSpecs(prev => (prev.length >= MAX_SPECS || prev.some(s => sameSpec(s, builder))) ? prev : [...prev, builder]);
@@ -425,6 +448,55 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     setSpecsTouched(false);
     setPlanMode(true);
   }, []);
+
+  // フィット窓: 窓長プリセット(ローリングでも共通)。最新起点では右端を最新に保つ。
+  const setFitLenPreset = useCallback((n: number) => {
+    setFitLen(n);
+    setFitEnd((prev) => {
+      const end = prev > 0 ? Math.min(prev, prices.length) : prices.length;
+      return Math.max(end, n);
+    });
+  }, [prices.length]);
+  // フィット窓: モード切替。ローリングは固定窓長が必要なので、全期間だった場合は既定1年に。
+  const switchFitMode = useCallback((m: "latest" | "rolling") => {
+    if (m === "rolling") {
+      setFitLen((prev) => {
+        const cur = prev > 0 ? Math.min(prev, prices.length) : prices.length;
+        return cur >= prices.length ? Math.min(252, prices.length - 1) : cur;
+      });
+    } else {
+      setFitPlaying(false);
+    }
+    setFitEnd(prices.length);
+    setFitMode(m);
+  }, [prices.length]);
+
+  // フィット窓のアニメーション: 窓の右端(fitEnd)を fitSpeed[本/秒] で前進させ、
+  // ★最適プランと(検証=この期間のみなら)エクイティが移り変わる様子を可視化する。
+  useEffect(() => {
+    if (!fitPlaying || fitMode !== "rolling") return;
+    const startPos = Math.min(fitLen > 0 ? fitLen : prices.length, prices.length);
+    let cur = fitEndRef.current;
+    if (cur >= prices.length) cur = startPos;
+    let raf = 0;
+    let last = performance.now();
+    let acc = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      acc += fitSpeed * dt;
+      if (acc >= 1) {
+        cur += Math.floor(acc); acc -= Math.floor(acc);
+        if (cur >= prices.length) {
+          if (fitLoop) { cur = startPos; }
+          else { setFitEnd(prices.length); setFitPlaying(false); return; }
+        }
+        setFitEnd(cur);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [fitPlaying, fitMode, fitSpeed, fitLoop, fitLen, prices.length]);
 
   // === core data ===
   const days: DayData[] = useMemo(() => {
@@ -691,37 +763,54 @@ export default function SpiralHeatmap({ prices, period }: Props) {
     return out;
   }, [days, trendMode, trendRes, trendSmooth, trendWindow]);
 
-  // === 曜日トレード: 各戦略の結果 / バイ&ホールド / 全組合せマトリクス ===
-  const tradeResults = useMemo<StrategyResult[]>(
-    () => specs.map(s => computeStrategy(prices, s, tradeCompound)),
-    [specs, prices, tradeCompound],
+  // === フィット窓・検証期間の導出 ===
+  // fitPrices: ★最適プランを算出する対象期間のスライス。evalPrices: エクイティ等を測る対象期間。
+  const effFitEnd = fitEnd > 0 ? Math.min(fitEnd, prices.length) : prices.length;
+  const rawFitLen = fitLen > 0 ? fitLen : prices.length;
+  const effFitLen = Math.min(rawFitLen, effFitEnd);
+  const fitPrices = useMemo(
+    () => prices.slice(effFitEnd - effFitLen, effFitEnd),
+    [prices, effFitEnd, effFitLen],
   );
-  const bhEquity = useMemo<EquityPoint[]>(() => buyHoldEquity(prices, tradeCompound), [prices, tradeCompound]);
-  const bhMetrics = useMemo(() => buyHoldMetrics(prices, tradeCompound), [prices, tradeCompound]);
+  const isFullFit = fitMode === "latest" && effFitLen >= prices.length;
+  const fitBarsAfter = prices.length - effFitEnd;         // 窓の右端→最新までの本数(ローリング位置)
+  const fitStartDate = fitPrices[0]?.time ?? "";
+  const fitEndDate = fitPrices[fitPrices.length - 1]?.time ?? "";
+  const evalPrices = evalMode === "window" ? fitPrices : prices;
+
+  // === 曜日トレード: 各戦略の結果 / バイ&ホールド / 全組合せマトリクス ===
+  // 検証期間 evalPrices 上で評価する(full=全履歴 / window=フィット窓のみ)。
+  const tradeResults = useMemo<StrategyResult[]>(
+    () => specs.map(s => computeStrategy(evalPrices, s, tradeCompound)),
+    [specs, evalPrices, tradeCompound],
+  );
+  const bhEquity = useMemo<EquityPoint[]>(() => buyHoldEquity(evalPrices, tradeCompound), [evalPrices, tradeCompound]);
+  const bhMetrics = useMemo(() => buyHoldMetrics(evalPrices, tradeCompound), [evalPrices, tradeCompound]);
   // 週内プラン: specs を1本の資金ストリームに連結
   const planResult = useMemo<PlanResult>(
-    () => computePlan(prices, specs, gapFill, costBps, tradeCompound),
-    [prices, specs, gapFill, costBps, tradeCompound],
+    () => computePlan(evalPrices, specs, gapFill, costBps, tradeCompound),
+    [evalPrices, specs, gapFill, costBps, tradeCompound],
   );
   // 注文タイミングの全4通り（始値/終値 × 始値/終値）のヒートマップを一括計算
   const tradeMatrices = useMemo(
     () => TIMING_COMBOS.map(([entryTiming, exitTiming]) => ({
       entryTiming,
       exitTiming,
-      grid: weekdayMatrix(prices, entryTiming, exitTiming, builder.side, tradeCompound, matrixMetric),
+      grid: weekdayMatrix(evalPrices, entryTiming, exitTiming, builder.side, tradeCompound, matrixMetric),
     })),
-    [prices, builder.side, tradeCompound, matrixMetric],
+    [evalPrices, builder.side, tradeCompound, matrixMetric],
   );
   // ロング戦略ランキング: 全100通りを指標で降順に。ランキング表で使用。
   const longRanking = useMemo<RankedStrategy[]>(
-    () => rankLongStrategies(prices, tradeCompound, rankMetric),
-    [prices, tradeCompound, rankMetric],
+    () => rankLongStrategies(evalPrices, tradeCompound, rankMetric),
+    [evalPrices, tradeCompound, rankMetric],
   );
   // 最適プラン: 週内クロックを10スロットに分解し各スロットの最適サイド(買/売/無)を独立選択→
   // 連続同符号を連結したレグ列。無レバ・単位ポジション・非重複の枠内で最大リターンの組合せ。
+  // ★フィット窓(fitPrices)で算出する — 検証期間(evalPrices)とは独立。
   const bestCombo = useMemo<BestCombination>(
-    () => bestCombination(prices, tradeCompound),
-    [prices, tradeCompound],
+    () => bestCombination(fitPrices, tradeCompound),
+    [fitPrices, tradeCompound],
   );
   // ユーザーが比較リストを未編集の間は、最適プラン(買+売の複数レグ)を初期表示として自動選択する。
   // 期間・複利設定を変えると最適プランも変わり追従する。手動編集すると固定される。
@@ -1905,6 +1994,96 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           <span className="text-xs font-normal text-gray-400">（初期表示＝買+売を組合せた最大リターンの週内プラン。任意の曜日・注文タイミングで売買を編集でき、連結モードで複数レグを1本に繋いでB&Hと公平比較）</span>
         </div>
 
+        {/* ★最適プランの算出期間(フィット窓) + 検証期間 */}
+        <div className="rounded border border-emerald-100 bg-white/70 p-2.5 space-y-1.5 mb-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-gray-600 font-medium">★最適プランの算出期間</span>
+            <div className="inline-flex rounded overflow-hidden border border-gray-200">
+              {([["latest", "最新起点"], ["rolling", "ローリング"]] as [typeof fitMode, string][]).map(([m, lbl]) => (
+                <button key={m} type="button" onClick={() => switchFitMode(m)}
+                  className={`px-2 py-0.5 ${fitMode === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
+              ))}
+            </div>
+            <span className="text-gray-500">
+              <span className="font-mono text-gray-700">{fitStartDate}</span> 〜 <span className="font-mono text-gray-700">{fitEndDate}</span>
+              <span className="text-gray-400">（{effFitLen.toLocaleString()}本 ≈{(effFitLen / 252).toFixed(1)}年）</span>
+              {isFullFit && <span className="text-gray-400"> ・全期間</span>}
+            </span>
+          </div>
+
+          {/* 窓長プリセット */}
+          <div className="flex flex-wrap items-center gap-1 text-[11px]">
+            <span className="text-gray-500 mr-0.5">窓長</span>
+            {([["1M", 21], ["2M", 42], ["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504], ["3Y", 756]] as [string, number][])
+              .filter(([, n]) => n < prices.length)
+              .map(([lbl, n]) => (
+                <button key={lbl} type="button" onClick={() => setFitLenPreset(n)}
+                  className={`px-1.5 py-0.5 rounded ${!isFullFit && effFitLen === n ? "bg-emerald-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
+              ))}
+            {fitMode === "latest" && (
+              <button type="button" onClick={() => setFitLen(prices.length)}
+                className={`px-1.5 py-0.5 rounded ${isFullFit ? "bg-emerald-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>全期間</button>
+            )}
+          </div>
+
+          {fitMode === "latest" ? (
+            <>
+              <input type="range" min={60} max={prices.length} step={1} value={effFitLen}
+                onChange={(e) => { setFitLen(Number(e.target.value)); setFitEnd(prices.length); }}
+                className="w-full accent-emerald-600" aria-label="窓長" />
+              <p className="text-[10px] text-gray-400">スライダーで窓長を変更（右端は常に最新）。左に動かすほど新しい期間だけで★最適プランを組み直します。「ローリング」に切替えると位置を過去↔最新へアニメーションできます。</p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setFitPlaying((v) => !v)}
+                  className={`px-2 py-0.5 rounded text-[11px] whitespace-nowrap ${fitPlaying ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}
+                  aria-label={fitPlaying ? "停止" : "再生"}>{fitPlaying ? "⏸ 停止" : "▶ 再生"}</button>
+                <input type="range" min={effFitLen} max={prices.length} step={1} value={effFitEnd}
+                  onChange={(e) => { setFitPlaying(false); setFitEnd(Number(e.target.value)); }}
+                  className="w-full accent-emerald-600" aria-label="窓の位置(右端)" />
+                <button type="button" onClick={() => { setFitPlaying(false); setFitEnd(prices.length); }} disabled={fitBarsAfter === 0}
+                  className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${fitBarsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>最新へ</button>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                <label className="flex items-center gap-1 text-gray-500">速度
+                  <select className="border rounded px-1 py-0.5" value={fitSpeed} onChange={(e) => setFitSpeed(Number(e.target.value))}>
+                    {([["ゆっくり(8本/秒)", 8], ["標準(30本/秒)", 30], ["速い(80本/秒)", 80], ["最速(200本/秒)", 200]] as [string, number][])
+                      .map(([lbl, v]) => <option key={v} value={v}>{lbl}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-1 text-gray-500">
+                  <input type="checkbox" checked={fitLoop} onChange={(e) => setFitLoop(e.target.checked)} />ループ
+                </label>
+                <div className="flex items-center gap-1 flex-1 min-w-[120px]">
+                  <div className="relative h-1 flex-1 rounded bg-gray-200 overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 bg-emerald-500"
+                      style={{ width: `${prices.length > effFitLen ? ((effFitEnd - effFitLen) / (prices.length - effFitLen)) * 100 : 100}%` }} />
+                  </div>
+                  <span className="font-mono text-gray-400 tabular-nums">{fitEndDate}</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400">
+                窓長を固定したまま <span className="font-medium">▶再生</span> で位置を過去→最新へスライドし、★最適プランが移り変わる様子を確認できます（最新から <span className="font-mono">{fitBarsAfter.toLocaleString()}</span> 本前で終了）。
+                {specsTouched && <span className="text-amber-700">※手動編集中は最適プランに追従しません。「★最適プランに戻す」で再追従。</span>}
+              </p>
+            </>
+          )}
+
+          {/* 検証期間 */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] border-t border-emerald-100 pt-1.5">
+            <span className="text-gray-600 font-medium">検証期間（エクイティ/DD/コスト）</span>
+            <div className="inline-flex rounded overflow-hidden border border-gray-200">
+              {([["full", "全履歴 (OOS頑健性)"], ["window", "この期間のみ (イン・サンプル)"]] as [typeof evalMode, string][]).map(([m, lbl]) => (
+                <button key={m} type="button" onClick={() => setEvalMode(m)}
+                  className={`px-2 py-0.5 ${evalMode === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
+              ))}
+            </div>
+            {evalMode === "window" && !isFullFit && <span className="text-gray-400">エクイティは <span className="font-mono">{fitStartDate}〜{fitEndDate}</span> のみで評価中（当てはまり＝イン・サンプル）。</span>}
+            {evalMode === "full" && !isFullFit && <span className="text-gray-400">窓で選んだ最適プランを全履歴で評価中（窓外＝アウトオブサンプル）。</span>}
+          </div>
+        </div>
+
         {/* builder */}
         <div className="flex flex-wrap items-end gap-2 mb-2 text-[11px]">
           <div>
@@ -1954,6 +2133,7 @@ export default function SpiralHeatmap({ prices, period }: Props) {
           {!specsTouched && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-amber-100 text-amber-800 border border-amber-200" title="週内クロックを10スロットに分解し各スロットの買/売/無を独立最適化した、非重複で最大リターンの組合せ">
               ★ 最適プラン（買{bestCombo.nLong}・売{bestCombo.nShort}スロット / 週内滞在{Math.round(bestCombo.coverage * 100)}%）
+              {!isFullFit && <span className="font-normal">・算出期間 {fitStartDate}〜{fitEndDate}</span>}
             </span>
           )}
           {specs.map((s, i) => (
@@ -2184,6 +2364,8 @@ export default function SpiralHeatmap({ prices, period }: Props) {
             <li><span className="font-medium">スロット独立最適化:</span> 連結プランの富 W = Π(1 + pos_s·r_s) は<span className="font-medium">スロットごとに因数分解</span>できる(各スロットは毎週同じ pos を適用)。よって各スロットで pos∈{"{+1買, −1売, 0無}"} を独立に選び、そのスロットの累積富 max(買W, 売W, 1) を最大化すれば、全体の富も最大になる。買W&lt;1 かつ 売W&lt;1(高ボラでゼロドリフトのボラ引き)なら<span className="font-medium">無ポジ</span>が最良。</li>
             <li><span className="font-medium">レグへ連結:</span> 連続する同符号スロットを環状に連結して1レグ(例: 木終→火始の買い)にまとめ、連結モードで1本のエクイティにする。<span className="font-medium">非重複</span>(同時に2ポジションを持たない)が保証される。</li>
             <li>チップ上の<span className="font-medium">「★ 最適プラン」</span>バッジに買/売スロット数と週内滞在率を表示。期間・複利設定を変えると最適プランも再計算され追従する。手動で「+比較」やヒートマップクリック等をすると固定され、<span className="font-medium">「★ 最適プランに戻す」</span>で復帰できる。</li>
+            <li><span className="font-medium">算出期間（フィット窓）×検証期間:</span> 上部の<span className="font-medium">「★最適プランの算出期間」</span>で、最適プランを<span className="font-medium">任意のローリング期間</span>から求められる。<span className="font-medium">「最新起点」</span>は右端を最新に固定して窓長を可変、<span className="font-medium">「ローリング」</span>は窓長を固定して位置(右端)を過去↔最新へスライド（<span className="font-medium">▶再生</span>でアニメーション）。窓を狭める(1M/2M等)ほど、その時期に効いていた曜日の癖が細かく見える。既定は全期間なので従来表示と一致する。</li>
+            <li><span className="font-medium">検証期間トグル:</span> こうして選んだ最適プランのエクイティ/最大DD/コスト後を、<span className="font-medium">「全履歴」</span>（フィット窓の外＝<span className="font-medium">アウトオブサンプル</span>を含めて頑健性を見る）か<span className="font-medium">「この期間のみ」</span>（イン・サンプルの当てはまり）で測り分けられる。<span className="font-medium">直近の窓で最適化→全履歴で評価</span>し、B&Hや過去区間でも崩れないかを確認するのが実戦的な使い方。</li>
           </ul>
           <p className="text-[11px] text-gray-400">※ これは<span className="font-medium">過去データ上で</span>最大リターンになる後知恵の組合せ。多数スロットの符号を過去に最適化するため<span className="font-medium">過剰適合(オーバーフィット)</span>しやすく、将来もそのまま効く保証はない点に注意(下の注意点も参照)。</p>
 

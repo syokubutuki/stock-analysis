@@ -21,6 +21,7 @@ import {
 } from "../../lib/weekday-conditional";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -741,6 +742,8 @@ export default function WeekdayConditionalChart({ prices }: Props) {
           <li>祝日週は同週パスが短くなる/exitが成立しないことがある（その回は集計から除外）。統計的有意≠実用的有意。</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C12" />
     </div>
   );
 }

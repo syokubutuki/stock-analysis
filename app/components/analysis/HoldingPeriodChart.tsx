@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeHoldingPeriods, type HoldingPeriodStats } from "../../lib/cross-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -312,6 +313,8 @@ export default function HoldingPeriodChart({ prices }: Props) {
           <li>過去の最適期間は市場レジーム（低ボラ/高ボラ）に大きく依存する</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C8" />
     </div>
   );
 }
