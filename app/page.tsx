@@ -203,16 +203,10 @@ const SpiralHeatmap = dynamic(
   () => import("./components/analysis/SpiralHeatmap"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
-const WeekdayEdgeScanChart = dynamic(
-  () => import("./components/analysis/WeekdayEdgeScanChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
-);
-const WeekdayVsBuyHoldChart = dynamic(
-  () => import("./components/analysis/WeekdayVsBuyHoldChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
-);
-const NisaVsTaxableChart = dynamic(
-  () => import("./components/analysis/NisaVsTaxableChart"),
+// WeekdayEdgeScanChart / WeekdayVsBuyHoldChart / NisaVsTaxableChart は
+// WeekdayWorkbench 内に集約済み(そちらで dynamic import している)。
+const WeekdayWorkbench = dynamic(
+  () => import("./components/analysis/WeekdayWorkbench"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
 const VolatilityChart = dynamic(
@@ -1763,6 +1757,12 @@ export default function AnalysisPage() {
                   onBulk={bumpBulk}
                   groups={[
                   {
+                    group: "曜日トレード・ワークベンチ（発見→プラン→評価）",
+                    items: [
+                      { id: "cal-weekday-workbench", title: "曜日トレード・ワークベンチ（好機スキャン → プラン構築 → 対B&H/対NISA・レバレッジ評価）", node: <WeekdayWorkbench prices={allPrices} /> },
+                    ],
+                  },
+                  {
                     group: "曜日・カレンダー（日足）",
                     items: [
                       { id: "cal-spiral", title: "カレンダー螺旋ヒートマップ", node: <SpiralHeatmap prices={filteredPrices} period={period} /> },
@@ -1772,9 +1772,6 @@ export default function AnalysisPage() {
                       { id: "cal-session-gap", title: "休場コンテキスト別 曜日値動き（連休・祝日の歪み検出）", node: <SessionGapChart prices={filteredPrices} /> },
                       { id: "cal-today-bin", title: "今日の値動き → リターンビン即時判断（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
                       { id: "cal-weekday-cond", title: "曜日 × 値動きビン 条件付き分析（インタラクティブ）", node: <WeekdayConditionalChart prices={filteredPrices} /> },
-                      { id: "cal-weekday-edge", title: "曜日タイミング好機スキャン", node: <WeekdayEdgeScanChart prices={filteredPrices} /> },
-                      { id: "cal-weekday-vs-bh", title: "月→金戦略 vs バイ&ホールド 統計的優位性検定", node: <WeekdayVsBuyHoldChart prices={filteredPrices} /> },
-                      { id: "cal-nisa-vs-taxable", title: "NISA(非課税・持ち切り) vs 現物(課税・曜日戦略) 税引後リターン比較", node: <NisaVsTaxableChart prices={allPrices} /> },
                       { id: "cal-monday-gap", title: "月曜ギャップ解剖（週初めの「下げて始まる」を層別）", node: <MondayGapChart prices={allPrices} /> },
                     ],
                   },
