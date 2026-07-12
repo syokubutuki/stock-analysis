@@ -1492,12 +1492,11 @@ export default function SpiralHeatmap({ prices }: Props) {
         に統合しました。
       </p>
 
-      {/* 曜日トレード・シミュレータは「曜日トレード・ワークベンチ」へ移設 */}
-      <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-2.5 text-[11px] text-gray-500">
-        曜日トレードの<span className="font-medium text-gray-600">売買シミュレータ（最適プラン・フィット窓・逐次WF・全組合せヒートマップ）</span>は、
-        カレンダー節先頭の<span className="font-medium text-emerald-700">「曜日トレード・ワークベンチ」②詳細シミュレータ</span>へ移設しました。
-        そこで見つけたプランはそのまま対バイ&ホールド検定・NISA vs 現物 税引後/レバレッジ評価に流せます。
-      </div>
+      {/* 曜日トレード・シミュレータは独立分析「曜日トレード・シミュレータ」へ移設 */}
+      <p className="text-[11px] text-gray-400">
+        曜日トレードの売買シミュレータ（最適プラン・フィット窓・逐次WF・全組合せヒートマップ）は、
+        カレンダー節の<span className="font-medium text-gray-500">「曜日トレード・シミュレータ」</span>に移設しました。
+      </p>
 
       {/* ===== 5. Week-of-month bar ===== */}
       <div>
