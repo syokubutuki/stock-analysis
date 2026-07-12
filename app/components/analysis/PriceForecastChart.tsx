@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePriceForecast } from "../../lib/simulation";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
   prices: PricePoint[];
@@ -335,6 +336,8 @@ export default function PriceForecastChart({ prices }: Props) {
           <li>投資判断の唯一の根拠にせず、他の分析と組み合わせて使用すること</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C21" />
     </div>
   );
 }

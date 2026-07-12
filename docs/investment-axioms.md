@@ -121,10 +121,13 @@ $q$ を動かすほどコスト $C$ が積み上がる。ゆえに $\Phi$ の最
 | C17 | レジーム切替下の $\Phi$ | 命題1＋C12＋公準3 | レジーム別 μ_k/σ_k と信念 π_t → **信念加重の $q$**（遷移期に縮小） | RegimeChart, BOCPDChart |
 | C18 | 多資産・多期間の動的配分 | 公準4＋命題2＋公理5 | 時変 μ_t/Σ_t → **Markowitz＋異時点ヘッジ需要** | /portfolio（OOS/Michaud） |
 | C19 | 情報の価値（相互情報量→上界） | 命題4＋命題1＋公準3 | I(Y;r) → **成長率増分 ΔG≤I の天井** | CausalChart, RollingTransferEntropy |
+| C20 | 分散投資の限界（N_eff） | 命題2＋公理5 | 平均相関 ρ̄・固有値 → **実効独立数 1/ρ̄ で頭打ち** | /portfolio, EfficientFrontier |
+| C21 | 時間分散 vs 時間集中（非エルゴード） | 公理5＋命題2＋命題4 | E[r]・σ² → **時間平均 g=E[log(1+f r)] を最大化**（一点集中しない） | PriceForecastChart, simulation 節 |
 
-> C1〜C19 は導出鎖つきで `app/lib/axioms/corollaries.ts` に実装済み（`/axioms` ページで可視化）。
-> **未導出（今後 corollary 化する候補）**: C20 分散投資の限界（相関と実効独立数）、
-> C21 時間分散 vs 時間集中（エルゴード性・成長の非可換性）等。
+> C1〜C21 は導出鎖つきで `app/lib/axioms/corollaries.ts` に実装済み（`/axioms` ページで可視化）。
+> **C21 は原論の「序」と公理5の根拠に直結する capstone**（富は乗法的・我々は1経路を生きる）。
+> **未導出（今後 corollary 化する候補）**: C22 レバレッジの最適点と破産（信用取引）、
+> C23 課税・非課税の建玉価値（実現益課税が複利に効く）等。
 
 ---
 
