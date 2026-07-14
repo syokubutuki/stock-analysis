@@ -255,17 +255,22 @@ export default function WeekdayUsCrossChart({ tickers, names }: Props) {
     return { ...base, scale: Math.max(p90, metric.fmt === "num2" ? 0.05 : 0.002), maxN };
   }, [result, metric, built]);
 
-  // 形状スパークラインの縦スケール(全セル共通)
+  // 形状スパークラインの縦スケール(全セル共通)。
+  // 帯は「日次リターンの±1σ」ではなく「平均の±1標準誤差(σ/√n)」。σは平均パス(~0.1-0.5%)の
+  // 10倍規模で潰れるため。s.e.は平均パスと同程度の大きさで、形状が枠いっぱいに読める。
   const shapeScale = useMemo(() => {
     if (!result || metric.key !== "shape") return 0.01;
     let mx = 1e-6;
     const scan = (c: CellStats | null) => {
       if (!c) return;
-      for (let g = 0; g < c.path.length; g++) mx = Math.max(mx, Math.abs(c.path[g]) + c.band[g]);
+      const rootN = Math.sqrt(Math.max(1, c.n));
+      for (let g = 0; g < c.path.length; g++) {
+        mx = Math.max(mx, Math.abs(c.path[g]) + c.band[g] / rootN);
+      }
     };
     for (const r of result.rows) for (const c of r.cells) scan(c);
     for (const c of result.consensus) scan(c);
-    return mx;
+    return mx / 0.85; // 上下に少し余白
   }, [result, metric]);
 
   const usLabel = US_DRIVERS.find((d) => d.ticker === usTicker)?.label ?? usTicker;
@@ -509,7 +514,7 @@ export default function WeekdayUsCrossChart({ tickers, names }: Props) {
           <li><strong>値幅・到達</strong>: 上値到達=ln(H/O)(利確余地)、下値到達=ln(L/O)(含み損の深さ=ストップ目安)、日中レンジ=ln(H/L)、ボラ=日中リターンのσ。</li>
           <li><strong>トレード質</strong>: 勝率=C&gt;Oの割合、終値位置=(C−L)/(H−L)(1=大引け天井/0=引け安)、シャープ=日中平均/σ。</li>
           <li><strong>時刻</strong>: 上値ピーク/最安時刻=平均累積パスの最大/最小時間、高値/安値時刻=日中の高安を付けた時刻の中央値。前者は『銘柄全体で均した山谷』、後者は『各日が実際に高安を付けた時刻の代表値』で、両者はズレうる(平均パスは打ち消し合いで山谷が緩み時刻が中央寄りに、各日の実測は極値なのでばらつく)。</li>
-          <li><strong>形状＋高安時刻</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) と±1σ帯を各セルにスパークライン描画し、上記4時刻を1枚に重ねて同時表示(● 上値ピーク/最安=平均パス基準、▽△ 高値/安値時刻中央=各日実測)。●と▽△の横のズレで両者の違いを一目で読める。</li>
+          <li><strong>形状＋高安時刻</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) と平均の±1標準誤差帯(σ/√n)を各セルにスパークライン描画し、上記4時刻を1枚に重ねて同時表示(● 上値ピーク/最安=平均パス基準、▽△ 高値/安値時刻中央=各日実測)。●と▽△の横のズレで両者の違いを一目で読める。縦帯に日次±1σ(~1-2%)を使うと平均パス(~0.1-0.5%)が潰れて横一直線になるため、平均自体の不確かさを表す標準誤差(σ/√n)を採用(帯が中心線に重なるほど平均パスの形は有意)。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 集計と対象期間</p>
@@ -623,7 +628,7 @@ function CrossHeatmap({
       )}
       {metric.key === "shape" && (
         <div className="flex flex-col gap-0.5 text-[10px] text-gray-500 mt-1.5">
-          <div>寄り基準の平均累積パス（<span className="text-slate-600 font-medium">灰帯=±1σ</span>）に、4つの時刻マーカーを重ねて同時表示：</div>
+          <div>寄り基準の平均累積パス（<span className="text-slate-600 font-medium">灰帯=平均の±1標準誤差 σ/√n</span>）に、4つの時刻マーカーを重ねて同時表示：</div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
             <span><span style={{ color: SP_GREEN }} className="font-bold">●</span> 上値ピーク時刻（平均パス最大＝利確目安）</span>
             <span><span style={{ color: SP_GREEN }} className="font-bold">▽</span> 高値時刻・中央（各日実測の高値時刻）</span>
@@ -639,7 +644,7 @@ function CrossHeatmap({
   );
 }
 
-// 1セルの日内平均パス(±1σ帯)ミニチャート。共通縦スケールで銘柄間比較可。
+// 1セルの日内平均パス(平均の±1標準誤差=σ/√n 帯)ミニチャート。共通縦スケールで銘柄間比較可。
 // さらに4つの時刻マーカーを重ねる:
 //  ● 上値ピーク時刻 / 最安時刻   = 平均累積パスの最大/最小(緑/赤の丸, パス上)
 //  ▽ 高値時刻中央 / △ 安値時刻中央 = 各日実測の高安時刻の中央値(緑/赤の三角, 上端/下端)
@@ -658,9 +663,10 @@ function PathSpark({ cell, grid, scale, timeLabels }: {
   const clampV = (v: number) => Math.max(-scale, Math.min(scale, v));
   const y = (v: number) => midY - (clampV(v) / scale) * halfH;
 
+  const rootN = Math.sqrt(Math.max(1, cell.n)); // σ → s.e.(平均の標準誤差)
   const line = path.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const upper = path.map((v, i) => `${x(i).toFixed(1)},${y(v + band[i]).toFixed(1)}`);
-  const lower = path.map((v, i) => `${x(i).toFixed(1)},${y(v - band[i]).toFixed(1)}`).reverse();
+  const upper = path.map((v, i) => `${x(i).toFixed(1)},${y(v + band[i] / rootN).toFixed(1)}`);
+  const lower = path.map((v, i) => `${x(i).toFixed(1)},${y(v - band[i] / rootN).toFixed(1)}`).reverse();
   const area = `M${upper.join(" L")} L${lower.join(" L")} Z`;
 
   // 分 → x(パスと同じ時間格子に写像)
@@ -671,7 +677,7 @@ function PathSpark({ cell, grid, scale, timeLabels }: {
   const trX = x(troughIdx), trY = y(path[troughIdx]);
 
   const title =
-    `平均パス形状（寄り基準の累積対数リターン, 灰帯=±1σ）\n` +
+    `平均パス形状（寄り基準の累積対数リターン, 灰帯=平均の±1標準誤差 σ/√n）\n` +
     `● 上値ピーク時刻 ${timeLabels[peakIdx] ?? ""}（平均パス最大）\n` +
     `▽ 高値時刻・中央 ${minuteToLabel(Math.round(highMin))}（各日実測）\n` +
     `● 最安時刻 ${timeLabels[troughIdx] ?? ""}（平均パス最小）\n` +
