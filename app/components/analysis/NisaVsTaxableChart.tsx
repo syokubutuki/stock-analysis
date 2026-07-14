@@ -34,6 +34,7 @@ import {
   type LeverageSweep,
 } from "../../lib/nisa-vs-taxable";
 import AnalysisGuide from "./AnalysisGuide";
+import AxiomPlacement from "./AxiomPlacement";
 import WeekSlotGrid, { type SlotSide, AVOID_WEEKEND } from "./WeekSlotGrid";
 
 interface Props {
@@ -643,6 +644,9 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           <li><span className="font-medium">現金は無利子</span>: 市場外の資金は0%と仮定。短期金利で運用できる環境ではNISA側の相対優位がわずかに縮みます。</li>
         </ul>
       </AnalysisGuide>
+
+      <AxiomPlacement corollaryId="C23" />
+      <AxiomPlacement corollaryId="C22" />
     </div>
   );
 }
