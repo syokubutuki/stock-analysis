@@ -180,6 +180,20 @@ export default function PortfolioPage() {
     [watchlist]
   );
   const { data, loading, progress, reload } = usePortfolioData(tickers);
+
+  // 名称の自動補完(整合性): コード追加/URL追加で name=コード のままの項目を、取得済みの
+  // 正式名(API)で埋める。ユーザーが設定した名称(name≠コード)は上書きしない。収束保証あり。
+  useEffect(() => {
+    let changed = false;
+    for (const item of watchlist) {
+      const fetched = data[item.ticker]?.name;
+      if (fetched && fetched !== item.ticker && (!item.name || item.name === item.ticker)) {
+        updateWatchlistItem(item.ticker, { name: fetched });
+        changed = true;
+      }
+    }
+    if (changed) setWatchlist(getWatchlist());
+  }, [data, watchlist]);
   // 分析パネルの一括開閉(既定は全て折りたたみ)。
   const [bulk, setBulk] = useState({ nonce: 0, open: false });
   const onBulk = useCallback((open: boolean) => setBulk((b) => ({ nonce: b.nonce + 1, open })), []);
@@ -277,6 +291,12 @@ export default function PortfolioPage() {
 
   const handleRemove = useCallback((ticker: string) => {
     setWatchlist(removeFromWatchlist(ticker));
+  }, []);
+
+  // 銘柄名のインライン編集(横断ヒートマップ等から)。ウォッチリストに永続化。
+  const handleRename = useCallback((ticker: string, name: string) => {
+    updateWatchlistItem(ticker, { name });
+    setWatchlist(getWatchlist());
   }, []);
 
   const openAnalysis = useCallback(
@@ -436,7 +456,7 @@ export default function PortfolioPage() {
               id: "pf-weekday-us-cross",
               title: "曜日 × 前夜米国ビン 交互作用：ウォッチリスト横断",
               subtitle: "選んだ前夜米国ビンの翌日に絞り、銘柄×曜日で日内特性を多面比較",
-              node: <WeekdayUsCrossChart tickers={tickers} names={tickerNames} />,
+              node: <WeekdayUsCrossChart tickers={tickers} names={tickerNames} onRename={handleRename} />,
             });
             return items.length > 0 ? (
               <AccordionSection groups={[{ items }]} bulk={bulk} onBulk={onBulk} />

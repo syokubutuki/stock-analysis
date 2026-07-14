@@ -12,7 +12,7 @@ import { useUsDaily, US_DRIVERS } from "../../hooks/useUsDaily";
 import { groupByDay, buildBinGrid, BinGrid } from "../../lib/intraday-core";
 import { computeUsReturns, BinScheme } from "../../lib/us-spillover-core";
 import {
-  UsMode, CrossStock, DateWindow, CellStats, ConsensusCell,
+  UsMode, CrossStock, DateWindow, CellStats, ConsensusCell, CrossRow,
   prepCross, computeCrossBinning, computeCrossRows,
   CROSS_WD_ORDER, CROSS_WD_LABELS, minuteToLabel,
 } from "../../lib/weekday-us-cross";
@@ -23,7 +23,17 @@ import AnalysisGuide from "./AnalysisGuide";
 interface Props {
   tickers: string[];
   names?: Record<string, string>;
+  // 銘柄名のインライン編集(ウォッチリストへ永続化)。未指定なら編集UIを出さない。
+  onRename?: (ticker: string, name: string) => void;
 }
+
+type SortKey = "amp" | "ticker" | "name" | "n";
+const SORTS: { key: SortKey; label: string; hint: string }[] = [
+  { key: "amp", label: "日中パス振幅", hint: "平均パスの山谷幅(最大−最小)が大きい順。値動きの形がはっきりした銘柄を上に。" },
+  { key: "ticker", label: "銘柄コード", hint: "ティッカーの昇順。" },
+  { key: "name", label: "名称", hint: "銘柄名の五十音/アルファベット順。" },
+  { key: "n", label: "データ数", hint: "そのビンの立会日数が多い順(標本が厚い銘柄を上に)。" },
+];
 
 const US_MODES: { value: UsMode; label: string; formula: string }[] = [
   { value: "ret", label: "前日終値比", formula: "ln(当日終値 / 前日終値)（オーバーナイト含む米国当日騰落）" },
@@ -147,13 +157,14 @@ function fmtBinRange(lo: number | null, hi: number | null): string {
 
 // ───────────────────────── 本体 ─────────────────────────
 
-export default function WeekdayUsCrossChart({ tickers, names }: Props) {
+export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props) {
   const [usTicker, setUsTicker] = useState("^IXIC");
   const [interval, setInterval] = useState("60m");
   const [scheme, setScheme] = useState<BinScheme>("tercile");
   const [usMode, setUsMode] = useState<UsMode>("ret");
   const [selBinRaw, setSelBinRaw] = useState<number | null>(null);
   const [metricKey, setMetricKey] = useState("intraday");
+  const [sortKey, setSortKey] = useState<SortKey>("amp");
   // 対象期間: 0=全期間/最新 の既定なので、データ長が変わっても破綻しない(effectでのreset不要)。
   const [winMode, setWinMode] = useState<"latest" | "rolling">("latest");
   const [winLen, setWinLen] = useState(0); // 窓長(立会日). 0=全期間
@@ -466,11 +477,30 @@ export default function WeekdayUsCrossChart({ tickers, names }: Props) {
             {metric.p && "★=有意(★★<1%/★<5%/☆<10%)。"}
           </div>
 
+          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+            <span className="text-gray-500">並び替え:</span>
+            {SORTS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setSortKey(s.key)}
+                title={s.hint}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                  sortKey === s.key ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+            {onRename && <span className="text-[10px] text-gray-400">｜銘柄名の ✎ で名称を編集(ウォッチリストに保存)</span>}
+          </div>
+
           <CrossHeatmap
             result={result}
             metric={metric}
             ctx={ctx}
             names={names}
+            sortKey={sortKey}
+            onRename={onRename}
           />
 
           <p className="text-[11px] text-gray-400">
@@ -526,15 +556,41 @@ export default function WeekdayUsCrossChart({ tickers, names }: Props) {
 
 // ───────────────────────── ヒートマップ表 ─────────────────────────
 
+// 1行(銘柄)の日内パス振幅=各曜日セルの平均パス山谷幅の最大。値動きの形のはっきり度合い。
+function rowAmplitude(r: CrossRow): number {
+  let mx = 0;
+  for (const c of r.cells) {
+    if (!c || c.path.length === 0) continue;
+    let lo = Infinity, hi = -Infinity;
+    for (const v of c.path) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (hi - lo > mx) mx = hi - lo;
+  }
+  return mx;
+}
+
 function CrossHeatmap({
-  result, metric, ctx, names,
+  result, metric, ctx, names, sortKey, onRename,
 }: {
   result: NonNullable<ReturnType<typeof computeCrossRows>>;
   metric: Metric;
   ctx: ColorCtx;
   names?: Record<string, string>;
+  sortKey: SortKey;
+  onRename?: (ticker: string, name: string) => void;
 }) {
   const { timeLabels, grid } = result;
+
+  const sortedRows = useMemo(() => {
+    const rows = [...result.rows];
+    const nm = (t: string) => names?.[t] || t;
+    switch (sortKey) {
+      case "amp": rows.sort((a, b) => rowAmplitude(b) - rowAmplitude(a)); break;
+      case "ticker": rows.sort((a, b) => a.ticker.localeCompare(b.ticker)); break;
+      case "name": rows.sort((a, b) => nm(a.ticker).localeCompare(nm(b.ticker), "ja")); break;
+      case "n": rows.sort((a, b) => b.nTotal - a.nTotal); break;
+    }
+    return rows;
+  }, [result.rows, sortKey, names]);
 
   const renderCell = (c: CellStats | null, consensusP?: number) => {
     if (!c || c.n < 1) return <span className="text-gray-300">—</span>;
@@ -569,13 +625,16 @@ function CrossHeatmap({
           </tr>
         </thead>
         <tbody>
-          {result.rows.map((r) => (
+          {sortedRows.map((r) => (
             <tr key={r.ticker} className="border-t border-gray-100">
               <td className="px-2 py-1 sticky left-0 bg-white z-10">
-                <div className="font-medium text-gray-700 truncate max-w-[130px]" title={r.ticker}>
-                  {names?.[r.ticker] || r.ticker}
-                </div>
-                <div className="text-[9px] text-gray-400">n={r.nTotal}</div>
+                <RowHeader
+                  ticker={r.ticker}
+                  name={names?.[r.ticker]}
+                  n={r.nTotal}
+                  ampl={rowAmplitude(r)}
+                  onRename={onRename}
+                />
               </td>
               {r.cells.map((c, i) => (
                 <td key={i} className="px-0.5 py-0.5 text-center align-middle">{renderCell(c)}</td>
@@ -623,6 +682,62 @@ function CrossHeatmap({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// 銘柄行の見出し。名称(あれば)+ 銘柄コードを併記し、onRename があれば ✎ でインライン編集。
+// 編集結果は親(ポートフォリオ)経由でウォッチリストに保存され、名称表示の不整合を解消できる。
+function RowHeader({ ticker, name, n, ampl, onRename }: {
+  ticker: string; name?: string; n: number; ampl: number;
+  onRename?: (ticker: string, name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(name ?? "");
+  const hasName = !!name && name !== ticker;
+  const amplPct = `${(ampl * 100).toFixed(ampl >= 0.01 ? 1 : 2)}%`;
+
+  if (editing) {
+    const commit = () => {
+      const t = val.trim();
+      if (t) onRename?.(ticker, t);
+      setEditing(false);
+    };
+    return (
+      <div className="flex items-center gap-1 max-w-[172px]">
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
+          className="w-[112px] px-1 py-0.5 text-[11px] border border-gray-300 rounded"
+          placeholder={ticker}
+        />
+        <button onClick={commit} title="保存" className="text-emerald-600 hover:text-emerald-700 text-sm leading-none">✓</button>
+        <button onClick={() => setEditing(false)} title="取消" className="text-gray-400 hover:text-gray-600 text-sm leading-none">✕</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[172px]">
+      <div className="flex items-center gap-1">
+        <span className="font-medium text-gray-700 truncate" title={hasName ? `${name}（${ticker}）` : ticker}>
+          {hasName ? name : ticker}
+        </span>
+        {onRename && (
+          <button
+            onClick={() => { setVal(hasName ? name! : ""); setEditing(true); }}
+            title="銘柄名を編集(ウォッチリストに保存)"
+            className="text-gray-300 hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
+          >✎</button>
+        )}
+      </div>
+      <div className="text-[9px] text-gray-400 tabular-nums flex items-center gap-1.5">
+        {hasName && <span className="font-mono">{ticker}</span>}
+        <span>n={n}</span>
+        <span className="text-gray-300">振幅{amplPct}</span>
+      </div>
     </div>
   );
 }
