@@ -67,7 +67,7 @@ const METRICS: Metric[] = [
   { key: "lowTime", label: "安値時刻(中央)", group: "時刻", color: "timeMin", fmt: "timeMin", get: (c) => c.lowMin, hint: "その日の安値を付けた時刻の中央値。" },
   // その他
   { key: "n", label: "データ数", group: "その他", color: "count", fmt: "int", get: (c) => c.n, hint: "そのセルの立会日数。少ないほど不安定。" },
-  { key: "shape", label: "日内パス形状", group: "その他", color: "shape", fmt: "none", get: () => 0, hint: "寄り基準の平均累積パスと±1σ帯。時間方向の値動きの形。" },
+  { key: "shape", label: "日内パス形状＋高安時刻", group: "その他", color: "shape", fmt: "none", get: () => 0, hint: "寄り基準の平均累積パス(±1σ帯)に、上値ピーク/最安(平均パス基準)と高値/安値の時刻中央(各日実測)の4マーカーを重ねて同時表示。" },
 ];
 
 const METRIC_GROUPS = ["リターン", "値幅・到達", "トレード質", "時刻", "その他"];
@@ -508,8 +508,8 @@ export default function WeekdayUsCrossChart({ tickers, names }: Props) {
           <li><strong>リターン</strong>: 日中=ln(C/O)、前日比=ln(C/P)(オーバーナイト込み・実損益に近い)、ギャップ=ln(O/P)(夜間の窓)。</li>
           <li><strong>値幅・到達</strong>: 上値到達=ln(H/O)(利確余地)、下値到達=ln(L/O)(含み損の深さ=ストップ目安)、日中レンジ=ln(H/L)、ボラ=日中リターンのσ。</li>
           <li><strong>トレード質</strong>: 勝率=C&gt;Oの割合、終値位置=(C−L)/(H−L)(1=大引け天井/0=引け安)、シャープ=日中平均/σ。</li>
-          <li><strong>時刻</strong>: 上値ピーク/最安時刻=平均累積パスの最大/最小時間、高値/安値時刻=日中の高安を付けた時刻の中央値。</li>
-          <li><strong>形状</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) と±1σ帯を各セルにスパークライン描画(時間方向の値動きの形)。</li>
+          <li><strong>時刻</strong>: 上値ピーク/最安時刻=平均累積パスの最大/最小時間、高値/安値時刻=日中の高安を付けた時刻の中央値。前者は『銘柄全体で均した山谷』、後者は『各日が実際に高安を付けた時刻の代表値』で、両者はズレうる(平均パスは打ち消し合いで山谷が緩み時刻が中央寄りに、各日の実測は極値なのでばらつく)。</li>
+          <li><strong>形状＋高安時刻</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) と±1σ帯を各セルにスパークライン描画し、上記4時刻を1枚に重ねて同時表示(● 上値ピーク/最安=平均パス基準、▽△ 高値/安値時刻中央=各日実測)。●と▽△の横のズレで両者の違いを一目で読める。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 集計と対象期間</p>
@@ -549,12 +549,12 @@ function CrossHeatmap({
   shapeScale: number;
   names?: Record<string, string>;
 }) {
-  const { timeLabels } = result;
+  const { timeLabels, grid } = result;
 
   const renderCell = (c: CellStats | null, consensusP?: number) => {
     if (!c || c.n < 1) return <span className="text-gray-300">—</span>;
     if (metric.key === "shape") {
-      return <PathSpark path={c.path} band={c.band} scale={shapeScale} />;
+      return <PathSpark cell={c} grid={grid} scale={shapeScale} timeLabels={timeLabels} />;
     }
     const v = metric.get(c);
     const bg = cellBg(metric, v, ctx);
@@ -621,29 +621,77 @@ function CrossHeatmap({
       {metric.color === "div" && (
         <div className="text-[10px] text-gray-400 mt-1">緑=プラス / 赤=マイナス、濃いほど大。</div>
       )}
+      {metric.key === "shape" && (
+        <div className="flex flex-col gap-0.5 text-[10px] text-gray-500 mt-1.5">
+          <div>寄り基準の平均累積パス（<span className="text-slate-600 font-medium">灰帯=±1σ</span>）に、4つの時刻マーカーを重ねて同時表示：</div>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span><span style={{ color: SP_GREEN }} className="font-bold">●</span> 上値ピーク時刻（平均パス最大＝利確目安）</span>
+            <span><span style={{ color: SP_GREEN }} className="font-bold">▽</span> 高値時刻・中央（各日実測の高値時刻）</span>
+            <span><span style={{ color: SP_RED }} className="font-bold">●</span> 最安時刻（平均パス最小＝仕込み/損切り目安）</span>
+            <span><span style={{ color: SP_RED }} className="font-bold">△</span> 安値時刻・中央（各日実測の安値時刻）</span>
+          </div>
+          <div className="text-gray-400">
+            ●（均された山谷の時刻）と ▽△（典型的な高安の時刻）の横のズレが両者の違い。近ければ一貫、離れれば日によって高安の付け方がばらつく。
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // 1セルの日内平均パス(±1σ帯)ミニチャート。共通縦スケールで銘柄間比較可。
-function PathSpark({ path, band, scale }: { path: number[]; band: number[]; scale: number }) {
-  const W = 58, H = 24, pad = 2;
+// さらに4つの時刻マーカーを重ねる:
+//  ● 上値ピーク時刻 / 最安時刻   = 平均累積パスの最大/最小(緑/赤の丸, パス上)
+//  ▽ 高値時刻中央 / △ 安値時刻中央 = 各日実測の高安時刻の中央値(緑/赤の三角, 上端/下端)
+// ●と▽△の横のズレが「均された山谷」と「典型的な高安の時刻」の違いを表す。
+const SP_GREEN = "#16a34a", SP_RED = "#dc2626";
+function PathSpark({ cell, grid, scale, timeLabels }: {
+  cell: CellStats; grid: BinGrid; scale: number; timeLabels: string[];
+}) {
+  const { path, band, peakIdx, troughIdx, highMin, lowMin } = cell;
+  const W = 74, H = 34, padX = 5, padTop = 7, padBot = 7;
   const G = path.length;
   if (G < 2 || scale <= 0) return <span className="text-gray-300">—</span>;
-  const x = (i: number) => pad + (i / (G - 1)) * (W - 2 * pad);
-  const y = (v: number) => H / 2 - (v / scale) * (H / 2 - pad);
-  const clamp = (v: number) => Math.max(-scale, Math.min(scale, v));
-  const line = path.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(clamp(v)).toFixed(1)}`).join(" ");
-  const upper = path.map((v, i) => `${x(i).toFixed(1)},${y(clamp(v + band[i])).toFixed(1)}`);
-  const lower = path.map((v, i) => `${x(i).toFixed(1)},${y(clamp(v - band[i])).toFixed(1)}`).reverse();
+  const x = (i: number) => padX + (Math.max(0, Math.min(G - 1, i)) / (G - 1)) * (W - 2 * padX);
+  const midY = padTop + (H - padTop - padBot) / 2;
+  const halfH = (H - padTop - padBot) / 2;
+  const clampV = (v: number) => Math.max(-scale, Math.min(scale, v));
+  const y = (v: number) => midY - (clampV(v) / scale) * halfH;
+
+  const line = path.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const upper = path.map((v, i) => `${x(i).toFixed(1)},${y(v + band[i]).toFixed(1)}`);
+  const lower = path.map((v, i) => `${x(i).toFixed(1)},${y(v - band[i]).toFixed(1)}`).reverse();
   const area = `M${upper.join(" L")} L${lower.join(" L")} Z`;
-  const end = path[G - 1];
-  const stroke = end >= 0 ? "#16a34a" : "#dc2626";
+
+  // 分 → x(パスと同じ時間格子に写像)
+  const xOfMin = (m: number) => x((m - grid.binStart) / grid.binMinutes);
+  const highX = xOfMin(highMin);
+  const lowX = xOfMin(lowMin);
+  const peakX = x(peakIdx), peakY = y(path[peakIdx]);
+  const trX = x(troughIdx), trY = y(path[troughIdx]);
+
+  const title =
+    `平均パス形状（寄り基準の累積対数リターン, 灰帯=±1σ）\n` +
+    `● 上値ピーク時刻 ${timeLabels[peakIdx] ?? ""}（平均パス最大）\n` +
+    `▽ 高値時刻・中央 ${minuteToLabel(Math.round(highMin))}（各日実測）\n` +
+    `● 最安時刻 ${timeLabels[troughIdx] ?? ""}（平均パス最小）\n` +
+    `△ 安値時刻・中央 ${minuteToLabel(Math.round(lowMin))}（各日実測）`;
+
   return (
     <svg width={W} height={H} className="inline-block align-middle" style={{ overflow: "visible" }}>
-      <line x1={pad} y1={H / 2} x2={W - pad} y2={H / 2} stroke="#e5e7eb" strokeWidth={1} />
-      <path d={area} fill={stroke} opacity={0.12} />
-      <path d={line} fill="none" stroke={stroke} strokeWidth={1.2} />
+      <title>{title}</title>
+      <line x1={padX} y1={midY} x2={W - padX} y2={midY} stroke="#e5e7eb" strokeWidth={1} />
+      <path d={area} fill="#94a3b8" opacity={0.16} />
+      <path d={line} fill="none" stroke="#475569" strokeWidth={1.2} />
+      {/* 高値時刻・中央: 上端▽ + 縦ガイド(緑) */}
+      <line x1={highX} y1={padTop - 1} x2={highX} y2={H - padBot} stroke={SP_GREEN} strokeWidth={0.6} strokeDasharray="1.5 1.5" opacity={0.45} />
+      <path d={`M${(highX - 3).toFixed(1)},${padTop - 6} L${(highX + 3).toFixed(1)},${padTop - 6} L${highX.toFixed(1)},${padTop - 1} Z`} fill={SP_GREEN} />
+      {/* 安値時刻・中央: 下端△ + 縦ガイド(赤) */}
+      <line x1={lowX} y1={padTop} x2={lowX} y2={H - padBot + 1} stroke={SP_RED} strokeWidth={0.6} strokeDasharray="1.5 1.5" opacity={0.45} />
+      <path d={`M${(lowX - 3).toFixed(1)},${H - padBot + 6} L${(lowX + 3).toFixed(1)},${H - padBot + 6} L${lowX.toFixed(1)},${H - padBot + 1} Z`} fill={SP_RED} />
+      {/* 上値ピーク / 最安: パス上の●(白縁) */}
+      <circle cx={peakX} cy={peakY} r={2.3} fill={SP_GREEN} stroke="#fff" strokeWidth={0.7} />
+      <circle cx={trX} cy={trY} r={2.3} fill={SP_RED} stroke="#fff" strokeWidth={0.7} />
     </svg>
   );
 }
