@@ -111,6 +111,10 @@ const ComplexPlaneChart = dynamic(
   () => import("./components/analysis/ComplexPlaneChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const ZPlanePoleChart = dynamic(
+  () => import("./components/analysis/ZPlanePoleChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const PhaseClockChart = dynamic(
   () => import("./components/analysis/PhaseClockChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1554,6 +1558,7 @@ export default function AnalysisPage() {
                         { id: "freq-emd", title: "EMD / Hilbert-Huang変換", node: <EMDChart prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "freq-analytic", title: "解析信号と瞬時周波数", node: <AnalyticSignalChart prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "freq-complex", title: "複素平面表現", node: <ComplexPlaneChart prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "freq-zplane", title: "z平面ポールマップ（AR極）", node: <ZPlanePoleChart prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "freq-phaseclock", title: "位相時計（Cycle Phase Clock）", node: <PhaseClockChart prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "freq-hhs", title: "Hilbert-Huang Spectrum / STFT / スペクトルエントロピー", node: <HilbertHuangChart prices={filteredPrices} seriesMode={seriesMode} /> },
                       ],
