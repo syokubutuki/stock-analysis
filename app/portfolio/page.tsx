@@ -163,9 +163,16 @@ export default function PortfolioPage() {
   const [addInput, setAddInput] = useState("");
 
   useEffect(() => {
+    // 株式原論の合流点(/axioms → /portfolio?add=…)からの銘柄追加を受ける(双方向連携)。
+    const add = new URLSearchParams(window.location.search).get("add");
+    if (add && add.trim()) {
+      const t = add.trim().toUpperCase();
+      addToWatchlist(t, t);
+      router.replace("/portfolio");
+    }
     setWatchlist(getWatchlist());
     setSnapshot(getSnapshot());
-  }, []);
+  }, [router]);
 
   const tickers = useMemo(() => watchlist.map((w) => w.ticker), [watchlist]);
   const tickerNames = useMemo(
@@ -293,6 +300,12 @@ export default function PortfolioPage() {
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-2">
+            <Link
+              href="/axioms"
+              className="text-sm text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50"
+            >
+              株式原論
+            </Link>
             <Link
               href="/strategy"
               className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
@@ -535,6 +548,15 @@ function ListRow({
           <span className="font-medium text-gray-800">{d.ticker}</span>
           <span className="ml-2 text-xs text-gray-400 truncate">{d.name}</span>
         </button>
+
+        <a
+          href={`/axioms?ticker=${encodeURIComponent(d.ticker)}`}
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 text-[10px] text-indigo-500 hover:text-indigo-700"
+          title="株式原論の合流点で q を分析"
+        >
+          原論
+        </a>
 
         <PriceSpark closes={row.sparkCloses} />
 

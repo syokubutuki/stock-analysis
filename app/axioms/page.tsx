@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   COROLLARIES,
   AXIOM_LABEL,
@@ -9,6 +10,12 @@ import {
   type Corollary,
   type AxiomRef,
 } from "../lib/axioms/corollaries";
+
+// 合流点(今日の q 提案)。自前でデータ取得する client コンポーネントなので SSR 無効。
+const TodayQProposal = dynamic(
+  () => import("../components/analysis/TodayQProposal"),
+  { ssr: false }
+);
 
 // 系譜図の階層定義。公準・公理・命題は固定（docs/investment-axioms.md）。
 const POSTULATES: AxiomRef[] = ["公準1", "公準2", "公準3", "公準4", "公準5"];
@@ -31,7 +38,10 @@ function AxiomBox({ id, highlight }: { id: AxiomRef; highlight?: boolean }) {
 function CorollaryCard({ c }: { c: Corollary }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div
+      id={c.id}
+      className="scroll-mt-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+    >
       <div className="flex items-baseline gap-2">
         <span className="rounded bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white">
           {c.id}
@@ -145,6 +155,9 @@ export default function AxiomsPage() {
             で決まり、あらゆる分析は「P の記述」にすぎず、q の選択を変えて初めて価値を持つ。
           </p>
         </section>
+
+        {/* 合流点: 今日の q 提案(全系が単一の建玉に畳み込まれる場所) */}
+        <TodayQProposal />
 
         {/* 系譜図 */}
         <section>
