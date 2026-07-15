@@ -48,8 +48,12 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   const tMin = -(L - 1), tMax = H, tSpan = tMax - tMin || 1;
   const xOf = (t: number) => ml + ((t - tMin) / tSpan) * plotW;
 
-  // y範囲: 全系列(クエリ・選抜アナログ・帯)から
-  const all: number[] = [...r.query.lead, ...r.leadP25, ...r.leadP75, ...r.fwdP25, ...r.fwdP75];
+  // y範囲: 全系列(クエリ・選抜アナログ・帯・高安到達)から
+  const all: number[] = [
+    ...r.query.lead, ...r.query.leadHigh, ...r.query.leadLow,
+    ...r.leadP25, ...r.leadP75, ...r.fwdP25, ...r.fwdP75,
+    ...r.fwdHighMedian, ...r.fwdLowMedian,
+  ];
   for (const s of r.selected) { all.push(...s.lead, ...s.forward); }
   const maxV = Math.max(0.01, ...all.map((v) => Math.abs(v)));
   const yOf = (v: number) => mt + plotH / 2 - (v / maxV) * (plotH / 2 - 4);
@@ -104,13 +108,36 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   r.leadMedian.forEach((v, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(tMin + i), yOf(v)));
   ctx.stroke(); ctx.setLineDash([]);
 
+  // フォワード 高値/安値 到達(MFE/MAE)の中央値: 緑上・赤下 + 薄いレンジ・コーン
+  ctx.fillStyle = "rgba(16,163,74,0.06)";
+  ctx.beginPath();
+  for (let m = 0; m <= H; m++) ctx[m === 0 ? "moveTo" : "lineTo"](xOf(m), yOf(r.fwdHighMedian[m]));
+  for (let m = H; m >= 0; m--) ctx.lineTo(xOf(m), yOf(r.fwdLowMedian[m]));
+  ctx.closePath(); ctx.fill();
+  ctx.setLineDash([3, 2]); ctx.lineWidth = 1.4;
+  ctx.strokeStyle = "#16a34a";
+  ctx.beginPath();
+  r.fwdHighMedian.forEach((v, m) => ctx[m === 0 ? "moveTo" : "lineTo"](xOf(m), yOf(v)));
+  ctx.stroke();
+  ctx.strokeStyle = "#dc2626";
+  ctx.beginPath();
+  r.fwdLowMedian.forEach((v, m) => ctx[m === 0 ? "moveTo" : "lineTo"](xOf(m), yOf(v)));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
   // フォワード中央値(太・青)
   ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 2.6;
   ctx.beginPath();
   r.fwdMedian.forEach((v, m) => ctx[m === 0 ? "moveTo" : "lineTo"](xOf(m), yOf(v)));
   ctx.stroke();
 
-  // 今週(クエリ)のリードイン(太・濃紺)
+  // 今週(クエリ)の日中レンジ(高安の縦バー=ローソクのヒゲ)
+  ctx.strokeStyle = "rgba(15,23,42,0.35)"; ctx.lineWidth = 1;
+  for (let i = 0; i < L; i++) {
+    const xx = xOf(tMin + i);
+    ctx.beginPath(); ctx.moveTo(xx, yOf(r.query.leadHigh[i])); ctx.lineTo(xx, yOf(r.query.leadLow[i])); ctx.stroke();
+  }
+  // 今週(クエリ)のリードイン終値(太・濃紺)
   ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2.8;
   ctx.beginPath();
   r.query.lead.forEach((v, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(tMin + i), yOf(v)));
@@ -242,17 +269,22 @@ export default function WeeklyAnalogChart({ prices }: Props) {
               ? <>前夜米国が<span className="font-bold">「{result.binMetaObj.labels[result.selBin]}」</span>で始まった過去 {result.selected.length} 週</>
               : <>今週の形に似た過去 {result.selected.length} 局面</>}
             {" → その後 "}{result.H}日の
-            <span className="font-bold"> 中央値 {fmtPct(result.medianFinal)}</span>
-            <span className="text-blue-700">（平均 {fmtPct(result.meanFinal)}｜上昇 {result.upCount} / 下落 {result.downCount} = 勝率 {((result.upCount / (result.upCount + result.downCount || 1)) * 100).toFixed(0)}%）</span>
+            <span className="font-bold"> 終値中央値 {fmtPct(result.medianFinal)}</span>
+            <span className="text-blue-700">（平均 {fmtPct(result.meanFinal)}｜勝率 {((result.upCount / (result.upCount + result.downCount || 1)) * 100).toFixed(0)}%）</span>
+            <span className="block mt-0.5">
+              到達の中央値: <span className="text-green-700 font-bold">高値 {fmtPct(result.medianMfe)}</span>（利確目安）／
+              <span className="text-red-700 font-bold"> 安値 {fmtPct(result.medianMae)}</span>（損切り目安）
+            </span>
           </div>
 
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-400">
-            <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#0f172a" }} /> 今週の経路(→今日=0%)</span>
-            <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#2563eb" }} /> その後の中央値</span>
-            <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#64748b" }} /> 過去のリードイン中央値</span>
-            <span><span className="inline-block w-3 h-2 align-middle" style={{ background: "rgba(37,99,235,0.13)" }} /> 25–75%帯</span>
+            <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#0f172a" }} /> 今週の経路(縦バー=日中高安)</span>
+            <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#2563eb" }} /> その後の終値中央値</span>
+            <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#16a34a" }} /> 高値到達中央(MFE)</span>
+            <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#dc2626" }} /> 安値到達中央(MAE)</span>
+            <span><span className="inline-block w-3 h-2 align-middle" style={{ background: "rgba(37,99,235,0.13)" }} /> 終値25–75%帯</span>
             <span>薄線=各事例</span>
           </div>
 
@@ -264,7 +296,9 @@ export default function WeeklyAnalogChart({ prices }: Props) {
                   <th className="text-left py-1 px-2">局面（週の起点〜今日相当）</th>
                   <th className="text-right px-2">前夜米国ビン</th>
                   {mode === "similar" && <th className="text-right px-2">形の距離</th>}
-                  <th className="text-right px-2">その後{result.H}日</th>
+                  <th className="text-right px-2">高値到達</th>
+                  <th className="text-right px-2">安値到達</th>
+                  <th className="text-right px-2">終値{result.H}日後</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,6 +311,8 @@ export default function WeeklyAnalogChart({ prices }: Props) {
                         : <span className="text-gray-300">—</span>}
                     </td>
                     {mode === "similar" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
+                    <td className="text-right px-2 text-green-600 tabular-nums">{fmtPct(s.mfe)}</td>
+                    <td className="text-right px-2 text-red-600 tabular-nums">{fmtPct(s.mae)}</td>
                     <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
                   </tr>
                 ))}
@@ -305,8 +341,9 @@ export default function WeeklyAnalogChart({ prices }: Props) {
         <p className="font-medium text-gray-700 mt-3">3. 図の読み方(すべて窓末=今日=0%に再基準化)</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>左側(t&lt;0, リードイン)</strong>: 今日に至る経路。<span className="text-gray-900 font-medium">濃紺の太線=今週</span>、点線=過去局面のリードイン中央値。両者の重なり具合で「似た入口か」を目視確認。全系列は t=0 で 0% に収束する。</li>
-          <li><strong>右側(t&gt;0, フォワード)</strong>: その後の分布。<span className="text-blue-700 font-medium">青の太線=中央値</span>、帯=25–75%、薄線=各事例。右肩上がり＆帯が上偏＝似た局面のあと上がりやすい。</li>
-          <li>上部バナーの中央値・平均・勝率(上昇件数/全件)で方向と確度を要約。</li>
+          <li><strong>右側(t&gt;0, フォワード)</strong>: その後の分布。<span className="text-blue-700 font-medium">青の太線=終値の中央値</span>、帯=終値25–75%、薄線=各事例。右肩上がり＆帯が上偏＝似た局面のあと上がりやすい。</li>
+          <li><strong>高安到達(HL/MFE・MAE)</strong>: 終値だけでなく日中の高安も使う。<span className="text-green-700 font-medium">緑点線=高値到達の中央値(MFE)</span>＝その後どこまで上げたか(利確目安)、<span className="text-red-700 font-medium">赤点線=安値到達の中央値(MAE)</span>＝どこまで下げたか(損切り/含み損目安)。各時点までの running max/min を集計。緑赤に挟まれたコーンが「典型的な値幅」。今週の経路には縦バーで日中レンジ(高安)を重ねる。</li>
+          <li>上部バナーの終値中央値・勝率に加え、到達の中央値(高値/安値)で利確幅・ストップ幅の当たりを付ける。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">4. 投資判断への活用</p>

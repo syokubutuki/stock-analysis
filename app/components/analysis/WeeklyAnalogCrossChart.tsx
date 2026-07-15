@@ -44,25 +44,27 @@ function fmtPct(v: number, d = 1): string {
   return `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
 }
 
-// 先行き中央値パス(+25-75帯)のミニSVG。縦は全銘柄共通スケールで比較可能。
+// 先行きミニSVG。青=終値中央値/薄青帯=終値25-75%/緑点線=高値到達中央(MFE)/赤点線=安値到達中央(MAE)。
+// 縦は全銘柄共通スケールで比較可能。
 function ForwardSpark({ res, scale }: { res: WeeklyAnalogResult; scale: number }) {
-  const { fwdMedian, fwdP25, fwdP75, H } = res;
-  const W = 96, HT = 30, padX = 3, padY = 4;
+  const { fwdMedian, fwdP25, fwdP75, fwdHighMedian, fwdLowMedian, H } = res;
+  const W = 96, HT = 34, padX = 3, padY = 4;
   if (H < 1 || scale <= 0) return <span className="text-gray-300">—</span>;
   const x = (m: number) => padX + (m / H) * (W - 2 * padX);
   const clamp = (v: number) => Math.max(-scale, Math.min(scale, v));
   const y = (v: number) => HT / 2 - (clamp(v) / scale) * (HT / 2 - padY);
-  const med = fwdMedian.map((v, m) => `${m === 0 ? "M" : "L"}${x(m).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const path = (arr: number[]) => arr.map((v, m) => `${m === 0 ? "M" : "L"}${x(m).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const up = fwdP75.map((v, m) => `${x(m).toFixed(1)},${y(v).toFixed(1)}`);
   const lo = fwdP25.map((v, m) => `${x(m).toFixed(1)},${y(v).toFixed(1)}`).reverse();
   const area = `M${up.join(" L")} L${lo.join(" L")} Z`;
-  const end = fwdMedian[H];
-  const stroke = end >= 0 ? "#16a34a" : "#dc2626";
+  const stroke = fwdMedian[H] >= 0 ? "#2563eb" : "#2563eb";
   return (
     <svg width={W} height={HT} className="inline-block align-middle" style={{ overflow: "visible" }}>
       <line x1={padX} y1={HT / 2} x2={W - padX} y2={HT / 2} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="2 2" />
       <path d={area} fill="rgba(37,99,235,0.12)" />
-      <path d={med} fill="none" stroke={stroke} strokeWidth={1.6} />
+      <path d={path(fwdHighMedian)} fill="none" stroke="#16a34a" strokeWidth={1} strokeDasharray="2 1.5" opacity={0.8} />
+      <path d={path(fwdLowMedian)} fill="none" stroke="#dc2626" strokeWidth={1} strokeDasharray="2 1.5" opacity={0.8} />
+      <path d={path(fwdMedian)} fill="none" stroke={stroke} strokeWidth={1.7} />
     </svg>
   );
 }
@@ -107,7 +109,9 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
     let mx = 0.005;
     for (const r of withRes) {
       const res = r.res!;
-      for (let m = 0; m <= res.H; m++) mx = Math.max(mx, Math.abs(res.fwdP25[m]), Math.abs(res.fwdP75[m]));
+      for (let m = 0; m <= res.H; m++) {
+        mx = Math.max(mx, Math.abs(res.fwdP25[m]), Math.abs(res.fwdP75[m]), Math.abs(res.fwdHighMedian[m]), Math.abs(res.fwdLowMedian[m]));
+      }
     }
     return mx;
   }, [withRes]);
@@ -222,8 +226,10 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
             <tr className="text-gray-500">
               <th className="text-left font-medium px-2 py-1 sticky left-0 bg-white z-10">銘柄</th>
               {mode === "usbin" && <th className="font-medium px-1 py-1 text-center">今週の起点</th>}
-              <th className="font-medium px-1 py-1 text-center">その後{H}日(中央値パス)</th>
-              <th className="font-medium px-2 py-1 text-right">中央値</th>
+              <th className="font-medium px-1 py-1 text-center">その後{H}日(終値/高安到達)</th>
+              <th className="font-medium px-2 py-1 text-right">終値中央</th>
+              <th className="font-medium px-2 py-1 text-right">高値中</th>
+              <th className="font-medium px-2 py-1 text-right">安値中</th>
               <th className="font-medium px-2 py-1 text-right">勝率</th>
               <th className="font-medium px-2 py-1 text-right">事例</th>
             </tr>
@@ -274,6 +280,12 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                   <td className={`px-2 py-1 text-right font-semibold tabular-nums ${res ? (res.medianFinal >= 0 ? "text-green-600" : "text-red-600") : "text-gray-300"}`}>
                     {res ? fmtPct(res.medianFinal) : "—"}
                   </td>
+                  <td className="px-2 py-1 text-right tabular-nums text-green-600">
+                    {res ? fmtPct(res.medianMfe) : "—"}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums text-red-600">
+                    {res ? fmtPct(res.medianMae) : "—"}
+                  </td>
                   <td className="px-2 py-1 text-right tabular-nums text-gray-600">
                     {res ? `${((res.upCount / (res.upCount + res.downCount || 1)) * 100).toFixed(0)}%` : "—"}
                   </td>
@@ -288,8 +300,8 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
       </div>
 
       <p className="text-[11px] text-gray-400">
-        中央値パスが揃って右肩上がり＝ウォッチリスト全体に追い風(地合い集中=分散不足の裏返し)。
-        1銘柄だけ逆行＝個別要因/ヘッジ候補。事例が少ない行(事例小)は偶然に振られやすい。
+        ミニチャート: <span className="text-blue-600">青=終値中央</span> / <span className="text-green-600">緑点線=高値到達中央(MFE=利確目安)</span> / <span className="text-red-600">赤点線=安値到達中央(MAE=損切り目安)</span> / 薄青帯=終値25–75%。
+        中央値が揃って右肩上がり＝全体に追い風(地合い集中=分散不足の裏返し)。1銘柄だけ逆行＝個別要因/ヘッジ候補。事例小は偶然に振られやすい。
       </p>
 
       <AnalysisGuide title="今週の軌跡アナログ 横断比較の詳細">
@@ -300,8 +312,8 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
         <p className="font-medium text-gray-700 mt-3">2. 各列の意味</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>今週の起点</strong>: その銘柄の今週(週初め)の前夜米国ビン。市場共通なので通常は全銘柄同じ(整合の差で稀にズレる)。</li>
-          <li><strong>その後H日(中央値パス)</strong>: 該当する過去局面の翌H日の中央値経路+25–75%帯のミニチャート。縦は全銘柄共通スケールで大小比較可。緑=上向き/赤=下向き。</li>
-          <li><strong>中央値/勝率/事例</strong>: H日後の中央値リターン、上昇件数/全件、集めた過去局面数。事例が薄いほど不安定。</li>
+          <li><strong>その後H日(終値/高安到達)</strong>: 過去局面の翌H日を、終値中央値(青)＋終値25–75%帯に加え、<span className="text-green-700">高値到達の中央値(緑点線=MFE)</span>と<span className="text-red-700">安値到達の中央値(赤点線=MAE)</span>を重ねたミニチャート。終値だけでなく日中高安(HL)も使い「どこまで上げ/下げやすいか」を示す。縦は全銘柄共通スケールで大小比較可。</li>
+          <li><strong>終値中央/高値中/安値中/勝率/事例</strong>: H日後の終値中央値、高値到達中央(利確目安)、安値到達中央(損切り目安)、上昇割合、過去局面数。事例が薄いほど不安定。</li>
         </ul>
         <p className="font-medium text-gray-700 mt-3">3. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">

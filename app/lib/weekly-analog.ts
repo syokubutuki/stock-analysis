@@ -27,9 +27,15 @@ export interface AnalogWindow {
   endIndex: number;
   startTime: string;
   endTime: string;
-  lead: number[]; // 長さ L。窓末=0% とする累積リターン(lead[L-1]=0)
-  forward: number[]; // 長さ H+1。forward[0]=0
-  forwardReturn: number; // H日後の累積リターン
+  lead: number[]; // 長さ L。窓末=今日=0% とする終値の累積リターン(lead[L-1]=0)
+  leadHigh: number[]; // 各日の高値(窓末終値比)。日中レンジの上端
+  leadLow: number[]; // 各日の安値(窓末終値比)。日中レンジの下端
+  forward: number[]; // 長さ H+1。終値の累積リターン forward[0]=0
+  fwdHigh: number[]; // 各時点までの高値到達(running max, MFE)。利確余地
+  fwdLow: number[]; // 各時点までの安値到達(running min, MAE)。含み損の深さ
+  forwardReturn: number; // H日後の終値累積リターン
+  mfe: number; // H日以内の最大高値到達
+  mae: number; // H日以内の最大安値到達(通常負)
   usBin: number | null; // 窓起点(週初め)の前夜米国ビン
   distance: number; // 今週リードイン形状への z化ユークリッド距離
 }
@@ -46,8 +52,10 @@ export interface WeeklyAnalogResult {
   selected: AnalogWindow[];
   leadMedian: number[]; leadP25: number[]; leadP75: number[];
   fwdMedian: number[]; fwdP25: number[]; fwdP75: number[];
+  fwdHighMedian: number[]; fwdLowMedian: number[]; // 高値/安値到達の中央値パス(MFE/MAE)
   upCount: number; downCount: number;
   medianFinal: number; meanFinal: number;
+  medianMfe: number; medianMae: number; // H日以内の高値/安値到達の中央値
   totalCandidates: number;
 }
 
@@ -80,19 +88,22 @@ function alignUsBins(
 
 // ───────────────────────── 窓の正規化・距離 ─────────────────────────
 
-// 窓末(end)を 0% とする累積リターン列(長さ L)。close 不正なら null。
-function leadPath(prices: PricePoint[], end: number, L: number): number[] | null {
+// 窓末(end)を 0% とする終値累積リターン列(長さ L)＋各日の高値/安値(窓末終値比)。close 不正なら null。
+function buildLead(prices: PricePoint[], end: number, L: number):
+  { lead: number[]; leadHigh: number[]; leadLow: number[] } | null {
   const start = end - L + 1;
   if (start < 0) return null;
   const baseC = prices[end].close;
   if (!(baseC > 0)) return null;
-  const out: number[] = [];
+  const lead: number[] = [], leadHigh: number[] = [], leadLow: number[] = [];
   for (let i = start; i <= end; i++) {
-    const c = prices[i].close;
+    const c = prices[i].close, h = prices[i].high, lo = prices[i].low;
     if (!(c > 0)) return null;
-    out.push(c / baseC - 1);
+    lead.push(c / baseC - 1);
+    leadHigh.push((h > 0 ? h : c) / baseC - 1);
+    leadLow.push((lo > 0 ? lo : c) / baseC - 1);
   }
-  return out;
+  return { lead, leadHigh, leadLow };
 }
 
 // z化(形状のみ比較。水準・スケール差を吸収)。
@@ -108,16 +119,23 @@ function euclid(a: number[], b: number[]): number {
   return Math.sqrt(s);
 }
 
-function forwardPath(prices: PricePoint[], end: number, H: number): number[] | null {
+// 窓末(end)を 0% とするフォワード終値パス＋高値/安値の到達(running max/min = MFE/MAE)。
+function buildForward(prices: PricePoint[], end: number, H: number):
+  { forward: number[]; fwdHigh: number[]; fwdLow: number[] } | null {
   const baseC = prices[end].close;
   if (!(baseC > 0)) return null;
-  const out: number[] = [];
+  const forward: number[] = [], fwdHigh: number[] = [], fwdLow: number[] = [];
+  let runH = -Infinity, runL = Infinity;
   for (let m = 0; m <= H; m++) {
-    const c = prices[end + m]?.close;
-    if (!(c > 0)) return null;
-    out.push(c / baseC - 1);
+    const p = prices[end + m];
+    if (!p || !(p.close > 0)) return null;
+    forward.push(p.close / baseC - 1);
+    const h = (p.high > 0 ? p.high : p.close) / baseC - 1;
+    const lo = (p.low > 0 ? p.low : p.close) / baseC - 1;
+    runH = Math.max(runH, h); runL = Math.min(runL, lo);
+    fwdHigh.push(runH); fwdLow.push(runL);
   }
-  return out;
+  return { forward, fwdHigh, fwdLow };
 }
 
 function aggPaths(paths: number[][], len: number): { med: number[]; p25: number[]; p75: number[] } {
@@ -152,16 +170,18 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
 
   const { bins: usBinByIdx, meta } = alignUsBins(prices, us, usMode, scheme);
 
-  // 今週(クエリ): 窓末 = 最新
+  // 今週(クエリ): 窓末 = 最新。フォワードは未確定なので lead のみ(HL含む)。
   const qEnd = n - 1;
-  const qLead = leadPath(prices, qEnd, L);
+  const qLead = buildLead(prices, qEnd, L);
   if (!qLead) return null;
   const qStart = qEnd - L + 1;
-  const qZ = zShape(qLead);
+  const qZ = zShape(qLead.lead);
   const queryUsBin = usBinByIdx[qStart];
   const query: AnalogWindow = {
     endIndex: qEnd, startTime: prices[qStart].time, endTime: prices[qEnd].time,
-    lead: qLead, forward: [], forwardReturn: NaN, usBin: queryUsBin, distance: 0,
+    lead: qLead.lead, leadHigh: qLead.leadHigh, leadLow: qLead.leadLow,
+    forward: [], fwdHigh: [], fwdLow: [], forwardReturn: NaN, mfe: NaN, mae: NaN,
+    usBin: queryUsBin, distance: 0,
   };
 
   // 候補窓: フォワード余地あり(j+H<=n-1)かつ 今週リードインと重ならない(窓末 < 今週窓の起点)
@@ -169,17 +189,19 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
   const cands: AnalogWindow[] = [];
   const binCounts = new Array(meta.count).fill(0);
   for (let j = L - 1; j <= jMax; j++) {
-    const lead = leadPath(prices, j, L);
-    if (!lead) continue;
-    const fwd = forwardPath(prices, j, H);
-    if (!fwd) continue;
+    const ld = buildLead(prices, j, L);
+    if (!ld) continue;
+    const fw = buildForward(prices, j, H);
+    if (!fw) continue;
     const wStart = j - L + 1;
     const usBin = usBinByIdx[wStart];
     if (usBin !== null) binCounts[usBin]++;
     cands.push({
       endIndex: j, startTime: prices[wStart].time, endTime: prices[j].time,
-      lead, forward: fwd, forwardReturn: fwd[H], usBin,
-      distance: euclid(qZ, zShape(lead)),
+      lead: ld.lead, leadHigh: ld.leadHigh, leadLow: ld.leadLow,
+      forward: fw.forward, fwdHigh: fw.fwdHigh, fwdLow: fw.fwdLow,
+      forwardReturn: fw.forward[H], mfe: fw.fwdHigh[H], mae: fw.fwdLow[H], usBin,
+      distance: euclid(qZ, zShape(ld.lead)),
     });
   }
   if (cands.length < 5) return null;
@@ -199,6 +221,8 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
 
   const lead = aggPaths(selected.map((s) => s.lead), L);
   const fwd = aggPaths(selected.map((s) => s.forward), H + 1);
+  const fwdHigh = aggPaths(selected.map((s) => s.fwdHigh), H + 1);
+  const fwdLow = aggPaths(selected.map((s) => s.fwdLow), H + 1);
   const finals = selected.map((s) => s.forwardReturn).filter((v) => isFinite(v));
   const upCount = finals.filter((v) => v > 0).length;
   const meanFinal = finals.reduce((s, v) => s + v, 0) / (finals.length || 1);
@@ -208,8 +232,10 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
     selected,
     leadMedian: lead.med, leadP25: lead.p25, leadP75: lead.p75,
     fwdMedian: fwd.med, fwdP25: fwd.p25, fwdP75: fwd.p75,
+    fwdHighMedian: fwdHigh.med, fwdLowMedian: fwdLow.med,
     upCount, downCount: finals.length - upCount,
     medianFinal: fwd.med[H], meanFinal,
+    medianMfe: fwdHigh.med[H], medianMae: fwdLow.med[H],
     totalCandidates: cands.length,
   };
 }
