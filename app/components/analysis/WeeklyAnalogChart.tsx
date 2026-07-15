@@ -9,6 +9,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeUsReturns, BinScheme } from "../../lib/us-spillover-core";
 import { useUsDaily } from "../../hooks/useUsDaily";
+import { useIntraday, IntradayResponse } from "../../hooks/useIntraday";
+import { groupByDay } from "../../lib/intraday-core";
 import {
   computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode,
 } from "../../lib/weekly-analog";
@@ -17,6 +19,72 @@ import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
   prices: PricePoint[];
+  ticker?: string; // 指定時のみ「今週を日中足で表示」ドリルダウンを有効化
+}
+
+// 今週(直近L営業日)の日中足パス。今日の最終値=0% に再基準化した連続系列 + 日境界。
+interface IntraWeek {
+  cum: number[];
+  dayStart: number[];
+  labels: string[];
+}
+function buildIntraWeek(resp: IntradayResponse, L: number): IntraWeek | null {
+  const days = groupByDay(resp.bars, resp.gmtoffset);
+  if (days.length === 0) return null;
+  const use = days.slice(-L);
+  const cum: number[] = [];
+  const dayStart: number[] = [];
+  const labels: string[] = [];
+  let idx = 0;
+  const flat: { close: number }[] = [];
+  for (const d of use) {
+    dayStart.push(idx);
+    labels.push(d.date.slice(5));
+    for (const b of d.bars) { flat.push(b); idx++; }
+  }
+  if (flat.length < 3) return null;
+  const lastC = flat[flat.length - 1].close;
+  if (!(lastC > 0)) return null;
+  for (const b of flat) cum.push(b.close / lastC - 1);
+  return { cum, dayStart, labels };
+}
+
+function drawIntraWeek(ctx: CanvasRenderingContext2D, width: number, height: number, d: IntraWeek) {
+  const ml = 44, mr = 14, mt = 16, mb = 16;
+  const plotW = width - ml - mr, plotH = height - mt - mb;
+  const N = d.cum.length;
+  if (N < 2) return;
+  const maxV = Math.max(0.004, ...d.cum.map((v) => Math.abs(v)));
+  const xOf = (i: number) => ml + (i / (N - 1)) * plotW;
+  const yOf = (v: number) => mt + plotH / 2 - (v / maxV) * (plotH / 2 - 4);
+
+  ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("今週の日中足の軌跡（60分足・今日の最終値=0%）", ml, 11);
+  // ゼロ線
+  ctx.strokeStyle = "#e5e7eb"; ctx.setLineDash([2, 2]);
+  ctx.beginPath(); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillText(`+${(maxV * 100).toFixed(1)}%`, ml - 4, mt + 8);
+  ctx.fillText("0%", ml - 4, yOf(0) + 3);
+  ctx.fillText(`-${(maxV * 100).toFixed(1)}%`, ml - 4, mt + plotH);
+  // 日境界 + 日付
+  ctx.textAlign = "center";
+  d.dayStart.forEach((s, k) => {
+    const x = xOf(s);
+    ctx.strokeStyle = "#e5e7eb"; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, mt); ctx.lineTo(x, mt + plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif";
+    ctx.fillText(d.labels[k], x + 2, mt + plotH + 12);
+  });
+  // パス
+  ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  d.cum.forEach((v, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(i), yOf(v)));
+  ctx.stroke();
+  ctx.fillStyle = "#0f172a";
+  ctx.beginPath(); ctx.arc(xOf(N - 1), yOf(0), 3, 0, Math.PI * 2); ctx.fill();
 }
 
 const L_PRESETS = [5, 10, 20];
@@ -152,8 +220,10 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   for (let t = tMin; t <= tMax; t += step) ctx.fillText(t === 0 ? "0" : `${t > 0 ? "+" : ""}${t}d`, xOf(t), mt + plotH + 14);
 }
 
-export default function WeeklyAnalogChart({ prices }: Props) {
+export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const intraCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [showIntraday, setShowIntraday] = useState(false);
   const [usTicker, setUsTicker] = useState("^IXIC");
   const [usMode, setUsMode] = useState<UsMode>("ret");
   const [scheme, setScheme] = useState<BinScheme>("tercile");
@@ -176,6 +246,19 @@ export default function WeeklyAnalogChart({ prices }: Props) {
     const init = initCanvas(canvasRef.current, 280);
     if (init) draw(init.ctx, init.width, init.height, result);
   }, [result]);
+
+  // 今週の日中足ドリルダウン(ticker 指定時のみ)
+  const { resp: intraResp, loading: intraLoading, error: intraError } =
+    useIntraday(showIntraday && ticker ? ticker : "", "60m");
+  const intraWeek = useMemo(
+    () => (showIntraday && intraResp ? buildIntraWeek(intraResp, L) : null),
+    [showIntraday, intraResp, L]
+  );
+  useEffect(() => {
+    if (!intraCanvasRef.current || !intraWeek) return;
+    const init = initCanvas(intraCanvasRef.current, 150);
+    if (init) drawIntraWeek(init.ctx, init.width, init.height, intraWeek);
+  }, [intraWeek]);
 
   // US 切替でビン選択をリセット(今週の起点ビン既定に戻す)
   const resetBin = () => setSelBinOverride(null);
@@ -288,6 +371,27 @@ export default function WeeklyAnalogChart({ prices }: Props) {
             <span>薄線=各事例</span>
           </div>
 
+          {/* 今週を日中足で見る(2階層目) */}
+          {ticker && (
+            <div className="space-y-1.5">
+              <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={showIntraday} onChange={(e) => setShowIntraday(e.target.checked)} className="accent-blue-600" />
+                今週の軌跡を日中足(60分)で見る
+              </label>
+              {showIntraday && (
+                <>
+                  {intraLoading && <div className="text-xs text-gray-400">日中足を取得中…</div>}
+                  {intraError && <div className="text-xs text-red-500">{intraError}</div>}
+                  {intraWeek && <div className="relative"><canvas ref={intraCanvasRef} /></div>}
+                  <p className="text-[10px] text-gray-400">
+                    日足では1日=1点に潰れる今週の値動きを、日中足で拡大表示（縦点線=日境界）。上のアナログ(過去局面)は日足のまま——
+                    日中足は取得期間が短く(60分足≈2年)、何年も前のアナログ週は日中では再現できないため。
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {/* アナログ一覧 */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -358,6 +462,7 @@ export default function WeeklyAnalogChart({ prices }: Props) {
           <li>「形・地合いが似ている」だけで因果はない。事例数が少ない(帯が広い/n小)ほど偶然に振られる。サイズを抑える。</li>
           <li>レジームが違えば同じ入口でも結果は変わる(過去の上げ相場と今の下げ相場など)。</li>
           <li>ユークリッド距離は時間のズレに弱い(等速比較)。窓L・先行きH・ビン粗さで結果は変わるため、複数設定で頑健性を確認する。</li>
+          <li>日中足ドリルダウン(「今週を日中足で見る」)は<strong>今週側のみ</strong>。日中足の取得期間が短い(60分足≈2年)ため、何年も前のアナログ過去局面は日中では再現できず、アナログ本体は日足で比較する。日足の高安(MFE/MAE)が値幅の目安を補う。</li>
         </ul>
       </AnalysisGuide>
     </div>
