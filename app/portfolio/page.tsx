@@ -33,6 +33,7 @@ import {
   diffAgainstSnapshot,
 } from "../lib/portfolio-snapshot";
 import { usePortfolioData } from "../hooks/usePortfolioData";
+import { PricePoint } from "../lib/types";
 import { usePortfolioDigests } from "../hooks/usePortfolioDigests";
 import { useBadgeBacktest } from "../hooks/useBadgeBacktest";
 import { useStopCompare } from "../hooks/useStopCompare";
@@ -71,6 +72,10 @@ const StopComparePanel = dynamic(
 );
 const WeekdayUsCrossChart = dynamic(
   () => import("../components/analysis/WeekdayUsCrossChart"),
+  { ssr: false }
+);
+const WeeklyAnalogCrossChart = dynamic(
+  () => import("../components/analysis/WeeklyAnalogCrossChart"),
   { ssr: false }
 );
 
@@ -180,6 +185,10 @@ export default function PortfolioPage() {
     [watchlist]
   );
   const { data, loading, progress, reload } = usePortfolioData(tickers);
+  const pricesByTicker = useMemo(
+    () => Object.fromEntries(Object.entries(data).map(([t, d]) => [t, d.prices])) as Record<string, PricePoint[]>,
+    [data]
+  );
 
   // 名称の自動補完(整合性): コード追加/URL追加で name=コード のままの項目を、取得済みの
   // 正式名(API)で埋める。ユーザーが設定した名称(name≠コード)は上書きしない。収束保証あり。
@@ -457,6 +466,12 @@ export default function PortfolioPage() {
               title: "曜日 × 前夜米国ビン 交互作用：ウォッチリスト横断",
               subtitle: "選んだ前夜米国ビンの翌日に絞り、銘柄×曜日で日内特性を多面比較",
               node: <WeekdayUsCrossChart tickers={tickers} names={tickerNames} onRename={handleRename} />,
+            });
+            if (tickers.length >= 2) items.push({
+              id: "pf-weekly-analog-cross",
+              title: "今週の軌跡アナログ：ウォッチリスト横断",
+              subtitle: "今週の入口(前夜米国ビン)や似た形から、全銘柄の来週見通しを横並び比較",
+              node: <WeeklyAnalogCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} onRename={handleRename} />,
             });
             return items.length > 0 ? (
               <AccordionSection groups={[{ items }]} bulk={bulk} onBulk={onBulk} />
