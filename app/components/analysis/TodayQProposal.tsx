@@ -16,6 +16,7 @@ import {
   type QContribution,
 } from "../../lib/axioms/q-synthesis";
 import AnalysisGuide from "./AnalysisGuide";
+import QBacktestChart from "./QBacktestChart";
 
 const PRESETS = [
   { ticker: "7203.T", label: "トヨタ" },
@@ -264,6 +265,11 @@ export default function TodayQProposal() {
             >
               {ticker} を /portfolio で配分検討 →
             </a>
+          </div>
+
+          {/* 検証: 上で主張した q が、実際に W を改善するかを過去に当てて確かめる(命題4) */}
+          <div className="mt-4">
+            {prices && <QBacktestChart key={ticker} prices={prices} />}
           </div>
         </>
       )}
