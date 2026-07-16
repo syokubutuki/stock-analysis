@@ -10,7 +10,7 @@ import { PricePoint } from "../../lib/types";
 import { computeUsReturns, BinScheme } from "../../lib/us-spillover-core";
 import { useUsDaily } from "../../hooks/useUsDaily";
 import {
-  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode,
+  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign,
 } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
@@ -26,13 +26,15 @@ const L_PRESETS = [5, 10, 20];
 const H_PRESETS = [5, 10, 20];
 const K_PRESETS = [10, 20, 30];
 
-type SortKey = "median" | "win" | "n" | "ticker" | "name";
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: "median", label: "先行き中央値" },
-  { key: "win", label: "勝率" },
-  { key: "n", label: "事例数" },
-  { key: "ticker", label: "銘柄コード" },
-  { key: "name", label: "名称" },
+type SortKey = "median" | "mfe" | "mae" | "win" | "n" | "ticker" | "name";
+const SORTS: { key: SortKey; label: string; hint: string }[] = [
+  { key: "median", label: "先行き中央値", hint: "H日後の終値中央値が大きい順。" },
+  { key: "mfe", label: "高値到達", hint: "高値到達の中央値(MFE)が大きい順＝利確余地の大きい銘柄が上に。" },
+  { key: "mae", label: "安値到達(浅い順)", hint: "安値到達の中央値(MAE)が浅い順＝下振れの小さい銘柄が上に(0に近いほど上)。" },
+  { key: "win", label: "勝率", hint: "上昇した事例の割合が高い順。" },
+  { key: "n", label: "事例数", hint: "集めた過去局面が多い順(標本が厚い銘柄を上に)。" },
+  { key: "ticker", label: "銘柄コード", hint: "ティッカーの昇順。" },
+  { key: "name", label: "名称", hint: "銘柄名の五十音/アルファベット順。" },
 ];
 
 interface Row {
@@ -77,6 +79,8 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
   const [L, setL] = useState(5);
   const [H, setH] = useState(5);
   const [K, setK] = useState(20);
+  const [metric, setMetric] = useState<DistMetric>("euclid");
+  const [align, setAlign] = useState<WindowAlign>("trailing");
   const [selBinOverride, setSelBinOverride] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("median");
   const [editing, setEditing] = useState<string | null>(null);
@@ -93,16 +97,17 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
     return uniq.map((ticker) => {
       const prices = pricesByTicker[ticker];
       const res = prices && prices.length >= 120
-        ? computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride })
+        ? computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align })
         : null;
       return { ticker, res };
     });
-  }, [uniq, pricesByTicker, us, L, H, K, mode, usMode, scheme, selBinOverride]);
+  }, [uniq, pricesByTicker, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align]);
 
   const withRes = rows.filter((r) => r.res);
   const meta = withRes[0]?.res?.binMetaObj ?? null;
   const queryBin = withRes[0]?.res?.queryUsBin ?? null;
   const selBin = withRes[0]?.res?.selBin ?? 0;
+  const effL = withRes[0]?.res?.L ?? L; // align="week" ではコアが今週の経過日数に決める
 
   // 共通縦スケール(全銘柄のフォワード帯から)
   const scale = useMemo(() => {
@@ -122,6 +127,8 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
     const val = (r: Row) => {
       if (!r.res) return -Infinity;
       if (sortKey === "median") return r.res.medianFinal;
+      if (sortKey === "mfe") return r.res.medianMfe; // 大きいほど利確余地
+      if (sortKey === "mae") return r.res.medianMae; // 0に近い(浅い)ほど上 = 降順でよい
       if (sortKey === "win") return r.res.upCount / (r.res.upCount + r.res.downCount || 1);
       if (sortKey === "n") return r.res.selected.length;
       return 0;
@@ -146,7 +153,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">
-        全銘柄の今週(直近{L}営業日)の経路を、
+        全銘柄の今週({align === "week" ? `週境界・月〜今日の${effL}営業日` : `直近${effL}営業日`})の経路を、
         <span className="font-medium text-gray-700">{mode === "usbin" ? "今週の入口(前夜米国ビン)" : "各銘柄の似た形"}</span>
         で過去局面と突き合わせ、来週{H}日の先読みを横並び比較。
       </p>
@@ -159,9 +166,33 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
-        <div className="flex items-center gap-1"><span>今週の窓 L:</span>{L_PRESETS.map((v) => <NumBtn key={v} v={v} cur={L} set={setL} />)}</div>
+        <div className="flex items-center gap-1">
+          <span>窓の取り方:</span>
+          {([["trailing", "直近L営業日"], ["week", "今週(週境界)"]] as [WindowAlign, string][]).map(([a, lbl]) => (
+            <button key={a} onClick={() => { setAlign(a); resetBin(); }}
+              title={a === "week"
+                ? "月曜起点で今日までを窓にし、過去も『各週の先頭同数日』と比較。曜日位置が揃い、窓起点=週初め(前夜米国ビンの基準)が厳密に一致する。候補は週数まで減る。"
+                : "直近L営業日を窓にする(週をまたぐ)。候補数が多く安定するが、曜日位置は揃わない。"}
+              className={`px-2 py-0.5 rounded ${align === a ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
+          ))}
+        </div>
+        {align === "trailing" ? (
+          <div className="flex items-center gap-1"><span>今週の窓 L:</span>{L_PRESETS.map((v) => <NumBtn key={v} v={v} cur={L} set={setL} />)}</div>
+        ) : (
+          <span className="text-gray-500">今週= <span className="font-medium text-gray-700">{effL}営業日</span>（月〜今日）</span>
+        )}
         <div className="flex items-center gap-1"><span>先行き H:</span>{H_PRESETS.map((v) => <NumBtn key={v} v={v} cur={H} set={setH} />)}</div>
         {mode === "similar" && <div className="flex items-center gap-1"><span>近傍 K:</span>{K_PRESETS.map((v) => <NumBtn key={v} v={v} cur={K} set={setK} />)}</div>}
+        <div className="flex items-center gap-1">
+          <span>形の距離:</span>
+          {([["euclid", "ユークリッド"], ["dtw", "DTW"]] as [DistMetric, string][]).map(([m, lbl]) => (
+            <button key={m} onClick={() => setMetric(m)}
+              title={m === "dtw"
+                ? "動的時間伸縮。山や谷が1日早い/遅いといった時間のズレを吸収して形を突き合わせる(Sakoe-Chibaバンド=窓長の約1/4)。"
+                : "等速比較。同じ日付位置どうしを突き合わせる。時間のズレに弱い。"}
+              className={`px-2 py-0.5 rounded ${metric === m ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
+          ))}
+        </div>
       </div>
 
       {mode === "usbin" && (
@@ -201,7 +232,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
       <div className="flex items-center gap-1.5 flex-wrap text-xs">
         <span className="text-gray-500">並び替え:</span>
         {SORTS.map((s) => (
-          <button key={s.key} onClick={() => setSortKey(s.key)}
+          <button key={s.key} onClick={() => setSortKey(s.key)} title={s.hint}
             className={`px-2 py-0.5 rounded text-[11px] font-medium ${sortKey === s.key ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>{s.label}</button>
         ))}
         {onRename && <span className="text-[10px] text-gray-400">｜✎ で名称編集(ウォッチリストに保存)</span>}
@@ -315,9 +346,17 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
           <li><strong>その後H日(終値/高安到達)</strong>: 過去局面の翌H日を、終値中央値(青)＋終値25–75%帯に加え、<span className="text-green-700">高値到達の中央値(緑点線=MFE)</span>と<span className="text-red-700">安値到達の中央値(赤点線=MAE)</span>を重ねたミニチャート。終値だけでなく日中高安(HL)も使い「どこまで上げ/下げやすいか」を示す。縦は全銘柄共通スケールで大小比較可。</li>
           <li><strong>終値中央/高値中/安値中/勝率/事例</strong>: H日後の終値中央値、高値到達中央(利確目安)、安値到達中央(損切り目安)、上昇割合、過去局面数。事例が薄いほど不安定。</li>
         </ul>
+        <p className="font-medium text-gray-700 mt-3">2b. 窓の取り方・形の距離・並べ替え</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>窓の取り方</strong>: 「直近L営業日」は週をまたぐ単純窓で事例数が多く安定。「今週(週境界)」は月曜起点で今日まで(L=今週の経過日数)を窓にし、過去も各週の先頭L日と比較——曜日位置が揃い、窓起点=週初め＝前夜米国ビンの基準日が厳密に一致する。ただし候補は週数まで減る(≒1/5)。</li>
+          <li><strong>形の距離</strong>: ユークリッドは等速比較(時間のズレに弱い)、DTW(動的時間伸縮)は山谷が1日早い/遅いズレを吸収して形を突き合わせる。両方で残る銘柄は確度が高い。</li>
+          <li><strong>並べ替え</strong>: 先行き中央値のほか<strong>高値到達</strong>(MFE降順＝利確余地の大きい順)、<strong>安値到達(浅い順)</strong>(MAEが0に近い順＝下振れの小さい順)でも並べられる。「上値が取れる銘柄」と「傷が浅い銘柄」を別々に探せる。</li>
+        </ul>
+
         <p className="font-medium text-gray-700 mt-3">3. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>今夜の米国が確定すれば来週の入口ビンが分かる。そのビン列で中央値・勝率が高い銘柄を来週の順張り候補に。</li>
+          <li>高値到達で並べれば「利確余地の大きい銘柄」、安値到達(浅い順)で並べれば「下振れの小さい銘柄」。中央値が同じでも値幅の質は違う。</li>
           <li>横断コンセンサス(上向き銘柄数)でブック全体の傾きを把握。全銘柄同方向＝地合いに集中(分散不足)、逆行銘柄はヘッジ候補。</li>
           <li>『似た形』モードは各銘柄固有のパターン先読み。ビンモードは地合い起点の先読み。両方で一貫する銘柄は確度が高い。</li>
         </ul>

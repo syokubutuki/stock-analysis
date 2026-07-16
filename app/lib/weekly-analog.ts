@@ -22,6 +22,10 @@ import { quantileSorted } from "./stats-significance";
 
 export type AnalogMode = "similar" | "usbin";
 export type UsMode = "ret" | "intra";
+// 形状距離: euclid=等速比較(時間のズレに弱い) / dtw=動的時間伸縮(ズレを吸収)
+export type DistMetric = "euclid" | "dtw";
+// 窓の取り方: trailing=直近L営業日 / week=今週(週境界にアライン。月曜起点で今日まで)
+export type WindowAlign = "trailing" | "week";
 
 export interface AnalogWindow {
   endIndex: number;
@@ -42,8 +46,10 @@ export interface AnalogWindow {
 
 export interface WeeklyAnalogResult {
   mode: AnalogMode;
-  L: number;
+  L: number; // 実際に使ったリードイン日数(align="week" では今週の経過日数)
   H: number;
+  align: WindowAlign;
+  metric: DistMetric;
   query: AnalogWindow; // 今週(フォワードは未確定なので forward は空)
   queryUsBin: number | null;
   selBin: number; // usbin モードで表示中のビン
@@ -119,6 +125,57 @@ function euclid(a: number[], b: number[]): number {
   return Math.sqrt(s);
 }
 
+// DTW(動的時間伸縮)距離。等速比較のユークリッドと違い、時間軸の伸び縮み(山が1日早い/遅い等)を
+// 吸収して「形」を突き合わせる。Sakoe-Chiba バンドで warping 幅を制限し、退化と計算量を抑える。
+//   D[i][j] = (a_i - b_j)^2 + min(D[i-1][j], D[i][j-1], D[i-1][j-1])
+// 累積コストの平方根を返す(全候補が同じ窓長なので順位付けに使える)。
+function dtw(a: number[], b: number[], band: number): number {
+  const n = a.length, m = b.length;
+  const w = Math.max(band, Math.abs(n - m));
+  let prev = new Array<number>(m + 1).fill(Infinity);
+  let cur = new Array<number>(m + 1).fill(Infinity);
+  prev[0] = 0;
+  for (let i = 1; i <= n; i++) {
+    cur.fill(Infinity);
+    const jS = Math.max(1, i - w), jE = Math.min(m, i + w);
+    for (let j = jS; j <= jE; j++) {
+      const cost = (a[i - 1] - b[j - 1]) ** 2;
+      cur[j] = cost + Math.min(prev[j], cur[j - 1], prev[j - 1]);
+    }
+    const t = prev; prev = cur; cur = t;
+  }
+  const d = prev[m];
+  return isFinite(d) ? Math.sqrt(d) : Infinity;
+}
+
+// 形状距離(z化済みの2波形)。dtw のバンドは窓長の約1/4(最低1)。
+function shapeDist(a: number[], b: number[], metric: DistMetric): number {
+  if (metric === "dtw") return dtw(a, b, Math.max(1, Math.round(a.length * 0.25)));
+  return euclid(a, b);
+}
+
+// ───────────────────────── 週境界(月曜起点)のグルーピング ─────────────────────────
+
+// その日が属する週の月曜日(YYYY-MM-DD)。曜日は UTC 基準で扱い、TZ による揺れを避ける。
+function weekKey(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (isNaN(d.getTime())) return dateStr;
+  const dow = d.getUTCDay(); // 0=日..6=土
+  d.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow)); // その週の月曜へ
+  return d.toISOString().slice(0, 10);
+}
+
+// 立会日インデックスを週(月曜起点)ごとにまとめる。各配列は昇順・連続インデックス。
+function groupWeeks(prices: PricePoint[]): Map<string, number[]> {
+  const g = new Map<string, number[]>();
+  for (let i = 0; i < prices.length; i++) {
+    const k = weekKey(prices[i].time);
+    const a = g.get(k);
+    if (a) a.push(i); else g.set(k, [i]);
+  }
+  return g;
+}
+
 // 窓末(end)を 0% とするフォワード終値パス＋高値/安値の到達(running max/min = MFE/MAE)。
 function buildForward(prices: PricePoint[], end: number, H: number):
   { forward: number[]; fwdHigh: number[]; fwdLow: number[] } | null {
@@ -154,21 +211,46 @@ function aggPaths(paths: number[][], len: number): { med: number[]; p25: number[
 export interface WeeklyAnalogParams {
   prices: PricePoint[];
   us: UsReturn[];
-  L: number; // リードイン日数(今週=5)
+  L: number; // リードイン日数(align="week" では今週の経過日数で上書きされる)
   H: number; // フォワード日数
   K: number; // similar モードの近傍数
   mode: AnalogMode;
   usMode: UsMode;
   scheme: BinScheme;
   selBinOverride?: number | null; // usbin モードで見るビン(null=今週の起点ビン)
+  metric?: DistMetric; // 形状距離(既定 euclid)
+  align?: WindowAlign; // 窓の取り方(既定 trailing)
 }
 
 export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogResult | null {
-  const { prices, us, L, H, K, mode, usMode, scheme } = params;
+  const { prices, us, H, K, mode, usMode, scheme } = params;
+  const metric = params.metric ?? "euclid";
+  const align = params.align ?? "trailing";
   const n = prices.length;
-  if (n < L + H + 20) return null;
+  if (n < params.L + H + 20) return null;
 
   const { bins: usBinByIdx, meta } = alignUsBins(prices, us, usMode, scheme);
+
+  // 窓長 L と候補窓末の集合を、窓の取り方に応じて決める。
+  //  trailing: 直近L営業日。候補は全ての位置。
+  //  week:     今週(月曜起点)の経過日数を L とし、候補は「過去の各週の先頭L日」に限定。
+  //            → 曜日位置が今週と揃い、窓起点=週初め(前夜米国ビンの基準)も厳密に一致する。
+  const weeks = align === "week" ? groupWeeks(prices) : null;
+  let L = params.L;
+  let weekEnds: number[] | null = null;
+  if (weeks) {
+    const curKey = weekKey(prices[n - 1].time);
+    const cur = weeks.get(curKey);
+    if (!cur || cur.length < 1) return null;
+    L = cur.length; // 今週の経過立会日数(月〜今日)
+    weekEnds = [];
+    for (const [k, idxs] of weeks) {
+      if (k === curKey) continue;
+      if (idxs.length < L) continue;
+      weekEnds.push(idxs[L - 1]); // その週の先頭L日目 = 今週と同じ曜日位置
+    }
+  }
+  if (n < L + H + 20) return null;
 
   // 今週(クエリ): 窓末 = 最新。フォワードは未確定なので lead のみ(HL含む)。
   const qEnd = n - 1;
@@ -186,9 +268,16 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
 
   // 候補窓: フォワード余地あり(j+H<=n-1)かつ 今週リードインと重ならない(窓末 < 今週窓の起点)
   const jMax = Math.min(n - 1 - H, qStart - 1);
+  const ends: number[] = [];
+  if (weekEnds) {
+    for (const j of weekEnds) if (j >= L - 1 && j <= jMax) ends.push(j);
+  } else {
+    for (let j = L - 1; j <= jMax; j++) ends.push(j);
+  }
+
   const cands: AnalogWindow[] = [];
   const binCounts = new Array(meta.count).fill(0);
-  for (let j = L - 1; j <= jMax; j++) {
+  for (const j of ends) {
     const ld = buildLead(prices, j, L);
     if (!ld) continue;
     const fw = buildForward(prices, j, H);
@@ -201,10 +290,11 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
       lead: ld.lead, leadHigh: ld.leadHigh, leadLow: ld.leadLow,
       forward: fw.forward, fwdHigh: fw.fwdHigh, fwdLow: fw.fwdLow,
       forwardReturn: fw.forward[H], mfe: fw.fwdHigh[H], mae: fw.fwdLow[H], usBin,
-      distance: euclid(qZ, zShape(ld.lead)),
+      distance: shapeDist(qZ, zShape(ld.lead), metric),
     });
   }
-  if (cands.length < 5) return null;
+  // 週境界アラインは候補が「週数」に減る(≒1/5)ため、最小要件を緩める。
+  if (cands.length < (weekEnds ? 3 : 5)) return null;
 
   // 表示ビン(usbin モード): 明示指定 > 今週の起点ビン > 標本最多ビン
   let selBin = params.selBinOverride ?? queryUsBin ?? binCounts.indexOf(Math.max(...binCounts));
@@ -228,7 +318,7 @@ export function computeWeeklyAnalog(params: WeeklyAnalogParams): WeeklyAnalogRes
   const meanFinal = finals.reduce((s, v) => s + v, 0) / (finals.length || 1);
 
   return {
-    mode, L, H, query, queryUsBin, selBin, binMetaObj: meta, binCounts,
+    mode, L, H, align, metric, query, queryUsBin, selBin, binMetaObj: meta, binCounts,
     selected,
     leadMedian: lead.med, leadP25: lead.p25, leadP75: lead.p75,
     fwdMedian: fwd.med, fwdP25: fwd.p25, fwdP75: fwd.p75,

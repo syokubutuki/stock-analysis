@@ -12,7 +12,7 @@ import { useUsDaily } from "../../hooks/useUsDaily";
 import { useIntraday, IntradayResponse } from "../../hooks/useIntraday";
 import { groupByDay } from "../../lib/intraday-core";
 import {
-  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode,
+  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign,
 } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
@@ -231,6 +231,8 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   const [L, setL] = useState(5);
   const [H, setH] = useState(5);
   const [K, setK] = useState(20);
+  const [metric, setMetric] = useState<DistMetric>("euclid");
+  const [align, setAlign] = useState<WindowAlign>("trailing");
   const [selBinOverride, setSelBinOverride] = useState<number | null>(null);
 
   const { prices: usPrices, loading: usLoading, error: usError } = useUsDaily(usTicker);
@@ -238,8 +240,10 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
   const result = useMemo(() => {
     if (us.length === 0) return null;
-    return computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride });
-  }, [prices, us, L, H, K, mode, usMode, scheme, selBinOverride]);
+    return computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align });
+  }, [prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align]);
+  // align="week" では窓長はコア側が今週の経過日数に決める
+  const effL = result?.L ?? L;
 
   useEffect(() => {
     if (!canvasRef.current || !result) return;
@@ -251,8 +255,8 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   const { resp: intraResp, loading: intraLoading, error: intraError } =
     useIntraday(showIntraday && ticker ? ticker : "", "60m");
   const intraWeek = useMemo(
-    () => (showIntraday && intraResp ? buildIntraWeek(intraResp, L) : null),
-    [showIntraday, intraResp, L]
+    () => (showIntraday && intraResp ? buildIntraWeek(intraResp, effL) : null),
+    [showIntraday, intraResp, effL]
   );
   useEffect(() => {
     if (!intraCanvasRef.current || !intraWeek) return;
@@ -274,7 +278,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">
-        今週(直近{L}営業日)の経路を、
+        今週({align === "week" ? `週境界・月〜今日の${effL}営業日` : `直近${effL}営業日`})の経路を、
         <span className="font-medium text-gray-700">似た形の過去局面</span>または
         <span className="font-medium text-gray-700">前夜米国ビンで絞った過去局面</span>と突き合わせ、
         今日(t=0)へ至る経路と<span className="font-medium text-gray-700">その後{H}日</span>の分布を重ねる。
@@ -293,11 +297,35 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
       {/* 共通パラメタ */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
-        <div className="flex items-center gap-1"><span>今週の窓 L:</span>{L_PRESETS.map((v) => <Btn key={v} v={v} cur={L} set={setL} />)}</div>
+        <div className="flex items-center gap-1">
+          <span>窓の取り方:</span>
+          {([["trailing", "直近L営業日"], ["week", "今週(週境界)"]] as [WindowAlign, string][]).map(([a, lbl]) => (
+            <button key={a} onClick={() => setAlign(a)}
+              title={a === "week"
+                ? "月曜起点で今日までを窓にし、過去も『各週の先頭同数日』と比較。曜日位置が揃い、窓起点=週初め(前夜米国ビンの基準)が厳密に一致する。候補は週数まで減る。"
+                : "直近L営業日を窓にする(週をまたぐ)。候補数が多く安定するが、曜日位置は揃わない。"}
+              className={`px-2 py-0.5 rounded ${align === a ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
+          ))}
+        </div>
+        {align === "trailing" ? (
+          <div className="flex items-center gap-1"><span>今週の窓 L:</span>{L_PRESETS.map((v) => <Btn key={v} v={v} cur={L} set={setL} />)}</div>
+        ) : (
+          <span className="text-gray-500">今週= <span className="font-medium text-gray-700">{effL}営業日</span>（月〜今日）</span>
+        )}
         <div className="flex items-center gap-1"><span>先行き H:</span>{H_PRESETS.map((v) => <Btn key={v} v={v} cur={H} set={setH} />)}</div>
         {mode === "similar" && (
           <div className="flex items-center gap-1"><span>近傍 K:</span>{K_PRESETS.map((v) => <Btn key={v} v={v} cur={K} set={setK} />)}</div>
         )}
+        <div className="flex items-center gap-1">
+          <span>形の距離:</span>
+          {([["euclid", "ユークリッド"], ["dtw", "DTW"]] as [DistMetric, string][]).map(([m, lbl]) => (
+            <button key={m} onClick={() => setMetric(m)}
+              title={m === "dtw"
+                ? "動的時間伸縮。山や谷が1日早い/遅いといった時間のズレを吸収して形を突き合わせる(Sakoe-Chibaバンド=窓長の約1/4)。"
+                : "等速比較。同じ日付位置どうしを突き合わせる。時間のズレに弱い。"}
+              className={`px-2 py-0.5 rounded ${metric === m ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
+          ))}
+        </div>
       </div>
 
       {/* 米国ビン設定(usbin モード) */}
@@ -439,7 +467,22 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
         <p className="font-medium text-gray-700 mt-3">2. 2つの絞り方</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>前夜米国ビンで絞る</strong>: 窓の起点(週初め)の前夜米国が指定ビン(例: 米大幅高)だった過去週だけを集める。「同じ地合いで始まった週はその後どうなったか」。米国ビンは各JP立会日に『寄り前で最後に確定した米国立会日(暦日が厳密に小さい最新)』のリターンを対応付けて層別(祝日・連休も自動整合)。</li>
-          <li><strong>似た形で絞る(アナログ)</strong>: 今週のリードイン形状に最も近い過去K局面を距離で探す。各窓を「窓末=0%の累積リターン列」にしz化(水準・ボラの差を吸収し"形"だけ比較)、ユークリッド距離が小さい順。</li>
+          <li><strong>似た形で絞る(アナログ)</strong>: 今週のリードイン形状に最も近い過去K局面を距離で探す。各窓を「窓末=0%の累積リターン列」にしz化(水準・ボラの差を吸収し"形"だけ比較)、距離が小さい順。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">2b. 形の距離: ユークリッド と DTW</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>ユークリッド(等速比較)</strong>: 同じ日付位置どうしの差を二乗和。d(a,b)=√Σ(aᵢ−bᵢ)²。単純だが<strong>時間のズレに弱い</strong>——同じ形でも山が1日早い/遅いだけで「似ていない」と判定される。</li>
+          <li><strong>DTW(動的時間伸縮)</strong>: 時間軸の伸び縮みを許して対応付ける。漸化式 {"D(i,j)=(aᵢ−bⱼ)² + min{ D(i−1,j), D(i,j−1), D(i−1,j−1) }"} を解き、累積コストの平方根を距離とする。「山が1日ずれた同じ形」を正しく似ていると判定できる。イメージは<em>2つの波形をゴムひものように伸縮させて最も重なる対応を探す</em>。</li>
+          <li><strong>Sakoe-Chibaバンド</strong>: warping の幅を窓長の約1/4(最低1)に制限。無制限だと1点が多数点に対応する退化(1日が週全体に伸びる等)が起き、計算量も増えるため。</li>
+          <li>使い分け: 曜日位置そのものに意味がある(月曜安い等)なら<strong>ユークリッド</strong>、値動きの「形」を優先しタイミングのズレを許すなら<strong>DTW</strong>。両方で残る局面は確度が高い。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">2c. 窓の取り方: 直近L営業日 と 週境界アライン</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>直近L営業日</strong>: 週をまたいで単純に直近L日を窓にする。候補位置が全日にわたるため<strong>事例数が多く安定</strong>するが、曜日位置は揃わない(過去窓の起点が水曜だったりする)。</li>
+          <li><strong>今週(週境界)</strong>: 月曜起点で今日までを窓とし(L=今週の経過立会日数、火曜なら2)、過去は<strong>各週の先頭L日</strong>と比較する。曜日位置が今週と揃い、窓起点=<strong>週初め</strong>＝前夜米国ビンの基準日が厳密に一致する。週の進行に応じてLが自動で伸びる(月→金で1→5)。</li>
+          <li>トレードオフ: 週境界アラインは候補が「週数」まで減る(≒1/5)。10年で約500週なので3分位ビンなら各≈150週だが、5分位や短い履歴では薄くなる。事例数の表示を必ず確認する。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 図の読み方(すべて窓末=今日=0%に再基準化)</p>
@@ -461,7 +504,8 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li>「形・地合いが似ている」だけで因果はない。事例数が少ない(帯が広い/n小)ほど偶然に振られる。サイズを抑える。</li>
           <li>レジームが違えば同じ入口でも結果は変わる(過去の上げ相場と今の下げ相場など)。</li>
-          <li>ユークリッド距離は時間のズレに弱い(等速比較)。窓L・先行きH・ビン粗さで結果は変わるため、複数設定で頑健性を確認する。</li>
+          <li>窓の取り方・距離(ユークリッド/DTW)・窓L・先行きH・ビン粗さで結果は変わる。複数設定で残る結論だけ採用する(設定を探し回ると過学習)。DTWも万能ではなく、バンドを広げるほど「何でも似ている」に近づく。</li>
+          <li>週境界アラインは候補が週数まで減り、5分位や短い履歴では事例が薄くなる(コアは最低3事例で打ち切り)。事例数を必ず確認。</li>
           <li>日中足ドリルダウン(「今週を日中足で見る」)は<strong>今週側のみ</strong>。日中足の取得期間が短い(60分足≈2年)ため、何年も前のアナログ過去局面は日中では再現できず、アナログ本体は日足で比較する。日足の高安(MFE/MAE)が値幅の目安を補う。</li>
         </ul>
       </AnalysisGuide>
