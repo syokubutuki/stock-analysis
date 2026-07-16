@@ -5,36 +5,17 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   COROLLARIES,
-  AXIOM_LABEL,
   Q_CHOICE_LABEL,
   type Corollary,
-  type AxiomRef,
 } from "../lib/axioms/corollaries";
 import TeX from "../components/analysis/TeX";
+import AxiomGraph from "../components/analysis/AxiomGraph";
 
 // 合流点(今日の q 提案)。自前でデータ取得する client コンポーネントなので SSR 無効。
 const TodayQProposal = dynamic(
   () => import("../components/analysis/TodayQProposal"),
   { ssr: false }
 );
-
-// 系譜図の階層定義。公準・公理・命題は固定（docs/investment-axioms.md）。
-const POSTULATES: AxiomRef[] = ["公準1", "公準2", "公準3", "公準4", "公準5"];
-const PROPOSITIONS: AxiomRef[] = ["命題1", "命題2", "命題3", "命題4", "命題5"];
-
-function AxiomBox({ id, highlight }: { id: AxiomRef; highlight?: boolean }) {
-  return (
-    <div
-      className={`rounded-lg border px-3 py-2 text-xs leading-snug ${
-        highlight
-          ? "border-indigo-400 bg-indigo-50 text-indigo-900 font-medium"
-          : "border-gray-200 bg-white text-gray-700"
-      }`}
-    >
-      {AXIOM_LABEL[id]}
-    </div>
-  );
-}
 
 function CorollaryCard({ c }: { c: Corollary }) {
   const [open, setOpen] = useState(false);
@@ -177,69 +158,20 @@ export default function AxiomsPage() {
         {/* 合流点: 今日の q 提案(全系が単一の建玉に畳み込まれる場所) */}
         <TodayQProposal />
 
-        {/* 系譜図 */}
+        {/* 系譜図(インタラクティブ依存グラフ) */}
         <section>
           <h2 className="mb-3 text-sm font-bold text-gray-900">公理系の系譜図</h2>
-          <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
-            <div>
-              <div className="mb-1.5 text-xs font-medium text-gray-500">
-                公準（株式に固有の要請）
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                {POSTULATES.map((p) => (
-                  <AxiomBox key={p} id={p} highlight={p === "公準4"} />
-                ))}
-              </div>
-              <div className="mt-1 text-[11px] text-indigo-500">
-                ↑ すべての系は公準4（会計恒等式）から出発する
-              </div>
-            </div>
+          <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+            <AxiomGraph />
 
-            <div className="text-center text-gray-300">▼</div>
-
-            <div>
-              <div className="mb-1.5 text-xs font-medium text-gray-500">
-                命題（直接導かれる基本定理）
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                {PROPOSITIONS.map((p) => (
-                  <AxiomBox key={p} id={p} />
-                ))}
-              </div>
-              {/* 命題1(技術の分解定理): 投資の巧拙は「当てる力」ではなく Cov(q,dP)。 */}
-              <div className="mt-2 rounded-lg bg-gray-50 py-1.5 text-center">
-                <TeX block>
-                  {"\\mathbb{E}[W] = \\int \\mathbb{E}[q]\\,\\mathbb{E}[dP] \\;+\\; \\int \\mathrm{Cov}(q,\\,dP) \\;-\\; \\mathbb{E}[C]"}
-                </TeX>
-                <div className="text-[11px] text-gray-500">
-                  命題1（技術の分解定理）── 巧拙は「価格を当てる力」ではなく{" "}
-                  <TeX>{"\\mathrm{Cov}(q, dP)"}</TeX>（エッジ）に宿る
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center text-gray-300">▼</div>
-
-            <div>
-              <div className="mb-1.5 text-xs font-medium text-gray-500">
-                系（既存理論の再導出）
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {COROLLARIES.map((c) => (
-                  <div
-                    key={c.id}
-                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs"
-                  >
-                    <span className="font-bold text-emerald-800">{c.id}</span>{" "}
-                    <span className="text-gray-700">{c.theory}</span>
-                    <div className="mt-0.5 text-[10px] text-gray-500">
-                      ← {c.basis.join(", ")}
-                    </div>
-                  </div>
-                ))}
-                <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[11px] text-gray-400">
-                  さらなる系は同じ会計恒等式から順次追記
-                </div>
+            {/* 命題1(技術の分解定理): 投資の巧拙は「当てる力」ではなく Cov(q,dP)。 */}
+            <div className="rounded-lg bg-gray-50 py-1.5 text-center">
+              <TeX block>
+                {"\\mathbb{E}[W] = \\int \\mathbb{E}[q]\\,\\mathbb{E}[dP] \\;+\\; \\int \\mathrm{Cov}(q,\\,dP) \\;-\\; \\mathbb{E}[C]"}
+              </TeX>
+              <div className="text-[11px] text-gray-500">
+                命題1（技術の分解定理）── 巧拙は「価格を当てる力」ではなく{" "}
+                <TeX>{"\\mathrm{Cov}(q, dP)"}</TeX>（エッジ）に宿る
               </div>
             </div>
           </div>

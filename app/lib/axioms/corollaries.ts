@@ -1356,6 +1356,19 @@ const C23_TAX_POSITION_VALUE: Corollary = {
  * 全系のレジストリ。docs/investment-axioms.md 第5部 C1〜C12＋拡張 C13〜C23（全系導出鎖つき）。
  * さらなる拡張候補（同型式で追記可能）は随時追記する。
  */
+/**
+ * 各命題が立脚する公準・公理（docs/investment-axioms.md 第4部の「─ ○○より」に対応）。
+ * 系は basis で公準・公理・命題のどれでも直接参照できるが、命題自身の根拠はここが唯一の源。
+ * 系譜図（AxiomGraph）が公準→命題→系の一本道を描くために使う。
+ */
+export const PROPOSITION_BASIS: Record<string, AxiomRef[]> = {
+  命題1: ["公準4"],
+  命題2: ["公準4", "公理5"],
+  命題3: ["公理2"],
+  命題4: ["公準2", "公理2"],
+  命題5: ["公準5"],
+};
+
 export const COROLLARIES: Corollary[] = [
   C1_KELLY,
   C2_MEAN_VARIANCE,
