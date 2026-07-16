@@ -18,6 +18,7 @@ import {
 } from "../../lib/weekday-us-cross";
 import { UsDriverButtons, BinSchemeButtons, intervalToMin } from "./usSpilloverShared";
 import { IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
+import { NameColMode, NAME_COL_W, useNameColMode, nameColStyle, NameColHeader } from "./crossTableShared";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -579,6 +580,7 @@ function CrossHeatmap({
   onRename?: (ticker: string, name: string) => void;
 }) {
   const { timeLabels, grid } = result;
+  const [nameCol, setNameCol] = useNameColMode();
 
   const sortedRows = useMemo(() => {
     const rows = [...result.rows];
@@ -618,7 +620,9 @@ function CrossHeatmap({
       <table className="text-[11px] w-full border-collapse">
         <thead>
           <tr className="text-gray-500">
-            <th className="text-left font-medium px-2 py-1 sticky left-0 bg-white z-10">銘柄</th>
+            <th className="text-left font-medium px-2 py-1 sticky left-0 bg-white z-10" style={nameColStyle(nameCol)}>
+              <NameColHeader mode={nameCol} onChange={setNameCol} />
+            </th>
             {CROSS_WD_ORDER.map((wd) => (
               <th key={wd} className="font-medium px-1 py-1 text-center min-w-[58px]">{CROSS_WD_LABELS[wd]}</th>
             ))}
@@ -627,13 +631,14 @@ function CrossHeatmap({
         <tbody>
           {sortedRows.map((r) => (
             <tr key={r.ticker} className="border-t border-gray-100">
-              <td className="px-2 py-1 sticky left-0 bg-white z-10">
+              <td className="px-2 py-1 sticky left-0 bg-white z-10" style={nameColStyle(nameCol)}>
                 <RowHeader
                   ticker={r.ticker}
                   name={names?.[r.ticker]}
                   n={r.nTotal}
                   ampl={rowAmplitude(r)}
                   onRename={onRename}
+                  mode={nameCol}
                 />
               </td>
               {r.cells.map((c, i) => (
@@ -642,9 +647,12 @@ function CrossHeatmap({
             </tr>
           ))}
           <tr className="border-t-2 border-gray-300 bg-gray-50">
-            <td className="px-2 py-1 sticky left-0 bg-gray-50 z-10">
-              <div className="font-bold text-gray-800">横断平均</div>
-              <div className="text-[9px] text-gray-400">{result.nStocks}銘柄プール</div>
+            <td className="px-2 py-1 sticky left-0 bg-gray-50 z-10" style={nameColStyle(nameCol)}
+              title={nameCol === "code" ? `横断平均（${result.nStocks}銘柄プール）` : undefined}>
+              <div className="font-bold text-gray-800 truncate">{nameCol === "code" ? "平均" : "横断平均"}</div>
+              <div className="text-[9px] text-gray-400 truncate">
+                {nameCol === "code" ? `${result.nStocks}銘柄` : `${result.nStocks}銘柄プール`}
+              </div>
             </td>
             {result.consensus.map((c: ConsensusCell | null, i) => (
               <td key={i} className="px-0.5 py-0.5 text-center align-middle"
@@ -688,14 +696,27 @@ function CrossHeatmap({
 
 // 銘柄行の見出し。名称(あれば)+ 銘柄コードを併記し、onRename があれば ✎ でインライン編集。
 // 編集結果は親(ポートフォリオ)経由でウォッチリストに保存され、名称表示の不整合を解消できる。
-function RowHeader({ ticker, name, n, ampl, onRename }: {
+// mode="code" では列を細めるため銘柄コードだけを出し、名称/振幅はツールチップに送る。
+function RowHeader({ ticker, name, n, ampl, onRename, mode }: {
   ticker: string; name?: string; n: number; ampl: number;
   onRename?: (ticker: string, name: string) => void;
+  mode: NameColMode;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name ?? "");
   const hasName = !!name && name !== ticker;
   const amplPct = `${(ampl * 100).toFixed(ampl >= 0.01 ? 1 : 2)}%`;
+  // td の左右padding(px-2=8px×2)を除いた実効幅。truncate を効かせるため内側にも上限を置く。
+  const innerW = { maxWidth: NAME_COL_W[mode] - 16 };
+
+  if (mode === "code") {
+    return (
+      <div style={innerW} title={`${hasName ? `${name}（${ticker}）` : ticker}｜n=${n}｜振幅${amplPct}`}>
+        <div className="font-mono font-medium text-gray-700 truncate">{ticker}</div>
+        <div className="text-[9px] text-gray-400 tabular-nums truncate">n={n}</div>
+      </div>
+    );
+  }
 
   if (editing) {
     const commit = () => {
@@ -704,7 +725,7 @@ function RowHeader({ ticker, name, n, ampl, onRename }: {
       setEditing(false);
     };
     return (
-      <div className="flex items-center gap-1 max-w-[172px]">
+      <div className="flex items-center gap-1" style={innerW}>
         <input
           autoFocus
           value={val}
@@ -720,7 +741,7 @@ function RowHeader({ ticker, name, n, ampl, onRename }: {
   }
 
   return (
-    <div className="max-w-[172px]">
+    <div style={innerW}>
       <div className="flex items-center gap-1">
         <span className="font-medium text-gray-700 truncate" title={hasName ? `${name}（${ticker}）` : ticker}>
           {hasName ? name : ticker}
@@ -733,7 +754,7 @@ function RowHeader({ ticker, name, n, ampl, onRename }: {
           >✎</button>
         )}
       </div>
-      <div className="text-[9px] text-gray-400 tabular-nums flex items-center gap-1.5">
+      <div className="text-[9px] text-gray-400 tabular-nums flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
         {hasName && <span className="font-mono">{ticker}</span>}
         <span>n={n}</span>
         <span className="text-gray-300">振幅{amplPct}</span>

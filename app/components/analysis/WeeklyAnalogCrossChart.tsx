@@ -13,6 +13,7 @@ import {
   computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign,
 } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
+import { NAME_COL_W, useNameColMode, nameColStyle, NameColHeader } from "./crossTableShared";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -85,6 +86,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
   const [sortKey, setSortKey] = useState<SortKey>("median");
   const [editing, setEditing] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
+  const [nameCol, setNameCol] = useNameColMode();
 
   const { prices: usPrices, loading: usLoading, error: usError } = useUsDaily(usTicker);
   const us = useMemo(() => (usPrices ? computeUsReturns(usPrices) : []), [usPrices]);
@@ -255,7 +257,9 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
         <table className="text-[11px] w-full border-collapse">
           <thead>
             <tr className="text-gray-500">
-              <th className="text-left font-medium px-2 py-1 sticky left-0 bg-white z-10">銘柄</th>
+              <th className="text-left font-medium px-2 py-1 sticky left-0 bg-white z-10" style={nameColStyle(nameCol)}>
+                <NameColHeader mode={nameCol} onChange={setNameCol} />
+              </th>
               {mode === "usbin" && <th className="font-medium px-1 py-1 text-center">今週の起点</th>}
               <th className="font-medium px-1 py-1 text-center">その後{H}日(終値/高安到達)</th>
               <th className="font-medium px-2 py-1 text-right">終値中央</th>
@@ -271,8 +275,14 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
               const hasName = !!names?.[r.ticker] && names[r.ticker] !== r.ticker;
               return (
                 <tr key={r.ticker} className="border-t border-gray-100">
-                  <td className="px-2 py-1 sticky left-0 bg-white z-10">
-                    {editing === r.ticker ? (
+                  <td className="px-2 py-1 sticky left-0 bg-white z-10" style={nameColStyle(nameCol)}>
+                    {nameCol === "code" ? (
+                      <div className="font-mono font-medium text-gray-700 truncate"
+                        style={{ maxWidth: NAME_COL_W.code - 16 }}
+                        title={hasName ? `${names[r.ticker]}（${r.ticker}）` : r.ticker}>
+                        {r.ticker}
+                      </div>
+                    ) : editing === r.ticker ? (
                       <div className="flex items-center gap-1">
                         <input autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)}
                           onKeyDown={(e) => {
@@ -284,7 +294,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                         <button onClick={() => setEditing(null)} className="text-gray-400 text-sm leading-none">✕</button>
                       </div>
                     ) : (
-                      <div className="max-w-[170px]">
+                      <div style={{ maxWidth: NAME_COL_W.name - 16 }}>
                         <div className="flex items-center gap-1">
                           <span className="font-medium text-gray-700 truncate" title={hasName ? `${names[r.ticker]}（${r.ticker}）` : r.ticker}>
                             {hasName ? names[r.ticker] : r.ticker}
