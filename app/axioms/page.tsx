@@ -10,6 +10,7 @@ import {
   type Corollary,
   type AxiomRef,
 } from "../lib/axioms/corollaries";
+import TeX from "../components/analysis/TeX";
 
 // 合流点(今日の q 提案)。自前でデータ取得する client コンポーネントなので SSR 無効。
 const TodayQProposal = dynamic(
@@ -53,6 +54,11 @@ function CorollaryCard({ c }: { c: Corollary }) {
       </div>
 
       <p className="mt-2 text-sm text-gray-700">{c.claim}</p>
+
+      {/* 結論の公式(見出しとして常時表示)。導出鎖はこの式に到達するための一本道。 */}
+      <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-center">
+        <TeX block>{c.formulaTex}</TeX>
+      </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {c.basis.map((b) => (
@@ -110,7 +116,10 @@ function CorollaryCard({ c }: { c: Corollary }) {
           </ol>
           <div>
             <span className="font-medium text-gray-700">結論の公式: </span>
-            <span className="font-mono text-[11px]">{c.formula}</span>
+            <div className="my-1 rounded bg-white px-2 py-1.5 text-center">
+              <TeX block>{c.formulaTex}</TeX>
+            </div>
+            <span className="text-gray-600">{c.formula}</span>
           </div>
           <p className="text-gray-600">{c.conclusion}</p>
           <div className="border-t border-gray-200 pt-1.5">
@@ -150,9 +159,18 @@ export default function AxiomsPage() {
           <p className="mt-2 text-sm leading-relaxed text-gray-700">
             「上がりそう」「ここで買いたい」は、すべて外生的な価格 P への言及であり、
             自分に決定権のない変数への願望にすぎない。我々が実際に選べるのは建玉{" "}
-            <b>q(t)</b>（符号・大きさ・タイミング・保有期間）ただ一つ。損益は会計恒等式{" "}
-            <span className="font-mono">W = ∫ q dP − C</span>{" "}
+            <b>q(t)</b>（符号・大きさ・タイミング・保有期間）ただ一つ。損益は会計恒等式
+          </p>
+
+          {/* 公準4: この一式から全23系が導出される。 */}
+          <div className="my-3 rounded-lg border border-indigo-200 bg-indigo-50/50 py-2 text-center">
+            <TeX block>{"W(T) = \\int_0^T q(t)\\,dP(t) \\;-\\; C"}</TeX>
+          </div>
+
+          <p className="text-sm leading-relaxed text-gray-700">
             で決まり、あらゆる分析は「P の記述」にすぎず、q の選択を変えて初めて価値を持つ。
+            儲けは価格の動き <TeX>{"dP"}</TeX> そのものではなく、
+            <b>その瞬間の建玉 <TeX>{"q"}</TeX> との積</b>でしか発生しない。
           </p>
         </section>
 
@@ -187,6 +205,16 @@ export default function AxiomsPage() {
                 {PROPOSITIONS.map((p) => (
                   <AxiomBox key={p} id={p} />
                 ))}
+              </div>
+              {/* 命題1(技術の分解定理): 投資の巧拙は「当てる力」ではなく Cov(q,dP)。 */}
+              <div className="mt-2 rounded-lg bg-gray-50 py-1.5 text-center">
+                <TeX block>
+                  {"\\mathbb{E}[W] = \\int \\mathbb{E}[q]\\,\\mathbb{E}[dP] \\;+\\; \\int \\mathrm{Cov}(q,\\,dP) \\;-\\; \\mathbb{E}[C]"}
+                </TeX>
+                <div className="text-[11px] text-gray-500">
+                  命題1（技術の分解定理）── 巧拙は「価格を当てる力」ではなく{" "}
+                  <TeX>{"\\mathrm{Cov}(q, dP)"}</TeX>（エッジ）に宿る
+                </div>
               </div>
             </div>
 

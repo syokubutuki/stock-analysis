@@ -71,8 +71,13 @@ export interface Corollary {
   assumption: string;
   /** 会計恒等式 W=∫q dP−C からの導出鎖。 */
   derivation: DerivationStep[];
-  /** 得られる q* の閉形式（＝既存理論の公式そのもの）。 */
+  /** 得られる q* の閉形式（＝既存理論の公式そのもの）。散文込みのプレーンテキスト。 */
   formula: string;
+  /**
+   * formula の数式部分を LaTeX で表したもの（KaTeX で本組み描画する）。
+   * 日本語は含めない（KaTeX の数式フォントに CJK が無いため）。散文は formula 側に残す。
+   */
+  formulaTex: string;
   /** その公式が何を意味するか（結論の解釈）。 */
   conclusion: string;
   /** 公準5（摩擦）を入れると公式がどう変わるか。 */
@@ -132,6 +137,7 @@ const C1_KELLY: Corollary = {
   formula:
     "f* = (p·b − (1−p)) / b = エッジ / オッズ。" +
     "連続版（正規リターン）では f* = μ / σ²（ドリフト÷分散）。",
+  formulaTex: "f^* = \\frac{pb-(1-p)}{b} \\qquad f^*_{\\mathrm{cont}} = \\frac{\\mu}{\\sigma^2}",
   conclusion:
     "最適な建玉サイズは「予測が当たる度合い（エッジ）」を「1回の賭けの分の悪さ（オッズ）」で" +
     "割った値。方向を当てる力ではなく、当たり具合とリスクの比がサイズを決める。",
@@ -190,6 +196,8 @@ const C2_MEAN_VARIANCE: Corollary = {
   formula:
     "w* ∝ Σ⁻¹(μ − rf·1)（接点ポートフォリオ）。" +
     "GMV（最小分散）は w ∝ Σ⁻¹1。効率的フロンティアはこれらの双曲線。",
+  formulaTex:
+    "w^* \\propto \\Sigma^{-1}(\\mu - r_f\\mathbf{1}) \\qquad w_{\\mathrm{GMV}} \\propto \\Sigma^{-1}\\mathbf{1}",
   conclusion:
     "最適な銘柄配分は、期待超過リターンを共分散の逆行列で「相関を割り引いて」重み付けした" +
     "もの。単に期待の高い銘柄ではなく、他銘柄と相関の低い銘柄が過大評価される。",
@@ -245,6 +253,7 @@ const C3_OPTIMAL_STOPPING: Corollary = {
   ],
   formula:
     "τ* = inf{ t : g(P_t) ≥ C(t,P_t) }（即時価値＝継続価値の自由境界で停止）。",
+  formulaTex: "\\tau^* = \\inf\\{\\, t : g(P_t) \\ge C(t, P_t) \\,\\}",
   conclusion:
     "最適な手仕舞いは「もう待っても期待が改善しない」最初の時点。目標株価やトレーリングは、" +
     "この自由境界の近似にすぎない。いつ売るかは P の予想ではなく境界条件で決まる。",
@@ -294,6 +303,7 @@ const C4_MEAN_REVERSION: Corollary = {
   ],
   formula:
     "q*_t ∝ (μ − P_t)（逆張り、乖離に線形）。実務では ±z·σ のバンドで建て/外す。",
+  formulaTex: "q^*_t = \\frac{\\kappa}{\\lambda\\sigma^2}\\,(\\mu - P_t) \\;\\propto\\; \\mu - P_t",
   conclusion:
     "平均回帰下では「上がる/下がる」を当てるのではなく、平均からの乖離が建玉の符号と大きさを" +
     "自動的に決める。エッジは予測精度ではなく κ（回帰の強さ）に宿る。",
@@ -341,6 +351,8 @@ const C5_VOL_TARGETING: Corollary = {
   ],
   formula:
     "q_t = σ_target / σ_t（ボラ・ターゲティング）。エッジ込みなら q_t ∝ μ/σ²_t（時変 Kelly）。",
+  formulaTex:
+    "q_t = \\frac{\\sigma_{\\mathrm{target}}}{\\sigma_t} \\qquad f^*_t = \\frac{\\mu}{\\sigma_t^2}",
   conclusion:
     "ボラ予測（GARCH 等）の価値は方向当てではなく、建玉サイズの調整に尽きる。" +
     "リスクを一定に保つほど、損益の連敗・ドローダウンが安定する。",
@@ -389,6 +401,8 @@ const C6_VAR_LIMIT: Corollary = {
   ],
   formula:
     "|q|_max = リスクバジェット / VaR_α(単位建玉)（CVaR 版は ES_α で割る）。",
+  formulaTex:
+    "|q|_{\\max} = \\frac{B}{\\mathrm{VaR}_\\alpha(r)} \\qquad |q|_{\\max}^{\\mathrm{CVaR}} = \\frac{B}{\\mathrm{ES}_\\alpha(r)}",
   conclusion:
     "建玉の上限は「当たる自信」ではなく、外れたときのテール損失で決まる。" +
     "テールが厚い局面ほど、同じ確信でも建玉を小さくするのが破産回避の必然。",
@@ -443,6 +457,7 @@ const C7_HEDGE: Corollary = {
   ],
   formula:
     "h* = −β = −Cov(r, r_M) / Var(r_M)。残差リターンは市場中立。",
+  formulaTex: "h^* = -\\beta = -\\frac{\\mathrm{Cov}(r, r_M)}{\\mathrm{Var}(r_M)}",
   conclusion:
     "ヘッジとは価格を予想して逃げることではなく、第二の建玉で系統的な dP を差し引くこと。" +
     "消せるのは市場リスクだけで、固有リスク（α の source）は残る。",
@@ -492,6 +507,8 @@ const C8_HOLDING_PERIOD: Corollary = {
   ],
   formula:
     "h* = argmax_h (h·μ − C)/√(h·σ²·VR(h))。VR<1 で長期化、VR>1 で短期化。",
+  formulaTex:
+    "h^* = \\operatorname*{arg\\,max}_{h} \\frac{h\\mu - C}{\\sqrt{h\\,\\sigma^2\\,\\mathrm{VR}(h)}}",
   conclusion:
     "「どれだけ持つか」は予想ではなく最適化問題。自己相関が回帰的なら長く、" +
     "モメンタム的なら短く持つのが、コスト込みで最も効率的。",
@@ -540,6 +557,7 @@ const C9_CALENDAR: Corollary = {
   ],
   formula:
     "q*_d = μ_d / (λ·σ²_d)（暦状態別の条件付き Kelly）。有意な状態のみ建玉、他は q=0。",
+  formulaTex: "q^*_d = \\frac{\\mu_d}{\\lambda\\,\\sigma_d^2}",
   conclusion:
     "カレンダー分析の価値は価格予想ではなく「いつ建玉を持つか（timing）」の選択。" +
     "エッジは条件付きドリフト μ_d に宿り、多重検定を生き残ったものだけが実効的。",
@@ -590,6 +608,8 @@ const C10_NO_TRADE_BAND: Corollary = {
   formula:
     "無取引帯 [q*−δ, q*+δ]、δ ∝ (k)^{1/3}。帯を出たら境界まで戻す。" +
     "リバランス条件: 期待エッジ改善 > 往復コスト k。",
+  formulaTex:
+    "\\left[\\,q^*-\\delta,\\; q^*+\\delta\\,\\right] \\qquad \\delta \\propto \\left(\\frac{k\\sigma^2}{\\lambda}\\right)^{1/3}",
   conclusion:
     "コストは連続的な建玉調整を離散的・帯状に変える。頻繁な微調整は損で、" +
     "建玉を動かすのはエッジがコストを上回るときだけ（命題5）。",
@@ -638,6 +658,7 @@ const C11_DRAWDOWN: Corollary = {
   ],
   formula:
     "q_t = m·(W_t − (1−D_max)·peak_t)（CPPI/ドローダウン制御）。下落でサイズ自動縮小。",
+  formulaTex: "q_t = m\\left(W_t - (1 - D_{\\max})\\cdot M_t\\right), \\quad M_t = \\max_{s\\le t} W_s",
   conclusion:
     "ドローダウン分析の出口は「建玉サイズを資産経路に応じて動的に縮める規則」。" +
     "含み損が深まるほど張らないことが、破産の吸収壁（公理5）を避ける必然。",
@@ -688,6 +709,7 @@ const C12_CONDITIONAL: Corollary = {
   ],
   formula:
     "Φ*(S) = μ(S) / (λ·σ²(S))（条件付き Kelly）。全分析はこの μ(S)・σ²(S) の推定に還元される。",
+  formulaTex: "\\Phi^*(S) = \\frac{\\mu(S)}{\\lambda\\,\\sigma^2(S)}",
   conclusion:
     "これは公理系の総合系（capstone）。分析とは状態 S を選び μ(S)/σ²(S) を測ること、" +
     "戦略とはその写像 Φ を組むこと。P の予想は一度も要らない。",
@@ -743,6 +765,8 @@ const C13_EXECUTION: Corollary = {
   ],
   formula:
     "x*(t) = X·sinh(κ(T−t))/sinh(κT), κ=√(λσ²/η)。リスク中立極限で線形(TWAP)。",
+  formulaTex:
+    "x^*(t) = X\\,\\frac{\\sinh\\!\\big(\\kappa(T-t)\\big)}{\\sinh(\\kappa T)}, \\qquad \\kappa = \\sqrt{\\frac{\\lambda\\sigma^2}{\\eta}}",
   conclusion:
     "建玉を「動かすこと自体」が制御問題。売買判断が決まっても、その建玉変更を" +
     "インパクトとリスクの釣り合いで時間配分するのが最適執行。約定は瞬時ではない。",
@@ -797,6 +821,7 @@ const C14_HJB_MERTON: Corollary = {
   ],
   formula:
     "π* = (μ−r)/(γσ²)（Merton 比率）。γ=1 で Kelly(C1)、γ>1 で fractional Kelly。",
+  formulaTex: "\\pi^* = \\frac{\\mu - r}{\\gamma\\,\\sigma^2}",
   conclusion:
     "HJB は連続時間の建玉最適化の一般機構で、C1・C5 はその特例。リスク回避 γ が" +
     "full-Kelly を割り引く。「どれだけ張るか」は効用の曲率で決まり、予想では決まらない。",
@@ -846,6 +871,8 @@ const C15_CONSTRAINED_KELLY: Corollary = {
   ],
   formula:
     "f_c = argmax g(f) s.t. R(f)≤ε ⇒ f_c=c·f*（0<c≤1）。half-Kelly は c=0.5 の実務近似。",
+  formulaTex:
+    "f_c = \\operatorname*{arg\\,max}_{f} g(f) \\;\\; \\mathrm{s.t.}\\;\\; R(f) \\le \\varepsilon \\;\\Longrightarrow\\; f_c = c\\,f^*, \\;\\; 0 < c \\le 1",
   conclusion:
     "full-Kelly は経路（連敗・ドローダウン）を無視するため過大。破産／DD 制約を課すと" +
     "必ず縮む。fractional Kelly は「経験則」ではなく、公理5の制約から出る帰結。",
@@ -900,6 +927,8 @@ const C16_ROBUST: Corollary = {
   ],
   formula:
     "q* = max(0, μ̂ − κ·s_μ)/(λσ²)。t 値 μ̂/s_μ が κ を超える時だけ建玉。",
+  formulaTex:
+    "q^* = \\frac{\\max\\!\\left(0,\\; \\hat\\mu - \\kappa\\, s_\\mu\\right)}{\\lambda\\sigma^2} \\qquad \\text{iff}\\;\\; \\frac{\\hat\\mu}{s_\\mu} > \\kappa",
   conclusion:
     "ロバスト化とは「エッジをその不確実性で割り引く」こと。推定が頼りないほど建玉を" +
     "小さく、有意でなければ休む。C15（fractional Kelly）と C2 の収縮を同じ原理で束ねる。",
@@ -954,6 +983,8 @@ const C17_REGIME: Corollary = {
   ],
   formula:
     "q*_t = μ̄_t / (λ·[Σπ_k σ²_k + Σπ_k(μ_k−μ̄_t)²]),  μ̄_t=Σπ_k μ_k。遷移期は自動縮小。",
+  formulaTex:
+    "q^*_t = \\frac{\\bar\\mu_t}{\\lambda\\left[\\sum_k \\pi_k \\sigma_k^2 + \\sum_k \\pi_k (\\mu_k - \\bar\\mu_t)^2\\right]}, \\qquad \\bar\\mu_t = \\sum_k \\pi_k \\mu_k",
   conclusion:
     "レジーム分析（HMM/BOCPD）の価値は、信念 π_t を通じて戦略 Φ を信念加重にすること。" +
     "「どのレジームか曖昧」自体がリスクとして建玉を縮める。予想ではなく信念が q を決める。",
@@ -1008,6 +1039,8 @@ const C18_DYNAMIC_ALLOCATION: Corollary = {
   ],
   formula:
     "w*_t = (1/γ)Σ_t⁻¹(μ_t − r·1) + w_hedge。iid なら w_hedge=0（myopic＝C2 反復）。",
+  formulaTex:
+    "w^*_t = \\underbrace{\\frac{1}{\\gamma}\\Sigma_t^{-1}(\\mu_t - r\\mathbf{1})}_{\\mathrm{myopic}} + \\underbrace{w_{\\mathrm{hedge}}}_{\\mathrm{intertemporal}}",
   conclusion:
     "多期間の建玉配分は、静的フロンティア（C2）を毎期解くだけでは足りず、" +
     "「将来の投資機会が悪化する局面で価値を持つ資産」への保険的な傾き（ヘッジ需要）を含む。",
@@ -1062,6 +1095,8 @@ const C19_INFO_VALUE: Corollary = {
   ],
   formula:
     "ΔG = I(Y; r)（公平オッズ）、一般に ΔG ≤ I(Y; r)。成長率の増分に情報量の天井。",
+  formulaTex:
+    "\\Delta G \\;\\le\\; I(Y; r) = \\sum_{y, r} p(y, r)\\, \\log \\frac{p(y, r)}{p(y)\\,p(r)}",
   conclusion:
     "分析の価値（命題4）には定量的な上限がある：シグナルが将来リターンについて持つ" +
     "情報（ビット）が、成長率を高められる最大量。情報を持たない指標は q を一切改善しない。",
@@ -1111,6 +1146,8 @@ const C20_DIVERSIFICATION_LIMIT: Corollary = {
   ],
   formula:
     "Var_∞ = σ²·ρ̄（分散の床）。N_eff = 1/ρ̄（等相関）or (Σλ)²/Σλ²（一般）。改善∝√N_eff。",
+  formulaTex:
+    "\\mathrm{Var}_\\infty = \\sigma^2 \\bar\\rho \\qquad N_{\\mathrm{eff}} = \\frac{1}{\\bar\\rho} \\;\\;\\text{or}\\;\\; \\frac{\\left(\\sum_i \\lambda_i\\right)^2}{\\sum_i \\lambda_i^2}",
   conclusion:
     "「銘柄数」ではなく「実効独立数 N_eff」がリスク低減を決める。相関の高い建玉を" +
     "増やしても真の分散にならず、σ²ρ̄ の床に阻まれる。分散は N でなく独立性で測る。",
@@ -1172,6 +1209,8 @@ const C21_ERGODICITY: Corollary = {
   ],
   formula:
     "時間平均 g = E[log(1+f·r)] ≈ f·E[r] − ½f²σ²。アンサンブル E[W] は E[r] で増えても g<0 なら破綻。",
+  formulaTex:
+    "g = \\mathbb{E}\\big[\\log(1 + f r)\\big] \\approx f\\,\\mathbb{E}[r] - \\tfrac{1}{2} f^2 \\sigma^2 \\;\\le\\; \\log\\big(1 + f\\,\\mathbb{E}[r]\\big)",
   conclusion:
     "原論の核心。『なぜ全財産を正のEVに賭けてはいけないか』の答え＝富は乗法的で、" +
     "我々は1本の経路を生きるから。時間分散（決して一点集中しない）が時間平均を引き上げる。" +
@@ -1237,6 +1276,8 @@ const C22_LEVERAGE_RUIN: Corollary = {
   formula:
     "k* = (μ − c)/σ²（成長最適レバ、Kelly の信用版）。実効上限 k = min(k*, k_ruin)。" +
     "初期維持率 1/k ≥ m ⇒ k ≤ 1/m。破産は原資産 −1/k 逆行で到来。",
+  formulaTex:
+    "k^* = \\frac{\\mu - c}{\\sigma^2} \\qquad k_{\\mathrm{eff}} = \\min\\!\\left(k^*,\\, k_{\\mathrm{ruin}}\\right), \\quad k \\le \\frac{1}{m}",
   conclusion:
     "レバレッジは期待を線形に伸ばすが分散ドラッグ（k²）と破産の吸収壁（公理5）が上限を作る。" +
     "「NISA を上回るのに要る最小レバ k*」を追う前に、その k が招く追証・破産確率を必ず対で見る。" +
@@ -1298,6 +1339,8 @@ const C23_TAX_POSITION_VALUE: Corollary = {
   formula:
     "税引後 ≈ (1+R_strat)(1−τ)。損益分岐 R_strat = R/(1−τ)（τ=0.20315→×1.255）。" +
     "毎回実現の複利ドラッグは回転率 n とともに増大し、非課税持ち切りが上限。",
+  formulaTex:
+    "W_{\\mathrm{post}} \\approx (1 + R_{\\mathrm{strat}})(1 - \\tau) \\qquad R_{\\mathrm{BE}} = \\frac{R}{1 - \\tau}",
   conclusion:
     "税は一回の目減りではなく、複利の基盤を実現ごとに削る繰り返しドラッグ（C21）。" +
     "同じ建玉でも非課税口座（NISA）で持つ方が時間平均成長率は高く、これが NISA 比較の理論的裏づけ。" +
