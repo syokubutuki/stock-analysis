@@ -3,6 +3,10 @@
 // weekday-intraday-path / turn-of-month-path / 曜日×米国交互作用 が共有する。
 // 各群の平均パス・中央値パス・95%帯(平均±1.96SE)・ピーク/ボトム時刻・終端(寄り→引け)の
 // 平均と有意性を算出し、さらに群間で終端が有意に異なるかのペア比較(Welch t + FDR)を行う。
+//
+// 【経時ドリフト】平均パスは「N日のあいだ日内の形が変わっていない(定常)」を暗黙に仮定する。
+// 直近だけ形が変わっていても平均は何事もなかったように出るため、群内をさらに日付順で
+// 時代分割(古い→直近)し、形状が変化してきたかを検定付きで示す(buildPathEvolution)。
 
 import { mean, std, median, tTest, benjaminiHochberg } from "./stats-significance";
 import { studentTwoSidedP } from "./us-spillover-core";
@@ -13,6 +17,48 @@ export interface PathGroup {
   label: string;
   color: string;
   paths: number[][];
+  // paths と同じ順序の営業日。与えると経時ドリフト(days/eras/drift)を算出する。
+  // 同一日に複数観測(バスケットの複数銘柄)がある場合は日内平均に畳んでから扱う。
+  dates?: string[];
+}
+
+// 個別日の累積パス(日付昇順)。同一日の複数観測は畳んだ後の1本。
+export interface DayPath {
+  date: string;
+  values: number[]; // 長さG
+  end: number; // 寄り→引け
+  peakIdx: number; // その日の高値時刻ビン(argmax)
+  troughIdx: number; // その日の安値時刻ビン(argmin)
+}
+
+// 群内を日付順に等分割した「時代」。古い→直近の順に並ぶ。
+export interface PathEra {
+  key: string;
+  label: string;
+  n: number;
+  from: string; // 期間の最初の営業日
+  to: string; // 期間の最後の営業日
+  mean: number[]; // その時代だけの平均パス
+  endMean: number;
+  peakIdx: number; // その時代の平均パスの高値時刻
+  troughIdx: number; // 同 安値時刻
+}
+
+// 形状が経時変化しているかの検定。
+export interface PathDrift {
+  nEarly: number;
+  nLate: number;
+  endEarly: number; // 最古の時代の終端平均
+  endLate: number; // 直近の時代の終端平均
+  endDiff: number; // 直近 − 最古
+  endP: number; // 上記差の Welch 2標本t検定 p値
+  // 高安「時刻」のドリフト: 日付順位 と 各日の高値/安値時刻ビン の Spearman 順位相関。
+  // ρ>0 = 時刻が後ろ倒しに移動、ρ<0 = 前倒し。
+  peakRho: number;
+  peakP: number;
+  troughRho: number;
+  troughP: number;
+  nRho: number; // 順位相関に使った日数
 }
 
 export interface PathStat {
@@ -30,6 +76,10 @@ export interface PathStat {
   endValues: number[]; // 各日の終端(寄り→引け)累積リターン。群間比較に使う
   peakIdx: number; // 平均パスが最大になる時間ビン
   troughIdx: number; // 平均パスが最小になる時間ビン
+  // ── 経時ドリフト(PathGroup.dates を与えた場合のみ中身が入る) ──
+  days: DayPath[]; // 個別日パス(日付昇順)。新旧グラデーション描画用
+  eras: PathEra[]; // 時代分割の平均パス(古→新)。標本不足なら空
+  drift: PathDrift | null; // 形状変化の検定。標本不足なら null
 }
 
 // 群間で終端リターンが異なるかのペア比較(Welchの2標本t検定 → BHでFDR補正)。
