@@ -675,6 +675,10 @@ const WeekdayUsPathChart = dynamic(
   () => import("./components/analysis/WeekdayUsPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const TodayVsExpectedPathChart = dynamic(
+  () => import("./components/analysis/TodayVsExpectedPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const RegimeUsPathChart = dynamic(
   () => import("./components/analysis/RegimeUsPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1799,6 +1803,7 @@ export default function AnalysisPage() {
                       { id: "cal-weekday-intra-path", title: "曜日 × 当日日内 平均累積パス", node: <WeekdayIntradayPathChart ticker={data.ticker} /> },
                       { id: "cal-tom-path", title: "月内位置（月初/中旬/月末）× 当日日内 平均累積パス", node: <TurnOfMonthPathChart ticker={data.ticker} /> },
                       { id: "cal-weekday-us-path", title: "曜日 × 前夜米国ビン 交互作用：日内平均累積パス", node: <WeekdayUsPathChart ticker={data.ticker} /> },
+                      { id: "cal-today-vs-expected", title: "当日の実測 vs 条件付き期待パス（台本どおりか／乖離は続くか）", node: <TodayVsExpectedPathChart ticker={data.ticker} /> },
                       { id: "cal-regime-us-path", title: "相場基調 × 前夜米国 交互作用：日内平均累積パス", node: <RegimeUsPathChart ticker={data.ticker} /> },
                       { id: "cal-weekday-intra-edge", title: "曜日 × 日内タイミング エッジスキャン", node: <WeekdayIntradayEdgeChart ticker={data.ticker} /> },
                       { id: "cal-sector-basket", title: "業種バスケット 曜日×日内（標本プール）", node: <SectorBasketWeekdayChart ticker={data.ticker} /> },
