@@ -215,15 +215,23 @@ function drawScatter(ctx: CanvasRenderingContext2D, W: number, H: number, r: Tod
   // 対象日の z と、その予測残余
   if (todayZ !== null) {
     const tx = X(todayZ);
-    ctx.setLineDash([3, 3]); ctx.strokeStyle = TODAY_COLOR; ctx.lineWidth = 1.5;
+    // 対象日の乖離は「弱い縦ガイド」に留める(この上に予測区間を重ねると潰れるため)。
+    ctx.setLineDash([2, 4]); ctx.strokeStyle = TODAY_COLOR + "55"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(tx, mt); ctx.lineTo(tx, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
     if (b.predicted !== null) {
-      ctx.fillStyle = TODAY_COLOR;
-      ctx.beginPath(); ctx.arc(tx, Y(b.predicted), 4.5, 0, Math.PI * 2); ctx.fill();
+      // 予測区間はガイド線から右へずらし、キャップ付きの太いエラーバーとして独立に見せる。
+      const ex = Math.min(tx + 9, ml + plotW - 6);
       if (b.predLo !== null && b.predHi !== null) {
-        ctx.strokeStyle = TODAY_COLOR + "88"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(tx, Y(Math.max(-yMax, b.predLo))); ctx.lineTo(tx, Y(Math.min(yMax, b.predHi))); ctx.stroke();
+        const yLo = Y(Math.max(-yMax, b.predLo)), yHi = Y(Math.min(yMax, b.predHi));
+        ctx.strokeStyle = TODAY_COLOR; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(ex, yLo); ctx.lineTo(ex, yHi); ctx.stroke();
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(ex - 4, yLo); ctx.lineTo(ex + 4, yLo); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex - 4, yHi); ctx.lineTo(ex + 4, yHi); ctx.stroke();
       }
+      ctx.fillStyle = TODAY_COLOR;
+      ctx.beginPath(); ctx.arc(ex, Y(b.predicted), 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1; ctx.stroke(); // 区間ヒゲと点を分離
     }
     ctx.fillStyle = TODAY_COLOR; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("対象日", tx + 4, mt + 9);
@@ -599,8 +607,8 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                     </div>
                   </div>
                   <p className="text-[11px] text-gray-400">
-                    青点＝過去日（横=その日の乖離z、縦=そこから引けまでの残余）。破線＝対象日の現在の乖離、●＝そのzに対する残余の予測値、縦線＝95%予測区間。
-                    予測区間が0を跨いでいる限り、方向は当てにならない（点予測だけ見ないこと）。
+                    青点＝過去日（横=その日の乖離z、縦=そこから引けまでの残余）。薄い破線＝対象日の現在の乖離。その右にずらした●＝そのzに対する残余の予測値、キャップ付き縦棒＝95%予測区間。
+                    予測区間が0（横のゼロ線）を跨いでいる限り、方向は当てにならない（点予測だけ見ないこと）。
                   </p>
                 </>
               ) : (
@@ -615,8 +623,9 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                 <span className="font-medium text-gray-700">問い:</span>{" "}
                 <span className="text-gray-500">
                   そもそも「台本」は個別の1日をどれだけ説明するのか。条件セルの各過去日について、その日を平均から抜いた
-                  leave-one-out 平均パスとの相関を取った分布。ここが0付近に集中しているなら、①②の読みは平均像の話であって
-                  個別日の予言ではない、と自覚して使う必要がある。
+                  leave-one-out 平均パスとの相関を取った分布。ただし累積パスは強く自己相関した(トレンド状の)系列どうしの相関なので、
+                  値は構造的に±1へ押しやられ、分布は両端に山ができる二峰性(U字)になりやすい。0付近に集中するのではなく
+                  『上に張り付いた日＝＋1／下に垂れた日＝−1』へ割れるのが普通で、だから中央値ではなく<strong>符号がどちらに偏るか</strong>で読む。
                 </span>
               </div>
               <div className="relative"><canvas ref={trackRef} /></div>
@@ -633,28 +642,31 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                       <div className="bg-gray-50 rounded p-2">
-                        <div className="text-gray-500">パス相関の中央値</div>
-                        <div className={`font-bold ${med > 0.3 ? "text-green-600" : med > 0 ? "text-gray-800" : "text-red-600"}`}>{med.toFixed(2)}</div>
+                        <div className="text-gray-500">終端の符号一致率</div>
+                        <div className={`font-bold ${signShare > 0.6 ? "text-green-600" : signShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(signShare, 0)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">相関が正だった日</div>
-                        <div className="font-bold text-gray-800">{fmtPct(posShare, 0)}</div>
+                        <div className={`font-bold ${posShare > 0.6 ? "text-green-600" : posShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(posShare, 0)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
-                        <div className="text-gray-500">終端の符号一致率</div>
-                        <div className={`font-bold ${signShare > 0.6 ? "text-green-600" : "text-gray-800"}`}>{fmtPct(signShare, 0)}</div>
+                        <div className="text-gray-500">パス相関の中央値（参考）</div>
+                        <div className="font-bold text-gray-800">{med.toFixed(2)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
-                        <div className="text-gray-500">追随βの中央値</div>
+                        <div className="text-gray-500">追随βの中央値（減衰込み）</div>
                         <div className="font-bold text-gray-800">{isFinite(medSlope) ? medSlope.toFixed(2) : "-"}</div>
                       </div>
                     </div>
                     <p className="text-[11px] text-gray-400">
-                      {med > 0.3
-                        ? "パス相関の中央値が高い＝この条件の日は実際に似た形をなぞる傾向。台本の信頼度は比較的高い。"
-                        : "パス相関の中央値が低い＝台本は平均像にすぎず、個別日の形はばらばら。①の乖離は『異常』ではなく通常のばらつきの範囲かもしれない。"}
-                      {" 追随β＞1なら台本より値幅が大きく出る条件、＜1なら台本より鈍い条件。"}
-                      {" 累積パス同士の相関は構造上0から離れやすいので、水準そのものより分布の広がりと符号一致率を重視する。"}
+                      {signShare > 0.6
+                        ? "終端の符号一致率が高い＝少なくとも引けの方向については台本が効いている。台本ベースの方向観をある程度信頼してよい。"
+                        : signShare < 0.4
+                          ? "終端の符号一致率が低い＝台本と逆に引ける日が多い条件。方向観としても当てにしない。"
+                          : "終端の符号一致率が五分＝台本の方向は個別日を予言しない。①の乖離は『異常』ではなく通常のばらつきの範囲とみなす。"}
+                      {" 追随βは leave-one-out 平均を説明変数に置く回帰で、平均側に測定誤差が乗るため（errors-in-variables）傾きは構造的に1未満へ縮む。"}
+                      {" よって『1未満＝鈍い』とは読めない。βどうしを条件間で相対比較するのは可（大きいほど台本追随が強い）。"}
+                      {" パス相関の中央値は分布がU字なので代表値になりにくく、参考に留める。"}
                     </p>
                   </>
                 );
@@ -707,15 +719,16 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
           <li><strong>②でβ(t)&gt;0かつ★</strong>: 継続型。上振れている日はさらに伸びやすい＝乖離方向に順張り。強い日に乗る根拠になる。</li>
           <li><strong>②でβがどの時刻も非有意</strong>: 乖離に情報はない。この場合「今日は上振れている」という観察から残余について言えることは何もなく、予測値は条件平均とほぼ同義になる。ここを混同しないこと。</li>
           <li><strong>②で朝は非有意・後場だけ有意</strong>: 情報の消化に時間がかかり、後場に入ってからの乖離だけが意味を持つ条件。エントリー時刻の設計に直結する。</li>
-          <li><strong>③でパス相関の中央値が低い(0付近)</strong>: 台本は平均像にすぎず、個別日はばらばらの形をなぞる。①の「乖離」は異常ではなく通常のばらつき。台本の重みを下げて読む。</li>
-          <li><strong>③で終端の符号一致率が60%超</strong>: 少なくとも方向については台本が効いている。</li>
+          <li><strong>③の分布は普通U字(二峰性)になる</strong>: 累積パスどうしの相関は構造上±1へ寄るため、山は両端にできる。だから中央値を代表値として『高い/低い』と読むのは不適切で、符号がどちらの端に偏るか(符号一致率・正相関の割合)で読む。</li>
+          <li><strong>③で終端の符号一致率が60%超</strong>: 少なくとも引けの方向については台本が効いている。逆に40%未満なら台本と逆に引ける日が多く、方向観としても当てにしない。五分なら台本の方向は個別日を予言せず、①の乖離は通常のばらつきとみなす。</li>
+          <li><strong>③の追随βは減衰する</strong>: leave-one-out 平均を説明変数に置くと平均側に測定誤差が乗り(errors-in-variables)、傾きは構造的に1未満へ縮む。単独で『1未満＝鈍い』とは読めない。条件を切り替えてβの相対比較に使う(大きいほど台本追随が強い)。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>寄り前: 前夜米国のビンと曜日が確定した時点で台本(期待パス)を引き、その日の基本方針(買い場探しか、戻り売りか、見送りか)を決める。</li>
           <li>場中: ①で今の乖離zを確認 → ②のβ(t)がその時刻で有意なら、残余の予測と予測区間から手仕舞い/追随を判断する。「上振れ×β&lt;0★」なら利確、「上振れ×β&gt;0★」なら継続保有。</li>
-          <li>③を先に確認する運用: 追随度が低い条件では①②の示唆を弱く扱う。台本の信頼度そのものを事前にチェックしてから使う。</li>
+          <li>③を先に確認する運用: 符号一致率が五分の条件では①②の示唆を弱く扱う。台本が方向を当てられる条件かを事前にチェックしてから使う。</li>
           <li>対象日を過去日に切り替えれば、「その日の朝に見えていた台本」と実際の結果を並べて目視で検証できる（先読み排除をONのまま）。判断ルールを決める前にこの目視検証を数十日ぶん回すと、過剰なルール化を防げる。</li>
         </ul>
 
