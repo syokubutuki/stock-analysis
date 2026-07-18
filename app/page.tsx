@@ -227,6 +227,10 @@ const OptimalExitChart = dynamic(
   () => import("./components/analysis/OptimalExitChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const EventCalendarChart = dynamic(
+  () => import("./components/analysis/EventCalendarChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const WeekdayVsBuyHoldChart = dynamic(
   () => import("./components/analysis/WeekdayVsBuyHoldChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
@@ -1809,6 +1813,7 @@ export default function AnalysisPage() {
                       { id: "cal-candle-season", title: "ローソク足の季節性（足の中身×カレンダー）", node: <CandleSeasonalityChart prices={filteredPrices} /> },
                       { id: "cal-weekclock", title: "週内クロック（月曜始値基準の累積OHLC）", node: <WeekClockChart prices={filteredPrices} ticker={data.ticker} /> },
                       { id: "cal-event-effect", title: "カレンダー・イベント効果（月末/SQ/連休/季節の先行きリターン）", node: <CalendarEffectChart prices={filteredPrices} /> },
+                      { id: "cal-event-calendar", title: "イベントカレンダー条件付け（FOMC/CPI/雇用統計/日銀/SQ の先行きリターン）", node: <EventCalendarChart prices={filteredPrices} /> },
                       { id: "cal-session-gap", title: "休場コンテキスト別 曜日値動き（連休・祝日の歪み検出）", node: <SessionGapChart prices={filteredPrices} /> },
                       { id: "cal-today-bin", title: "今日の値動き → リターンビン即時判断（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
                       { id: "cal-weekly-analog", title: "今週の軌跡アナログ比較（似た形／前夜米国ビンで絞って先読み）", node: <WeeklyAnalogChart prices={allPrices} ticker={data.ticker} /> },
