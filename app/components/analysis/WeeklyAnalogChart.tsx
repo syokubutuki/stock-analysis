@@ -12,10 +12,26 @@ import { useUsDaily } from "../../hooks/useUsDaily";
 import { useIntraday, IntradayResponse } from "../../hooks/useIntraday";
 import { groupByDay } from "../../lib/intraday-core";
 import {
-  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign,
+  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign, WeightMode,
 } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
+
+// C1: 信頼度バッジ。実効n・ベースライン差p・novelty棄却の3条件から緑/黄/赤。
+function confidence(r: WeeklyAnalogResult): { level: "green" | "amber" | "red"; label: string; reasons: string[] } {
+  const okN = r.nEff >= 15;
+  const okP = r.diffP < 0.05;
+  const okNov = !r.rejected;
+  const pass = [okN, okP, okNov].filter(Boolean).length;
+  const reasons = [
+    `${okN ? "✓" : "✕"} 実効n=${r.nEff}${okN ? "" : "(薄い)"}`,
+    `${okP ? "✓" : "✕"} ベースライン差 p=${r.diffP < 0.001 ? "<.001" : r.diffP.toFixed(3)}`,
+    `${okNov ? "✓" : "✕"} 前例あり(novelty ${(r.novelty * 100).toFixed(0)}%)`,
+  ];
+  if (pass === 3) return { level: "green", label: "採用可", reasons };
+  if (pass >= 1 && okNov) return { level: "amber", label: "参考", reasons };
+  return { level: "red", label: "使うな", reasons };
+}
 
 interface Props {
   prices: PricePoint[];
@@ -109,7 +125,7 @@ function fmtPct(v: number, d = 1): string {
   return `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
 }
 
-function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: WeeklyAnalogResult) {
+function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: WeeklyAnalogResult, highlight: number | null) {
   const { L, H } = r;
   const ml = 46, mr = 16, mt = 22, mb = 24;
   const plotW = width - ml - mr, plotH = height - mt - mb;
@@ -120,7 +136,7 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   const all: number[] = [
     ...r.query.lead, ...r.query.leadHigh, ...r.query.leadLow,
     ...r.leadP25, ...r.leadP75, ...r.fwdP25, ...r.fwdP75,
-    ...r.fwdHighMedian, ...r.fwdLowMedian,
+    ...r.fwdHighMedian, ...r.fwdLowMedian, ...r.baselineFwdMedian,
   ];
   for (const s of r.selected) { all.push(...s.lead, ...s.forward); }
   const maxV = Math.max(0.01, ...all.map((v) => Math.abs(v)));
@@ -161,14 +177,22 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   ctx.closePath(); ctx.fill();
 
   // 各アナログ(最大40本, 連続: リードイン→フォワード)
-  ctx.strokeStyle = "rgba(148,163,184,0.4)"; ctx.lineWidth = 1;
   const shown = r.selected.slice(0, 40);
+  let hl: typeof shown[number] | null = null;
   for (const s of shown) {
+    if (highlight !== null && s.endIndex === highlight) { hl = s; continue; }
+    ctx.strokeStyle = "rgba(148,163,184,0.4)"; ctx.lineWidth = 1;
     ctx.beginPath();
     s.lead.forEach((v, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(tMin + i), yOf(v)));
     s.forward.forEach((v, m) => ctx.lineTo(xOf(m), yOf(v)));
     ctx.stroke();
   }
+
+  // ベースライン(全候補窓)の中央値パス: 灰色の細線(A1: 絞った意味の有無を目視)
+  ctx.strokeStyle = "rgba(107,114,128,0.85)"; ctx.lineWidth = 1.3; ctx.setLineDash([2, 2]);
+  ctx.beginPath();
+  r.baselineFwdMedian.forEach((v, m) => ctx[m === 0 ? "moveTo" : "lineTo"](xOf(m), yOf(v)));
+  ctx.stroke(); ctx.setLineDash([]);
 
   // アナログのリードイン中央値(点線・比較用)
   ctx.strokeStyle = "#64748b"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -214,11 +238,22 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   ctx.fillStyle = "#0f172a";
   ctx.beginPath(); ctx.arc(xOf(0), yOf(0), 3, 0, Math.PI * 2); ctx.fill();
 
+  // 強調中のアナログ(C2/C6: 一覧クリックで該当事例を橙で前面に)
+  if (hl) {
+    ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    hl.lead.forEach((v, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(tMin + i), yOf(v)));
+    hl.forward.forEach((v, m) => ctx.lineTo(xOf(m), yOf(v)));
+    ctx.stroke();
+  }
+
   // x目盛
   ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
   const step = Math.max(1, Math.round((tMax - tMin) / 6));
   for (let t = tMin; t <= tMax; t += step) ctx.fillText(t === 0 ? "0" : `${t > 0 ? "+" : ""}${t}d`, xOf(t), mt + plotH + 14);
 }
+
+const LS_KEY = "weeklyAnalog.settings.v1";
 
 export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -233,23 +268,46 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   const [K, setK] = useState(20);
   const [metric, setMetric] = useState<DistMetric>("euclid");
   const [align, setAlign] = useState<WindowAlign>("trailing");
+  const [weight, setWeight] = useState<WeightMode>("uniform");
+  const [volNorm, setVolNorm] = useState(false);
+  const [dtwBandFrac, setDtwBandFrac] = useState(0.25);
+  const [hlWeight, setHlWeight] = useState(0);
   const [selBinOverride, setSelBinOverride] = useState<number | null>(null);
+  const [highlight, setHighlight] = useState<number | null>(null); // C2/C6: 強調するアナログの endIndex
+
+  // C4: 設定の localStorage 永続化(銘柄非依存)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
+      if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
+      if (typeof s.dtwBandFrac === "number") setDtwBandFrac(s.dtwBandFrac);
+      if (typeof s.hlWeight === "number") setHlWeight(s.hlWeight);
+      if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K);
+      if (s.usMode) setUsMode(s.usMode); if (s.scheme) setScheme(s.scheme);
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ mode, metric, align, weight, volNorm, dtwBandFrac, hlWeight, L, H, K, usMode, scheme })); } catch { /* ignore */ }
+  }, [mode, metric, align, weight, volNorm, dtwBandFrac, hlWeight, L, H, K, usMode, scheme]);
 
   const { prices: usPrices, loading: usLoading, error: usError } = useUsDaily(usTicker);
   const us = useMemo(() => (usPrices ? computeUsReturns(usPrices) : []), [usPrices]);
 
   const result = useMemo(() => {
     if (us.length === 0) return null;
-    return computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align });
-  }, [prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align]);
+    return computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight });
+  }, [prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight]);
   // align="week" では窓長はコア側が今週の経過日数に決める
   const effL = result?.L ?? L;
 
   useEffect(() => {
     if (!canvasRef.current || !result) return;
     const init = initCanvas(canvasRef.current, 280);
-    if (init) draw(init.ctx, init.width, init.height, result);
-  }, [result]);
+    if (init) draw(init.ctx, init.width, init.height, result, highlight);
+  }, [result, highlight]);
 
   // 今週の日中足ドリルダウン(ticker 指定時のみ)
   const { resp: intraResp, loading: intraLoading, error: intraError } =
@@ -286,10 +344,11 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
       {/* モード切替 */}
       <div className="inline-flex rounded overflow-hidden border border-gray-200 text-xs">
-        {([["usbin", "前夜米国ビンで絞る"], ["similar", "似た形で絞る(アナログ)"]] as [AnalogMode, string][]).map(([m, lbl]) => (
+        {([["usbin", "前夜米国ビンで絞る"], ["similar", "似た形で絞る(アナログ)"], ["ensemble", "両立(米国ビン∩似た形)"]] as [AnalogMode, string][]).map(([m, lbl]) => (
           <button
             key={m}
             onClick={() => { setMode(m); resetBin(); }}
+            title={m === "ensemble" ? "指定した前夜米国ビンに絞ったうえで、形の近い順に上位K局面(B4)。地合いと形の両立で確度を上げる。事例は減るので実効nに注意。" : undefined}
             className={`px-3 py-1 font-medium ${mode === m ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
           >{lbl}</button>
         ))}
@@ -313,7 +372,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
           <span className="text-gray-500">今週= <span className="font-medium text-gray-700">{effL}営業日</span>（月〜今日）</span>
         )}
         <div className="flex items-center gap-1"><span>先行き H:</span>{H_PRESETS.map((v) => <Btn key={v} v={v} cur={H} set={setH} />)}</div>
-        {mode === "similar" && (
+        {(mode === "similar" || mode === "ensemble") && (
           <div className="flex items-center gap-1"><span>近傍 K:</span>{K_PRESETS.map((v) => <Btn key={v} v={v} cur={K} set={setK} />)}</div>
         )}
         <div className="flex items-center gap-1">
@@ -321,15 +380,43 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
           {([["euclid", "ユークリッド"], ["dtw", "DTW"]] as [DistMetric, string][]).map(([m, lbl]) => (
             <button key={m} onClick={() => setMetric(m)}
               title={m === "dtw"
-                ? "動的時間伸縮。山や谷が1日早い/遅いといった時間のズレを吸収して形を突き合わせる(Sakoe-Chibaバンド=窓長の約1/4)。"
+                ? "動的時間伸縮。山や谷が1日早い/遅いといった時間のズレを吸収して形を突き合わせる(Sakoe-Chibaバンドは下のスライダで可変)。"
                 : "等速比較。同じ日付位置どうしを突き合わせる。時間のズレに弱い。"}
               className={`px-2 py-0.5 rounded ${metric === m ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
           ))}
         </div>
       </div>
 
-      {/* 米国ビン設定(usbin モード) */}
-      {mode === "usbin" && (
+      {/* 手法の質: 重み・ボラ正規化・DTWバンド・HL距離 */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
+        <div className="flex items-center gap-1">
+          <span>近傍の重み:</span>
+          {([["uniform", "等重み"], ["kernel", "カーネル"]] as [WeightMode, string][]).map(([m, lbl]) => (
+            <button key={m} onClick={() => setWeight(m)}
+              title={m === "kernel" ? "Nadaraya-Watson。距離が近い局面ほど重く、遠い局面は薄く。バンド幅=選抜距離の中央値。(B1)" : "全事例を1票ずつ等しく扱う。"}
+              className={`px-2 py-0.5 rounded ${weight === m ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
+          ))}
+        </div>
+        <label className="inline-flex items-center gap-1 cursor-pointer" title="フォワードをσ単位で集計し今週のσで掛け戻す。静かな週と荒い週の値幅の違いを補正(B2)。">
+          <input type="checkbox" checked={volNorm} onChange={(e) => setVolNorm(e.target.checked)} className="accent-blue-600" />σ正規化
+        </label>
+        {metric === "dtw" && (
+          <label className="inline-flex items-center gap-1" title="Sakoe-Chibaバンド幅(窓長比)。大きいほど時間のズレを許すが、L/2以上では退化(何でも似ている)に近づく(B3)。">
+            <span>DTWバンド {Math.round(dtwBandFrac * 100)}%</span>
+            <input type="range" min={0} max={50} step={5} value={Math.round(dtwBandFrac * 100)}
+              onChange={(e) => setDtwBandFrac(Number(e.target.value) / 100)} className="accent-blue-600 w-24" />
+            {dtwBandFrac >= 0.5 && <span className="text-amber-600">退化注意</span>}
+          </label>
+        )}
+        <label className="inline-flex items-center gap-1" title="距離に日中レンジ(高安幅)の形状チャネルを加える重み γ。同じ終値経路でも荒れ方の違いを区別(B6)。">
+          <span>HL距離 γ={hlWeight.toFixed(1)}</span>
+          <input type="range" min={0} max={10} step={1} value={Math.round(hlWeight * 10)}
+            onChange={(e) => setHlWeight(Number(e.target.value) / 10)} className="accent-blue-600 w-24" />
+        </label>
+      </div>
+
+      {/* 米国ビン設定(usbin/ensemble モード) */}
+      {mode !== "similar" && (
         <div className="space-y-2">
           <div className="flex items-center gap-4 flex-wrap">
             <UsDriverButtons value={usTicker} onChange={(t) => { setUsTicker(t); resetBin(); }} />
@@ -375,18 +462,42 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
       {result ? (
         <>
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-            {mode === "usbin"
-              ? <>前夜米国が<span className="font-bold">「{result.binMetaObj.labels[result.selBin]}」</span>で始まった過去 {result.selected.length} 週</>
-              : <>今週の形に似た過去 {result.selected.length} 局面</>}
-            {" → その後 "}{result.H}日の
-            <span className="font-bold"> 終値中央値 {fmtPct(result.medianFinal)}</span>
-            <span className="text-blue-700">（平均 {fmtPct(result.meanFinal)}｜勝率 {((result.upCount / (result.upCount + result.downCount || 1)) * 100).toFixed(0)}%）</span>
-            <span className="block mt-0.5">
-              到達の中央値: <span className="text-green-700 font-bold">高値 {fmtPct(result.medianMfe)}</span>（利確目安）／
-              <span className="text-red-700 font-bold"> 安値 {fmtPct(result.medianMae)}</span>（損切り目安）
-            </span>
-          </div>
+          {(() => {
+            const conf = confidence(result);
+            const badgeCls = conf.level === "green" ? "bg-green-100 text-green-800 border-green-400"
+              : conf.level === "amber" ? "bg-amber-100 text-amber-800 border-amber-400"
+              : "bg-red-100 text-red-800 border-red-400";
+            return (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-bold ${badgeCls}`}
+                    title={conf.reasons.join(" / ")}>信頼度: {conf.label}</span>
+                  {result.rejected && <span className="text-red-700 font-medium">⚠ 今週は前例が薄い(novelty {(result.novelty * 100).toFixed(0)}%)——定石が効きにくい</span>}
+                </div>
+                <div>
+                  {mode === "usbin"
+                    ? <>前夜米国が<span className="font-bold">「{result.binMetaObj.labels[result.selBin]}」</span>で始まった過去 {result.selected.length} 週</>
+                    : mode === "ensemble"
+                    ? <>「{result.binMetaObj.labels[result.selBin]}」×似た形の過去 {result.selected.length} 局面</>
+                    : <>今週の形に似た過去 {result.selected.length} 局面</>}
+                  <span className="text-blue-700"> (実効 {result.nEff})</span>
+                  {" → その後 "}{result.H}日の
+                  <span className="font-bold"> 終値中央値 {fmtPct(result.medianFinal)}</span>
+                  <span className="text-blue-700">（平均 {fmtPct(result.meanFinal)}｜勝率 {((result.upCount / (result.upCount + result.downCount || 1)) * 100).toFixed(0)}%）</span>
+                </div>
+                <div>
+                  ベースライン(無条件)中央値 {fmtPct(result.baselineMedian)}／
+                  <span className={`font-bold ${result.diffP < 0.05 ? "text-blue-900" : "text-gray-500"}`}>差 {result.diffMedian >= 0 ? "+" : ""}{(result.diffMedian * 100).toFixed(1)}pt, p={result.diffP < 0.001 ? "<.001" : result.diffP.toFixed(3)}</span>
+                  <span className="text-blue-700">｜中央値95%CI [{fmtPct(result.ciLo)}, {fmtPct(result.ciHi)}]（方向安定 {(result.ciStable * 100).toFixed(0)}%）</span>
+                </div>
+                <div>
+                  到達の中央値: <span className="text-green-700 font-bold">高値 {fmtPct(result.medianMfe)}</span>（利確目安）／
+                  <span className="text-red-700 font-bold"> 安値 {fmtPct(result.medianMae)}</span>（損切り目安）
+                  {result.volNorm && <span className="text-gray-500">｜σ正規化(今週σ {(result.volQuery * 100).toFixed(1)}%/日)</span>}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="relative"><canvas ref={canvasRef} /></div>
 
@@ -396,7 +507,8 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
             <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#16a34a" }} /> 高値到達中央(MFE)</span>
             <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#dc2626" }} /> 安値到達中央(MAE)</span>
             <span><span className="inline-block w-3 h-2 align-middle" style={{ background: "rgba(37,99,235,0.13)" }} /> 終値25–75%帯</span>
-            <span>薄線=各事例</span>
+            <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#6b7280" }} /> ベースライン中央(無条件)</span>
+            <span>薄線=各事例（一覧クリックで<span style={{ color: "#f59e0b" }}>橙</span>強調）</span>
           </div>
 
           {/* 今週を日中足で見る(2階層目) */}
@@ -427,7 +539,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                 <tr className="text-gray-500 border-b border-gray-200">
                   <th className="text-left py-1 px-2">局面（週の起点〜今日相当）</th>
                   <th className="text-right px-2">前夜米国ビン</th>
-                  {mode === "similar" && <th className="text-right px-2">形の距離</th>}
+                  {mode !== "usbin" && <th className="text-right px-2">形の距離</th>}
                   <th className="text-right px-2">高値到達</th>
                   <th className="text-right px-2">安値到達</th>
                   <th className="text-right px-2">終値{result.H}日後</th>
@@ -435,14 +547,16 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
               </thead>
               <tbody>
                 {result.selected.slice(0, 10).map((s) => (
-                  <tr key={s.endIndex} className="border-b border-gray-100">
-                    <td className="py-1 px-2 text-gray-700 tabular-nums">{s.startTime} 〜 {s.endTime}</td>
+                  <tr key={`${s.source}-${s.endIndex}`}
+                    onClick={() => setHighlight(highlight === s.endIndex ? null : s.endIndex)}
+                    className={`border-b border-gray-100 cursor-pointer ${highlight === s.endIndex ? "bg-amber-50" : "hover:bg-gray-50"}`}>
+                    <td className="py-1 px-2 text-gray-700 tabular-nums">{s.source && <span className="text-[9px] text-gray-400 mr-1">{s.source}</span>}{s.startTime} 〜 {s.endTime}</td>
                     <td className="text-right px-2">
                       {s.usBin !== null
                         ? <span className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[s.usBin] }} />{result.binMetaObj.labels[s.usBin]}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    {mode === "similar" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
+                    {mode !== "usbin" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
                     <td className="text-right px-2 text-green-600 tabular-nums">{fmtPct(s.mfe)}</td>
                     <td className="text-right px-2 text-red-600 tabular-nums">{fmtPct(s.mae)}</td>
                     <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
@@ -483,6 +597,23 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
           <li><strong>直近L営業日</strong>: 週をまたいで単純に直近L日を窓にする。候補位置が全日にわたるため<strong>事例数が多く安定</strong>するが、曜日位置は揃わない(過去窓の起点が水曜だったりする)。</li>
           <li><strong>今週(週境界)</strong>: 月曜起点で今日までを窓とし(L=今週の経過立会日数、火曜なら2)、過去は<strong>各週の先頭L日</strong>と比較する。曜日位置が今週と揃い、窓起点=<strong>週初め</strong>＝前夜米国ビンの基準日が厳密に一致する。週の進行に応じてLが自動で伸びる(月→金で1→5)。</li>
           <li>トレードオフ: 週境界アラインは候補が「週数」まで減る(≒1/5)。10年で約500週なので3分位ビンなら各≈150週だが、5分位や短い履歴では薄くなる。事例数の表示を必ず確認する。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">2d. 統計的妥当性: ベースライン差・実効n・信頼度</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>無条件ベースラインとの差(A1)</strong>: 「勝率58%」も、その銘柄の<em>無条件</em>のH日リターンが元々56%なら無意味。全候補窓のフォワード分布を灰色の点線で重ね、選抜中央値との<strong>差(pt)と p 値</strong>を出す。p 値は<strong>ブロック順列検定</strong>——重複窓のかたまり(クラスタ)を単位に無作為抽出したヌル差の分布で |実測差| の外れ度を測る。差が有意でないビンは「絞った意味がない」。</li>
+          <li><strong>実効標本数 n_eff(A2)</strong>: 隣接窓はフォワードをH−1日共有し独立でない。「事例300」の独立数は実質 ≈300/H。フォワードが重なる窓を1クラスタに畳んだ数が<strong>実効n</strong>。25–75%帯やCIはこのクラスタを単位に<strong>ブロック・ブートストラップ</strong>で出すので、初めて過信のない幅になる。</li>
+          <li><strong>信頼度バッジ(C1)</strong>: 実効n≥15・ベースライン差 p&lt;0.05・前例あり(novelty低)の3条件で<span className="text-green-700 font-medium">緑=採用可</span>/<span className="text-amber-700 font-medium">黄=参考</span>/<span className="text-red-700 font-medium">赤=使うな</span>。増えた指標を1つの信号に統合する。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">2e. 手法の質: 重み・ボラ正規化・novelty・アンサンブル</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>カーネル重み(B1)</strong>: 上位K件を等重みにすると1位も20位も同じ1票。Nadaraya-Watson は距離 d の近い局面を重く w=exp(−d²/2h²)(h=選抜距離の中央値)。遠い近傍の希釈を防ぐ。</li>
+          <li><strong>novelty / 棄却(B1・C5)</strong>: 今週の最近傍距離を過去の最近傍距離分布の中で位置づけた分位。上位(90%超)なら<strong>「前例が薄い」</strong>と警告——今週が前例のない形なら、無理に集めた事例で予測を出すべきでない。棄却状態自体が「定石が効かない」という情報。</li>
+          <li><strong>σ正規化(B2)</strong>: z化は形だけ見るため、静かな週(σ0.5%)と荒い週(σ3%)が「同じ形」で一致しうる。フォワードをσ単位に直して集計し今週のσで掛け戻すと、MFE/MAEの値幅目安が現在のボラ環境に整合する。</li>
+          <li><strong>DTWバンド可変(B3)</strong>: Sakoe-Chibaバンドは結果を大きく左右する(広いほど「何でも似ている」)。スライダで感度を確認できる。L/2以上は退化(1点が多数点に対応)しやすい。</li>
+          <li><strong>HL距離 γ(B6)</strong>: 終値経路だけの距離に日中レンジ(高安幅)の形状チャネルを加える。d=√(d_close²+γ·d_range²)。「同じ終値経路でも荒れながら来たか静かに来たか」を区別。</li>
+          <li><strong>両立(アンサンブル, B4)</strong>: 前夜米国ビンで絞ったうえで形の近い順にK件。地合いと形が両立した局面は確度が高いが、事例が減るので実効nを必ず確認。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 図の読み方(すべて窓末=今日=0%に再基準化)</p>

@@ -5,16 +5,46 @@
 // 「今週の入口(前夜米国ビン=市場共通) or 各銘柄の似た形」から、来週H日の先読みを一覧比較する。
 // usbin モードでは前夜米国ビンは市場共通なので、選んだビン列で全銘柄の先行きを横並びにできる。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeUsReturns, BinScheme } from "../../lib/us-spillover-core";
 import { useUsDaily } from "../../hooks/useUsDaily";
+import { useAnalogWorker } from "../../hooks/useAnalogWorker";
 import {
-  computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign,
+  WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign, WeightMode,
 } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import { NAME_COL_W, useNameColMode, nameColStyle, NameColHeader } from "./crossTableShared";
 import AnalysisGuide from "./AnalysisGuide";
+
+// A4: 銘柄間フォワード相関の平均 ρ̄ を直近リターンから概算し、実効銘柄数 N_eff=N/(1+(N-1)ρ̄) を返す。
+function effectiveTickers(tickers: string[], pricesByTicker: Record<string, PricePoint[]>): { rhoBar: number; nEff: number } {
+  const series: number[][] = [];
+  for (const t of tickers) {
+    const p = pricesByTicker[t];
+    if (!p || p.length < 60) continue;
+    const tail = p.slice(-252);
+    const r: number[] = [];
+    for (let i = 1; i < tail.length; i++) if (tail[i].close > 0 && tail[i - 1].close > 0) r.push(Math.log(tail[i].close / tail[i - 1].close));
+    if (r.length >= 40) series.push(r);
+  }
+  const N = series.length;
+  if (N < 2) return { rhoBar: 0, nEff: Math.max(1, N) };
+  const corr = (a: number[], b: number[]): number => {
+    const n = Math.min(a.length, b.length);
+    const aa = a.slice(a.length - n), bb = b.slice(b.length - n);
+    const ma = aa.reduce((s, v) => s + v, 0) / n, mb = bb.reduce((s, v) => s + v, 0) / n;
+    let cov = 0, va = 0, vb = 0;
+    for (let i = 0; i < n; i++) { const da = aa[i] - ma, db = bb[i] - mb; cov += da * db; va += da * da; vb += db * db; }
+    const d = Math.sqrt(va * vb);
+    return d > 0 ? cov / d : 0;
+  };
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { sum += corr(series[i], series[j]); cnt++; }
+  const rhoBar = cnt ? Math.max(0, sum / cnt) : 0;
+  const nEff = N / (1 + (N - 1) * rhoBar);
+  return { rhoBar, nEff };
+}
 
 interface Props {
   tickers: string[];
@@ -47,6 +77,17 @@ function fmtPct(v: number, d = 1): string {
   return `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
 }
 
+// C1: 実効n・ベースライン差p・novelty棄却から緑/黄/赤の信頼度。
+function confLevel(r: WeeklyAnalogResult): { level: "green" | "amber" | "red"; title: string } {
+  const okN = r.nEff >= 15, okP = r.diffP < 0.05, okNov = !r.rejected;
+  const pass = [okN, okP, okNov].filter(Boolean).length;
+  const title = `実効n=${r.nEff}${okN ? "" : "(薄)"} / 差p=${r.diffP < 0.001 ? "<.001" : r.diffP.toFixed(3)} / novelty ${(r.novelty * 100).toFixed(0)}%`;
+  if (pass === 3) return { level: "green", title };
+  if (pass >= 1 && okNov) return { level: "amber", title };
+  return { level: "red", title };
+}
+const CONF_COLOR: Record<string, string> = { green: "#16a34a", amber: "#f59e0b", red: "#dc2626" };
+
 // 先行きミニSVG。青=終値中央値/薄青帯=終値25-75%/緑点線=高値到達中央(MFE)/赤点線=安値到達中央(MAE)。
 // 縦は全銘柄共通スケールで比較可能。
 function ForwardSpark({ res, scale }: { res: WeeklyAnalogResult; scale: number }) {
@@ -72,6 +113,8 @@ function ForwardSpark({ res, scale }: { res: WeeklyAnalogResult; scale: number }
   );
 }
 
+const LS_KEY = "weeklyAnalogCross.settings.v1";
+
 export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names, onRename }: Props) {
   const [usTicker, setUsTicker] = useState("^IXIC");
   const [usMode, setUsMode] = useState<UsMode>("ret");
@@ -82,11 +125,35 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
   const [K, setK] = useState(20);
   const [metric, setMetric] = useState<DistMetric>("euclid");
   const [align, setAlign] = useState<WindowAlign>("trailing");
+  const [weight, setWeight] = useState<WeightMode>("uniform");
+  const [volNorm, setVolNorm] = useState(false);
+  const [dtwBandFrac, setDtwBandFrac] = useState(0.25);
+  const [hlWeight, setHlWeight] = useState(0);
+  const [pool, setPool] = useState(false);
   const [selBinOverride, setSelBinOverride] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("median");
   const [editing, setEditing] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
   const [nameCol, setNameCol] = useNameColMode();
+
+  // C4: 設定の localStorage 永続化
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
+      if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
+      if (typeof s.dtwBandFrac === "number") setDtwBandFrac(s.dtwBandFrac);
+      if (typeof s.hlWeight === "number") setHlWeight(s.hlWeight);
+      if (typeof s.pool === "boolean") setPool(s.pool);
+      if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K);
+      if (s.usMode) setUsMode(s.usMode); if (s.scheme) setScheme(s.scheme);
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ mode, metric, align, weight, volNorm, dtwBandFrac, hlWeight, pool, L, H, K, usMode, scheme })); } catch { /* ignore */ }
+  }, [mode, metric, align, weight, volNorm, dtwBandFrac, hlWeight, pool, L, H, K, usMode, scheme]);
 
   const { prices: usPrices, loading: usLoading, error: usError } = useUsDaily(usTicker);
   const us = useMemo(() => (usPrices ? computeUsReturns(usPrices) : []), [usPrices]);
@@ -94,16 +161,24 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
   const uniq = useMemo(() => Array.from(new Set(tickers.filter((t) => t && t.trim()))), [tickers]);
   const resetBin = () => setSelBinOverride(null);
 
-  const rows = useMemo<Row[]>(() => {
-    if (us.length === 0) return [];
-    return uniq.map((ticker) => {
-      const prices = pricesByTicker[ticker];
-      const res = prices && prices.length >= 120
-        ? computeWeeklyAnalog({ prices, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align })
-        : null;
-      return { ticker, res };
+  // C3: 全銘柄×設定の計算を Web Worker に逃がす(L=20/DTW/横断でメインスレッドが固まるのを防ぐ)
+  const { run } = useAnalogWorker();
+  const [rows, setRows] = useState<Row[]>([]);
+  const [computing, setComputing] = useState(false);
+  const runIdRef = useRef(0);
+  useEffect(() => {
+    if (us.length === 0 || uniq.length < 1) { setRows([]); return; }
+    const myId = ++runIdRef.current;
+    setComputing(true);
+    run({
+      kind: "cross", tickers: uniq, pricesByTicker, us, pool,
+      params: { L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight },
+    }).then((resp) => {
+      if (myId !== runIdRef.current) return;
+      setRows((resp.rows as Row[]) ?? []);
+      setComputing(false);
     });
-  }, [uniq, pricesByTicker, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align]);
+  }, [run, uniq, pricesByTicker, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight, pool]);
 
   const withRes = rows.filter((r) => r.res);
   const meta = withRes[0]?.res?.binMetaObj ?? null;
@@ -141,8 +216,12 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
     return arr;
   }, [rows, sortKey, names]);
 
-  // 横断コンセンサス
+  // 横断コンセンサス(A4: 相関調整)
   const bull = withRes.filter((r) => r.res!.medianFinal > 0).length;
+  const { rhoBar, nEff: nEffTickers } = useMemo(
+    () => effectiveTickers(rows.filter((r) => r.res).map((r) => r.ticker), pricesByTicker),
+    [rows, pricesByTicker]
+  );
 
   if (uniq.length < 2) {
     return <div className="text-sm text-gray-500">横断比較にはウォッチリストに2銘柄以上が必要です。</div>;
@@ -160,11 +239,14 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
         で過去局面と突き合わせ、来週{H}日の先読みを横並び比較。
       </p>
 
-      <div className="inline-flex rounded overflow-hidden border border-gray-200 text-xs">
-        {([["usbin", "前夜米国ビンで絞る"], ["similar", "似た形で絞る(アナログ)"]] as [AnalogMode, string][]).map(([m, lbl]) => (
-          <button key={m} onClick={() => { setMode(m); resetBin(); }}
-            className={`px-3 py-1 font-medium ${mode === m ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
-        ))}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="inline-flex rounded overflow-hidden border border-gray-200 text-xs">
+          {([["usbin", "前夜米国ビンで絞る"], ["similar", "似た形で絞る(アナログ)"], ["ensemble", "両立(米国ビン∩似た形)"]] as [AnalogMode, string][]).map(([m, lbl]) => (
+            <button key={m} onClick={() => { setMode(m); resetBin(); }}
+              className={`px-3 py-1 font-medium ${mode === m ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
+          ))}
+        </div>
+        {computing && <span className="text-xs text-gray-400">計算中…（Web Worker）</span>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
@@ -184,20 +266,50 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
           <span className="text-gray-500">今週= <span className="font-medium text-gray-700">{effL}営業日</span>（月〜今日）</span>
         )}
         <div className="flex items-center gap-1"><span>先行き H:</span>{H_PRESETS.map((v) => <NumBtn key={v} v={v} cur={H} set={setH} />)}</div>
-        {mode === "similar" && <div className="flex items-center gap-1"><span>近傍 K:</span>{K_PRESETS.map((v) => <NumBtn key={v} v={v} cur={K} set={setK} />)}</div>}
+        {(mode === "similar" || mode === "ensemble") && <div className="flex items-center gap-1"><span>近傍 K:</span>{K_PRESETS.map((v) => <NumBtn key={v} v={v} cur={K} set={setK} />)}</div>}
         <div className="flex items-center gap-1">
           <span>形の距離:</span>
           {([["euclid", "ユークリッド"], ["dtw", "DTW"]] as [DistMetric, string][]).map(([m, lbl]) => (
             <button key={m} onClick={() => setMetric(m)}
               title={m === "dtw"
-                ? "動的時間伸縮。山や谷が1日早い/遅いといった時間のズレを吸収して形を突き合わせる(Sakoe-Chibaバンド=窓長の約1/4)。"
+                ? "動的時間伸縮。山や谷が1日早い/遅いといった時間のズレを吸収して形を突き合わせる(Sakoe-Chibaバンドは下のスライダで可変)。"
                 : "等速比較。同じ日付位置どうしを突き合わせる。時間のズレに弱い。"}
               className={`px-2 py-0.5 rounded ${metric === m ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
           ))}
         </div>
       </div>
 
-      {mode === "usbin" && (
+      {/* 手法の質: 重み・σ正規化・DTWバンド・HL距離・横断プール */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
+        <div className="flex items-center gap-1">
+          <span>重み:</span>
+          {([["uniform", "等重み"], ["kernel", "カーネル"]] as [WeightMode, string][]).map(([m, lbl]) => (
+            <button key={m} onClick={() => setWeight(m)}
+              title={m === "kernel" ? "Nadaraya-Watson。距離が近い局面ほど重く(B1)。" : "全事例を1票ずつ等しく扱う。"}
+              className={`px-2 py-0.5 rounded ${weight === m ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}>{lbl}</button>
+          ))}
+        </div>
+        <label className="inline-flex items-center gap-1 cursor-pointer" title="フォワードをσ単位で集計し各銘柄の今週σで復元(B2)。">
+          <input type="checkbox" checked={volNorm} onChange={(e) => setVolNorm(e.target.checked)} className="accent-blue-600" />σ正規化
+        </label>
+        {metric === "dtw" && (
+          <label className="inline-flex items-center gap-1" title="Sakoe-Chibaバンド幅(窓長比)。L/2以上は退化に近づく(B3)。">
+            <span>DTWバンド {Math.round(dtwBandFrac * 100)}%</span>
+            <input type="range" min={0} max={50} step={5} value={Math.round(dtwBandFrac * 100)}
+              onChange={(e) => setDtwBandFrac(Number(e.target.value) / 100)} className="accent-blue-600 w-20" />
+          </label>
+        )}
+        <label className="inline-flex items-center gap-1" title="距離に日中レンジ形状チャネルを加える重み γ(B6)。">
+          <span>HL距離 γ={hlWeight.toFixed(1)}</span>
+          <input type="range" min={0} max={10} step={1} value={Math.round(hlWeight * 10)}
+            onChange={(e) => setHlWeight(Number(e.target.value) / 10)} className="accent-blue-600 w-20" />
+        </label>
+        <label className="inline-flex items-center gap-1 cursor-pointer" title="他銘柄の過去週もアナログ候補に含めて事例数を増やす(B5, σ正規化を自動適用)。同一週の複数銘柄は1クラスタとして相関を吸収。">
+          <input type="checkbox" checked={pool} onChange={(e) => setPool(e.target.checked)} className="accent-blue-600" />横断プール(B5)
+        </label>
+      </div>
+
+      {mode !== "similar" && (
         <div className="space-y-2">
           <div className="flex items-center gap-4 flex-wrap">
             <UsDriverButtons value={usTicker} onChange={(t) => { setUsTicker(t); resetBin(); }} />
@@ -244,12 +356,23 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
       {usError && <div className="text-xs text-red-500">{usError}</div>}
 
       {meta && withRes.length > 0 && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-          {mode === "usbin"
-            ? <>今週の入口<span className="font-bold">「{meta.labels[selBin]}」</span>の翌週見通し：</>
-            : <>各銘柄の似た形の翌週見通し：</>}
-          <span className="font-bold"> {withRes.length}銘柄中 {bull}銘柄が上向き</span>
-          <span className="text-blue-700">（{bull > withRes.length / 2 ? "横断的にやや強気" : bull < withRes.length / 2 ? "横断的にやや弱気" : "拮抗"}）</span>
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900 space-y-0.5">
+          <div>
+            {mode === "usbin"
+              ? <>今週の入口<span className="font-bold">「{meta.labels[selBin]}」</span>の翌週見通し：</>
+              : mode === "ensemble"
+              ? <>「{meta.labels[selBin]}」×似た形の翌週見通し：</>
+              : <>各銘柄の似た形の翌週見通し：</>}
+            <span className="font-bold"> {withRes.length}銘柄中 {bull}銘柄が上向き</span>
+            <span className="text-blue-700">（{bull > withRes.length / 2 ? "横断的にやや強気" : bull < withRes.length / 2 ? "横断的にやや弱気" : "拮抗"}）</span>
+          </div>
+          <div className="text-[11px] text-blue-700">
+            A4 相関調整: 銘柄間フォワード相関 ρ̄≈{rhoBar.toFixed(2)} →
+            <span className="font-bold"> 実効 {nEffTickers.toFixed(1)}銘柄相当</span>
+            {nEffTickers < withRes.length * 0.4
+              ? <>（{withRes.length}票ではなく<span className="font-medium">ほぼ地合い{Math.round(nEffTickers)}票</span>——全銘柄同方向は分散不足の裏返し）</>
+              : <>（銘柄間の独立性はそこそこ保たれている）</>}
+          </div>
         </div>
       )}
 
@@ -263,10 +386,12 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
               {mode === "usbin" && <th className="font-medium px-1 py-1 text-center">今週の起点</th>}
               <th className="font-medium px-1 py-1 text-center">その後{H}日(終値/高安到達)</th>
               <th className="font-medium px-2 py-1 text-right">終値中央</th>
+              <th className="font-medium px-2 py-1 text-right" title="無条件ベースラインとの中央値差(pt)と順列検定p値(A1)">差(vs無条件)</th>
               <th className="font-medium px-2 py-1 text-right">高値中</th>
               <th className="font-medium px-2 py-1 text-right">安値中</th>
               <th className="font-medium px-2 py-1 text-right">勝率</th>
-              <th className="font-medium px-2 py-1 text-right">事例</th>
+              <th className="font-medium px-2 py-1 text-right" title="事例数（実効n＝重複窓を畳んだ独立数, A2）">事例/実効</th>
+              <th className="font-medium px-1 py-1 text-center" title="実効n・ベースライン差p・noveltyから緑=採用可/黄=参考/赤=使うな(C1)">信頼</th>
             </tr>
           </thead>
           <tbody>
@@ -321,6 +446,10 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                   <td className={`px-2 py-1 text-right font-semibold tabular-nums ${res ? (res.medianFinal >= 0 ? "text-green-600" : "text-red-600") : "text-gray-300"}`}>
                     {res ? fmtPct(res.medianFinal) : "—"}
                   </td>
+                  <td className={`px-2 py-1 text-right tabular-nums ${res ? (res.diffP < 0.05 ? "text-gray-700 font-medium" : "text-gray-400") : "text-gray-300"}`}
+                    title={res ? `p=${res.diffP < 0.001 ? "<.001" : res.diffP.toFixed(3)}` : ""}>
+                    {res ? `${res.diffMedian >= 0 ? "+" : ""}${(res.diffMedian * 100).toFixed(1)}pt${res.diffP < 0.05 ? "*" : ""}` : "—"}
+                  </td>
                   <td className="px-2 py-1 text-right tabular-nums text-green-600">
                     {res ? fmtPct(res.medianMfe) : "—"}
                   </td>
@@ -331,7 +460,10 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                     {res ? `${((res.upCount / (res.upCount + res.downCount || 1)) * 100).toFixed(0)}%` : "—"}
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums text-gray-400">
-                    {res ? res.selected.length : "—"}
+                    {res ? <>{res.selected.length}<span className="text-gray-300">/</span><span className="text-gray-600">{res.nEff}</span></> : "—"}
+                  </td>
+                  <td className="px-1 py-1 text-center">
+                    {res ? (() => { const c = confLevel(res); return <span title={c.title} className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CONF_COLOR[c.level] }} />; })() : <span className="text-gray-300">—</span>}
                   </td>
                 </tr>
               );
@@ -361,6 +493,16 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
           <li><strong>窓の取り方</strong>: 「直近L営業日」は週をまたぐ単純窓で事例数が多く安定。「今週(週境界)」は月曜起点で今日まで(L=今週の経過日数)を窓にし、過去も各週の先頭L日と比較——曜日位置が揃い、窓起点=週初め＝前夜米国ビンの基準日が厳密に一致する。ただし候補は週数まで減る(≒1/5)。</li>
           <li><strong>形の距離</strong>: ユークリッドは等速比較(時間のズレに弱い)、DTW(動的時間伸縮)は山谷が1日早い/遅いズレを吸収して形を突き合わせる。両方で残る銘柄は確度が高い。</li>
           <li><strong>並べ替え</strong>: 先行き中央値のほか<strong>高値到達</strong>(MFE降順＝利確余地の大きい順)、<strong>安値到達(浅い順)</strong>(MAEが0に近い順＝下振れの小さい順)でも並べられる。「上値が取れる銘柄」と「傷が浅い銘柄」を別々に探せる。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">2c. 統計的妥当性と手法の質(新)</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>差(vs無条件)・信頼(A1/C1)</strong>: 各行に無条件ベースラインとの中央値差(pt)と順列検定 p 値(*=p&lt;0.05)、および実効n・差p・noveltyを束ねた<span style={{ color: CONF_COLOR.green }}>緑</span>/<span style={{ color: CONF_COLOR.amber }}>黄</span>/<span style={{ color: CONF_COLOR.red }}>赤</span>の信頼ドット。中央値が高くても差が有意でない銘柄は「絞った意味がない」。</li>
+          <li><strong>事例/実効(A2)</strong>: フォワードが重なる窓を畳んだ<strong>実効n</strong>を併記。「事例300・実効60」なら独立情報は60。CI・p値もこのクラスタ単位で算出。</li>
+          <li><strong>横断コンセンサスの相関調整(A4)</strong>: 「8/10銘柄が上向き」は8つの独立証拠ではない。同一市場の銘柄は相関 ρ̄≈0.5〜0.8。実効銘柄数 N_eff=N/(1+(N−1)ρ̄) を直近リターンの平均相関から概算し、「実効◯銘柄相当」を表示。全銘柄同方向＝<strong>分散が効いていない</strong>という正しい読みに誘導する。</li>
+          <li><strong>重み・σ正規化・DTWバンド・HL距離(B1/B2/B3/B6)</strong>: 個別版と同じ。カーネル重みで遠い近傍を希釈、σ正規化で値幅を各銘柄のボラ環境に整合、DTWバンドで時間ズレ許容を調整、HL距離で荒れ方の違いを区別。</li>
+          <li><strong>横断プール(B5)</strong>: 自己履歴だけでは薄い(週境界×ビンで各≈100週)。他銘柄の過去週も候補に含めて事例を数倍に。リターンはσ正規化してから距離・集計、同一週の複数銘柄は1クラスタとして横断相関を吸収。「銘柄が似た反応をする」前提が必要。</li>
+          <li><strong>Web Worker(C3)</strong>: 全銘柄×DTW×設定変更の計算はメインスレッドを固めるため別スレッドで実行(「計算中…」表示)。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 投資判断への活用</p>
