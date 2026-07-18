@@ -223,6 +223,10 @@ const WeekendPremiumChart = dynamic(
   () => import("./components/analysis/WeekendPremiumChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const OptimalExitChart = dynamic(
+  () => import("./components/analysis/OptimalExitChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const WeekdayVsBuyHoldChart = dynamic(
   () => import("./components/analysis/WeekdayVsBuyHoldChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
@@ -1799,6 +1803,7 @@ export default function AnalysisPage() {
                       { id: "cal-null-calib", title: "ヌル較正：曜日最適化の「偽発見の床」（採用前の門番）", node: <NullCalibrationChart prices={filteredPrices} /> },
                       { id: "cal-weekday-vs-bh", title: "月→金戦略 vs バイ&ホールド 統計的優位性検定", node: <WeekdayVsBuyHoldChart prices={filteredPrices} /> },
                       { id: "cal-weekend-premium", title: "週末プレミアム μ_w：週末を持つべきか／飛ばすべきか（区間分解）", node: <WeekendPremiumChart prices={filteredPrices} /> },
+                      { id: "cal-optimal-exit", title: "状態依存の最適手仕舞い（月曜Open建玉→いつ降りるか・後退帰納法）", node: <OptimalExitChart prices={filteredPrices} /> },
                       { id: "cal-nisa-vs-taxable", title: "NISA(非課税・持ち切り) vs 現物(課税・曜日戦略) 税引後・レバレッジ比較", node: <NisaVsTaxableChart prices={allPrices} /> },
                       { id: "cal-spiral", title: "カレンダー螺旋ヒートマップ", node: <SpiralHeatmap prices={filteredPrices} period={period} /> },
                       { id: "cal-candle-season", title: "ローソク足の季節性（足の中身×カレンダー）", node: <CandleSeasonalityChart prices={filteredPrices} /> },
