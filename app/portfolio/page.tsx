@@ -78,6 +78,10 @@ const WeeklyAnalogCrossChart = dynamic(
   () => import("../components/analysis/WeeklyAnalogCrossChart"),
   { ssr: false }
 );
+const WeekdayCrossSectionChart = dynamic(
+  () => import("../components/analysis/WeekdayCrossSectionChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -472,6 +476,12 @@ export default function PortfolioPage() {
               title: "今週の軌跡アナログ：ウォッチリスト横断",
               subtitle: "今週の入口(前夜米国ビン)や似た形から、全銘柄の来週見通しを横並び比較",
               node: <WeeklyAnalogCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} onRename={handleRename} />,
+            });
+            if (tickers.length >= 2) items.push({
+              id: "pf-weekday-cross-section",
+              title: "クロスセクション：銘柄×週プール（週末プレミアム・曜日効果）",
+              subtitle: "同一日=1クラスタのクラスタ頑健SEで、横断相関に正直な検出力を測る",
+              node: <WeekdayCrossSectionChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             return items.length > 0 ? (
               <AccordionSection groups={[{ items }]} bulk={bulk} onBulk={onBulk} />
