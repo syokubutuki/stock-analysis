@@ -28,9 +28,13 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
   const [searching, setSearching] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const skipSearchRef = useRef(false);
+  const focusedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // 入力をデバウンスして検索。候補選択直後の value 変更では再検索しない。
+  // この入力欄は本体ヘッダーと浮動バーの2箇所にあり value を共有するため、
+  // フォーカス中のインスタンスだけが検索・候補表示する（もう一方や localStorage
+  // 復元による value 同期で、画面外の欄がドロップダウンを開くのを防ぐ）。
   useEffect(() => {
     if (skipSearchRef.current) {
       skipSearchRef.current = false;
@@ -42,6 +46,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
       setSearching(false);
       return;
     }
+    if (!focusedRef.current) return;
     setSearching(true);
     const handle = setTimeout(async () => {
       abortRef.current?.abort();
@@ -131,7 +136,11 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
+              focusedRef.current = true;
               if (suggestions.length > 0) setOpen(true);
+            }}
+            onBlur={() => {
+              focusedRef.current = false;
             }}
             placeholder="コード or 社名 (例: 9984, トヨタ, AAPL)"
             className="px-4 py-2 border border-gray-300 rounded-lg text-base w-52 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"

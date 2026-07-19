@@ -1045,13 +1045,10 @@ export default function AnalysisPage() {
     (open: boolean) => setSectionBulk((b) => ({ nonce: b.nonce + 1, open })),
     []
   );
-  // 上部固定バーの自動隠し。3状態:
-  //  - 最上部: 銘柄検索 + 期間/系列 + タブを全表示 (barHidden=false, atTop=true)
-  //  - 下スクロール中: 全部隠す (barHidden=true)
-  //  - 上スクロール中(途中): 銘柄検索窓のみ表示 (barHidden=false, atTop=false)
-  //    期間/系列/タブは画面を占有しページを揺らすため、最上部以外では出さない。
-  const [barHidden, setBarHidden] = useState(false);
-  const [atTop, setAtTop] = useState(true);
+  // ヘッダー本体は通常フローに置き、ページと一緒に自然にスクロールアウトさせる。
+  // 本体が画面外に出た状態で上スクロールしたときだけ、検索窓のみの浮動バーを出す。
+  const [showFloat, setShowFloat] = useState(false);
+  const headerBarRef = useRef<HTMLDivElement>(null);
 
   // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
   const restoredRef = useRef(false);
@@ -1099,9 +1096,9 @@ export default function AnalysisPage() {
     } catch {}
   }, [period]);
 
-  // Headroom: 下スクロールでバーを隠し、上スクロールでは検索行だけ再表示する。
-  // タブ行は最上部でのみ表示（ヒステリシスで境界のちらつきを防ぐ）。
-  // 表示/非表示は transform で行うためスクロール量が揺れても破綻しない。
+  // 浮動検索バーの表示制御。ヘッダー本体が見えている間は出さず、
+  // 画面外に出た後の上スクロールでスライドイン / 下スクロールでスライドアウトする。
+  // ±6px の閾値はスクロール量の揺れによるちらつき防止。
   useEffect(() => {
     let lastY = window.scrollY;
     let ticking = false;
@@ -1111,15 +1108,14 @@ export default function AnalysisPage() {
       requestAnimationFrame(() => {
         const y = window.scrollY;
         const dy = y - lastY;
-        if (y <= 4) {
-          // 最上部: 全表示
-          setBarHidden(false);
-          setAtTop(true);
-        } else {
-          // 最上部から十分離れたら期間/系列/タブを畳む（戻すのは最上部のみ＝ヒステリシス）
-          if (y > 120) setAtTop(false);
-          if (dy > 6) setBarHidden(true);        // 下スクロール → 全部隠す
-          else if (dy < -6) setBarHidden(false); // 上スクロール → 検索行を表示
+        const bar = headerBarRef.current;
+        const barBottom = bar ? bar.offsetTop + bar.offsetHeight : 200;
+        if (y <= barBottom) {
+          setShowFloat(false); // ヘッダー本体が見えている → 浮動バー不要
+        } else if (dy > 6) {
+          setShowFloat(false); // 下スクロール → スライドアウト
+        } else if (dy < -6) {
+          setShowFloat(true); // 上スクロール → 検索窓だけスライドイン
         }
         lastY = y;
         ticking = false;
@@ -1195,15 +1191,12 @@ export default function AnalysisPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-        {/* sticky ヘッダ: 検索 + 期間/系列 + セクションタブ（再検索やタブ切替で一番上へ戻らずに済む）。
-            下スクロール中は隠して分析領域を広く使い、上スクロールで即再表示する。 */}
+        {/* ヘッダー本体: 検索 + 期間/系列 + セクションタブ。通常フローに置き、
+            下スクロールではページと一緒に自然にスクロールアウトする。 */}
         <div
-          className={`sticky top-0 z-30 -mx-4 px-4 py-3 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 space-y-2 transition-transform duration-200 ${
-            barHidden ? "-translate-y-full" : "translate-y-0"
-          }`}
+          ref={headerBarRef}
+          className="-mx-4 px-4 py-3 border-b border-gray-200 space-y-2"
         >
-          {/* 入力エリア。スクロール中(最上部以外)は銘柄検索窓のみを残し、
-              画面を占有する期間/系列/ウォッチリスト/銘柄名は最上部でのみ表示する。 */}
           <div className="flex items-center gap-3 flex-wrap">
             <TickerSearchInput
               value={tickerInput}
@@ -1211,37 +1204,32 @@ export default function AnalysisPage() {
               onSubmit={fetchStock}
               loading={loading}
             />
-            {atTop && (
+            <WatchlistPanel
+              currentTicker={data?.ticker ?? null}
+              currentName={data?.name ?? null}
+              onSelect={(ticker) => {
+                setTickerInput(ticker);
+                fetchStock(ticker);
+              }}
+            />
+            {data && (
               <>
-                <WatchlistPanel
-                  currentTicker={data?.ticker ?? null}
-                  currentName={data?.name ?? null}
-                  onSelect={(ticker) => {
-                    setTickerInput(ticker);
-                    fetchStock(ticker);
-                  }}
+                <span className="text-gray-600 text-sm font-medium">
+                  {data.name}
+                </span>
+                <PeriodSelector current={period} onChange={setPeriod} />
+                <SeriesModeSelector
+                  current={seriesMode}
+                  onChange={setSeriesMode}
+                  disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
                 />
-                {data && (
-                  <>
-                    <span className="text-gray-600 text-sm font-medium">
-                      {data.name}
-                    </span>
-                    <PeriodSelector current={period} onChange={setPeriod} />
-                    <SeriesModeSelector
-                      current={seriesMode}
-                      onChange={setSeriesMode}
-                      disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
-                    />
-                  </>
-                )}
               </>
             )}
           </div>
 
-          {/* セクションタブ（最上部でのみ表示。読書中は畳んで検索窓だけ残す）。
-              スマホは横1行のスクロール帯にして縦に伸ばさず、下段タブへ届くための
-              縦スクロール(=バーが隠れる)を不要にする。PCは従来通り折り返し。 */}
-          {atTop && data && filteredPrices.length > 0 && (
+          {/* セクションタブ。スマホは横1行のスクロール帯にして縦に伸ばさず、
+              PCは折り返して全タブを見せる。 */}
+          {data && filteredPrices.length > 0 && (
             <div className="flex gap-1 overflow-x-auto sm:flex-wrap sm:overflow-visible pb-0.5">
               {SECTIONS.map(({ key, label, description }) => (
                 <button
@@ -1259,6 +1247,23 @@ export default function AnalysisPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* 浮動検索バー: ヘッダー本体が画面外のとき、上スクロールで検索窓だけが現れる。
+            fixed なのでレイアウトに影響せず、非表示時は transform で画面外に退避。 */}
+        <div
+          className={`fixed top-0 left-0 right-0 z-30 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 transition-transform duration-200 ${
+            showFloat ? "translate-y-0" : "-translate-y-full"
+          }`}
+        >
+          <div className="max-w-7xl mx-auto px-4 py-2">
+            <TickerSearchInput
+              value={tickerInput}
+              onChange={setTickerInput}
+              onSubmit={fetchStock}
+              loading={loading}
+            />
+          </div>
         </div>
 
         {error && (
