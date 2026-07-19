@@ -17,10 +17,14 @@ import { PricePoint } from "../../lib/types";
 import {
   computeVolTarget,
   DEFAULT_VT_SPEC,
+  SIGMA_SOURCE_LABEL,
+  type SigmaSource,
+  type UsInputs,
   type VolEstimator,
   type VolTargetResult,
   type VolTargetSpec,
 } from "../../lib/vol-targeting";
+import { useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -70,26 +74,45 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 
 export default function VolTargetingChart({ prices }: Props) {
   const [estimator, setEstimator] = useState<VolEstimator>("ewma");
+  const [sigmaSource, setSigmaSource] = useState<SigmaSource>("own");
   const [targetMode, setTargetMode] = useState<"auto" | "fixed">("auto");
   const [sigmaTarget, setSigmaTarget] = useState(0.2);
   const [maxLev, setMaxLev] = useState(3);
   const [trendFilter, setTrendFilter] = useState(false);
   const [costBps, setCostBps] = useState(5);
 
+  // 外部σ̂ソースの素材（モジュールキャッシュ付きフックなので常時取得してよい）
+  const vixData = useUsDaily("^VIX");
+  const gspcData = useUsDaily("^GSPC");
+  const usInputs = useMemo<UsInputs>(
+    () => ({ vix: vixData.prices ?? undefined, us: gspcData.prices ?? undefined }),
+    [vixData.prices, gspcData.prices],
+  );
+  const extReady: Record<SigmaSource, boolean> = {
+    own: true,
+    vix: !!usInputs.vix,
+    usrv: !!usInputs.us,
+    hybrid: !!usInputs.vix,
+  };
+
   const spec = useMemo<VolTargetSpec>(
     () => ({
       ...DEFAULT_VT_SPEC,
       estimator,
+      sigmaSource,
       targetMode,
       sigmaTargetAnn: sigmaTarget,
       maxLev,
       trendFilter,
       costBps,
     }),
-    [estimator, targetMode, sigmaTarget, maxLev, trendFilter, costBps],
+    [estimator, sigmaSource, targetMode, sigmaTarget, maxLev, trendFilter, costBps],
   );
 
-  const result = useMemo<VolTargetResult | null>(() => computeVolTarget(prices, spec), [prices, spec]);
+  const result = useMemo<VolTargetResult | null>(
+    () => computeVolTarget(prices, spec, usInputs),
+    [prices, spec, usInputs],
+  );
   const hasResult = result !== null;
 
   // === エクイティ曲線 + レバ/予測ボラ（横軸=日付なので lightweight-charts, 2ペイン同期）===
@@ -292,7 +315,7 @@ export default function VolTargetingChart({ prices }: Props) {
     );
   }
 
-  const { metrics, sharpe, annual, alpha, volForecast, perm, meta, costs, sweep } = result;
+  const { metrics, sharpe, annual, alpha, volForecast, perm, meta, costs, sweep, comparison } = result;
 
   // 総合判定: リスク調整後の優位（Sharpe差 / α / 置換）と、リスク低減（DD・ボラ）
   const sigTests = [sharpe.jkmP, alpha.pOneSided, perm ? perm.pOneSided : null];
@@ -312,7 +335,33 @@ export default function VolTargetingChart({ prices }: Props) {
       {/* コントロール */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <div className="flex items-center gap-1">
-          <span className="text-gray-500">ボラ推定:</span>
+          <span className="text-gray-500">σ̂ソース:</span>
+          {(Object.keys(SIGMA_SOURCE_LABEL) as SigmaSource[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => extReady[s] && setSigmaSource(s)}
+              disabled={!extReady[s]}
+              title={
+                !extReady[s]
+                  ? vixData.loading || gspcData.loading
+                    ? "米国データ取得中…"
+                    : "米国データの取得に失敗しました"
+                  : s === "vix"
+                  ? "前夜VIX終値(自銘柄水準に因果較正)"
+                  : s === "usrv"
+                  ? "^GSPC日次リターンのEWMA(自銘柄水準に因果較正)"
+                  : s === "hybrid"
+                  ? "max(自銘柄σ̂, 較正済VIX): どちらかの警告に従う防御型"
+                  : "自銘柄の過去リターンのみ"
+              }
+              className={`px-2 py-0.5 rounded border ${sigmaSource === s ? "bg-purple-600 text-white border-purple-600" : extReady[s] ? "bg-white text-gray-600 border-gray-300" : "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed"}`}
+            >
+              {SIGMA_SOURCE_LABEL[s]}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-gray-500">{sigmaSource === "own" ? "ボラ推定:" : "自銘柄σ̂(較正基準):"}</span>
           {(Object.keys(ESTIMATOR_LABEL) as VolEstimator[]).map((e) => (
             <button
               key={e}
@@ -503,8 +552,12 @@ export default function VolTargetingChart({ prices }: Props) {
             <PBadge p={perm ? perm.pOneSided : null} label="perm" />
           </div>
           <p className="text-xs text-gray-500">
-            リターンをシャッフルし<span className="font-medium">ボラ・クラスタリングを破壊</span>した{perm ? perm.nPerm : 0}本のヌル系列で
-            ΔSharpe を再計算。実測（赤線）が分布の右端なら、改善はボラ予測に由来する本物。
+            {sigmaSource === "own" ? (
+              <>リターンをシャッフルし<span className="font-medium">ボラ・クラスタリングを破壊</span>した{perm ? perm.nPerm : 0}本のヌル系列でΔSharpe を再計算。</>
+            ) : (
+              <>σ̂系列（{SIGMA_SOURCE_LABEL[sigmaSource]}）は固定したままリターンをシャッフルし、<span className="font-medium">σ̂とリターンの対応を破壊</span>した{perm ? perm.nPerm : 0}本のヌル系列でΔSharpe を再計算。</>
+            )}
+            実測（赤線）が分布の右端なら、改善は予測情報に由来する本物。
           </p>
           <div className="w-full"><canvas ref={permRef} /></div>
         </div>
@@ -526,6 +579,48 @@ export default function VolTargetingChart({ prices }: Props) {
           </div>
         </div>
       </div>
+
+      {/* σ̂ソース横断比較 */}
+      {comparison && (
+        <div className="overflow-x-auto">
+          <div className="text-xs text-gray-500 mb-1">
+            σ̂ソース横断比較（共通評価区間・現在の設定で軽量再計算。紫=選択中）。
+            日本株では自銘柄σ̂より前夜VIX/米国実現ボラの方が ρ・ΔDD が良くなるか、が見どころです。
+          </div>
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-gray-300 text-gray-500 text-xs">
+                <th className="text-left py-1 px-2">σ̂ソース</th>
+                <th className="text-right py-1 px-2">予測力 ρ</th>
+                <th className="text-right py-1 px-2">MZ R²</th>
+                <th className="text-right py-1 px-2">ΔSharpe</th>
+                <th className="text-right py-1 px-2">ΔDD(pt)</th>
+                <th className="text-right py-1 px-2">平均レバ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comparison.map((row) => (
+                <tr
+                  key={row.source}
+                  className={`border-b border-gray-100 ${row.source === sigmaSource ? "bg-purple-50 font-medium" : ""} ${extReady[row.source] ? "cursor-pointer hover:bg-gray-50" : ""}`}
+                  onClick={() => extReady[row.source] && setSigmaSource(row.source)}
+                >
+                  <td className="py-1 px-2 text-gray-700">{row.label}</td>
+                  <td className={`text-right px-2 ${cls(row.spearman - 0.2)}`}>{num2(row.spearman)}</td>
+                  <td className="text-right px-2 text-gray-700">{row.mzR2.toFixed(3)}</td>
+                  <td className={`text-right px-2 ${cls(row.dSharpe)}`}>{num2(row.dSharpe)}</td>
+                  <td className={`text-right px-2 ${cls(row.dMaxDD)}`}>{(row.dMaxDD * 100).toFixed(1)}</td>
+                  <td className="text-right px-2 text-gray-700">{row.avgLev.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-gray-400 mt-1">
+            行クリックでそのソースに切替。ΔDD は最大ドローダウンの改善幅（正=浅くなった）。
+            この表は点推定のみ（検定なし）なので、最終判断は上の検定カードで。
+          </p>
+        </div>
+      )}
 
       {/* 定数レバ掃引 */}
       <div>
@@ -647,9 +742,67 @@ export default function VolTargetingChart({ prices }: Props) {
             先物ならキャリーは実質金利差程度なので、米国指数に対しては保守的すぎる可能性があります。
           </li>
           <li>
-            <span className="font-medium">日本株への応用余地</span>: ボラ推定の入力を自銘柄の過去ボラから
+            <span className="font-medium">日本株への応用</span>: ボラ推定の入力を自銘柄の過去ボラから
             「前夜のVIX・米国実現ボラ」に替えれば、ギャップの予測不能性をある程度回避できる見込みがあります
             （カレンダー節のボラティリティ・スピルオーバー分析が示す「米国の荒れ→当日の荒れ」の伝播を利用）。
+            → この仮説は<span className="font-medium">σ̂ソース切替（次節）として実装済み</span>です。
+          </li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">8. VIX入力版（σ̂ソース切替）の理論</p>
+        <p>
+          「σ̂ソース」で予測ボラの入力を切り替えられます。狙いは第7節の知見への対処です:
+          日本株の日次分散は前夜米国発の寄り付きギャップが大きく、<span className="font-medium">自分の過去だけを見るσ̂は
+          米国発の荒れを一日遅れでしか察知できない</span>。それなら最初から米国のリスク計を読めばよい、という発想です。
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>
+            <span className="font-medium">VIXとは</span>: S&P500オプション価格から逆算した「市場が織り込む今後30日の年率ボラ」
+            （インプライド・ボラティリティ）。恐怖指数とも呼ばれ、値20なら年率20%の変動を市場が予想している意味。
+            実現ボラより平均的に数ポイント高い（ボラ・リスクプレミアム）ことが知られています。
+          </li>
+          <li>
+            <span className="font-medium">前夜整合</span>: 建玉は営業日tの終値時点で決めるため、使える米国情報は
+            「決定日より暦日が厳密に小さい最新の米国立会日」の終値（スピルオーバー分析群と同じ規約）。
+            当夜の米国セッションは見えないので、利用しているのは<span className="font-medium">VIXの持続性</span>
+            （今日高いVIXは明日も高く、明日のギャップも荒れやすい）であり、ルックアヘッドはありません。
+          </li>
+          <li>
+            <span className="font-medium">因果的スケール較正</span>: VIXはS&P500のボラであり水準が自銘柄と違うため、
+            σ̂<sub>t</sub> = raw<sub>t</sub> × (過去252日の自銘柄σ̂平均) / (過去252日のraw平均) で
+            「タイミング情報は外部、水準は自銘柄」に合わせます。比率は過去情報のみで毎日更新（因果的）。
+            リスクプレミアムの上乗せ分もこの比率が自動吸収します。
+          </li>
+          <li>
+            <span className="font-medium">米国実現ボラ（^GSPC EWMA）</span>: VIXの代わりに米国指数の実現ボラを使う変種。
+            プレミアム変動が乗らないぶん素直ですが、オプション市場の先読み（イベント前の織り込み）は失われます。
+          </li>
+          <li>
+            <span className="font-medium">ハイブリッド(max)</span>: max(自銘柄σ̂, 較正済VIX)。どちらかが荒れを警告したら
+            建玉を落とす防御型。ボラ過大評価に倒すため平均レバは下がり、リターンを犠牲にDD低減を優先します。
+          </li>
+          <li>
+            <span className="font-medium">置換検定の変更</span>: 外部ソースではσ̂系列を固定したままリターンだけを
+            シャッフルします（σ̂↔リターンの対応破壊）。ヌル仮説は「外部σ̂は自銘柄の荒れと無関係」。
+          </li>
+          <li>
+            <span className="font-medium">読み方</span>: σ̂ソース横断比較の表で、外部ソースが自銘柄σ̂より
+            ρ・ΔDD を改善しているかを見ます。改善するのは「米国主導で荒れる銘柄」（輸出大型株・指数連動）で、
+            内需小型・個別材料株ではVIXとの連動が弱く効きません（②スピルオーバーβの弱い銘柄）。
+          </li>
+          <li>
+            <span className="font-medium">実測（2016〜2026, 共通評価区間）</span>: 仮説どおり日本銘柄で外部ソースが優位でした。
+            日経平均は自銘柄σ̂だと最大DDが<span className="font-medium">悪化</span>（−4.7pt）するのに、
+            前夜VIXに替えると<span className="font-medium">+4.7ptの改善</span>に反転し、MZ R²も 0.058→0.098 とほぼ倍増。
+            トヨタ(7203.T)もΔDDが +2.6pt→+7.8pt に拡大し、置換検定は p≈0.10 まで改善（own時 p≈0.37）。
+            米国実現ボラはΔSharpe最大（^N225 +0.14 / 7203.T +0.12）だが平均レバが高め。
+            ハイブリッド(max)はσ̂を過大評価しがちで中庸でした。
+            「日本株のギャップは自分の過去より前夜の米国リスク計で測れ」が実データで裏付けられた形です。
+          </li>
+          <li>
+            <span className="font-medium">注意</span>: VIX自体のジャンプ（米国の突発ニュース）は日本の決定時点では
+            やはり一日遅れです。守れるのは「米国発の荒れの持続」であり、初日のギャップは食らいます。
+            また較正比率は過去1年窓なので、ボラ構造の急変（銘柄の業態変化等）には約1年遅れて追随します。
           </li>
         </ul>
       </AnalysisGuide>

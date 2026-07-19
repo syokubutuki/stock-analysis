@@ -7,18 +7,32 @@
 // 静かな日は信用取引でレバを掛ける。平均リターンをほぼ保ったまま実現分散を下げ、
 // Sharpe を改善するのが狙い（Moreira & Muir 2017 / Harvey et al. 2018 の単一資産版）。
 //
-// ■ ルックアヘッド禁止
-// σ̂_t・目標ボラ・トレンドフィルタは全て t−1 までの情報のみで決まる。
-// 信用金利は借入分 (k−1)+ に日割りで課金、リバランスはバンド制で売買コストも控除。
+// ■ σ̂ ソース（2026-07 拡張）
+// 日本株の日次分散は前夜米国ニュースの寄り付きギャップ流入が大きく、自銘柄の過去ボラ
+// では予測しきれない（指数横断の実測: ρ ^GSPC 0.37 vs ^N225 0.22）。そこで σ̂ の入力を
+// 選択制にする:
+//   own    : 自銘柄の過去リターン（EWMA / 実現20日 / 実現60日）
+//   vix    : 前夜VIX終値（S&P500のインプライドボラ, /100 で年率σ）
+//   usrv   : 米国実現ボラ（^GSPC 日次リターンの EWMA λ=0.94）
+//   hybrid : max(own, スケール済VIX)（どちらかが荒れを警告したら建玉を落とす防御型）
+// 外部ソースは水準が資産と異なる（VIXはリスクプレミアム上乗せ・別資産）ため、
+// 因果的スケール較正 σ̂_t = raw_t × trailingMean252(σ̂own)/trailingMean252(raw) で
+// 「タイミング情報は外部、水準は自銘柄」に合わせる。
+//
+// ■ 前夜整合（ルックアヘッド禁止）
+// 建玉の決定は営業日 t の終値時点（リターン r_t = close_t→close_{t+1} の開始点）。
+// その時点で確定している最新の米国セッションは「決定日より暦日が厳密に小さい最新の
+// 米国立会日」（us-spillover-core.alignJpUs と同じ規約）。祝日連休も自動整合。
 //
 // ■ 検定（「有意にB&Hを上回るか」を多面的に）
 //  1) Sharpe差: Jobson–Korkie–Memmel 解析z + ペア・ブロックBootstrap
 //  2) スパニング回帰α: r_strat = α + β·r_BH + ε の α>0 を Newey–West t で検定
-//     （B&Hの線形合成では作れない付加価値があるかの直接検定）
-//  3) 置換検定（機構の検証）: リターンをシャッフルしてボラ・クラスタリングを破壊した
-//     ヌル分布上で ΔSharpe を再計算。実測がその分布の右端なら「改善はボラ予測に由来」
+//  3) 置換検定（機構の検証）: own はリターンをシャッフルしてボラ・クラスタリングを破壊、
+//     外部ソースは σ̂ 系列を固定したままリターンをシャッフルして σ̂↔リターンの対応を破壊。
+//     どちらも「実測がヌル分布の右端なら改善は予測情報に由来」
 //  4) ボラ予測力: Mincer–Zarnowitz 回帰 r_t² = a + b·σ̂_t² と Spearman順位相関
 //  5) 定数レバ掃引: k固定戦略の幾何年率/Sharpe曲線と実効ケリー k*（可変レバの立ち位置）
+//  6) ソース横断比較: 全σ̂ソースを共通評価区間で回し ρ / ΔSharpe / ΔDD を並べる
 
 import { PricePoint } from "./types";
 import { mean, std, quantileSorted } from "./stats-significance";
@@ -51,9 +65,18 @@ function normalCdf(z: number): number {
 
 // ---------- 仕様 ----------
 export type VolEstimator = "ewma" | "rv20" | "rv60";
+export type SigmaSource = "own" | "vix" | "usrv" | "hybrid";
+
+export const SIGMA_SOURCE_LABEL: Record<SigmaSource, string> = {
+  own: "自銘柄σ̂",
+  vix: "前夜VIX",
+  usrv: "米国実現ボラ",
+  hybrid: "ハイブリッド(max)",
+};
 
 export interface VolTargetSpec {
-  estimator: VolEstimator; // 予測ボラの推定法
+  estimator: VolEstimator; // 自銘柄σ̂の推定法（own のσ̂そのもの + 外部ソースの較正基準）
+  sigmaSource: SigmaSource; // σ̂ の入力ソース
   targetMode: "auto" | "fixed"; // auto=過去1年のσ̂平均（因果的・調整パラメータなし）
   sigmaTargetAnn: number; // fixed時の目標ボラ（年率）
   maxLev: number; // 建玉上限（信用3倍まで）
@@ -65,6 +88,7 @@ export interface VolTargetSpec {
 
 export const DEFAULT_VT_SPEC: VolTargetSpec = {
   estimator: "ewma",
+  sigmaSource: "own",
   targetMode: "auto",
   sigmaTargetAnn: 0.2,
   maxLev: 3,
@@ -73,6 +97,12 @@ export const DEFAULT_VT_SPEC: VolTargetSpec = {
   marginRateLong: 0.026,
   rebalanceBand: 0.25,
 };
+
+// 外部σ̂ソースの素材（component が useUsDaily で取得して渡す）
+export interface UsInputs {
+  vix?: PricePoint[]; // ^VIX 日足
+  us?: PricePoint[]; // ^GSPC 日足（米国実現ボラ用）
+}
 
 // ---------- 出力型 ----------
 export interface VTMetrics {
@@ -138,6 +168,17 @@ export interface LevSweep {
   annualAtOne: number;
 }
 
+// ソース横断比較の1行（共通評価区間・boot/permなしの軽量版）
+export interface SourceComparisonRow {
+  source: SigmaSource;
+  label: string;
+  spearman: number;
+  mzR2: number;
+  dSharpe: number; // 戦略 − B&H
+  dMaxDD: number; // 戦略DD − B&H DD（正=改善）
+  avgLev: number;
+}
+
 export interface VolTargetResult {
   meta: {
     nDays: number; // 評価区間の営業日数
@@ -147,6 +188,7 @@ export interface VolTargetResult {
     avgLev: number;
     avgTargetAnn: number; // 実際に使われた目標ボラの平均
     warmup: number;
+    sigmaSource: SigmaSource;
   };
   rows: VTRow[];
   metrics: { strat: VTMetrics; bh: VTMetrics };
@@ -157,67 +199,191 @@ export interface VolTargetResult {
   volForecast: VolForecastQuality;
   perm: PermTest | null;
   sweep: LevSweep;
+  comparison: SourceComparisonRow[] | null; // 外部データがある場合のみ
 }
 
-// ---------- コア・シミュレーション（リターン配列から, 実データ/置換で共用） ----------
-interface SimOut {
-  start: number; // 取引開始index（rets配列上）
-  lev: number[]; // index t（t<start は NaN）
-  sigmaAnn: number[]; // 同上
-  targetAnn: number[];
-  stratRet: number[]; // t=start.. の日次リターン
-  bhRet: number[];
-  turnover: number; // Σ|Δk|
-  carryPaid: number; // 金利控除の合計（リターン単位）
-  costPaid: number;
+// ---------- 入力系列の準備 ----------
+interface Prepared {
+  rets: number[]; // r_t = close_t → close_{t+1}（夜間込み簡易リターン）
+  dates: string[]; // r_t が確定する日付 = prices[t+1].time
+  decisions: string[]; // r_t の建玉を決める日付 = prices[t].time（この時点までの情報のみ使用可）
+  closes: number[]; // 決定時点の終値（トレンドフィルタ用）
 }
 
-// closes[t] は「リターン r_t を観測する直前に確定している終値」（トレンドフィルタ用）
-function simulate(rets: number[], closes: number[], spec: VolTargetSpec): SimOut | null {
+function prepare(prices: PricePoint[]): Prepared {
+  const rets: number[] = [], dates: string[] = [], decisions: string[] = [], closes: number[] = [];
+  for (let i = 0; i < prices.length - 1; i++) {
+    const c0 = prices[i].close, c1 = prices[i + 1].close;
+    if (!(c0 > 0) || !(c1 > 0)) continue;
+    rets.push(c1 / c0 - 1);
+    dates.push(prices[i + 1].time);
+    decisions.push(prices[i].time);
+    closes.push(c0);
+  }
+  return { rets, dates, decisions, closes };
+}
+
+// ---------- σ̂ の構築 ----------
+// 自銘柄σ̂（年率）。σ̂_t は rets[0..t-1] のみから（先頭 s0 個は NaN）。
+function computeSigmaOwn(rets: number[], estimator: VolEstimator): number[] {
   const n = rets.length;
-  const lambda = 0.94;
-  const win = spec.estimator === "rv60" ? 60 : 20;
-  const s0 = spec.estimator === "ewma" ? 20 : win; // σ̂ が定義できる最初のindex
-  const start = Math.max(63, s0 + 40); // 自動目標に最低40個のσ̂履歴を確保
-  if (n - start < TRADING_DAYS) return null; // 評価区間は最低1年
-
-  // --- 予測ボラ σ̂_t（年率）: t期のリターンを見る前に確定 ---
-  const sigmaAnn = new Array<number>(n).fill(NaN);
-  if (spec.estimator === "ewma") {
+  const sigma = new Array<number>(n).fill(NaN);
+  if (estimator === "ewma") {
+    const s0 = 20, lambda = 0.94;
+    if (n <= s0) return sigma;
     let v = 0;
     for (let i = 0; i < s0; i++) v += rets[i] * rets[i];
     v /= s0;
     for (let t = s0; t < n; t++) {
-      sigmaAnn[t] = Math.sqrt(Math.max(v, 1e-12) * TRADING_DAYS);
+      sigma[t] = Math.sqrt(Math.max(v, 1e-12) * TRADING_DAYS);
       v = lambda * v + (1 - lambda) * rets[t] * rets[t];
     }
   } else {
-    // 実現ボラ（直近win日, 移動和で O(n)）
+    const win = estimator === "rv60" ? 60 : 20;
     let s1 = 0, s2 = 0;
     for (let i = 0; i < n; i++) {
       s1 += rets[i]; s2 += rets[i] * rets[i];
       if (i >= win) { s1 -= rets[i - win]; s2 -= rets[i - win] * rets[i - win]; }
-      const t = i + 1; // σ̂_t は rets[t-win..t-1] から
+      const t = i + 1;
       if (t >= win && t < n) {
         const m = s1 / win;
         const varr = Math.max(s2 / win - m * m, 1e-12);
-        sigmaAnn[t] = Math.sqrt(varr * TRADING_DAYS);
+        sigma[t] = Math.sqrt(varr * TRADING_DAYS);
       }
     }
   }
+  return sigma;
+}
 
-  // --- σ̂ の累積和（自動目標 = 過去252日のσ̂平均, 因果的） ---
-  const sigPrefix = new Array<number>(n + 1).fill(0);
+// 米国系列を「決定日より暦日が厳密に小さい最新値」で各 t に整合（asof join, 前夜整合）。
+function alignAsof(decisions: string[], usDates: string[], usVals: number[]): number[] {
+  const n = decisions.length;
+  const out = new Array<number>(n).fill(NaN);
+  let j = 0;
   for (let t = 0; t < n; t++) {
-    sigPrefix[t + 1] = sigPrefix[t] + (Number.isFinite(sigmaAnn[t]) ? sigmaAnn[t] : 0);
+    while (j < usDates.length && usDates[j] < decisions[t]) j++;
+    if (j - 1 >= 0) out[t] = usVals[j - 1];
+  }
+  return out;
+}
+
+// 前夜VIX: 終値/100 = 年率σ（S&P500のインプライドボラ）
+function sigmaFromVix(decisions: string[], vixPrices: PricePoint[]): number[] {
+  const ds: string[] = [], vs: number[] = [];
+  for (const p of vixPrices) {
+    if (p.close > 0) { ds.push(p.time); vs.push(p.close / 100); }
+  }
+  return alignAsof(decisions, ds, vs);
+}
+
+// 米国実現ボラ: ^GSPC 日次リターンの EWMA(λ=0.94)。各米国立会日の引け時点で確定した値。
+function sigmaFromUsRv(decisions: string[], usPrices: PricePoint[]): number[] {
+  const ds: string[] = [], vs: number[] = [];
+  const lambda = 0.94, s0 = 20;
+  let v = 0, cnt = 0;
+  const rets: number[] = [], rDates: string[] = [];
+  for (let i = 1; i < usPrices.length; i++) {
+    const pc = usPrices[i - 1].close, c = usPrices[i].close;
+    if (!(pc > 0) || !(c > 0)) continue;
+    rets.push(c / pc - 1);
+    rDates.push(usPrices[i].time);
+  }
+  for (let i = 0; i < rets.length; i++) {
+    if (cnt < s0) { v += rets[i] * rets[i]; cnt++; if (cnt === s0) v /= s0; continue; }
+    v = lambda * v + (1 - lambda) * rets[i] * rets[i];
+    ds.push(rDates[i]); vs.push(Math.sqrt(Math.max(v, 1e-12) * TRADING_DAYS));
+  }
+  return alignAsof(decisions, ds, vs);
+}
+
+// 因果的スケール較正: σ̂_t = raw_t × trailingMean252(own)_t / trailingMean252(raw)_t。
+// タイミング情報は外部系列、水準は自銘柄に合わせる（VIXのリスクプレミアム・別資産の水準差を吸収）。
+function calibrateToOwn(raw: number[], own: number[], minObs = 40): number[] {
+  const n = raw.length;
+  const out = new Array<number>(n).fill(NaN);
+  const sumR = new Array<number>(n + 1).fill(0), cntR = new Array<number>(n + 1).fill(0);
+  const sumO = new Array<number>(n + 1).fill(0), cntO = new Array<number>(n + 1).fill(0);
+  for (let t = 0; t < n; t++) {
+    const fr = Number.isFinite(raw[t]), fo = Number.isFinite(own[t]);
+    sumR[t + 1] = sumR[t] + (fr ? raw[t] : 0); cntR[t + 1] = cntR[t] + (fr ? 1 : 0);
+    sumO[t + 1] = sumO[t] + (fo ? own[t] : 0); cntO[t + 1] = cntO[t] + (fo ? 1 : 0);
+  }
+  for (let t = 0; t < n; t++) {
+    if (!Number.isFinite(raw[t])) continue;
+    const lo = Math.max(0, t - TRADING_DAYS);
+    const cR = cntR[t] - cntR[lo], cO = cntO[t] - cntO[lo];
+    if (cR < minObs || cO < minObs) continue;
+    const mR = (sumR[t] - sumR[lo]) / cR, mO = (sumO[t] - sumO[lo]) / cO;
+    if (mR > 1e-8) out[t] = raw[t] * (mO / mR);
+  }
+  return out;
+}
+
+// ソースに応じた最終σ̂系列。データ不足なら null。
+function buildSigma(
+  prep: Prepared,
+  spec: VolTargetSpec,
+  usInputs?: UsInputs
+): number[] | null {
+  const own = computeSigmaOwn(prep.rets, spec.estimator);
+  if (spec.sigmaSource === "own") return own;
+  if (spec.sigmaSource === "vix" || spec.sigmaSource === "hybrid") {
+    if (!usInputs?.vix || usInputs.vix.length < 300) return null;
+    const scaled = calibrateToOwn(sigmaFromVix(prep.decisions, usInputs.vix), own);
+    if (spec.sigmaSource === "vix") return scaled;
+    // hybrid: どちらかが荒れを警告したら従う（max）。外部が未定義の間は own。
+    return own.map((o, t) => {
+      const s = scaled[t];
+      if (!Number.isFinite(o)) return NaN;
+      return Number.isFinite(s) ? Math.max(o, s) : o;
+    });
+  }
+  // usrv
+  if (!usInputs?.us || usInputs.us.length < 300) return null;
+  return calibrateToOwn(sigmaFromUsRv(prep.decisions, usInputs.us), own);
+}
+
+// ---------- コア・シミュレーション ----------
+interface SimOut {
+  start: number; // 取引開始index（rets配列上）
+  lev: number[]; // index t（t<start は NaN）
+  targetAnn: number[];
+  stratRet: number[]; // t=start.. の日次リターン
+  bhRet: number[];
+  turnover: number;
+  carryPaid: number;
+  costPaid: number;
+}
+
+function simulate(
+  rets: number[],
+  closes: number[],
+  spec: VolTargetSpec,
+  sigmaAnn: number[],
+  startOverride?: number
+): SimOut | null {
+  const n = rets.length;
+  let firstFinite = -1;
+  for (let t = 0; t < n; t++) if (Number.isFinite(sigmaAnn[t])) { firstFinite = t; break; }
+  if (firstFinite < 0) return null;
+  const start = Math.max(63, firstFinite + 40, startOverride ?? 0); // 自動目標に最低40個のσ̂履歴
+  if (n - start < TRADING_DAYS) return null; // 評価区間は最低1年
+
+  // σ̂ の累積和（自動目標 = 過去252日のσ̂平均, 因果的・欠損は除外）
+  const sigPrefix = new Array<number>(n + 1).fill(0);
+  const cntPrefix = new Array<number>(n + 1).fill(0);
+  for (let t = 0; t < n; t++) {
+    const f = Number.isFinite(sigmaAnn[t]);
+    sigPrefix[t + 1] = sigPrefix[t] + (f ? sigmaAnn[t] : 0);
+    cntPrefix[t + 1] = cntPrefix[t] + (f ? 1 : 0);
   }
   const autoTarget = (t: number): number => {
-    const lo = Math.max(s0, t - TRADING_DAYS);
-    const cnt = t - lo;
-    return cnt > 0 ? (sigPrefix[t] - sigPrefix[lo]) / cnt : spec.sigmaTargetAnn;
+    const lo = Math.max(0, t - TRADING_DAYS);
+    const c = cntPrefix[t] - cntPrefix[lo];
+    return c >= 20 ? (sigPrefix[t] - sigPrefix[lo]) / c : spec.sigmaTargetAnn;
   };
 
-  // --- SMA200 トレンドフィルタ（closes の過去のみ, 63本未満は無効） ---
+  // SMA200 トレンドフィルタ（closes の過去のみ, 63本未満は無効）
   const cPrefix = new Array<number>(n + 1).fill(0);
   for (let t = 0; t < n; t++) cPrefix[t + 1] = cPrefix[t] + closes[t];
   const belowSma = (t: number): boolean => {
@@ -227,7 +393,6 @@ function simulate(rets: number[], closes: number[], spec: VolTargetSpec): SimOut
     return closes[t] < sma;
   };
 
-  // --- メインループ ---
   const lev = new Array<number>(n).fill(NaN);
   const targetAnn = new Array<number>(n).fill(NaN);
   const stratRet: number[] = [];
@@ -236,26 +401,28 @@ function simulate(rets: number[], closes: number[], spec: VolTargetSpec): SimOut
   let turnover = 0, carryPaid = 0, costPaid = 0;
   const dailyRate = spec.marginRateLong / TRADING_DAYS;
   for (let t = start; t < n; t++) {
-    const tgt = spec.targetMode === "auto" ? autoTarget(t) : spec.sigmaTargetAnn;
-    let kRaw = tgt / Math.max(sigmaAnn[t], 1e-6);
-    kRaw = Math.min(Math.max(kRaw, 0), spec.maxLev);
-    if (spec.trendFilter && belowSma(t)) kRaw = Math.min(kRaw, 1);
     let cost = 0;
-    if (Math.abs(kRaw - kHeld) >= spec.rebalanceBand || stratRet.length === 0) {
-      const d = Math.abs(kRaw - kHeld);
-      turnover += d;
-      cost = (d * spec.costBps) / 1e4;
-      kHeld = kRaw;
+    if (Number.isFinite(sigmaAnn[t])) {
+      const tgt = spec.targetMode === "auto" ? autoTarget(t) : spec.sigmaTargetAnn;
+      let kRaw = tgt / Math.max(sigmaAnn[t], 1e-6);
+      kRaw = Math.min(Math.max(kRaw, 0), spec.maxLev);
+      if (spec.trendFilter && belowSma(t)) kRaw = Math.min(kRaw, 1);
+      if (Math.abs(kRaw - kHeld) >= spec.rebalanceBand || stratRet.length === 0) {
+        const d = Math.abs(kRaw - kHeld);
+        turnover += d;
+        cost = (d * spec.costBps) / 1e4;
+        kHeld = kRaw;
+      }
+      targetAnn[t] = tgt;
     }
     const carry = Math.max(kHeld - 1, 0) * dailyRate;
     lev[t] = kHeld;
-    targetAnn[t] = tgt;
     carryPaid += carry;
     costPaid += cost;
     stratRet.push(kHeld * rets[t] - carry - cost);
     bhRet.push(rets[t]);
   }
-  return { start, lev, sigmaAnn, targetAnn, stratRet, bhRet, turnover, carryPaid, costPaid };
+  return { start, lev, targetAnn, stratRet, bhRet, turnover, carryPaid, costPaid };
 }
 
 // ---------- 指標 ----------
@@ -383,7 +550,6 @@ function spanningAlpha(y: number[], x: number[], nwLag = 5): AlphaTest {
   }
   const beta = sxx > 0 ? sxy / sxx : 0;
   const alpha = my - beta * mx;
-  // 残差と R²
   const e = new Array<number>(T);
   let ssr = 0, sst = 0;
   for (let i = 0; i < T; i++) {
@@ -392,8 +558,7 @@ function spanningAlpha(y: number[], x: number[], nwLag = 5): AlphaTest {
     sst += (y[i] - my) * (y[i] - my);
   }
   const r2 = sst > 0 ? 1 - ssr / sst : 0;
-  // u_t = z_t e_t, z_t = [1, x_t]。S = Γ0 + Σ w_l (Γl + Γl')
-  const u0 = e; // 1·e_t
+  const u0 = e;
   const u1 = new Array<number>(T);
   for (let i = 0; i < T; i++) u1[i] = x[i] * e[i];
   const S = [ [0, 0], [0, 0] ];
@@ -417,14 +582,12 @@ function spanningAlpha(y: number[], x: number[], nwLag = 5): AlphaTest {
     S[1][0] += w * (gl[1][0] + gl[0][1]);
     S[1][1] += w * (gl[1][1] + gl[1][1]);
   }
-  // A = Z'Z = [[T, Σx],[Σx, Σx²]] の逆行列
   let sx = 0, sx2 = 0;
   for (let i = 0; i < T; i++) { sx += x[i]; sx2 += x[i] * x[i]; }
   const det = T * sx2 - sx * sx;
   let tNW: number | null = null, pOneSided: number | null = null;
   if (det > 1e-12) {
     const Ainv = [ [sx2 / det, -sx / det], [-sx / det, T / det] ];
-    // V = Ainv · S · Ainv, se(α) = sqrt(V[0][0])
     const v00 =
       Ainv[0][0] * (S[0][0] * Ainv[0][0] + S[0][1] * Ainv[1][0]) +
       Ainv[0][1] * (S[1][0] * Ainv[0][0] + S[1][1] * Ainv[1][0]);
@@ -441,7 +604,7 @@ function volForecastQuality(rets: number[], sigmaAnn: number[], start: number): 
   const xs: number[] = [], ys: number[] = [];
   for (let t = start; t < rets.length; t++) {
     if (!Number.isFinite(sigmaAnn[t])) continue;
-    xs.push((sigmaAnn[t] * sigmaAnn[t]) / TRADING_DAYS); // 日次分散予測
+    xs.push((sigmaAnn[t] * sigmaAnn[t]) / TRADING_DAYS);
     ys.push(rets[t] * rets[t]);
   }
   const T = xs.length;
@@ -460,7 +623,6 @@ function volForecastQuality(rets: number[], sigmaAnn: number[], start: number): 
     ssr += eh * eh;
   }
   const r2 = sst > 0 ? 1 - ssr / sst : 0;
-  // Spearman: σ̂ と |r| の順位相関（同順位は平均順位）
   const rank = (arr: number[]): number[] => {
     const idx = arr.map((v, i) => ({ v, i })).sort((p, q) => p.v - q.v);
     const rk = new Array<number>(arr.length);
@@ -487,11 +649,12 @@ function volForecastQuality(rets: number[], sigmaAnn: number[], start: number): 
   return { mzSlope: slope, mzIntercept: intercept, mzR2: r2, spearman };
 }
 
-// 置換検定: リターンをi.i.d.シャッフル（分布・ドリフトは保存、ボラ・クラスタリングは破壊）した
-// 系列に同一パイプラインを適用し、ΔSharpe のヌル分布を得る。
+// 置換検定。own: リターンをシャッフルしσ̂も再計算（クラスタリング破壊）。
+// 外部ソース: σ̂系列は固定し、リターンだけシャッフル（σ̂↔リターンの対応破壊）。
 function permutationTest(
   rets: number[],
   spec: VolTargetSpec,
+  sigmaFixed: number[] | null, // 外部ソース時の固定σ̂（own時は null）
   actualDelta: number,
   nPerm: number,
   seed: number
@@ -502,15 +665,14 @@ function permutationTest(
   const perm = rets.slice();
   const closes = new Array<number>(n);
   for (let b = 0; b < nPerm; b++) {
-    // Fisher–Yates
     for (let i = n - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
     }
-    // 疑似価格経路（トレンドフィルタ用）
     closes[0] = 1;
     for (let t = 1; t < n; t++) closes[t] = closes[t - 1] * (1 + perm[t - 1]);
-    const sim = simulate(perm, closes, spec);
+    const sigma = sigmaFixed ?? computeSigmaOwn(perm, spec.estimator);
+    const sim = simulate(perm, closes, spec, sigma);
     if (!sim) continue;
     const s = bootStats(sim.stratRet).sharpe - bootStats(sim.bhRet).sharpe;
     if (Number.isFinite(s)) dist.push(s);
@@ -542,33 +704,75 @@ function levSweep(rets: number[], start: number, spec: VolTargetSpec): LevSweep 
   return { ks, annual, sharpe, kStarEmp, kKellyGross, annualAtOne };
 }
 
+// ---------- ソース横断比較（軽量: boot/permなし・共通評価区間） ----------
+function sourceComparison(
+  prep: Prepared,
+  spec: VolTargetSpec,
+  usInputs?: UsInputs
+): SourceComparisonRow[] | null {
+  const sources: SigmaSource[] = ["own"];
+  if (usInputs?.vix && usInputs.vix.length >= 300) sources.push("vix", "hybrid");
+  if (usInputs?.us && usInputs.us.length >= 300) sources.push("usrv");
+  if (sources.length <= 1) return null;
+
+  // 各ソースのσ̂を先に作り、公平のため共通の開始点（最も遅い開始）で揃える
+  const sigmas = new Map<SigmaSource, number[]>();
+  let commonStart = 0;
+  for (const src of sources) {
+    const sg = buildSigma(prep, { ...spec, sigmaSource: src }, usInputs);
+    if (!sg) continue;
+    let ff = -1;
+    for (let t = 0; t < sg.length; t++) if (Number.isFinite(sg[t])) { ff = t; break; }
+    if (ff < 0) continue;
+    sigmas.set(src, sg);
+    commonStart = Math.max(commonStart, Math.max(63, ff + 40));
+  }
+  if (sigmas.size <= 1) return null;
+
+  const rows: SourceComparisonRow[] = [];
+  for (const [src, sg] of sigmas) {
+    const sim = simulate(prep.rets, prep.closes, { ...spec, sigmaSource: src }, sg, commonStart);
+    if (!sim) continue;
+    const ms = metricsFromDaily(sim.stratRet);
+    const mb = metricsFromDaily(sim.bhRet);
+    const vfq = volForecastQuality(prep.rets, sg, sim.start);
+    const levVals = sim.lev.slice(sim.start).filter((v) => Number.isFinite(v));
+    rows.push({
+      source: src,
+      label: SIGMA_SOURCE_LABEL[src],
+      spearman: vfq.spearman,
+      mzR2: vfq.mzR2,
+      dSharpe: ms.sharpe - mb.sharpe,
+      dMaxDD: ms.maxDD - mb.maxDD,
+      avgLev: mean(levVals),
+    });
+  }
+  const order: SigmaSource[] = ["own", "vix", "usrv", "hybrid"];
+  rows.sort((a, b) => order.indexOf(a.source) - order.indexOf(b.source));
+  return rows.length > 1 ? rows : null;
+}
+
 // ---------- メイン ----------
 export function computeVolTarget(
   prices: PricePoint[],
   spec: VolTargetSpec,
+  usInputs?: UsInputs,
   seed = 20260718
 ): VolTargetResult | null {
   const len = prices.length;
   if (len < 400) return null;
 
-  // 日次リターン（終値→翌終値, 夜間込み）。rets[t] の日付は prices[t+1].time。
-  const rets: number[] = [];
-  const dates: string[] = [];
-  const closes: number[] = []; // closes[t] = r_t 観測直前の終値
-  for (let i = 0; i < len - 1; i++) {
-    const c0 = prices[i].close, c1 = prices[i + 1].close;
-    if (!(c0 > 0) || !(c1 > 0)) continue;
-    rets.push(c1 / c0 - 1);
-    dates.push(prices[i + 1].time);
-    closes.push(c0);
-  }
-  const sim = simulate(rets, closes, spec);
+  const prep = prepare(prices);
+  const sigmaAnn = buildSigma(prep, spec, usInputs);
+  if (!sigmaAnn) return null; // 外部ソース指定だがデータ未着
+
+  const sim = simulate(prep.rets, prep.closes, spec, sigmaAnn);
   if (!sim) return null;
 
   const { start, stratRet, bhRet } = sim;
   const nEval = stratRet.length;
+  const { rets, dates } = prep;
 
-  // 累積リターン行
   const rows: VTRow[] = [];
   let Ws = 1, Wb = 1;
   for (let t = start; t < rets.length; t++) {
@@ -580,7 +784,7 @@ export function computeVolTarget(
       strat: Ws - 1,
       bh: Wb - 1,
       lev: sim.lev[t],
-      sigmaAnn: sim.sigmaAnn[t],
+      sigmaAnn: sigmaAnn[t],
     });
   }
 
@@ -594,9 +798,11 @@ export function computeVolTarget(
   const sharpeT = sharpeDiffTest(stratRet, bhRet, seed + 1);
   const annualT = annualDiffTest(stratRet, bhRet, seed + 2);
   const alphaT = spanningAlpha(stratRet, bhRet);
-  const vfq = volForecastQuality(rets, sim.sigmaAnn, start);
-  const permT = permutationTest(rets, spec, sharpeT.delta, 200, seed + 3);
+  const vfq = volForecastQuality(rets, sigmaAnn, start);
+  const sigmaFixed = spec.sigmaSource === "own" ? null : sigmaAnn;
+  const permT = permutationTest(rets, spec, sigmaFixed, sharpeT.delta, 200, seed + 3);
   const sweep = levSweep(rets, start, spec);
+  const comparison = sourceComparison(prep, spec, usInputs);
 
   return {
     meta: {
@@ -607,6 +813,7 @@ export function computeVolTarget(
       avgLev: mean(levVals),
       avgTargetAnn: mean(tgtVals),
       warmup: start,
+      sigmaSource: spec.sigmaSource,
     },
     rows,
     metrics: { strat: metricsStrat, bh: metricsBH },
@@ -621,5 +828,6 @@ export function computeVolTarget(
     volForecast: vfq,
     perm: permT,
     sweep,
+    comparison,
   };
 }
