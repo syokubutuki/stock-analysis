@@ -451,6 +451,10 @@ const SimpleBacktestChart = dynamic(
   () => import("./components/analysis/SimpleBacktestChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
 );
+const VolTargetingChart = dynamic(
+  () => import("./components/analysis/VolTargetingChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const MultiTimeframeChart = dynamic(
   () => import("./components/analysis/MultiTimeframeChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
@@ -1890,6 +1894,7 @@ export default function AnalysisPage() {
                         { id: "sim-multivar-simplex", title: "多変量埋め込みでの近傍予測（multivariate simplex）", node: <MultivarSimplexChart prices={filteredPrices} /> },
                         { id: "sim-forecast", title: "株価予測シミュレーター（モンテカルロ）", node: <PriceForecastChart prices={filteredPrices} /> },
                         { id: "sim-backtest", title: "シンプルバックテスト", node: <SimpleBacktestChart prices={filteredPrices} /> },
+                        { id: "sim-vol-target", title: "ボラティリティ・ターゲティング（信用レバ可変） vs バイ&ホールド 統計検定", node: <VolTargetingChart prices={allPrices} /> },
                       ],
                     },
                     {
