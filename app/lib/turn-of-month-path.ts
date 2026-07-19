@@ -68,10 +68,14 @@ export function computeTurnOfMonthPaths(
   const G = grid.bins.length;
   const cls = classifyByMonth(rows, window);
 
-  const groups: PathGroup[] = GROUP_META.map((m) => ({
-    key: m.key, label: m.label, color: m.color,
-    paths: rows.filter((d) => cls.get(d.date) === m.key).map((d) => dayCumPath(d, grid, gmtoffset)),
-  }));
+  const groups: PathGroup[] = GROUP_META.map((m) => {
+    const gRows = rows.filter((d) => cls.get(d.date) === m.key);
+    return {
+      key: m.key, label: m.label, color: m.color,
+      paths: gRows.map((d) => dayCumPath(d, grid, gmtoffset)),
+      dates: gRows.map((d) => d.date),
+    };
+  });
 
   const { stats, maxAbs } = buildPathStats(groups, G);
   const bins: TomPathBin[] = stats.map((s) => ({ ...s, group: s.key }));

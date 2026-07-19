@@ -13,6 +13,8 @@ import {
 } from "./intradayShared";
 import {
   drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  usePathEvolution, PathEvolutionControls, PathDriftTable,
+  PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -94,11 +96,15 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
 
   // パス描画
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const evo = usePathEvolution(pathResult?.bins);
   useEffect(() => {
     if (view !== "path" || !pathResult || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 260);
-    if (init) drawPathStats(init.ctx, init.width, init.height, pathResult.bins, pathResult.timeLabels, pathResult.maxAbs, { showBand, showMedian });
-  }, [view, pathResult, showBand, showMedian]);
+    if (init) drawPathStats(init.ctx, init.width, init.height, pathResult.bins, pathResult.timeLabels, pathResult.maxAbs, {
+      showBand, showMedian,
+      showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
+    });
+  }, [view, pathResult, showBand, showMedian, evo.showSpaghetti, evo.showEras, evo.groupFilter]);
 
   // 原系列タイムライン(基準銘柄の日次終値上に曜日色●)
   const timelineDays: TimelineDay[] = useMemo(() => {
@@ -202,12 +208,16 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
               中央値パス（破線）
             </label>
           </div>
+          <PathEvolutionControls stats={pathResult.bins} evo={evo} />
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={pathResult.bins} timeLabels={pathResult.timeLabels} groupHeader="曜日" />
           <p className="text-[11px] text-gray-400">
             実線=平均・破線=中央値の日内累積リターン（{nStocks}銘柄プール）。▲=平均パスのピーク時刻（＝寄りロングの最良手仕舞い目安）／▽=ボトム時刻。
             95%帯は同一営業日の全銘柄を1クラスタとみなす頑健SEで算出（横断相関で幅が狭くなりすぎるのを防ぐ）。
+            {(evo.showSpaghetti || evo.showEras) &&
+              "個別日・時代分割は同一営業日の全銘柄をバスケット平均に畳んだ「1日1本」で描く（のべ銘柄×日で水増ししない）。"}
+            {evo.showEras && "時代分割中は全期間平均を隠し、古い→直近ほど濃く太い線。▲▽は直近期の高安時刻。"}
           </p>
 
           {/* 標本の内訳: のべ / 独立日 / 実効 */}
@@ -249,6 +259,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
           </p>
 
           <PairDiffMatrix stats={pathResult.bins} pairDiffs={pathResult.pairDiffs} />
+          <PathDriftTable stats={pathResult.bins} timeLabels={pathResult.timeLabels} />
 
           {/* 銘柄別の寄与(「似ている」仮定の検証) */}
           {pathResult.perStock.length > 1 && (
@@ -431,6 +442,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
           <li>{"銘柄ごとにボラが大きく異なると高ボラ銘柄が平均を支配する。似たボラ帯の銘柄で組むのが無難。"}</li>
           <li>{"Yahoo日中足は約15分遅延・取得期間に上限あり。取引コスト・スリッページ・昼休みをまたぐ保有の非約定時間は未考慮。"}</li>
         </ul>
+        <PathDriftGuideSection />
       </AnalysisGuide>
     </div>
   );

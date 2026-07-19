@@ -16,6 +16,8 @@ import { US_DRIVERS } from "../../hooks/useUsDaily";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import {
   drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  usePathEvolution, PathEvolutionControls, PathDriftTable,
+  PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -102,11 +104,16 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
     return computeWeekdayPaths(days, data.grid, data.gmtoffset);
   }, [binning, selBin, data]);
 
+  const evo = usePathEvolution(result?.bins);
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 260);
-    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, { showBand, showMedian });
-  }, [result, showBand, showMedian]);
+    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, {
+      showBand, showMedian,
+      showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
+    });
+  }, [result, showBand, showMedian, evo.showSpaghetti, evo.showEras, evo.groupFilter]);
 
   const timelineDays: TimelineDay[] = useMemo(
     () => (result ? result.days.map((d) => ({ date: d.date, close: d.close, key: String(d.weekday) })) : []),
@@ -220,15 +227,19 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
             </span>
           </div>
           <PathLegend stats={result.bins} />
+          <PathEvolutionControls stats={result.bins} evo={evo} />
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="曜日" />
           <p className="text-[11px] text-gray-400">
             選んだ前夜米国ビンに絞った上での曜日別パス。ビンを切り替えて、同じ曜日の形がビン間で反転・強弱するか（交互作用）を見る。
             例: 金曜は米大幅高なら継続・米大幅安ならフェード、など地合いの強さ依存の曜日癖を切り分ける。
+            {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
+            {evo.showSpaghetti && "個別日は最新ほど濃く太い。枠外に出た日はクリップされる（縦軸は平均基準のため）。"}
           </p>
 
           <PairDiffMatrix stats={result.bins} pairDiffs={result.pairDiffs} />
+          <PathDriftTable stats={result.bins} timeLabels={result.timeLabels} />
 
           <div className="pt-3 border-t border-gray-100 space-y-3">
             <button
@@ -287,6 +298,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
           <li>{"分割(ビン数×曜日)を細かくするほど見かけのパターンが出やすい(多重比較)。差の検定★とタイムラインの偏り、各セルのnで過剰解釈を防ぐ。"}</li>
           <li>{"米国指数の選択(S&P500/NASDAQ/ダウ等)とビン基準(前日終値比/日中)で結果は変わる。対象銘柄と連動の強い指数を選ぶ。"}</li>
         </ul>
+        <PathDriftGuideSection />
       </AnalysisGuide>
     </div>
   );

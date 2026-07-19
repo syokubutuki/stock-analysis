@@ -47,10 +47,14 @@ export function computeWeekdayPaths(
   if (rows.length < 8) return null;
   const G = grid.bins.length;
 
-  const groups: PathGroup[] = WD_ORDER.map((wd) => ({
-    key: String(wd), label: WD_LABELS[wd], color: WD_COLORS[wd],
-    paths: rows.filter((d) => d.weekday === wd).map((d) => dayCumPath(d, grid, gmtoffset)),
-  }));
+  const groups: PathGroup[] = WD_ORDER.map((wd) => {
+    const wdRows = rows.filter((d) => d.weekday === wd);
+    return {
+      key: String(wd), label: WD_LABELS[wd], color: WD_COLORS[wd],
+      paths: wdRows.map((d) => dayCumPath(d, grid, gmtoffset)),
+      dates: wdRows.map((d) => d.date),
+    };
+  });
 
   const { stats, maxAbs } = buildPathStats(groups, G);
   const bins: WeekdayPathBin[] = stats.map((s, i) => ({ ...s, weekday: WD_ORDER[i] }));

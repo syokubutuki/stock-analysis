@@ -91,6 +91,137 @@ export interface PairDiff {
   pAdj: number; // FDR補正後p値
 }
 
+// ───────────────────────── 経時ドリフト ─────────────────────────
+
+// 同順位に平均順位を割り当てるランク変換(Spearmanのタイ補正に必須)。
+function avgRanks(v: number[]): number[] {
+  const idx = v.map((x, i) => ({ x, i })).sort((a, b) => a.x - b.x);
+  const r = new Array(v.length).fill(0);
+  let k = 0;
+  while (k < idx.length) {
+    let j = k;
+    while (j + 1 < idx.length && idx[j + 1].x === idx[k].x) j++;
+    const rank = (k + j) / 2 + 1; // 同値は平均順位
+    for (let m = k; m <= j; m++) r[idx[m].i] = rank;
+    k = j + 1;
+  }
+  return r;
+}
+
+// Spearman順位相関(タイ補正済)と、t近似による両側p値。
+function spearman(x: number[], y: number[]): { rho: number; p: number } | null {
+  const n = x.length;
+  if (n < 5) return null;
+  const rx = avgRanks(x), ry = avgRanks(y);
+  const mx = mean(rx), my = mean(ry);
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = rx[i] - mx, dy = ry[i] - my;
+    sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+  }
+  if (sxx <= 0 || syy <= 0) return null; // 全日で同じ時刻に高値=順位相関は定義できない
+  const rho = sxy / Math.sqrt(sxx * syy);
+  if (Math.abs(rho) >= 1) return { rho, p: 0 };
+  const t = rho * Math.sqrt((n - 2) / (1 - rho * rho));
+  return { rho, p: studentTwoSidedP(t, n - 2) };
+}
+
+function argMax(a: number[]): number {
+  let k = 0;
+  for (let i = 1; i < a.length; i++) if (a[i] > a[k]) k = i;
+  return k;
+}
+function argMin(a: number[]): number {
+  let k = 0;
+  for (let i = 1; i < a.length; i++) if (a[i] < a[k]) k = i;
+  return k;
+}
+
+const ERA_LABELS: Record<number, string[]> = {
+  2: ["前半", "直近半分"],
+  3: ["古い1/3", "中間1/3", "直近1/3"],
+};
+
+// 群の個別日パスを日付昇順に整え、時代分割の平均パスと形状ドリフトの検定を返す。
+//
+// 同一日に複数観測(バスケットの複数銘柄)がある場合は、まずその日の平均パスに畳む。
+// 同じ日の銘柄は一斉に動く(横断相関)ため素朴に並べると独立日数を水増ししてしまい、
+// ドリフト検定のp値が不当に小さくなる。畳むことで検定の単位を必ず「独立な営業日」にする。
+export function buildPathEvolution(
+  paths: number[][], dates: string[], G: number
+): { days: DayPath[]; eras: PathEra[]; drift: PathDrift | null } {
+  if (paths.length === 0 || dates.length !== paths.length || G < 2) {
+    return { days: [], eras: [], drift: null };
+  }
+
+  // 1) 同一日を平均に畳む
+  const byDate = new Map<string, { sum: number[]; k: number }>();
+  for (let i = 0; i < paths.length; i++) {
+    const cur = byDate.get(dates[i]);
+    if (cur) {
+      for (let g = 0; g < G; g++) cur.sum[g] += paths[i][g];
+      cur.k++;
+    } else {
+      byDate.set(dates[i], { sum: paths[i].slice(0, G), k: 1 });
+    }
+  }
+  const days: DayPath[] = Array.from(byDate.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, { sum, k }]) => {
+      const values = sum.map((s) => s / k);
+      return { date, values, end: values[G - 1], peakIdx: argMax(values), troughIdx: argMin(values) };
+    });
+
+  const n = days.length;
+  // 2) 時代分割。1期あたり4日を切ると平均パスは形状でなく個別日ノイズになるため打ち切る。
+  const K = n >= 12 ? 3 : n >= 8 ? 2 : 0;
+  const eras: PathEra[] = [];
+  for (let e = 0; e < K; e++) {
+    const from = Math.floor((e * n) / K), to = Math.floor(((e + 1) * n) / K);
+    const slice = days.slice(from, to);
+    const m = new Array(G).fill(0);
+    for (let g = 0; g < G; g++) m[g] = mean(slice.map((d) => d.values[g]));
+    eras.push({
+      key: `era${e}`,
+      label: ERA_LABELS[K][e],
+      n: slice.length,
+      from: slice[0].date,
+      to: slice[slice.length - 1].date,
+      mean: m,
+      endMean: m[G - 1],
+      peakIdx: argMax(m),
+      troughIdx: argMin(m),
+    });
+  }
+
+  // 3) ドリフト検定: 終端は最古 vs 直近の Welch、高安時刻は日付順位との Spearman。
+  let drift: PathDrift | null = null;
+  if (K >= 2) {
+    const early = days.slice(0, Math.floor(n / K));
+    const late = days.slice(n - Math.floor(n / K));
+    const eEnd = early.map((d) => d.end), lEnd = late.map((d) => d.end);
+    const w = welchP(lEnd, eEnd);
+    const rank = days.map((_, i) => i);
+    const pk = spearman(rank, days.map((d) => d.peakIdx));
+    const tr = spearman(rank, days.map((d) => d.troughIdx));
+    drift = {
+      nEarly: early.length,
+      nLate: late.length,
+      endEarly: mean(eEnd),
+      endLate: mean(lEnd),
+      endDiff: mean(lEnd) - mean(eEnd),
+      endP: w ? w.p : 1,
+      peakRho: pk ? pk.rho : 0,
+      peakP: pk ? pk.p : 1,
+      troughRho: tr ? tr.rho : 0,
+      troughP: tr ? tr.p : 1,
+      nRho: n,
+    };
+  }
+
+  return { days, eras, drift };
+}
+
 export function buildPathStats(groups: PathGroup[], G: number): { stats: PathStat[]; maxAbs: number } {
   let maxAbs = 1e-6;
   const stats: PathStat[] = groups.map((grp) => {
@@ -112,11 +243,15 @@ export function buildPathStats(groups: PathGroup[], G: number): { stats: PathSta
     }
     const endValues = mat.map((p) => p[G - 1]);
     const tt = tTest(endValues);
+    const evo = grp.dates
+      ? buildPathEvolution(mat, grp.dates, G)
+      : { days: [], eras: [], drift: null };
     return {
       key: grp.key, label: grp.label, color: grp.color, n: mat.length,
       mean: m, med: md, lo, hi,
       endMean: m[G - 1], endMed: md[G - 1], endP: tt ? tt.p : 1,
       endValues, peakIdx, troughIdx,
+      days: evo.days, eras: evo.eras, drift: evo.drift,
     };
   });
   return { stats, maxAbs };

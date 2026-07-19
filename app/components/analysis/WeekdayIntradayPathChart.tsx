@@ -8,6 +8,8 @@ import { intervalToMin } from "./usSpilloverShared";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat } from "./intradayShared";
 import {
   drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  usePathEvolution, PathEvolutionControls, PathDriftTable,
+  PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -28,11 +30,16 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
     return computeWeekdayPaths(days, grid, resp.gmtoffset);
   }, [resp, interval]);
 
+  const evo = usePathEvolution(result?.bins);
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 260);
-    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, { showBand, showMedian });
-  }, [result, showBand, showMedian]);
+    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, {
+      showBand, showMedian,
+      showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
+    });
+  }, [result, showBand, showMedian, evo.showSpaghetti, evo.showEras, evo.groupFilter]);
 
   const timelineDays: TimelineDay[] = useMemo(
     () => (result ? result.days.map((d) => ({ date: d.date, close: d.close, key: String(d.weekday) })) : []),
@@ -68,15 +75,19 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
       {result && (
         <>
           <PathLegend stats={result.bins} />
+          <PathEvolutionControls stats={result.bins} evo={evo} />
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="曜日" />
           <p className="text-[11px] text-gray-400">
             実線=平均・破線=中央値の日内累積リターン。▲=平均パスのピーク時刻／▽=ボトム時刻（利確・手仕舞いの目安）。
             右肩上がり＝日中も買われる、寄り直後にピーク→垂れる＝寄り天フェード。平均と中央値が大きく離れる曜日は少数の異常日が形を作っている。
+            {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
+            {evo.showSpaghetti && "個別日は最新ほど濃く太い。枠外に出た日はクリップされる（縦軸は平均基準のため）。"}
           </p>
 
           <PairDiffMatrix stats={result.bins} pairDiffs={result.pairDiffs} />
+          <PathDriftTable stats={result.bins} timeLabels={result.timeLabels} />
 
           {/* ── 曜日 × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
@@ -139,6 +150,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
           <li>{"特定レジーム(強い上昇相場等)に観測期間が偏ると地合いを曜日効果と誤認しうる。下のタイムラインで曜日色が全期間に均等散布かを確認する。"}</li>
           <li>{"時間格子はデータ実測のセッション範囲から作る。東証の前場/後場の昼休みは連続扱いになる点に留意。"}</li>
         </ul>
+        <PathDriftGuideSection />
       </AnalysisGuide>
     </div>
   );

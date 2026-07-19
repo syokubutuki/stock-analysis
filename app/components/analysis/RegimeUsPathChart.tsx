@@ -13,6 +13,8 @@ import { US_DRIVERS } from "../../hooks/useUsDaily";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import {
   drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  usePathEvolution, PathEvolutionControls, PathDriftTable,
+  PathDriftGuideSection,
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
@@ -72,11 +74,16 @@ export default function RegimeUsPathChart({ ticker }: Props) {
     return nonEmpty.reduce((a, b) => (b.n > a.n ? b : a));
   }, [result, selectedKey]);
 
+  const evo = usePathEvolution(selected?.usStats);
+
   useEffect(() => {
     if (!result || !selected || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 260);
-    if (init) drawPathStats(init.ctx, init.width, init.height, selected.usStats, result.timeLabels, result.maxAbs, { showBand, showMedian });
-  }, [result, selected, showBand, showMedian]);
+    if (init) drawPathStats(init.ctx, init.width, init.height, selected.usStats, result.timeLabels, result.maxAbs, {
+      showBand, showMedian,
+      showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
+    });
+  }, [result, selected, showBand, showMedian, evo.showSpaghetti, evo.showEras, evo.groupFilter]);
 
   const timelineDays: TimelineDay[] = useMemo(
     () => (result ? result.days.map((d) => ({ date: d.date, close: d.close, key: d.regimeKey })) : []),
@@ -302,10 +309,18 @@ export default function RegimeUsPathChart({ ticker }: Props) {
               <span className="text-gray-400">（n={selected.n}）— この基調の日を前夜{usLabel}ビンで分け、寄り基準の日内累積パスを描く。</span>
             </div>
             <PathLegend stats={selected.usStats} />
+            <PathEvolutionControls stats={selected.usStats} evo={evo} />
             <div className="relative"><canvas ref={canvasRef} /></div>
+            {(evo.showEras || evo.showSpaghetti) && (
+              <p className="text-[11px] text-gray-400">
+                {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
+                {evo.showSpaghetti && "個別日は最新ほど濃く太い。枠外に出た日はクリップされる（縦軸は平均基準のため）。"}
+              </p>
+            )}
 
             <PathSummaryTable stats={selected.usStats} timeLabels={result.timeLabels} groupHeader="前夜米国ビン" />
             <PairDiffMatrix stats={selected.usStats} pairDiffs={selected.usPairDiffs} />
+            <PathDriftTable stats={selected.usStats} timeLabels={result.timeLabels} />
           </div>
 
           {/* ── 基調所属 × 原系列タイムライン ── */}
@@ -383,6 +398,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
           <li>{"基調は連日続く(自己相関)ため独立標本でない。素のt値は甘めに出る。強度の再現性はタイムラインの偏りと合わせて判断。"}</li>
           <li>{"K・T・米国指数・ビン方式を動かすほど多重比較(forking paths)。出たエッジは探索段階の候補とし、別手法(WeekdayIntradayEdge等)で確定する。"}</li>
         </ul>
+        <PathDriftGuideSection />
       </AnalysisGuide>
     </div>
   );

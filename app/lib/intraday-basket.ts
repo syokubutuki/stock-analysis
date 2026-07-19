@@ -17,7 +17,7 @@
 
 import { DayData, BinGrid } from "./intraday-core";
 import { dayCumPath } from "./us-spillover-core";
-import { PathStat, PairDiff } from "./intraday-path-core";
+import { PathStat, PairDiff, buildPathEvolution } from "./intraday-path-core";
 import { computeWeekdayIntradayEdge, EdgeRankBy, EdgeWindow } from "./weekday-intraday-edge";
 import { mean, std, median, benjaminiHochberg, quantileSorted } from "./stats-significance";
 import { studentTwoSidedP } from "./us-spillover-core";
@@ -168,10 +168,14 @@ export function poolWeekdayPaths(
     const endP = endStat && endStat.se > 0
       ? studentTwoSidedP(endMean / endStat.se, Math.max(1, endStat.nDays - 1))
       : 1;
+    // 経時ドリフト。同一日の複数銘柄はバスケット平均に畳まれるので、
+    // 時代分割も検定も「独立な営業日」単位になる(のべ銘柄×日で水増ししない)。
+    const evo = buildPathEvolution(paths, dates, G);
     return {
       key: String(wd), label: WD_LABELS[wd], color: WD_COLORS[wd],
       n: M, mean: m, med: md, lo, hi,
       endMean, endMed: md[G - 1], endP, endValues, peakIdx, troughIdx,
+      days: evo.days, eras: evo.eras, drift: evo.drift,
       weekday: wd,
       nDays: endStat ? endStat.nDays : 0,
       nEff: endStat ? endStat.nEff : 0,

@@ -184,10 +184,12 @@ export function computeRegimeUsPaths(
     // 前夜米国ビン別にパスをまとめる
     const groups: PathGroup[] = [];
     for (let b = 0; b < usMeta.count; b++) {
-      const paths = idxs
-        .filter((i) => binIdx[i] === b)
-        .map((i) => dayCumPath(rows[i].jp, grid, gmtoffset));
-      groups.push({ key: String(b), label: usMeta.labels[b], color: usMeta.colors[b], paths });
+      const binIdxs = idxs.filter((i) => binIdx[i] === b);
+      groups.push({
+        key: String(b), label: usMeta.labels[b], color: usMeta.colors[b],
+        paths: binIdxs.map((i) => dayCumPath(rows[i].jp, grid, gmtoffset)),
+        dates: binIdxs.map((i) => rows[i].jp.date),
+      });
     }
     const { stats, maxAbs: mA } = buildPathStats(groups, G);
     maxAbs = Math.max(maxAbs, mA);

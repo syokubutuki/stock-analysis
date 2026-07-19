@@ -8,6 +8,8 @@ import { intervalToMin } from "./usSpilloverShared";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat } from "./intradayShared";
 import {
   drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  usePathEvolution, PathEvolutionControls, PathDriftTable,
+  PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -31,11 +33,16 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
     return computeTurnOfMonthPaths(days, grid, resp.gmtoffset, windowK);
   }, [resp, interval, windowK]);
 
+  const evo = usePathEvolution(result?.bins);
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 260);
-    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, { showBand, showMedian });
-  }, [result, showBand, showMedian]);
+    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, {
+      showBand, showMedian,
+      showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
+    });
+  }, [result, showBand, showMedian, evo.showSpaghetti, evo.showEras, evo.groupFilter]);
 
   const timelineDays: TimelineDay[] = useMemo(
     () => (result ? result.days.map((d) => ({ date: d.date, close: d.close, key: d.group })) : []),
@@ -85,15 +92,19 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
       {result && (
         <>
           <PathLegend stats={result.bins} />
+          <PathEvolutionControls stats={result.bins} evo={evo} />
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="月内位置" />
           <p className="text-[11px] text-gray-400">
             実線=平均・破線=中央値。▲=ピーク時刻／▽=ボトム時刻。月末群・月初群が中旬群と形が違えば、
             月替わりのフロー（月末のリバランス売買、月初の資金流入）が日内の値動きに現れているサイン。
+            {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
+            {evo.showSpaghetti && "個別日は最新ほど濃く太い。枠外に出た日はクリップされる（縦軸は平均基準のため）。"}
           </p>
 
           <PairDiffMatrix stats={result.bins} pairDiffs={result.pairDiffs} />
+          <PathDriftTable stats={result.bins} timeLabels={result.timeLabels} />
 
           {/* ── 月内位置 × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
@@ -156,6 +167,7 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
           <li>{"月末効果は月次で相関しうる(同じレジームの月が続く)。中央値・タイムラインで一部期間への偏りを確認する。"}</li>
           <li>{"K(境界日数)を変えると分類が変わる。複数Kで頑健なパターンだけを信頼する。"}</li>
         </ul>
+        <PathDriftGuideSection />
       </AnalysisGuide>
     </div>
   );
