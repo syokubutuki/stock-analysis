@@ -900,6 +900,22 @@ const SignalStackingChart = dynamic(
   () => import("./components/analysis/SignalStackingChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const EdgeCapacityChart = dynamic(
+  () => import("./components/analysis/EdgeCapacityChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const EdgeDecayChart = dynamic(
+  () => import("./components/analysis/EdgeDecayChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const ProspectiveLedgerChart = dynamic(
+  () => import("./components/analysis/ProspectiveLedgerChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const TestRegistryChart = dynamic(
+  () => import("./components/analysis/TestRegistryChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const WeekdayConditionalChart = dynamic(
   () => import("./components/analysis/WeekdayConditionalChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1010,7 +1026,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
   { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・ローリングHurst+サロゲート帯・MF-DFA・R/S・DCCA・相関次元" },
   { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
   { key: "conditional", label: "条件付き分析", description: "状態→先行きリターン表（RSI/ボラ/トレンド別の条件付き期待値・有意性・年次持続性）" },
-  { key: "edge", label: "エッジ探索", description: "条件ペア交互作用スキャン・レジーム別エッジマップ・ウォークフォワード頑健性・シグナル合成" },
+  { key: "edge", label: "エッジ探索", description: "条件ペア交互作用スキャン・レジーム別エッジマップ・ウォークフォワード頑健性・シグナル合成・エッジ容量推定・減衰検知(SPRT/CUSUM)・前向き検証台帳・多重検定台帳" },
   { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
   { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
   { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
@@ -1796,11 +1812,21 @@ export default function AnalysisPage() {
                   onBulk={bumpBulk}
                   groups={[
                     {
+                      group: "探索（エッジを見つける）",
                       items: [
                         { id: "edge-interaction", title: "条件ペア交互作用スキャナ", node: <InteractionScanChart prices={filteredPrices} /> },
                         { id: "edge-regime-map", title: "レジーム別エッジマップ", node: <RegimeEdgeMapChart prices={filteredPrices} /> },
                         { id: "edge-walkforward", title: "ウォークフォワード頑健性（DSR + PBO）", node: <WalkForwardChart prices={filteredPrices} /> },
                         { id: "edge-signal-stack", title: "シグナル合成", node: <SignalStackingChart prices={filteredPrices} /> },
+                      ],
+                    },
+                    {
+                      group: "規律（信じてよいか・いくらまでか・まだ生きているか）",
+                      items: [
+                        { id: "edge-capacity", title: "エッジ容量推定（このエッジは何円まで運用できるか）", node: <EdgeCapacityChart prices={filteredPrices} /> },
+                        { id: "edge-decay", title: "エッジ減衰・死亡検知（SPRT + CUSUM 逐次監視）", node: <EdgeDecayChart prices={allPrices} /> },
+                        { id: "edge-ledger", title: "前向き検証台帳（凍結→未来のデータだけで採点）", node: <ProspectiveLedgerChart prices={allPrices} ticker={data.ticker} /> },
+                        { id: "edge-test-registry", title: "グローバル多重検定台帳（アプリ全体の偽発見の床）", node: <TestRegistryChart /> },
                       ],
                     },
                   ]}
