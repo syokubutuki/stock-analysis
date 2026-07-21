@@ -82,6 +82,10 @@ const WeekdayCrossSectionChart = dynamic(
   () => import("../components/analysis/WeekdayCrossSectionChart"),
   { ssr: false }
 );
+const CrossSectionalEdgeChart = dynamic(
+  () => import("../components/analysis/CrossSectionalEdgeChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -482,6 +486,12 @@ export default function PortfolioPage() {
               title: "クロスセクション：銘柄×週プール（週末プレミアム・曜日効果）",
               subtitle: "同一日=1クラスタのクラスタ頑健SEで、横断相関に正直な検出力を測る",
               node: <WeekdayCrossSectionChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            if (tickers.length >= 4) items.push({
+              id: "pf-cross-sectional-edge",
+              title: "クロスセクション・ロングショート（小エッジの棲息域）",
+              subtitle: "全銘柄を横断ランク→上位ロング/下位ショートの市場中立ブック。IC・実効ブレッドス・基本法則IR・point-in-time在籍",
+              node: <CrossSectionalEdgeChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             return items.length > 0 ? (
               <AccordionSection groups={[{ items }]} bulk={bulk} onBulk={onBulk} />
