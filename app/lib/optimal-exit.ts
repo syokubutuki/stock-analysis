@@ -294,6 +294,10 @@ export interface OptimalExitResult {
   optimalOOS: StratStat;
   holdToEnd: StratStat; // 常に金曜引けまで
   exitDay1: StratStat; // 建て日引けで即降り
+  // 曜日固定エグジット: 建てから h 日目(1..H_MAX)の引けで必ず降りる戦略の比較。
+  // 「週内のどこで降りるのが最良か」を最も素朴に示す。fixedExitByDay[h-1] が h日目。
+  fixedExitByDay: StratStat[];
+  bestFixedDay: number; // Sharpe最大の固定エグジット日(1..H_MAX)
   // 参考: in-sample の最適方策（過剰最適化の目安）
   optimalIS: StratStat;
   nWeeks: number;
@@ -313,6 +317,8 @@ export function computeOptimalExit(prices: PricePoint[], opts: BuildOptions = {}
     optimalOOS: summarize([], [], []),
     holdToEnd: summarize([], [], []),
     exitDay1: summarize([], [], []),
+    fixedExitByDay: Array.from({ length: H_MAX }, () => summarize([], [], [])),
+    bestFixedDay: 1,
     optimalIS: summarize([], [], []),
     nWeeks: weeks.length,
     from: prices[0]?.time ?? "",
@@ -358,12 +364,31 @@ export function computeOptimalExit(prices: PricePoint[], opts: BuildOptions = {}
     d1Ret.push(w.ret[0]); d1Held.push(1); d1Z.push(w.z[0]);
   });
 
+  // 曜日固定エグジット: 建てから h 日目の引けで必ず降りる（週が短ければ最終ノード）
+  const fixedExitByDay: StratStat[] = [];
+  for (let h = 1; h <= H_MAX; h++) {
+    const fr: number[] = [];
+    const fh: number[] = [];
+    const fz: number[] = [];
+    for (const w of weeks) {
+      const idx = Math.min(h, w.z.length) - 1;
+      fr.push(w.ret[idx]); fh.push(idx + 1); fz.push(w.z[idx]);
+    }
+    fixedExitByDay.push(summarize(fr, fh, fz));
+  }
+  let bestFixedDay = 1;
+  for (let h = 2; h <= H_MAX; h++) {
+    if (fixedExitByDay[h - 1].sharpe > fixedExitByDay[bestFixedDay - 1].sharpe) bestFixedDay = h;
+  }
+
   return {
     ok: true,
     policy: fullPolicy,
     optimalOOS: summarize(oosRet, oosHeld, oosZ),
     holdToEnd: summarize(holdRet, holdHeld, holdZ),
     exitDay1: summarize(d1Ret, d1Held, d1Z),
+    fixedExitByDay,
+    bestFixedDay,
     optimalIS: summarize(isRet, isHeld, isZ),
     nWeeks: weeks.length,
     from: prices[0].time,

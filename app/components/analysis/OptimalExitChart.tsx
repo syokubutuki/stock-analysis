@@ -18,6 +18,9 @@ interface Props {
 
 const { H_MAX, N_BINS } = OPTIMAL_EXIT_CONST;
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+// 月曜建て前提での保有日→曜日ラベル（祝日でずれる週もあるため目安）
+const DAY_LABEL = ["月", "火", "水", "木", "金"];
+const exitDayLabel = (h: number) => `${h}日目${DAY_LABEL[h - 1] ? `(${DAY_LABEL[h - 1]})` : ""}`;
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
   const parent = canvas.parentElement;
@@ -94,6 +97,88 @@ function drawPolicy(
   ctx.restore();
 }
 
+// 曜日固定エグジット: 建てから h 日目の引けで降りる戦略の年率Sharpe（棒）と平均リターン（数値）。
+// 適応最適(OOS)と「金曜まで持つ」を破線で重ねて、どの固定日が最良かを直接見せる。
+function drawExitByDay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  fixed: StratStat[],
+  bestDay: number,
+  adaptiveSharpe: number,
+  holdSharpe: number,
+) {
+  const ml = 40;
+  const mr = 12;
+  const mt = 28;
+  const mb = 34;
+  const plotW = width - ml - mr;
+  const plotH = height - mt - mb;
+  const n = fixed.length;
+
+  ctx.fillStyle = "#374151";
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("建てから何日目の引けで降りるか → 年率Sharpe（破線=適応最適/金曜保持）", ml - 32, 14);
+
+  const sharpes = fixed.map((s) => s.sharpe);
+  const maxAbs = Math.max(0.3, ...sharpes.map((v) => Math.abs(v)), Math.abs(adaptiveSharpe), Math.abs(holdSharpe));
+  const zeroY = mt + plotH / 2;
+  const scale = plotH / 2 / maxAbs;
+
+  ctx.strokeStyle = "#d1d5db";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(ml, zeroY);
+  ctx.lineTo(ml + plotW, zeroY);
+  ctx.stroke();
+
+  const slot = plotW / n;
+  const bw = Math.min(48, slot * 0.55);
+  fixed.forEach((s, i) => {
+    const cx = ml + slot * (i + 0.5);
+    const h = s.sharpe * scale;
+    const isBest = i + 1 === bestDay;
+    const up = s.sharpe >= 0;
+    ctx.fillStyle = isBest ? "rgba(37,99,235,0.85)" : up ? "rgba(37,99,235,0.4)" : "rgba(220,38,38,0.4)";
+    if (up) ctx.fillRect(cx - bw / 2, zeroY - h, bw, h);
+    else ctx.fillRect(cx - bw / 2, zeroY, bw, -h);
+    ctx.fillStyle = "#374151";
+    ctx.font = `${isBest ? "bold " : ""}10px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(s.sharpe.toFixed(2), cx, up ? zeroY - h - 4 : zeroY - h + 12);
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "9px sans-serif";
+    ctx.fillText(exitDayLabel(i + 1), cx, mt + plotH + 13);
+    ctx.fillText(pct(s.meanRet), cx, mt + plotH + 24);
+  });
+
+  // 参照破線
+  const refLine = (v: number, color: string, label: string) => {
+    const y = zeroY - v * scale;
+    ctx.save();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(ml, y);
+    ctx.lineTo(ml + plotW, y);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = color;
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(label, ml + plotW, y - 2);
+  };
+  refLine(holdSharpe, "#6b7280", "金曜保持");
+  refLine(adaptiveSharpe, "#16a34a", "適応最適");
+
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "9px sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(maxAbs.toFixed(1), ml - 4, mt + 8);
+  ctx.fillText("0", ml - 4, zeroY + 3);
+}
+
 function statCard(label: string, s: StratStat, highlight: "good" | "base" | "over" | null) {
   const bg =
     highlight === "good"
@@ -114,6 +199,7 @@ function statCard(label: string, s: StratStat, highlight: "good" | "base" | "ove
 
 export default function OptimalExitChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dayRef = useRef<HTMLCanvasElement>(null);
   const [side, setSide] = useState<ExitSide>("long");
   const [entryTiming, setEntryTiming] = useState<EntryTiming>("open");
 
@@ -128,6 +214,22 @@ export default function OptimalExitChart({ prices }: Props) {
     const init = initCanvas(canvas, 300);
     if (!init) return;
     drawPolicy(init.ctx, init.width, init.height, result.policy.action, result.policy.count);
+  }, [result]);
+
+  useEffect(() => {
+    const canvas = dayRef.current;
+    if (!canvas || !result.ok) return;
+    const init = initCanvas(canvas, 190);
+    if (!init) return;
+    drawExitByDay(
+      init.ctx,
+      init.width,
+      init.height,
+      result.fixedExitByDay,
+      result.bestFixedDay,
+      result.optimalOOS.sharpe,
+      result.holdToEnd.sharpe,
+    );
   }, [result]);
 
   const beatsHold = result.ok && result.optimalOOS.sharpe > result.holdToEnd.sharpe;
@@ -192,10 +294,35 @@ export default function OptimalExitChart({ prices }: Props) {
             </div>
           </div>
 
+          {/* 曜日固定エグジット比較（週内のどこで降りるのが最良か） */}
+          {(() => {
+            const best = result.fixedExitByDay[result.bestFixedDay - 1];
+            const beatsHoldFixed = best.sharpe > result.holdToEnd.sharpe + 1e-9;
+            return (
+              <div className="mt-3 rounded p-2.5 text-xs bg-blue-50 border border-blue-200 text-blue-900">
+                <div className="font-semibold">
+                  週内で降りる最良の固定日は <b>{exitDayLabel(result.bestFixedDay)}の引け</b>
+                  （Sharpe {best.sharpe.toFixed(2)} / μ {pct(best.meanRet)} / 保有{" "}
+                  {best.meanHeld.toFixed(1)}d）
+                </div>
+                <div className="mt-1 leading-relaxed">
+                  {beatsHoldFixed
+                    ? `「金曜まで持つ」（Sharpe ${result.holdToEnd.sharpe.toFixed(2)}）より、${exitDayLabel(result.bestFixedDay)}で降りるほうが良かったことになります。`
+                    : `固定日で降りるどれもが「金曜まで持つ」（Sharpe ${result.holdToEnd.sharpe.toFixed(2)}）を超えられず、単純保持が最良でした。`}
+                  {" "}ただしこれは<b>後知恵で最良日を選んだ値</b>なので、状態依存の適応最適（OOS）と併せて過信を避けてください。
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="mt-2">
+            <canvas ref={dayRef} />
+          </div>
+
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statCard("最適手仕舞い（OOS）", result.optimalOOS, beatsHold ? "good" : null)}
-            {statCard("金曜まで持つ", result.holdToEnd, "base")}
-            {statCard("建て日引けで即降り", result.exitDay1, "base")}
+            {statCard("状態依存の最適（OOS）", result.optimalOOS, beatsHold ? "good" : null)}
+            {statCard("金曜まで持つ（単純保持）", result.holdToEnd, "base")}
+            {statCard(`最良の固定日（${exitDayLabel(result.bestFixedDay)}）`, result.fixedExitByDay[result.bestFixedDay - 1], "base")}
             {statCard("最適（IS・過剰最適化の目安）", result.optimalIS, "over")}
           </div>
 
