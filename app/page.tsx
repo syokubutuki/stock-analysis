@@ -909,6 +909,10 @@ const EdgeCapacityChart = dynamic(
   () => import("./components/analysis/EdgeCapacityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const EdgeBookChart = dynamic(
+  () => import("./components/analysis/EdgeBookChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const EdgeDecayChart = dynamic(
   () => import("./components/analysis/EdgeDecayChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1832,6 +1836,7 @@ export default function AnalysisPage() {
                       items: [
                         { id: "edge-power", title: "検出力の壁（今の標本で証明できるか・必要なブレッドス）", node: <EdgePowerChart prices={allPrices} /> },
                         { id: "edge-capacity", title: "エッジ容量推定（このエッジは何円まで運用できるか）", node: <EdgeCapacityChart prices={filteredPrices} /> },
+                        { id: "edge-book", title: "合成ブック（弱いエッジN本を束ねる・テール相関・容量の食い合い）", node: <EdgeBookChart prices={allPrices} /> },
                         { id: "edge-decay", title: "エッジ減衰・死亡検知（SPRT + CUSUM 逐次監視）", node: <EdgeDecayChart prices={allPrices} /> },
                         { id: "edge-ledger", title: "前向き検証台帳（凍結→未来のデータだけで採点）", node: <ProspectiveLedgerChart prices={allPrices} ticker={data.ticker} /> },
                         { id: "edge-test-registry", title: "グローバル多重検定台帳（アプリ全体の偽発見の床）", node: <TestRegistryChart /> },
