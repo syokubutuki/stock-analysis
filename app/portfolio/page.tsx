@@ -82,6 +82,10 @@ const WeekdayCrossSectionChart = dynamic(
   () => import("../components/analysis/WeekdayCrossSectionChart"),
   { ssr: false }
 );
+const ExitCrossChart = dynamic(
+  () => import("../components/analysis/ExitCrossChart"),
+  { ssr: false }
+);
 const CrossSectionalEdgeChart = dynamic(
   () => import("../components/analysis/CrossSectionalEdgeChart"),
   { ssr: false }
@@ -486,6 +490,12 @@ export default function PortfolioPage() {
               title: "クロスセクション：銘柄×週プール（週末プレミアム・曜日効果）",
               subtitle: "同一日=1クラスタのクラスタ頑健SEで、横断相関に正直な検出力を測る",
               node: <WeekdayCrossSectionChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            if (tickers.length >= 2) items.push({
+              id: "pf-exit-cross",
+              title: "曜日固定エグジット 横断：週内どこで降りるのが最良か",
+              subtitle: "月曜Open建玉→h日目引けで降りる戦略を銘柄×週でプール（クラスタ頑健・銘柄別異質性）",
+              node: <ExitCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             if (tickers.length >= 4) items.push({
               id: "pf-cross-sectional-edge",

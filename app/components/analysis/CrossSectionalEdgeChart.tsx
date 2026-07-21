@@ -14,6 +14,8 @@ import {
   computeCrossSectional, DEFAULT_X_PARAMS, XSIGNAL_LABEL, XSIGNAL_DESC,
   type XSignalId, type XResult,
 } from "../../lib/cross-sectional-edge";
+import { UNIVERSES, getUniverse } from "../../lib/universes";
+import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -21,6 +23,8 @@ interface Props {
   pricesByTicker: Record<string, PricePoint[]>;
   names?: Record<string, string>;
 }
+
+type UniverseMode = "watchlist" | "paste" | string; // string=プリセットid
 
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
 const num2 = (v: number) => v.toFixed(2);
@@ -43,11 +47,53 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
   const [quantile, setQuantile] = useState(DEFAULT_X_PARAMS.quantile);
   const [costBps, setCostBps] = useState(DEFAULT_X_PARAMS.costBps);
 
+  // ユニバース: ウォッチリスト / プリセット(大型30・主要60) / 貼り付け
+  const [uniMode, setUniMode] = useState<UniverseMode>("watchlist");
+  const [pasteRaw, setPasteRaw] = useState("");
+  const [pasteTickers, setPasteTickers] = useState<string[]>([]);
+  const [fetched, setFetched] = useState<{ prices: Record<string, PricePoint[]>; names: Record<string, string> }>({ prices: {}, names: {} });
+  const [fetching, setFetching] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  // 選択ユニバースのティッカー列
+  const uniTickers = useMemo<string[]>(() => {
+    if (uniMode === "watchlist") return tickers;
+    if (uniMode === "paste") return pasteTickers;
+    return getUniverse(uniMode)?.tickers.map((t) => t.ticker) ?? [];
+  }, [uniMode, tickers, pasteTickers]);
+
+  // 非ウォッチリスト時は自前で取得
+  useEffect(() => {
+    if (uniMode === "watchlist") return;
+    if (uniTickers.length === 0) { setFetched({ prices: {}, names: {} }); return; }
+    const ctrl = new AbortController();
+    setFetching(true);
+    setProgress({ done: 0, total: uniTickers.length });
+    fetchUniverse(uniTickers, (done, total) => setProgress({ done, total }), ctrl.signal)
+      .then((res) => {
+        if (ctrl.signal.aborted) return;
+        const prices: Record<string, PricePoint[]> = {};
+        const nm: Record<string, string> = {};
+        const preset = getUniverse(uniMode);
+        for (const [tk, v] of Object.entries(res)) {
+          if (v.prices.length > 0) { prices[tk] = v.prices; nm[tk] = v.name; }
+        }
+        if (preset) for (const t of preset.tickers) if (!nm[t.ticker]) nm[t.ticker] = t.name;
+        setFetched({ prices, names: nm });
+      })
+      .finally(() => { if (!ctrl.signal.aborted) setFetching(false); });
+    return () => ctrl.abort();
+  }, [uniMode, uniTickers]);
+
+  const activePrices = uniMode === "watchlist" ? pricesByTicker : fetched.prices;
+  const activeNames = uniMode === "watchlist" ? (names ?? {}) : fetched.names;
+  const activeCount = Object.keys(activePrices).length;
+
   const result = useMemo<XResult>(
-    () => computeCrossSectional(pricesByTicker, names ?? {}, {
+    () => computeCrossSectional(activePrices, activeNames, {
       ...DEFAULT_X_PARAMS, signal, rebalanceDays, quantile, costBps,
     }),
-    [pricesByTicker, names, signal, rebalanceDays, quantile, costBps],
+    [activePrices, activeNames, signal, rebalanceDays, quantile, costBps],
   );
   const ready = result.ok;
 
@@ -84,19 +130,69 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
     chart.timeScale().fitContent();
   }, [result]);
 
-  if (!result.ok) {
-    return <div className="text-xs text-gray-500 p-3">{result.reason ?? "データ待ち"}</div>;
-  }
+  const irGap = result.ok ? result.sharpeRealizedGross - result.irTheoretical : 0;
 
-  const irGap = result.sharpeRealizedGross - result.irTheoretical;
+  // ユニバース選択 UI（結果の有無に関わらず常に表示する）
+  const universeSelector = (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="text-gray-500">ユニバース:</span>
+        <button onClick={() => setUniMode("watchlist")} className={`px-2 py-0.5 rounded border ${uniMode === "watchlist" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>
+          ウォッチリスト({tickers.length})
+        </button>
+        {UNIVERSES.map((u) => (
+          <button key={u.id} onClick={() => setUniMode(u.id)} className={`px-2 py-0.5 rounded border ${uniMode === u.id ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`} title={u.note}>
+            {u.label}
+          </button>
+        ))}
+        <button onClick={() => setUniMode("paste")} className={`px-2 py-0.5 rounded border ${uniMode === "paste" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>
+          貼り付け
+        </button>
+        {fetching && <span className="text-blue-600">取得中… {progress.done}/{progress.total}</span>}
+        {!fetching && uniMode !== "watchlist" && <span className="text-gray-400">{activeCount}銘柄 読込済</span>}
+      </div>
+      {uniMode === "paste" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <textarea
+            value={pasteRaw} onChange={(e) => setPasteRaw(e.target.value)}
+            placeholder="7203.T 6758.T 9984 ... (空白/カンマ/改行区切り・4桁は.T補完・廃止銘柄を含めれば point-in-time が効く)"
+            className="flex-1 min-w-[280px] h-16 text-xs border border-gray-300 rounded p-1.5 font-mono"
+          />
+          <button onClick={() => setPasteTickers(parseTickerList(pasteRaw))} className="px-2 py-1 text-xs rounded bg-blue-600 text-white">
+            読み込み({parseTickerList(pasteRaw).length})
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  if (fetching && activeCount === 0) {
+    return (
+      <div className="space-y-3">
+        {universeSelector}
+        <div className="text-xs text-gray-500 p-3">ユニバースを取得中… {progress.done}/{progress.total}（10年分×{progress.total}銘柄。初回は時間がかかります）</div>
+      </div>
+    );
+  }
+  if (!result.ok) {
+    return (
+      <div className="space-y-3">
+        {universeSelector}
+        <div className="text-xs text-gray-500 p-3">{result.reason ?? "データ待ち"}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
+      {universeSelector}
       <p className="text-sm text-gray-600">
-        ウォッチリスト全{tickers.length}銘柄を毎リバランス日に横断ランクし、
+        {uniMode === "watchlist" ? "ウォッチリスト" : getUniverse(uniMode)?.label ?? "貼り付け"}の
+        <span className="font-medium">全{activeCount}銘柄</span>を毎リバランス日に横断ランクし、
         <span className="font-medium">上位{(quantile * 100).toFixed(0)}%ロング / 下位{(quantile * 100).toFixed(0)}%ショート</span>の
         ダラー中立ブックを作ります。単名では breadth≈1 で頭打ちの小エッジを、多数同時ベットで初めて使える形にする
         ── 基本法則 <span className="font-medium">IR ≈ IC·√BR</span> の実践です。
+        {activeCount >= 30 && <span className="text-green-700">（{activeCount}銘柄＝breadthが十分で、小エッジのICも検出しやすい）</span>}
       </p>
 
       {/* コントロール */}
