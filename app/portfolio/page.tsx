@@ -90,6 +90,10 @@ const CrossSectionalEdgeChart = dynamic(
   () => import("../components/analysis/CrossSectionalEdgeChart"),
   { ssr: false }
 );
+const ParticipationPremiumChart = dynamic(
+  () => import("../components/analysis/ParticipationPremiumChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -462,6 +466,14 @@ export default function PortfolioPage() {
           {(() => {
             const dn = Object.keys(data).length;
             const items: AccordionItem[] = [];
+            // 系C24: 個別配分の一段手前に「参加の価値（株式プレミアムという床）」を据える。
+            // 市場代理を自前取得するためウォッチリスト数に依存せず常設。
+            items.push({
+              id: "pf-participation-premium",
+              title: "参加の価値：株式プレミアムという床（株式原論 C24）",
+              subtitle: "何を保有するか＝まず市場に参加する価値を実測。実現プレミアム±SE・t値／参加のg・最大DD／エントリー時刻スイープ（タイミング無関係と床の不安定性）",
+              node: <ParticipationPremiumChart />,
+            });
             if (dn >= 2) items.push({ id: "pf-risk", title: "ポートフォリオ・リスク分析", node: <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} /> });
             if (dn >= 2) items.push({ id: "pf-frontier", title: "効率的フロンティア・CML", node: <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
             if (dn >= 1) items.push({ id: "pf-capm", title: "CAPM・SML（β / α）", node: <CapmSmlChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
