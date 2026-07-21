@@ -14,6 +14,7 @@
 // 生存者バイアスの警告を出す(ユーザーが廃止銘柄を含めれば正しく効く土台)。
 import { PricePoint } from "./types";
 import { mean, std } from "./stats-significance";
+import { representativeSpread } from "./spread-estimator";
 
 export type XSignalId = "reversal1" | "reversal5" | "momentum" | "lowvol";
 
@@ -89,6 +90,8 @@ export interface XResult {
   maxDD: number; // net
   turnoverPerYear: number; // 年あたり片道回転(Σ|Δw|/2 の年率)
   costBreakevenBps: number; // 実現シャープが0になる片道コスト(bp)
+  medSpreadBps: number; // ユニバースの代表スプレッド中央値(片道bp, Corwin-Schultz)
+  spreadSurvives: boolean; // costBreakeven > medSpread(スプレッドを越えて生き残るか)
   marketBeta: number; // LSリターンの対等加重ユニバースリターンへのβ(中立性チェック)
   equity: XEquityPoint[];
   spans: TickerSpan[]; // 各銘柄の在籍期間
@@ -181,7 +184,8 @@ export function computeCrossSectional(
     ok: false, reason, from: "", to: "", years: 0, nPeriods: 0, avgBreadth: 0, universeSize: 0,
     icMean: 0, icStd: 0, icIR: 0, icT: 0, hitRate: 0, breadthPerYear: 0, irTheoretical: 0,
     sharpeRealizedGross: 0, sharpeRealizedNet: 0, annGross: 0, annNet: 0, maxDD: 0,
-    turnoverPerYear: 0, costBreakevenBps: 0, marketBeta: 0, equity: [], spans: [],
+    turnoverPerYear: 0, costBreakevenBps: 0, medSpreadBps: 0, spreadSurvives: false,
+    marketBeta: 0, equity: [], spans: [],
     nExtendToEnd: 0, survivorWarn: false, params,
   });
 
@@ -209,6 +213,14 @@ export function computeCrossSectional(
   });
   const spanOf = new Map(spans.map((sp) => [sp.ticker, sp]));
   const nExtendToEnd = spans.filter((sp) => sp.extendsToEnd).length;
+
+  // ユニバースの代表スプレッド中央値(片道bp)。小型株ほど大きく、エッジをコストで食う壁になる。
+  // representativeSpread は往復コストの水準を返すので、片道は概ねその半分とみなす。
+  const spreadsRT = series
+    .map((s) => representativeSpread(pricesByTicker[s.ticker] ?? []))
+    .filter((v) => v > 0 && isFinite(v))
+    .sort((a, b) => a - b);
+  const medSpreadBps = spreadsRT.length > 0 ? (spreadsRT[Math.floor(spreadsRT.length / 2)] / 2) * 1e4 : 0;
 
   const h = 1; // 保有はリバランス間隔で自然に決まる(各期の1営業日先リターンを合成)
   const reb = Math.max(1, Math.round(params.rebalanceDays));
@@ -350,7 +362,9 @@ export function computeCrossSectional(
     ok: true, from, to, years, nPeriods, avgBreadth, universeSize: universeSizeMax,
     icMean, icStd, icIR, icT, hitRate, breadthPerYear, irTheoretical,
     sharpeRealizedGross, sharpeRealizedNet, annGross, annNet, maxDD,
-    turnoverPerYear, costBreakevenBps, marketBeta, equity, spans,
+    turnoverPerYear, costBreakevenBps,
+    medSpreadBps, spreadSurvives: isFinite(costBreakevenBps) && costBreakevenBps > medSpreadBps,
+    marketBeta, equity, spans,
     nExtendToEnd, survivorWarn: nExtendToEnd === series.length && series.length >= 4,
     params,
   };

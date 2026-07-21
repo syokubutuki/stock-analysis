@@ -240,21 +240,26 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         <Stat label="実現シャープ(ネット)" value={num2(result.sharpeRealizedNet)} tone={result.sharpeRealizedNet > 0.5 ? "good" : "neutral"} sub={`グロス ${num2(result.sharpeRealizedGross)}`} />
         <Stat label="年率リターン(ネット)" value={pct(result.annNet)} tone={result.annNet > 0 ? "good" : "bad"} sub={`グロス ${pct(result.annGross)}`} />
         <Stat label="最大DD" value={pct(result.maxDD)} tone="bad" />
-        <Stat label="回転(片道/年)" value={`${result.turnoverPerYear.toFixed(1)}回`} sub={`コスト分岐 ${isFinite(result.costBreakevenBps) ? result.costBreakevenBps.toFixed(1) + "bp" : "—"}`} />
-        <Stat label="市場β(中立性)" value={num2(result.marketBeta)} tone={Math.abs(result.marketBeta) < 0.2 ? "good" : "bad"} sub="0に近いほど中立" />
+        <Stat label="コスト分岐 vs スプレッド" value={`${isFinite(result.costBreakevenBps) ? result.costBreakevenBps.toFixed(1) : "—"} / ${result.medSpreadBps.toFixed(0)}bp`} tone={result.spreadSurvives ? "good" : "bad"} sub={result.spreadSurvives ? "スプレッド超で生存" : "スプレッドで消失"} />
+        <Stat label="市場β(中立性)" value={num2(result.marketBeta)} tone={Math.abs(result.marketBeta) < 0.2 ? "good" : "bad"} sub={`回転 ${result.turnoverPerYear.toFixed(0)}回/年`} />
       </div>
 
       {/* IR ギャップの解釈 */}
-      <div className={`rounded-lg border p-3 text-sm ${result.icT >= 2 ? "bg-green-50 border-green-300" : "bg-gray-50 border-gray-300"}`}>
+      <div className={`rounded-lg border p-3 text-sm ${result.icT >= 2 && result.spreadSurvives ? "bg-green-50 border-green-300" : result.icT >= 2 ? "bg-amber-50 border-amber-300" : "bg-gray-50 border-gray-300"}`}>
         <span className="font-medium">読み方: </span>
         IC={num2(result.icMean)}(t={num2(result.icT)})。
         {result.icT >= 2
-          ? "横断シグナルは有意です。"
+          ? "横断シグナルは統計的に有意です。"
           : "横断シグナルは有意水準に届いていません。"}
         {" "}基本法則の理論IR {num2(result.irTheoretical)} に対し実現シャープ(グロス) {num2(result.sharpeRealizedGross)}
         {Math.abs(irGap) < 0.3 ? "(ほぼ整合)" : irGap < 0 ? "(実現が下振れ=分散不足/相関/執行の摩擦)" : "(実現が上振れ=たまたま or 非独立ベット)"}。
-        コスト分岐点は{isFinite(result.costBreakevenBps) ? `${result.costBreakevenBps.toFixed(1)}bp` : "—"}
-        {isFinite(result.costBreakevenBps) && result.costBreakevenBps < 10 ? "（薄い。回転の速いリバーサル系は現実の手数料で消えがち）" : ""}。
+        {" "}<span className="font-medium">
+          {result.icT >= 2 && !result.spreadSurvives
+            ? `だがコスト分岐 ${result.costBreakevenBps.toFixed(1)}bp < 代表スプレッド ${result.medSpreadBps.toFixed(0)}bp ── エッジは実在してもスプレッドで消えます。これが小型株の「エッジはあるが容量・コストの壁」の正体です。`
+            : result.spreadSurvives
+            ? `コスト分岐 ${result.costBreakevenBps.toFixed(1)}bp が代表スプレッド ${result.medSpreadBps.toFixed(0)}bp を上回り、執行コスト後も生き残る余地があります。`
+            : `コスト分岐点は${isFinite(result.costBreakevenBps) ? `${result.costBreakevenBps.toFixed(1)}bp` : "—"}(代表スプレッド ${result.medSpreadBps.toFixed(0)}bp)。`}
+        </span>
       </div>
 
       {/* エクイティ */}
@@ -340,6 +345,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
 
         <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">メガキャップ vs 小型:</span> 大型は裁定が効きエッジ(IC)が小さいが、スプレッドが薄くコスト後も残りやすい。小型は裁定が緩くICが大きく出やすいが、スプレッド・容量の壁が厳しく「コスト分岐 &lt; スプレッド」でエッジが消えることが多い。さらに<span className="font-medium">小型ほど生存者バイアスが深刻</span>(消えた敗者が現構成リストに無い)なので、現構成での高ICは割り引いて見ること。真の検証には廃止銘柄を含む時点構成メンバーが要ります。</li>
           <li>ウォッチリストは少数(数〜数十銘柄)で、真のクロスセクション(数百〜千)より breadth が小さく検出力も限定的です。銘柄を増やすほど IC の t 値は上がります。</li>
           <li>ショートには貸株料・逆日歩・規制があり(rakuten-margin参照)、ここでは片道コストの往復近似のみ。実務のショートコストは別途重い。</li>
           <li>容量: リバーサル系は回転が速く、平方根インパクトで容量が小さい。個別の容量は単名の「エッジ容量推定」を各脚に当てて概算してください。</li>

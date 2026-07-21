@@ -82,6 +82,40 @@ const EXTRA30: { ticker: string; name: string }[] = [
   { ticker: "4689.T", name: "LINEヤフー" },
 ];
 
+// 中型・新興(メガキャップより裁定が緩くエッジが残りやすい一方、スプレッド・容量の壁が厳しい)。
+// 現構成のため生存者バイアスは大型より深刻(小型ほど上場廃止・破綻が多く、消えた敗者が抜けている)。
+// 実在しない/データ不足の銘柄は取得時に自動で外れる(≥260営業日フィルタ)ので、多少の欠けは許容。
+const MIDSMALL: { ticker: string; name: string }[] = [
+  { ticker: "2432.T", name: "ディー・エヌ・エー" },
+  { ticker: "3659.T", name: "ネクソン" },
+  { ticker: "3765.T", name: "ガンホー" },
+  { ticker: "4385.T", name: "メルカリ" },
+  { ticker: "2371.T", name: "カカクコム" },
+  { ticker: "3092.T", name: "ZOZO" },
+  { ticker: "4751.T", name: "サイバーエージェント" },
+  { ticker: "2413.T", name: "エムスリー" },
+  { ticker: "6532.T", name: "ベイカレント" },
+  { ticker: "4443.T", name: "Sansan" },
+  { ticker: "4478.T", name: "freee" },
+  { ticker: "3993.T", name: "PKSHA Technology" },
+  { ticker: "3900.T", name: "クラウドワークス" },
+  { ticker: "4477.T", name: "BASE" },
+  { ticker: "6035.T", name: "IRジャパンHD" },
+  { ticker: "4485.T", name: "JTOWER" },
+  { ticker: "2127.T", name: "日本M&Aセンター" },
+  { ticker: "3038.T", name: "神戸物産" },
+  { ticker: "3141.T", name: "ウエルシアHD" },
+  { ticker: "3549.T", name: "クスリのアオキHD" },
+  { ticker: "7532.T", name: "パン・パシフィック(ドンキ)" },
+  { ticker: "2695.T", name: "くら寿司" },
+  { ticker: "3097.T", name: "物語コーポレーション" },
+  { ticker: "7581.T", name: "サイゼリヤ" },
+  { ticker: "2670.T", name: "ABCマート" },
+  { ticker: "2811.T", name: "カゴメ" },
+  { ticker: "2702.T", name: "日本マクドナルドHD" },
+  { ticker: "6544.T", name: "ジャパンエレベーター" },
+];
+
 function dedupe(rows: { ticker: string; name: string }[]): { ticker: string; name: string }[] {
   const seen = new Set<string>();
   const out: { ticker: string; name: string }[] = [];
@@ -101,6 +135,12 @@ export const UNIVERSES: UniverseDef[] = [
     label: "主要60（大型・高流動）",
     note: "大型60本。ブレッドスを桁上げして小エッジの検出力を上げる。取得に時間がかかる。",
     tickers: dedupe([...CORE30, ...EXTRA30]),
+  },
+  {
+    id: "midsmall",
+    label: "中型・新興（裁定が緩い代わりにスプレッド大）",
+    note: "メガキャップより裁定が緩くエッジが残りやすいが、スプレッド・容量の壁が厳しく生存者バイアスも深刻。真の小型はコード貼り付けで。",
+    tickers: dedupe(MIDSMALL),
   },
 ];
 
