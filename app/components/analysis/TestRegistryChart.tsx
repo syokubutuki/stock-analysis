@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import AnalysisGuide from "./AnalysisGuide";
 import { TEST_INVENTORY, registrySummary } from "../../lib/test-registry";
+import { liveLedger, resetLedger, type LiveLedger } from "../../lib/test-ledger";
 
 function Badge({ label, value, tone, sub }: { label: string; value: string; tone: "good" | "bad" | "neutral"; sub?: string }) {
   const cls = tone === "good" ? "bg-green-50 border-green-200 text-green-700"
@@ -22,6 +23,13 @@ export default function TestRegistryChart() {
   const [effDivisor, setEffDivisor] = useState(3);
 
   const summary = useMemo(() => registrySummary(alpha, effDivisor), [alpha, effDivisor]);
+
+  // 実測台帳(localStorage由来)はクライアントでのみ算出。nonceで再取得・リセット反映。
+  const [live, setLive] = useState<LiveLedger | null>(null);
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    setLive(liveLedger(alpha, effDivisor));
+  }, [alpha, effDivisor, nonce]);
 
   const sections = useMemo(() => {
     const map = new Map<string, typeof TEST_INVENTORY>();
@@ -80,6 +88,38 @@ export default function TestRegistryChart() {
         />
       </div>
 
+      {/* 実測台帳: あなたが実際に開いた分析 × 見た銘柄 */}
+      {live && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-blue-900">実測台帳 — あなたが実際に振ったサイコロ</span>
+            <button
+              onClick={() => { resetLedger(); setNonce((n) => n + 1); }}
+              className="text-[11px] rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-600 hover:bg-gray-50"
+            >
+              銘柄履歴をリセット
+            </button>
+          </div>
+          <p className="text-[11px] text-blue-900/80">
+            開いた検定分析 <b>{live.nOpenedInventory}/{live.nInventoryTotal}</b> × 閲覧銘柄 <b>{live.nTickers}</b> で数えた、
+            あなた個人の実際の家族サイズ。静的な「全分析×1銘柄」より現実の探索に近い(直積なので上限寄り)。
+            {live.tickers.length > 0 && <span className="text-blue-900/60">　銘柄: {live.tickers.slice(0, 12).join(", ")}{live.tickers.length > 12 ? " …" : ""}</span>}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <Badge label="実測の総検定数 M_live" value={live.liveTests.toLocaleString()} tone="neutral" sub={`${live.perTickerTests.toLocaleString()}/銘柄 × ${live.nTickers}銘柄`} />
+            <Badge label="期待偽発見数" value={`${live.expectedFalse.toFixed(0)}個`} tone={live.expectedFalse >= 1 ? "bad" : "neutral"} sub="M_live × α" />
+            <Badge label="どこかで有意が出る確率" value={`${(live.probAtLeastOne * 100).toFixed(1)}%`} tone={live.probAtLeastOne > 0.5 ? "bad" : "neutral"} sub={`実効独立数 M_live/${effDivisor}`} />
+            <Badge label="全体5%のper-test閾値" value={live.liveTests > 0 ? `p<${live.bonferroniAlpha.toExponential(1)}` : "—"} tone="neutral" sub="Bonferroni" />
+          </div>
+          {live.nOpenedInventory === 0 && (
+            <p className="text-[11px] text-blue-900/60">
+              まだ検定を走らせる分析を開いていません。曜日スキャンや交互作用スキャナ等を開くと、ここに実測の母数が積み上がります。
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500 font-medium">静的台帳（アプリに実装された理論上の母数・1銘柄）</div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
@@ -114,7 +154,8 @@ export default function TestRegistryChart() {
         </table>
       </div>
       <p className="text-[10px] text-gray-400">
-        検定数は既定パラメータでのオーダーの目安。銘柄を替えて同じスキャンを再実行すれば、母数はさらに銘柄数倍に膨らむ。
+        検定数は既定パラメータでのオーダーの目安。銘柄を替えて同じスキャンを再実行すれば母数は銘柄数倍に膨らむ——
+        その「実際に何を探索したか」は上の<span className="font-medium">実測台帳</span>が自動で数えています(開いた分析×閲覧銘柄)。
       </p>
 
       <AnalysisGuide title="グローバル多重検定台帳の詳細理論">

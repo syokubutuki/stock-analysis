@@ -10,6 +10,7 @@ import WatchlistPanel from "./components/WatchlistPanel";
 import TickerSearchInput from "./components/TickerSearchInput";
 import AccordionSection from "./components/analysis/AccordionSection";
 import { SeriesMode } from "./lib/series-mode";
+import { recordTicker } from "./lib/test-ledger";
 
 const DiffSeriesChart = dynamic(
   () => import("./components/analysis/DiffSeriesChart"),
@@ -1098,6 +1099,8 @@ export default function AnalysisPage() {
       try {
         localStorage.setItem("sa:lastTicker", data.ticker);
       } catch {}
+      // 多重検定台帳(実測): 閲覧した銘柄を記録し、家族サイズに反映する。
+      recordTicker(data.ticker);
     }
   }, [data?.ticker]);
   useEffect(() => {
