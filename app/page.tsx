@@ -900,6 +900,10 @@ const SignalStackingChart = dynamic(
   () => import("./components/analysis/SignalStackingChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const EdgePowerChart = dynamic(
+  () => import("./components/analysis/EdgePowerChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
+);
 const EdgeCapacityChart = dynamic(
   () => import("./components/analysis/EdgeCapacityChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1823,6 +1827,7 @@ export default function AnalysisPage() {
                     {
                       group: "規律（信じてよいか・いくらまでか・まだ生きているか）",
                       items: [
+                        { id: "edge-power", title: "検出力の壁（今の標本で証明できるか・必要なブレッドス）", node: <EdgePowerChart prices={allPrices} /> },
                         { id: "edge-capacity", title: "エッジ容量推定（このエッジは何円まで運用できるか）", node: <EdgeCapacityChart prices={filteredPrices} /> },
                         { id: "edge-decay", title: "エッジ減衰・死亡検知（SPRT + CUSUM 逐次監視）", node: <EdgeDecayChart prices={allPrices} /> },
                         { id: "edge-ledger", title: "前向き検証台帳（凍結→未来のデータだけで採点）", node: <ProspectiveLedgerChart prices={allPrices} ticker={data.ticker} /> },
