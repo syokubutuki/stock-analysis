@@ -15,6 +15,10 @@
 import { PricePoint } from "./types";
 import { mean, std } from "./stats-significance";
 import { representativeSpread } from "./spread-estimator";
+import {
+  MarginKind, resolveMarginRate, adminFeeMonthlyRate, transferFeeAnnualRate,
+  DEFAULT_MARGIN_KIND,
+} from "./rakuten-margin";
 
 export type XSignalId = "reversal1" | "reversal5" | "momentum" | "lowvol";
 
@@ -36,8 +40,10 @@ export interface XParams {
   signal: XSignalId;
   rebalanceDays: number; // リバランス間隔(営業日)。1=毎日
   quantile: number; // 上位/下位それぞれ何割をロング/ショートするか(0.1..0.5)
-  costBps: number; // 片道コスト(bp)。回転に比例して控除
+  costBps: number; // 片道コスト(bp)。回転に比例して控除(flat モデル)
   grossLeverage: number; // 総エクスポージャ(ロング+ショートの絶対値合計)
+  costModel?: "flat" | "rakuten"; // rakuten=楽天証券の実コスト(スプレッド+信用金利+貸株料+諸経費)
+  marginKind?: MarginKind; // 信用区分(金利/貸株料の実レート)
   membership?: Record<string, { from?: string; to?: string }>; // point-in-time 在籍窓の上書き
 }
 
@@ -47,6 +53,8 @@ export const DEFAULT_X_PARAMS: XParams = {
   quantile: 0.3,
   costBps: 0,
   grossLeverage: 1,
+  costModel: "flat",
+  marginKind: DEFAULT_MARGIN_KIND,
 };
 
 export interface TickerSpan {
@@ -80,8 +88,16 @@ export interface XResult {
   icT: number; // IC の t 値 = icIR·√nPeriods
   hitRate: number; // ICが正だったリバランスの割合
   // 基本法則 vs 実現
-  breadthPerYear: number; // 年あたり独立ベット数 ≈ avgBreadth × リバランス/年
-  irTheoretical: number; // IC·√(breadthPerYear)(年率の理論IR)
+  breadthPerYear: number; // 年あたり独立ベット数 ≈ avgBreadth × リバランス/年(素朴)
+  irTheoretical: number; // IC·√(breadthPerYear)(年率の理論IR・素朴)
+  // Task1: 相関ディスカウント後の誠実なブレッドス
+  rhoXs: number; // 横断残差相関の平均ペア(≥0にクランプ)=同日クラスタの目減り
+  kEffPerRebalance: number; // 1リバランスの実効ベット数 = k/(1+(k−1)ρ_xs)
+  temporalEff: number; // 時間方向の実効率 ess/nPeriods(シグナル持続=リバランス重複の目減り)
+  essRebalances: number; // 実効独立リバランス数
+  breadthPerYearEff: number; // 相関ディスカウント後の年あたり独立ベット数
+  irTheoreticalDiscounted: number; // IC·√(breadthPerYearEff)(誠実な理論IR)
+  icTEff: number; // 時間相関で目減りさせたICのt値
   sharpeRealizedGross: number; // 実現の年率シャープ(グロス)
   sharpeRealizedNet: number;
   // ブック成績
@@ -92,6 +108,16 @@ export interface XResult {
   costBreakevenBps: number; // 実現シャープが0になる片道コスト(bp)
   medSpreadBps: number; // ユニバースの代表スプレッド中央値(片道bp, Corwin-Schultz)
   spreadSurvives: boolean; // costBreakeven > medSpread(スプレッドを越えて生き残るか)
+  // Task2: 楽天証券・実コスト会計
+  realCost: boolean; // 実コストモデルを適用したか
+  spreadDragAnnual: number; // スプレッド往復の年率ドラッグ(bid-askバウンス=微細構造)
+  financeDragAnnual: number; // 信用金利(買方)+貸株料(売方)の年率ドラッグ
+  otherDragAnnual: number; // 事務管理費+名義書換料の年率ドラッグ
+  totalDragAnnual: number; // 実コスト合計の年率ドラッグ
+  annNetReal: number; // 実コスト控除後の年率リターン
+  sharpeRealizedNetReal: number; // 実コスト控除後の年率シャープ
+  realCostSurvives: boolean; // 実コスト後も年率リターンが正か
+  marginKind: MarginKind; // 使用した信用区分
   marketBeta: number; // LSリターンの対等加重ユニバースリターンへのβ(中立性チェック)
   equity: XEquityPoint[];
   spans: TickerSpan[]; // 各銘柄の在籍期間
@@ -175,6 +201,97 @@ function signalValue(s: Series, i: number, sig: XSignalId): number | null {
   }
 }
 
+// ---------------------------------------------------------------
+// Task1: 相関ディスカウントの部品
+// ---------------------------------------------------------------
+// 横断の独立性: 残差相関行列の参加比(participation ratio)で「実効独立ファクター数」を測る。
+// -------------------------------------------------------------
+// 各銘柄を市場(等加重指数)に時系列回帰し、市場ベータを除いた残差(個別+業種)の相関行列 C を作る。
+// 実効独立数 N_eff = (Σλ)²/Σλ² = N²/Σ_ij C_ij²(固有値分解不要。trace=N, Frobenius=Σ C_ij²)。
+//   独立: C_ij=0 → N_eff=N。全相関 ρ: N_eff=N/(1+(N−1)ρ²)。6業種ブロック → N_eff≒6。
+// なぜ「平均ペア相関」ではないか: 同業種の正相関(少数ペア)が他業種の多数ペアに希釈され
+// 平均は≈0になり業種クラスタが消える。C_ij²の総和なら符号に依らず全ての非独立性を拾う。
+// 返り値 ι = N_eff/N ∈ (0,1]。1=完全独立、小さいほど「同じ地合いで一緒に動く」。
+function computeIndependenceRatio(series: Series[], calendar: string[]): number {
+  const T = calendar.length, N = series.length;
+  if (N < 2 || T < 130) return 1;
+  const calIdx = new Map<string, number>();
+  calendar.forEach((d, i) => calIdx.set(d, i));
+  const R: Float64Array[] = series.map((s) => {
+    const arr = new Float64Array(T).fill(NaN);
+    for (let i = 1; i < s.dates.length; i++) {
+      const ci = calIdx.get(s.dates[i]);
+      if (ci !== undefined) arr[ci] = s.logret[i];
+    }
+    return arr;
+  });
+  // 市場リターン(日次・等加重の横断平均)
+  const mkt = new Float64Array(T).fill(NaN);
+  for (let ci = 0; ci < T; ci++) {
+    let sum = 0, cnt = 0;
+    for (let k = 0; k < N; k++) { const v = R[k][ci]; if (!Number.isNaN(v)) { sum += v; cnt++; } }
+    if (cnt >= 2) mkt[ci] = sum / cnt;
+  }
+  // 各銘柄を市場に時系列回帰し、残差系列 res_k = r_k − α − β_k·mkt を作る(βはばらつくので非退化)。
+  const res: Float64Array[] = series.map((_, k) => {
+    const A = R[k];
+    let sm = 0, sr = 0, smm = 0, smr = 0, n = 0;
+    for (let ci = 0; ci < T; ci++) {
+      const x = A[ci], m = mkt[ci];
+      if (Number.isNaN(x) || Number.isNaN(m)) continue;
+      sm += m; sr += x; smm += m * m; smr += m * x; n++;
+    }
+    const out = new Float64Array(T).fill(NaN);
+    if (n < 120) return out;
+    const vm = smm / n - (sm / n) ** 2;
+    const beta = vm > 0 ? (smr / n - (sm / n) * (sr / n)) / vm : 0;
+    const alpha = sr / n - beta * (sm / n);
+    for (let ci = 0; ci < T; ci++) {
+      const x = A[ci], m = mkt[ci];
+      if (!Number.isNaN(x) && !Number.isNaN(m)) out[ci] = x - alpha - beta * m;
+    }
+    return out;
+  });
+  // 残差相関行列の Frobenius ノルム² = Σ_ij C_ij²(対角=N, 非対角は共起120日以上のみ)。
+  let frob = N; // 対角の 1 が N 個
+  let valid = 0;
+  for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) {
+    let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0, n = 0;
+    const A = res[a], B = res[b];
+    for (let ci = 0; ci < T; ci++) {
+      const x = A[ci], y = B[ci];
+      if (Number.isNaN(x) || Number.isNaN(y)) continue;
+      sa += x; sb += y; saa += x * x; sbb += y * y; sab += x * y; n++;
+    }
+    if (n < 120) continue;
+    const cov = sab / n - (sa / n) * (sb / n);
+    const va = saa / n - (sa / n) ** 2, vb = sbb / n - (sb / n) ** 2;
+    const d = Math.sqrt(va * vb);
+    if (d > 0) { const c = cov / d; frob += 2 * c * c; valid++; } // C_ij と C_ji の 2 つ
+  }
+  if (valid === 0) return 1;
+  const nEff = (N * N) / frob;
+  return Math.max(1 / N, Math.min(1, nEff / N));
+}
+
+// 時間方向の実効標本数(系列相関で目減り)。Bartlett 加重の積分自己相関。
+function effectiveSample(x: number[]): number {
+  const n = x.length;
+  if (n < 8) return n;
+  const m = mean(x);
+  let v = 0; for (const e of x) v += (e - m) ** 2; v /= n;
+  if (v <= 0) return n;
+  const K = Math.min(20, Math.floor(n / 5));
+  let f = 1;
+  for (let k = 1; k <= K; k++) {
+    let c = 0; for (let i = k; i < n; i++) c += (x[i] - m) * (x[i - k] - m);
+    c /= n * v;
+    f += 2 * (1 - k / (K + 1)) * c;
+  }
+  f = Math.max(1, f);
+  return Math.max(1, Math.min(n, n / f));
+}
+
 export function computeCrossSectional(
   pricesByTicker: Record<string, PricePoint[]>,
   names: Record<string, string>,
@@ -183,8 +300,13 @@ export function computeCrossSectional(
   const empty = (reason: string): XResult => ({
     ok: false, reason, from: "", to: "", years: 0, nPeriods: 0, avgBreadth: 0, universeSize: 0,
     icMean: 0, icStd: 0, icIR: 0, icT: 0, hitRate: 0, breadthPerYear: 0, irTheoretical: 0,
+    rhoXs: 0, kEffPerRebalance: 0, temporalEff: 1, essRebalances: 0, breadthPerYearEff: 0,
+    irTheoreticalDiscounted: 0, icTEff: 0,
     sharpeRealizedGross: 0, sharpeRealizedNet: 0, annGross: 0, annNet: 0, maxDD: 0,
     turnoverPerYear: 0, costBreakevenBps: 0, medSpreadBps: 0, spreadSurvives: false,
+    realCost: false, spreadDragAnnual: 0, financeDragAnnual: 0, otherDragAnnual: 0,
+    totalDragAnnual: 0, annNetReal: 0, sharpeRealizedNetReal: 0, realCostSurvives: false,
+    marginKind: params.marginKind ?? DEFAULT_MARGIN_KIND,
     marketBeta: 0, equity: [], spans: [],
     nExtendToEnd: 0, survivorWarn: false, params,
   });
@@ -325,13 +447,58 @@ export function computeCrossSectional(
   const breadthPerYear = avgBreadth * periodsPerYear;
   const irTheoretical = icMean * Math.sqrt(Math.max(0, breadthPerYear));
 
-  // ブック成績(グロス/ネット)
-  const cost = params.costBps / 1e4;
-  const netRets = periodRets.map((r, i) => r - cost * 2 * periodTurnovers[i]); // 片道×2=往復近似
+  // Task1: 相関ディスカウント。BR_eff = k_eff(横断) × ess独立リバランス/年(時間)。
+  //  横断: 残差相関行列の参加比 ι=N_eff/N で、選抜 k 銘柄の実効独立ベット数 k_eff = k·ι。
+  //  表示用 ρ_xs は k_eff = k/(1+(k−1)ρ) を満たす等価平均相関(直感用)。
+  const indepRatio = computeIndependenceRatio(series, calendar);
+  const kEffPerRebalance = Math.max(1, avgBreadth * indepRatio);
+  const rhoXs = avgBreadth > 1 ? Math.max(0, (avgBreadth / kEffPerRebalance - 1) / (avgBreadth - 1)) : 0;
+  const essRebalances = effectiveSample(periodRets);
+  const temporalEff = nPeriods > 0 ? essRebalances / nPeriods : 1;
+  const breadthPerYearEff = kEffPerRebalance * (essRebalances / years);
+  const irTheoreticalDiscounted = icMean * Math.sqrt(Math.max(0, breadthPerYearEff));
+  const icTEff = icIR * Math.sqrt(Math.max(1, essRebalances));
+
   const perPeriodSharpe = (rs: number[]) => { const sd = std(rs); return sd > 0 ? mean(rs) / sd : 0; };
+
+  // ブック成績(グロス)
   const sharpeRealizedGross = perPeriodSharpe(periodRets) * Math.sqrt(periodsPerYear);
-  const sharpeRealizedNet = perPeriodSharpe(netRets) * Math.sqrt(periodsPerYear);
   const annGross = mean(periodRets) * periodsPerYear;
+
+  // フラットコスト(従来): 片道costBps × 往復
+  const cost = params.costBps / 1e4;
+  const netRetsFlat = periodRets.map((r, i) => r - cost * 2 * periodTurnovers[i]);
+
+  // Task2: 楽天証券・実コスト会計。
+  //  スプレッド往復(bid-askバウンス=微細構造) + 信用金利(買方)/貸株料(売方) + 諸経費。
+  const marginKind = params.marginKind ?? DEFAULT_MARGIN_KIND;
+  const rate = resolveMarginRate(marginKind);
+  const halfSpread = medSpreadBps / 1e4; // 片道(半スプレッド)率
+  const G = params.grossLeverage;
+  const financeRateAnnual = G * (0.5 * rate.longRate + 0.5 * rate.shortRate); // 買方金利+貸株料
+  // 諸経費: 事務管理費(建玉notional・両側)+ 名義書換料(買建のみ)。代表株価=最新終値の中央値。
+  const lastCloses = series.map((s) => s.close[s.close.length - 1]).filter((v) => v > 0).sort((a, b) => a - b);
+  const medPrice = lastCloses.length ? lastCloses[Math.floor(lastCloses.length / 2)] : 0;
+  const otherRateAnnual = medPrice > 0
+    ? adminFeeMonthlyRate(medPrice) * 12 * G + transferFeeAnnualRate(medPrice) * (G / 2)
+    : 0;
+  const dtFrac = reb / 252; // 保有期間(年)
+  const spreadCosts = periodTurnovers.map((tv) => 2 * tv * halfSpread); // Σ|Δw|=2·回転 が半スプレッドを跨ぐ
+  const financeCostPer = financeRateAnnual * dtFrac; // 期あたり(定数)
+  const otherCostPer = otherRateAnnual * dtFrac;
+  const netRetsReal = periodRets.map((r, i) => r - spreadCosts[i] - financeCostPer - otherCostPer);
+
+  const spreadDragAnnual = mean(spreadCosts) * periodsPerYear;
+  const financeDragAnnual = financeCostPer * periodsPerYear;
+  const otherDragAnnual = otherCostPer * periodsPerYear;
+  const totalDragAnnual = spreadDragAnnual + financeDragAnnual + otherDragAnnual;
+  const annNetReal = mean(netRetsReal) * periodsPerYear;
+  const sharpeRealizedNetReal = perPeriodSharpe(netRetsReal) * Math.sqrt(periodsPerYear);
+
+  // 表示の net はコストモデル選択に追従(グラフ・主要指標が誠実に一致するように)
+  const useReal = params.costModel === "rakuten";
+  const netRets = useReal ? netRetsReal : netRetsFlat;
+  const sharpeRealizedNet = perPeriodSharpe(netRets) * Math.sqrt(periodsPerYear);
   const annNet = mean(netRets) * periodsPerYear;
 
   // コスト分岐点: mean(r) − c*·2·meanTurn = 0 → c* = mean(r)/(2·meanTurn)
@@ -361,9 +528,13 @@ export function computeCrossSectional(
   return {
     ok: true, from, to, years, nPeriods, avgBreadth, universeSize: universeSizeMax,
     icMean, icStd, icIR, icT, hitRate, breadthPerYear, irTheoretical,
+    rhoXs, kEffPerRebalance, temporalEff, essRebalances, breadthPerYearEff,
+    irTheoreticalDiscounted, icTEff,
     sharpeRealizedGross, sharpeRealizedNet, annGross, annNet, maxDD,
     turnoverPerYear, costBreakevenBps,
     medSpreadBps, spreadSurvives: isFinite(costBreakevenBps) && costBreakevenBps > medSpreadBps,
+    realCost: useReal, spreadDragAnnual, financeDragAnnual, otherDragAnnual, totalDragAnnual,
+    annNetReal, sharpeRealizedNetReal, realCostSurvives: annNetReal > 0, marginKind,
     marketBeta, equity, spans,
     nExtendToEnd, survivorWarn: nExtendToEnd === series.length && series.length >= 4,
     params,

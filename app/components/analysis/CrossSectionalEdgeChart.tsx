@@ -16,6 +16,7 @@ import {
 } from "../../lib/cross-sectional-edge";
 import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
+import { MARGIN_KIND_ORDER, MARGIN_KIND_LABEL, resolveMarginRate, type MarginKind } from "../../lib/rakuten-margin";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -46,6 +47,8 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
   const [rebalanceDays, setRebalanceDays] = useState(DEFAULT_X_PARAMS.rebalanceDays);
   const [quantile, setQuantile] = useState(DEFAULT_X_PARAMS.quantile);
   const [costBps, setCostBps] = useState(DEFAULT_X_PARAMS.costBps);
+  const [costModel, setCostModel] = useState<"flat" | "rakuten">("flat");
+  const [marginKind, setMarginKind] = useState<MarginKind>("system");
 
   // ユニバース: ウォッチリスト / プリセット(大型30・主要60) / 貼り付け
   const [uniMode, setUniMode] = useState<UniverseMode>("watchlist");
@@ -91,9 +94,9 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
 
   const result = useMemo<XResult>(
     () => computeCrossSectional(activePrices, activeNames, {
-      ...DEFAULT_X_PARAMS, signal, rebalanceDays, quantile, costBps,
+      ...DEFAULT_X_PARAMS, signal, rebalanceDays, quantile, costBps, costModel, marginKind,
     }),
-    [activePrices, activeNames, signal, rebalanceDays, quantile, costBps],
+    [activePrices, activeNames, signal, rebalanceDays, quantile, costBps, costModel, marginKind],
   );
   const ready = result.ok;
 
@@ -216,11 +219,28 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
           <input type="range" min={0.1} max={0.5} step={0.05} value={quantile} onChange={(e) => setQuantile(Number(e.target.value))} />
         </label>
         <label className="flex items-center gap-1">
-          片道コスト
-          {[0, 2, 5, 10].map((c) => (
-            <button key={c} onClick={() => setCostBps(c)} className={`px-1.5 py-0.5 rounded border ${costBps === c ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>{c}bp</button>
-          ))}
+          コスト
+          <button onClick={() => setCostModel("flat")} className={`px-1.5 py-0.5 rounded border ${costModel === "flat" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>フラット</button>
+          <button onClick={() => setCostModel("rakuten")} className={`px-1.5 py-0.5 rounded border ${costModel === "rakuten" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`} title="楽天証券の実コスト: 代表スプレッド往復 + 信用金利/貸株料 + 諸経費">楽天実コスト</button>
         </label>
+        {costModel === "flat" ? (
+          <label className="flex items-center gap-1">
+            片道
+            {[0, 2, 5, 10].map((c) => (
+              <button key={c} onClick={() => setCostBps(c)} className={`px-1.5 py-0.5 rounded border ${costBps === c ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>{c}bp</button>
+            ))}
+          </label>
+        ) : (
+          <label className="flex items-center gap-1">
+            信用区分
+            <select className="border rounded px-1 py-0.5" value={marginKind} onChange={(e) => setMarginKind(e.target.value as MarginKind)}>
+              {MARGIN_KIND_ORDER.map((k) => <option key={k} value={k}>{MARGIN_KIND_LABEL[k]}</option>)}
+            </select>
+            <span className="text-gray-400">
+              買{(resolveMarginRate(marginKind).longRate * 100).toFixed(2)}%/貸株{(resolveMarginRate(marginKind).shortRate * 100).toFixed(2)}%
+            </span>
+          </label>
+        )}
       </div>
       <p className="text-[11px] text-gray-500">{XSIGNAL_DESC[signal]}</p>
 
@@ -234,10 +254,10 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
 
       {/* 主要指標 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Stat label="IC(平均・順位相関)" value={num2(result.icMean)} tone={result.icMean > 0 ? "good" : "bad"} sub={`t=${num2(result.icT)} / 的中${(result.hitRate * 100).toFixed(0)}%`} />
-        <Stat label="実効ブレッドス" value={`${result.avgBreadth.toFixed(0)}銘柄`} sub={`年${result.breadthPerYear.toFixed(0)}ベット`} />
-        <Stat label="理論IR (IC·√BR)" value={num2(result.irTheoretical)} sub="年率の上限目安" />
-        <Stat label="実現シャープ(ネット)" value={num2(result.sharpeRealizedNet)} tone={result.sharpeRealizedNet > 0.5 ? "good" : "neutral"} sub={`グロス ${num2(result.sharpeRealizedGross)}`} />
+        <Stat label="IC(平均・順位相関)" value={num2(result.icMean)} tone={result.icMean > 0 ? "good" : "bad"} sub={`t=${num2(result.icT)}→実効${num2(result.icTEff)} / 的中${(result.hitRate * 100).toFixed(0)}%`} />
+        <Stat label="実効ブレッドス(相関後)" value={`${result.breadthPerYearEff.toFixed(0)}`} sub={`素朴${result.breadthPerYear.toFixed(0)}→相関/時間で目減り`} />
+        <Stat label="理論IR(相関ディスカウント後)" value={num2(result.irTheoreticalDiscounted)} tone="neutral" sub={`素朴 ${num2(result.irTheoretical)}`} />
+        <Stat label="実現シャープ(ネット)" value={num2(result.sharpeRealizedNet)} tone={result.sharpeRealizedNet > 0.5 ? "good" : "neutral"} sub={`グロス ${num2(result.sharpeRealizedGross)}${result.realCost ? " / 楽天実コスト後" : ""}`} />
         <Stat label="年率リターン(ネット)" value={pct(result.annNet)} tone={result.annNet > 0 ? "good" : "bad"} sub={`グロス ${pct(result.annGross)}`} />
         <Stat label="最大DD" value={pct(result.maxDD)} tone="bad" />
         <Stat label="コスト分岐 vs スプレッド" value={`${isFinite(result.costBreakevenBps) ? result.costBreakevenBps.toFixed(1) : "—"} / ${result.medSpreadBps.toFixed(0)}bp`} tone={result.spreadSurvives ? "good" : "bad"} sub={result.spreadSurvives ? "スプレッド超で生存" : "スプレッドで消失"} />
@@ -262,10 +282,59 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         </span>
       </div>
 
+      {/* Task1: 相関ディスカウントの内訳 */}
+      <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-[11px] space-y-1">
+        <div className="font-medium text-gray-700 text-xs">理論IRの相関ディスカウント（素朴なブレッドスの補正）</div>
+        <p className="text-gray-600">
+          基本法則の素朴な理論IR {num2(result.irTheoretical)} は「銘柄×リバランスを全部独立」と数える楽観値。
+          実際は<b>同日は銘柄がまとめて動き(横断相関 ρ_xs={num2(result.rhoXs)})</b>、
+          <b>シグナルが持続するとリバランスが重複する(時間実効率 {(result.temporalEff * 100).toFixed(0)}%)</b>ため、
+          独立ベットは目減りします。
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-gray-700">
+          <div>横断相関 ρ_xs <b>{num2(result.rhoXs)}</b><div className="text-gray-400">1リバラ実効 {result.kEffPerRebalance.toFixed(1)}/{result.avgBreadth.toFixed(0)}銘柄</div></div>
+          <div>時間実効率 <b>{(result.temporalEff * 100).toFixed(0)}%</b><div className="text-gray-400">実効独立リバラ {result.essRebalances.toFixed(0)}/{result.nPeriods}</div></div>
+          <div>年間独立ベット <b>{result.breadthPerYearEff.toFixed(0)}</b><div className="text-gray-400">素朴 {result.breadthPerYear.toFixed(0)} から</div></div>
+          <div>理論IR <b className="text-gray-900">{num2(result.irTheoretical)}→{num2(result.irTheoreticalDiscounted)}</b><div className="text-gray-400">実現グロス {num2(result.sharpeRealizedGross)}</div></div>
+        </div>
+        <p className="text-gray-500">
+          ディスカウント後の理論IR {num2(result.irTheoreticalDiscounted)} が実現グロス {num2(result.sharpeRealizedGross)} に近いほど、
+          「基本法則が実際に効いている(=独立ベットの数を正直に数えれば説明できる)」ことを意味します。
+          {result.params.signal === "momentum" && " モメンタムはシグナルが遅く、リバランス重複で時間実効率が大きく落ちます。"}
+        </p>
+      </div>
+
+      {/* Task2: 楽天実コストの内訳 */}
+      {result.realCost && (
+        <div className={`rounded-lg border p-3 text-sm space-y-2 ${result.realCostSurvives ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"}`}>
+          <div className="flex items-center justify-between flex-wrap gap-1">
+            <span className="font-medium text-gray-800">楽天証券・実コスト検証（{MARGIN_KIND_LABEL[result.marginKind]}）</span>
+            <span className={`text-xs font-bold ${result.realCostSurvives ? "text-green-700" : "text-red-700"}`}>
+              {result.realCostSurvives ? "実コスト後も生存" : "実コストで消失"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <Stat label="スプレッド往復(微細構造)" value={`−${(result.spreadDragAnnual * 100).toFixed(1)}%`} tone="bad" sub="bid-askバウンス/年" />
+            <Stat label="金利+貸株料" value={`−${(result.financeDragAnnual * 100).toFixed(1)}%`} tone="bad" sub="買方金利+貸株料/年" />
+            <Stat label="諸経費" value={`−${(result.otherDragAnnual * 100).toFixed(2)}%`} tone="neutral" sub="事務管理+名義書換/年" />
+            <Stat label="実コスト後 年率" value={pct(result.annNetReal)} tone={result.annNetReal > 0 ? "good" : "bad"} sub={`グロス ${pct(result.annGross)}`} />
+          </div>
+          <p className="text-[11px] text-gray-600">
+            グロス年率 {pct(result.annGross)} から実コスト合計 <b>−{(result.totalDragAnnual * 100).toFixed(1)}%/年</b> を引くと
+            <b className={result.annNetReal > 0 ? "text-green-700" : "text-red-700"}> {pct(result.annNetReal)}</b>
+            （実コスト後シャープ {num2(result.sharpeRealizedNetReal)}）。
+            {" "}最大の殺し手は<b>スプレッド往復（−{(result.spreadDragAnnual * 100).toFixed(1)}%）</b>で、これは
+            「終値で建てられず bid-ask を跨ぐ」という短期リバーサルの微細構造そのもの。回転
+            {result.turnoverPerYear.toFixed(0)}回/年 × 代表スプレッド{result.medSpreadBps.toFixed(0)}bp が効いています。
+            {result.marginKind === "ichinichi" && " ※いちにち信用は金利0だが日計り限定(翌日持ち越し不可)なので、終値→翌終値の本戦略には本来使えません(下限の目安として表示)。"}
+          </p>
+        </div>
+      )}
+
       {/* エクイティ */}
       <div>
         <div className="text-xs text-gray-500 mb-1">
-          市場中立ブックの累積リターン（灰=グロス / 青=ネット, ホイールでズーム）— {result.from}〜{result.to} / {result.years.toFixed(1)}年 / {result.nPeriods}リバランス
+          市場中立ブックの累積リターン（灰=グロス / 青=ネット{result.realCost ? "・楽天実コスト" : `・フラット${costBps}bp`}, ホイールでズーム）— {result.from}〜{result.to} / {result.years.toFixed(1)}年 / {result.nPeriods}リバランス
         </div>
         <div ref={containerRef} className="w-full" />
       </div>
@@ -316,8 +385,30 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
           <li>{"横断ランクで上位qをロング・下位qをショート。等加重・ダラー中立: Σw_long = +L/2, Σw_short = −L/2(Lは総エクスポージャ)。"}</li>
           <li>{"ブック期リターン = Σ_i w_i·r_i(t→t+h)。"}</li>
           <li>{"IC = Spearman( s_i(t), r_i(t→t+h) ) を銘柄横断で計算。IC の t 値 = mean(IC)/std(IC)·√(期数)。"}</li>
-          <li>{"理論IR = mean(IC)·√(年あたり独立ベット数 BR)、BR ≈ 平均採用銘柄数 × 年間リバランス回数。"}</li>
+          <li>{"素朴な理論IR = mean(IC)·√(年あたり独立ベット数 BR)、BR ≈ 平均採用銘柄数 × 年間リバランス回数。"}</li>
           <li>{"コスト分岐点 c* : mean(期リターン) − c*·2·mean(片道回転) = 0 を解いた片道コスト。"}</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">2.5 理論IRの相関ディスカウント（重要）</p>
+        <p>
+          素朴な BR は「銘柄×リバランスを全部独立」と数えるため楽観的です。独立ベット数は2方向で目減りします。
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>{"横断(同日クラスタ): 同じ日は銘柄がまとめて動く。残差相関 ρ_xs(=対等加重ファクターを引いた残差の平均ペア相関)を使い、1リバランスの実効ベット数を k_eff = k/(1+(k−1)ρ_xs) に縮める。ダラー中立ブックは共通ファクターをヘッジ済みなので ρ_xs は小さめ。"}</li>
+          <li>{"時間(リバランス重複): シグナルが持続すると連続するリバランスの建玉が重なり、独立な期数が減る。ブック期リターンの自己相関から実効独立リバランス数 ess = nPeriods/(1+2Σ w_k ρ_k)(Bartlett加重)を求め、時間実効率 = ess/nPeriods とする。モメンタムのように遅いシグナルほど大きく落ちる。"}</li>
+          <li>{"誠実な理論IR = mean(IC)·√(k_eff × ess独立リバランス/年)。ICの t 値も ess で目減りさせた実効t=IC情報比·√ess を併記。"}</li>
+        </ul>
+        <p>これは他分析の「実効標本 nEff」と同じ規律で、他所で横断相関を割り引いているのに理論IRだけ素朴、という不整合を正すものです。</p>
+
+        <p className="font-medium text-gray-700 mt-3">2.6 楽天証券・実コスト検証（微細構造）</p>
+        <p>
+          「片道◯bp」の抽象コストではなく、楽天証券の実レートで検証します(単一ソース rakuten-margin.ts)。
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>{"スプレッド往復(微細構造の本体): 終値プリントでは約定できず bid-ask を跨ぐため、片道で半スプレッドを払う。期コスト = Σ|Δw| × 半スプレッド = 2·回転·(medSpread/2)。短期リバーサルの見かけ益の多くはこの bid-ask バウンスで、実際には獲れない。"}</li>
+          <li>{"信用金利+貸株料: 買建に買方金利(制度2.80%)、売建に貸株料(1.10%)。ダラー中立(半分ずつ)なら年率 ≒ 0.5·2.80% + 0.5·1.10% = 1.95%。保有日数ぶん日割りで控除。"}</li>
+          <li>{"諸経費: 事務管理費(0.11円/株/月・建玉notional)+ 名義書換料(買建・権利日跨ぎ)。低位株ほど相対負担が重い。"}</li>
+          <li>{"いちにち信用は金利0だが日計り限定で翌日持ち越し不可。終値→翌終値の本戦略には本来使えない(0コストの下限目安)。"}</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">3. 実装したシグナル</p>
