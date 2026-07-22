@@ -94,6 +94,10 @@ const ParticipationPremiumChart = dynamic(
   () => import("../components/analysis/ParticipationPremiumChart"),
   { ssr: false }
 );
+const SelectionTiltChart = dynamic(
+  () => import("../components/analysis/SelectionTiltChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -473,6 +477,13 @@ export default function PortfolioPage() {
               title: "参加の価値：株式プレミアムという床（株式原論 C24）",
               subtitle: "何を保有するか＝まず市場に参加する価値を実測。実現プレミアム±SE・t値／参加のg・最大DD／エントリー時刻スイープ（タイミング無関係と床の不安定性）",
               node: <ParticipationPremiumChart />,
+            });
+            // 系C25: 床（C24）の一段先＝特性チルトで床を底上げできるかの前向き検証。
+            items.push({
+              id: "pf-selection-tilt",
+              title: "対象選択による床の底上げ：横断ドリフト・チルト（株式原論 C25）",
+              subtitle: "特性(モメンタム/低ボラ/短期反転/トレンド)で対象をチルトし市場等加重(床)への超過ドリフトΔμを前向き検証。t値ハードル(C16)＋BH-FDR＋N_eff(C20)＋生存者バイアス診断。大半は床未達が誠実な既定",
+              node: <SelectionTiltChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             if (dn >= 2) items.push({ id: "pf-risk", title: "ポートフォリオ・リスク分析", node: <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} /> });
             if (dn >= 2) items.push({ id: "pf-frontier", title: "効率的フロンティア・CML", node: <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
