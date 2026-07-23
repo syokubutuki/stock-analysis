@@ -24,12 +24,13 @@ import {
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 
-// 市場代理プリセット。1306=TOPIX連動ETF（分配金込みadjClose→総収益の床）、^N225=日経225(配当抜き)。
+// 市場代理プリセット。1321=日経225連動ETF（分配金込みadjClose→総収益の床・データ良好）。
+// TOPIX ETF(1306/1475)は Yahoo の adjClose に ~10倍の誤ティックがあり既定から外す（選んでも異常値は自動除外）。
 const PROXY_PRESETS: { id: string; label: string; note: string }[] = [
-  { id: "1306", label: "TOPIX ETF (1306)", note: "分配金込み・総収益の床" },
-  { id: "1321", label: "日経225 ETF (1321)", note: "分配金込み" },
+  { id: "1321", label: "日経225 ETF (1321)", note: "分配金込み・総収益の床（推奨）" },
   { id: "^N225", label: "日経225 指数", note: "配当抜き・床は過小" },
   { id: "^GSPC", label: "S&P500 指数", note: "米国・配当抜き" },
+  { id: "1306", label: "TOPIX ETF (1306)", note: "分配金込みだがYahooに誤ティック（自動除外）" },
 ];
 
 const HOLD_OPTIONS: { days: number; label: string }[] = [
@@ -63,7 +64,7 @@ function Stat({
 }
 
 export default function ParticipationPremiumChart() {
-  const [proxy, setProxy] = useState<string>("1306");
+  const [proxy, setProxy] = useState<string>("1321");
   const [customProxy, setCustomProxy] = useState("");
   const [rfPct, setRfPct] = useState("0");
   const [holdDays, setHoldDays] = useState(252);
@@ -265,6 +266,12 @@ export default function ParticipationPremiumChart() {
               <Stat label="年率ボラ" value={`${(p.annualVol * 100).toFixed(1)}%`} />
               <Stat label="観測日数" value={`${p.nDays}日`} sub={`${p.years.toFixed(1)}年`} />
             </div>
+            {result.droppedOutliers > 0 && (
+              <p className="mt-1.5 text-[11px] text-amber-600 bg-amber-50 rounded px-2 py-1">
+                ⚠ 日次±50%超の異常値 {result.droppedOutliers} 件をデータエラー（Yahoo の誤 adjClose）として
+                除外して計算しています。別の市場代理（日経225 ETF 1321 など）を推奨。
+              </p>
+            )}
             <p className="mt-1.5 text-[11px] text-gray-500">
               床は「当てにいく対象」ではなく「居るだけで受け取る」。ただし t 値が示す通り、
               10年程度の標本では市場プレミアムでさえ有意化しにくい（SE=σ/√T の壁）。

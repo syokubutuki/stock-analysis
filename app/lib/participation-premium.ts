@@ -133,7 +133,15 @@ export interface ParticipationResult {
   equity: EquityPoint[];
   /** エントリー時刻スイープ（タイミングは分散のみ動かす／床の不安定性）。 */
   sweep: HorizonSweep;
+  /** データエラーとして除外した異常日数（|日次r|>50%。Yahoo の誤 adjClose 等）。透明性のため公開。 */
+  droppedOutliers: number;
 }
+
+/**
+ * データエラーの上限。個別株の値幅制限・指数・ETF のいずれも1日で ±50% は超えない。
+ * これを超える日次リターンは Yahoo の誤 adjClose（例: 1306.T/1475.T の ~10倍スパイク）とみなす。
+ */
+export const MAX_DAILY_RETURN = 0.5;
 
 // --- 床の高さ（実現プレミアムと有意性） --------------------------------------
 export function premiumStats(rets: number[], rf: number): PremiumStats {
@@ -247,12 +255,25 @@ export function computeParticipation(
   const holdLabel = opts?.holdLabel ?? "1年";
   if (prices.length < holdDays + 30) return null;
 
-  const dr = dailyReturns(prices);
-  if (dr.length < 30) return null;
+  const drRaw = dailyReturns(prices);
+  if (drRaw.length < 30) return null;
+
+  // データエラー除外（透明）: |日次r|>50% は誤 adjClose とみなし落とす。落とした数は公開する。
+  const dr = drRaw.filter((d) => Math.abs(d.r) <= MAX_DAILY_RETURN);
+  const droppedOutliers = drRaw.length - dr.length;
+
+  // スイープ用に、除外後リターンから価格系列を再構成（1本の異常ティックがスイープ窓も汚すため）。
+  const p0 = prices.find((p) => p.close > 0)?.close ?? 1;
+  const cleanedPrices: PricePoint[] = [];
+  let v = p0;
+  for (const d of dr) {
+    v *= 1 + d.r;
+    cleanedPrices.push({ time: d.time, open: v, high: v, low: v, close: v, volume: 0 });
+  }
 
   const premium = premiumStats(dr.map((d) => d.r), rf);
   const { equity, metrics } = participationCurve(dr);
-  const sweep = horizonSweep(prices, holdDays, holdLabel);
+  const sweep = horizonSweep(cleanedPrices, holdDays, holdLabel);
 
-  return { premium, participation: metrics, equity, sweep };
+  return { premium, participation: metrics, equity, sweep, droppedOutliers };
 }
