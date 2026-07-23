@@ -33,6 +33,17 @@ import {
   type ComparisonInput,
   type LeverageSweep,
 } from "../../lib/nisa-vs-taxable";
+import {
+  RAKUTEN_MARGIN_RATES,
+  MARGIN_KIND_ORDER,
+  MARGIN_KIND_LABEL,
+  resolveMarginRate,
+  DEFAULT_MARGIN_KIND,
+  ADMIN_FEE_PER_SHARE_MONTHLY,
+  TRANSFER_FEE_PER_LOT,
+  type MarginKind,
+  type RatePlan,
+} from "../../lib/rakuten-margin";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 import WeekSlotGrid, { type SlotSide, AVOID_WEEKEND } from "./WeekSlotGrid";
@@ -75,9 +86,26 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
   const [quota, setQuota] = useState(GROWTH_QUOTA);
   // 信用取引パラメータ(戦略シナリオにのみ適用。NISA/現物BHは現物lev1)
   const [leverage, setLeverage] = useState(1);
+  // 楽天証券の信用区分・金利プラン。選択すると金利/貸株料が実額で自動セットされる。
+  const [marginKind, setMarginKind] = useState<MarginKind>(DEFAULT_MARGIN_KIND);
+  const [ratePlan, setRatePlan] = useState<RatePlan>("standard");
   const [marginRatePct, setMarginRatePct] = useState(DEFAULT_MARGIN_RATE_LONG * 100);
   const [shortFeePct, setShortFeePct] = useState(DEFAULT_SHORT_FEE_RATE * 100);
   const [maintPct, setMaintPct] = useState(DEFAULT_MAINTENANCE * 100);
+  // 諸経費(楽天の実額)。事務管理費11銭/株/月・名義書換料55円/単位を建玉notional比で計上。
+  const [includeAdminFee, setIncludeAdminFee] = useState(true);
+  const [includeTransferFee, setIncludeTransferFee] = useState(true);
+
+  // 信用区分/プランを変えたら、その区分の実額レートを金利・貸株料へ反映。
+  const applyKindPlan = (kind: MarginKind, plan: RatePlan) => {
+    const preferAvail = RAKUTEN_MARGIN_RATES[kind].preferential !== undefined;
+    const p: RatePlan = plan === "preferential" && !preferAvail ? "standard" : plan;
+    const r = resolveMarginRate(kind, p);
+    setMarginKind(kind);
+    setRatePlan(p);
+    setMarginRatePct(r.longRate * 100);
+    setShortFeePct(r.shortRate * 100);
+  };
 
   // 戦略スロット。制御時は外部プラン、非制御時は内部state(初期値=bestCombの最適プラン)。
   const best = useMemo(() => (prices.length > 60 ? bestCombination(prices, true) : null), [prices]);
@@ -99,7 +127,16 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
     marginRateLong: marginRatePct / 100,
     shortFeeRate: shortFeePct / 100,
     maintenanceMargin: maintPct / 100,
-  }), [legs, taxModel, taxRate, costBps, leverage, marginRatePct, shortFeePct, maintPct]);
+    includeAdminFee,
+    includeTransferFee,
+  }), [legs, taxModel, taxRate, costBps, leverage, marginRatePct, shortFeePct, maintPct, includeAdminFee, includeTransferFee]);
+
+  // 諸経費の実効年率(表示用): 基準株価=終値平均。
+  const refPrice = useMemo(() => {
+    let sum = 0, n = 0;
+    for (const p of prices) { if (p.close > 0) { sum += p.close; n++; } }
+    return n > 0 ? sum / n : 0;
+  }, [prices]);
 
   const cmp = useMemo<Comparison | null>(() => {
     if (prices.length < 60) return null;
@@ -325,6 +362,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
     { label: "税引後リターン", get: (r) => pct(r.afterTaxReturn), color: (r) => cls(r.afterTaxReturn) },
     { label: "支払税(富比)", get: (r) => `−${(r.taxPaid * 100).toFixed(2)}%`, color: () => "text-rose-500" },
     { label: "取引コスト", get: (r) => `−${(r.cost * 100).toFixed(2)}%`, color: () => "text-gray-500" },
+    { label: "諸経費(事務/名義)", get: (r) => `−${(r.miscCost * 100).toFixed(2)}%`, color: () => "text-gray-500" },
     { label: "市場滞在率", get: (r) => `${(r.exposure * 100).toFixed(0)}%` },
     { label: "往復回数", get: (r) => `${r.nRoundTrips}` },
     { label: "年率ボラ", get: (r) => `${(r.volAnnual * 100).toFixed(1)}%` },
@@ -400,25 +438,57 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
       </div>
 
       {/* 信用取引パラメータ(戦略シナリオにのみ適用。NISA/現物BHは現物lev1) */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm rounded-lg border border-purple-200 bg-purple-50/40 p-2">
-        <span className="text-xs font-medium text-purple-800">信用取引（戦略のみ）</span>
-        <label className="flex items-center gap-1.5 text-gray-600">
-          レバ {leverage.toFixed(1)}×
-          <input type="range" min={1} max={MAX_LEVERAGE} step={0.1} value={leverage} onChange={(e) => setLeverage(Number(e.target.value))} className="w-32" />
-        </label>
-        <label className="flex items-center gap-1 text-gray-500">
-          買い方金利
-          <input type="number" min={0} max={20} step={0.1} value={marginRatePct} onChange={(e) => setMarginRatePct(Math.max(0, Number(e.target.value) || 0))} className="w-14 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />%
-        </label>
-        <label className="flex items-center gap-1 text-gray-500">
-          貸株料
-          <input type="number" min={0} max={20} step={0.1} value={shortFeePct} onChange={(e) => setShortFeePct(Math.max(0, Number(e.target.value) || 0))} className="w-14 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />%
-        </label>
-        <label className="flex items-center gap-1 text-gray-500">
-          追証維持率
-          <input type="number" min={0} max={100} step={1} value={maintPct} onChange={(e) => setMaintPct(Math.max(0, Number(e.target.value) || 0))} className="w-14 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />%
-        </label>
-        <span className="text-[11px] text-gray-400">レバ1×＝現物相当（買いは金利0、売りは貸株料のみ）。NISAは信用不可。</span>
+      <div className="flex flex-col gap-2 text-sm rounded-lg border border-purple-200 bg-purple-50/40 p-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-xs font-medium text-purple-800">信用取引（戦略のみ）／楽天証券コスト</span>
+          <label className="flex items-center gap-1 text-gray-500">
+            信用区分
+            <select value={marginKind} onChange={(e) => applyKindPlan(e.target.value as MarginKind, ratePlan)} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
+              {MARGIN_KIND_ORDER.map((k) => (
+                <option key={k} value={k}>{MARGIN_KIND_LABEL[k]}</option>
+              ))}
+            </select>
+          </label>
+          <label className={`flex items-center gap-1 ${RAKUTEN_MARGIN_RATES[marginKind].preferential ? "text-gray-500" : "text-gray-300"}`}>
+            <input
+              type="checkbox"
+              disabled={!RAKUTEN_MARGIN_RATES[marginKind].preferential}
+              checked={ratePlan === "preferential"}
+              onChange={(e) => applyKindPlan(marginKind, e.target.checked ? "preferential" : "standard")}
+            />
+            優遇金利
+          </label>
+          <label className="flex items-center gap-1.5 text-gray-600">
+            レバ {leverage.toFixed(1)}×
+            <input type="range" min={1} max={MAX_LEVERAGE} step={0.1} value={leverage} onChange={(e) => setLeverage(Number(e.target.value))} className="w-32" />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label className="flex items-center gap-1 text-gray-500">
+            買方金利
+            <input type="number" min={0} max={20} step={0.1} value={marginRatePct} onChange={(e) => setMarginRatePct(Math.max(0, Number(e.target.value) || 0))} className="w-14 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />%
+          </label>
+          <label className="flex items-center gap-1 text-gray-500">
+            貸株料
+            <input type="number" min={0} max={20} step={0.1} value={shortFeePct} onChange={(e) => setShortFeePct(Math.max(0, Number(e.target.value) || 0))} className="w-14 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />%
+          </label>
+          <label className="flex items-center gap-1 text-gray-500">
+            追証維持率
+            <input type="number" min={0} max={100} step={1} value={maintPct} onChange={(e) => setMaintPct(Math.max(0, Number(e.target.value) || 0))} className="w-14 border border-gray-200 rounded px-1 py-0.5 bg-white text-right" />%
+          </label>
+          <label className="flex items-center gap-1 text-gray-500">
+            <input type="checkbox" checked={includeAdminFee} onChange={(e) => setIncludeAdminFee(e.target.checked)} />
+            事務管理費（11銭/株/月）
+          </label>
+          <label className="flex items-center gap-1 text-gray-500">
+            <input type="checkbox" checked={includeTransferFee} onChange={(e) => setIncludeTransferFee(e.target.checked)} />
+            名義書換料（55円/単位）
+          </label>
+        </div>
+        <span className="text-[11px] text-gray-400">
+          レバ1×＝現物相当（買いは金利0、売りは貸株料のみ）。NISAは信用不可。手数料はゼロコース＝0円前提。
+          諸経費は基準株価{refPrice > 0 ? ` ${Math.round(refPrice).toLocaleString()}円` : ""}で建玉notional比に換算（事務管理費は建玉1か月経過ごと、週内手仕舞いなら実質0）。逆日歩は変動のため未計上。
+        </span>
       </div>
 
       {/* 戦略スロット・グリッド(workbench制御時は上流で編集するので隠す) */}
@@ -526,9 +596,15 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             <div className="flex justify-between"><span className="text-gray-500">取引コスト（往復 {cmp.strategy.nRoundTrips}回 @ {costBps}bps×レバ）</span><span className="text-gray-600">−{(cmp.strategy.cost * 100).toFixed(2)}%</span></div>
             <div className="flex justify-between"><span className="text-gray-500">信用 買い方金利（{marginRatePct}%/年 × 借入{Math.max(0, leverage - 1).toFixed(1)}×）</span><span className="text-purple-600">−{(cmp.strategy.carryLong * 100).toFixed(2)}%</span></div>
             <div className="flex justify-between"><span className="text-gray-500">貸株料（{shortFeePct}%/年 × 売り建て）</span><span className="text-purple-600">−{(cmp.strategy.carryShort * 100).toFixed(2)}%</span></div>
+            {includeAdminFee && (
+              <div className="flex justify-between"><span className="text-gray-500">事務管理費（{ADMIN_FEE_PER_SHARE_MONTHLY.toFixed(2)}円/株/月 × 建玉1か月毎）</span><span className="text-purple-600">−{(cmp.strategy.adminFee * 100).toFixed(2)}%</span></div>
+            )}
+            {includeTransferFee && (
+              <div className="flex justify-between"><span className="text-gray-500">名義書換料（{TRANSFER_FEE_PER_LOT}円/単位 × 権利確定跨ぎ期待値）</span><span className="text-purple-600">−{(cmp.strategy.transferFee * 100).toFixed(2)}%</span></div>
+            )}
             <div className="flex justify-between"><span className="text-gray-500">支払税</span><span className="text-rose-500">−{(cmp.strategy.taxPaid * 100).toFixed(2)}%</span></div>
             <div className="flex justify-between border-t border-gray-100 pt-1"><span className="text-gray-500">→ 税引後リターン（この全期間）</span><span className={`font-medium ${cls(cmp.strategy.afterTaxReturn)}`}>{pct(cmp.strategy.afterTaxReturn)}</span></div>
-            <p className="text-[11px] text-gray-400">キャリーは持ち越し日数比例（金→月の週末は3日分）。逆日歩（品貸料）は変動のため未計上——実際はさらに不利になり得ます。</p>
+            <p className="text-[11px] text-gray-400">キャリーは持ち越し日数比例（金→月の週末は3日分）。事務管理費は建玉が満1か月を跨ぐごとに課金（週内手仕舞いは0）。逆日歩（品貸料）は制度信用の売りで変動——未計上のため実際はさらに不利になり得ます。</p>
           </div>
 
           <p className="text-xs text-gray-400">
@@ -613,6 +689,15 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li><span className="font-medium">レバ後リターン</span>: 建玉中は口座が原資産×kで動きます（equity ×= 1 + k·pos·r）。期待リターンは概ねk倍。</li>
           <li><span className="font-medium">キャリーコスト（保有日数比例）</span>: 買い建ては借入(k−1)分に<span className="font-medium">買い方金利</span>、売り建ては建玉k分に<span className="font-medium">貸株料</span>を日割りで控除。金→月の週末は3日分乗ります。これらは経費なので課税損益からも差し引かれます。</li>
+          <li>
+            <span className="font-medium">楽天証券の実際のコスト</span>: 既定は<span className="font-medium">制度信用（通常）</span>で買方金利 <span className="font-medium">年2.80%</span>・貸株料 <span className="font-medium">年1.10%</span>。信用区分を切り替えると実額が入ります——
+            一般信用「無期限」も 2.80%/1.10%（優遇なら買方 2.10%）、一般信用「短期」は貸株料 3.90%、<span className="font-medium">いちにち信用</span>は金利・貸株料とも 0%（ただし当日返済必須なので日跨ぎ戦略には使えません）。売買手数料はゼロコース＝0円前提。
+            金利計算式は <code>建玉金額 × 年率 × 保有暦日数 ÷ 365</code>。
+          </li>
+          <li>
+            <span className="font-medium">諸経費（金利・貸株料以外）</span>: <span className="font-medium">事務管理費</span>＝建玉が満1か月経過するごとに1株あたり11銭（税込）。株価Pの建玉に対し notional 比で <code>0.11/P（月）</code>＝年 <code>1.32/P</code> 相当（例: 3,000円株で約0.044%/年、低位株ほど重い）。<span className="font-medium">週内で手仕舞う短期戦略は満1か月に届かないので実質0</span>になります。
+            <span className="font-medium">名義書換料</span>＝権利確定日を越えて買建の場合、1売買単位あたり55円（税込）。年2回の権利確定日を跨ぐ期待値として <code>55×2/(P×売買単位)</code> を年率で計上。いずれもチェックボックスでON/OFF可。
+          </li>
           <li><span className="font-medium">追証・破産の判定</span>: 静的建玉の維持率＝純資産/建玉評価額 = (1+k·x)/(k·(1+u)) が<span className="font-medium">追証維持率</span>を割ると追証、純資産≤0（原資産が約 −1/k 逆行）で破産。確率は分布仮定を置かず、ローリング1年窓での発生頻度で推定します。</li>
           <li><span className="font-medium">リスクの比例拡大</span>: レバはリターンだけでなくボラ・最大DD・追証/破産確率も拡大します。②のリスク曲線と k* を必ず一緒に見てください。</li>
         </ul>
@@ -638,7 +723,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           <li><span className="font-medium">配当を含まない</span>: 終値ベースのため配当が抜けています。配当もNISAは非課税なので、本来のNISA優位はここで示すより<span className="font-medium">さらに大きい</span>可能性があります。</li>
           <li><span className="font-medium">過剰適合</span>: 「最適プラン」を同じ期間で評価すると戦略が過大評価されます。ローリングでの安定性や、期間を変えた再現性を必ず確認してください。</li>
           <li><span className="font-medium">コスト・スリッページ</span>: 往復コストは片道bpsで近似。実際は板の薄さ・スプレッドでさらに削られます。</li>
-          <li><span className="font-medium">信用の簡略化</span>: 逆日歩（品貸料）は変動のため未計上。追証は静的建玉近似で判定し、追証後の強制決済・建替えコストや金利の日々変動は省略。実際の信用取引はここで示すより不利になり得ます。</li>
+          <li><span className="font-medium">信用の簡略化</span>: 金利・貸株料・事務管理費・名義書換料は楽天の実額で計上しますが、<span className="font-medium">逆日歩（品貸料）は制度信用の売りで日々変動するため未計上</span>。諸経費は基準株価（終値平均）で notional 比に換算した近似で、名義書換料は権利確定日を年2回の期待値で置いた簡略化です（実際の権利日・銘柄の売買単位で変わります）。追証は静的建玉近似で判定し、追証後の強制決済・建替えコストや金利の日々変動は省略。実際の信用取引はここで示すより不利になり得ます。</li>
           <li><span className="font-medium">レバはリスクを解決しない</span>: k* は期待値でNISAに並ぶ点にすぎず、ボラ・最大DD・破産確率が同時に膨らみます。リスク調整後（Sharpe）ではむしろ悪化しがちです。</li>
           <li><span className="font-medium">繰越・他口座通算の無視</span>: 年内損益通算のみ考慮し、翌年への損失繰越や他口座との通算は無視しています。</li>
           <li><span className="font-medium">現金は無利子</span>: 市場外の資金は0%と仮定。短期金利で運用できる環境ではNISA側の相対優位がわずかに縮みます。</li>

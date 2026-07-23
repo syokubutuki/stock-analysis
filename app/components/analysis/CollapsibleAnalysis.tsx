@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { OPEN_PANEL_EVENT, type OpenPanelDetail } from "../../lib/panel-nav";
 
 interface Props {
   /** localStorage 永続化・アンカー用の安定ID（銘柄に依存しない） */
@@ -73,8 +74,28 @@ export default function CollapsibleAnalysis({
     });
   };
 
+  // 他コンポーネントからの「この分析を開いて」という命令に追従する。
+  // 中身をマウントしてからスクロールするため次フレームまで待つ。
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<OpenPanelDetail>).detail;
+      if (!detail || detail.id !== id) return;
+      setOpen(true);
+      try {
+        localStorage.setItem(storageKey(id), "1");
+      } catch {}
+      requestAnimationFrame(() =>
+        sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    };
+    window.addEventListener(OPEN_PANEL_EVENT, onOpen as EventListener);
+    return () => window.removeEventListener(OPEN_PANEL_EVENT, onOpen as EventListener);
+  }, [id]);
+
   return (
     <section
+      ref={sectionRef}
       id={`panel-${id}`}
       className="bg-white rounded-lg border border-gray-200 overflow-hidden scroll-mt-36"
     >

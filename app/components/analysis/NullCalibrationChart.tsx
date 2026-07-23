@@ -81,9 +81,13 @@ function drawHistogram(
     27,
   );
 
-  // 95%点より右＝「偶然では滅多に届かない」領域
+  // 左端〜95%点＝「偶然だけで届いてしまう」域（発見なし域, 淡赤）。
+  // 95%点より右＝「偶然では滅多に届かない」棄却域（緑）。
+  // 実測がこのどちら側に落ちるかが、そのまま「発見か/床に埋没か」を意味する。
   const x95 = xOf(st.p95);
-  ctx.fillStyle = "rgba(22,163,74,0.07)";
+  ctx.fillStyle = "rgba(220,38,38,0.05)";
+  ctx.fillRect(ml, mt, Math.max(0, x95 - ml), plotH);
+  ctx.fillStyle = "rgba(22,163,74,0.09)";
   ctx.fillRect(x95, mt, Math.max(0, ml + plotW - x95), plotH);
 
   for (let i = 0; i < h.counts.length; i++) {
@@ -115,6 +119,16 @@ function drawHistogram(
     return x;
   };
 
+  // 域ラベル（塗り分けの意味を明示）
+  ctx.font = "9px sans-serif";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(220,38,38,0.55)";
+  ctx.textAlign = "left";
+  ctx.fillText("偶然で届く域（発見なし）", ml + 3, mt + plotH - 4);
+  ctx.fillStyle = "rgba(22,163,74,0.7)";
+  ctx.textAlign = "right";
+  ctx.fillText("棄却域（発見）", ml + plotW - 3, mt + 10);
+
   const xMed = vline(st.p50, "#6b7280", [3, 3], 1); // ヌル中央値 = 偽発見の床
   vline(st.p95, "#16a34a", [4, 3], 1);
   const xAct = vline(st.actual, "#dc2626", [], 2); // 実測
@@ -122,12 +136,19 @@ function drawHistogram(
   ctx.font = "9px sans-serif";
   ctx.textAlign = "center";
   ctx.fillStyle = "#6b7280";
-  ctx.fillText(`ヌル中央値 ${formatMetric(key, st.p50)}`, xMed, mt - 4);
+  ctx.fillText(`床（ヌル中央値）${formatMetric(key, st.p50)}`, xMed, mt - 4);
   ctx.fillStyle = "#16a34a";
   ctx.fillText(`95%点 ${formatMetric(key, st.p95)}`, x95, mt + plotH + 22);
   ctx.fillStyle = "#dc2626";
   ctx.font = "bold 10px sans-serif";
   ctx.fillText(`実測 ${formatMetric(key, st.actual)}`, xAct, mt + plotH + 11);
+  // 実測が「偶然域の内側か／棄却域を突破したか」を実測線の直近に注記する。
+  const beyond = st.actual > st.p95;
+  ctx.font = "bold 9px sans-serif";
+  ctx.fillStyle = beyond ? "#16a34a" : "#dc2626";
+  ctx.textAlign = beyond ? "left" : "right";
+  const noteX = beyond ? Math.min(xAct + 5, ml + plotW) : Math.max(xAct - 5, ml);
+  ctx.fillText(beyond ? "床を突破 →" : "← 偶然の範囲内", noteX, mt + 22);
 
   ctx.fillStyle = "#9ca3af";
   ctx.font = "9px sans-serif";

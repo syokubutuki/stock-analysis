@@ -36,6 +36,7 @@
 
 import { PricePoint } from "./types";
 import { mean, std, quantileSorted } from "./stats-significance";
+import { DEFAULT_MARGIN_RATE_LONG } from "./rakuten-margin";
 
 const TRADING_DAYS = 252;
 
@@ -94,7 +95,7 @@ export const DEFAULT_VT_SPEC: VolTargetSpec = {
   maxLev: 3,
   trendFilter: false,
   costBps: 5,
-  marginRateLong: 0.026,
+  marginRateLong: DEFAULT_MARGIN_RATE_LONG, // 楽天証券・制度信用(通常)の買方金利 2.80%
   rebalanceBand: 0.25,
 };
 

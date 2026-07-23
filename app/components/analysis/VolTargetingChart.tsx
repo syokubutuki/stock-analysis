@@ -423,7 +423,7 @@ export default function VolTargetingChart({ prices }: Props) {
           ))}
         </div>
         <span className="text-xs text-gray-400">
-          {meta.startDate}〜{meta.endDate} / {meta.years.toFixed(1)}年 / 信用金利2.6%
+          {meta.startDate}〜{meta.endDate} / {meta.years.toFixed(1)}年 / 信用金利2.8%（楽天・制度信用）
         </span>
       </div>
 
@@ -699,7 +699,7 @@ export default function VolTargetingChart({ prices }: Props) {
           <li><span className="font-medium">リターンの有意な上乗せは原理的に困難</span>: 本手法の主効果はリスク低減です。年率リターン差のCIはたいてい0を跨ぎます。「有意にB&Hを上回る」と言えるのは主にSharpe・DDの次元です。</li>
           <li><span className="font-medium">ギャップリスク</span>: 日次リバランスでは寄り付きの窓（オーバーナイトの急落）は避けられません。レバ3倍中の−33%ギャップで理論上破産します。</li>
           <li><span className="font-medium">急落の一日目は食らう</span>: σ̂ は事後的に上がるため、平穏→急落の初日はフルポジションで被弾します。守れるのは「荒れが続く局面」だけです。</li>
-          <li><span className="font-medium">コスト</span>: 信用金利（年2.6%が借入分に常時）と日次リバランスの売買コストがΔSharpeを削ります。バンド制リバランス（±0.25）で回転を抑えています。</li>
+          <li><span className="font-medium">コスト</span>: 信用金利（楽天・制度信用の年2.8%が借入分に常時）と日次リバランスの売買コストがΔSharpeを削ります。バンド制リバランス（±0.25）で回転を抑えています。</li>
           <li><span className="font-medium">実装可能性の批判</span>: Cederburg et al. (2020) は、リアルタイム実装ではボラ管理の優位が多くの資産で消えると報告しています。市場インデックス系が最も生き残りやすい類型です。</li>
         </ul>
 
@@ -737,7 +737,7 @@ export default function VolTargetingChart({ prices }: Props) {
             置換検定 p&lt;0.1（機構の存在）とDD改善の実利をどう評価するかが実践上の判断になります。
           </li>
           <li>
-            <span className="font-medium">コスト前提の注意</span>: 本シミュレーションの信用金利2.6%は日本株の制度信用の想定。
+            <span className="font-medium">コスト前提の注意</span>: 本シミュレーションの信用金利2.8%は楽天証券・日本株の制度信用（通常）の実額。
             S&P500系を実際に持つ手段（先物・CFD・1557.T等）は資金調達コスト構造が異なり、
             先物ならキャリーは実質金利差程度なので、米国指数に対しては保守的すぎる可能性があります。
           </li>

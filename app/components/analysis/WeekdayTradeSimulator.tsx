@@ -36,6 +36,17 @@ import {
   type WalkForwardResult,
   type BestCombination,
 } from "../../lib/weekday-trade";
+import {
+  DEFAULT_NULL_PARAMS,
+  formatMetric,
+  type NullCalibParams,
+  type NullCalibResult,
+} from "../../lib/null-calibration";
+import type {
+  NullCalibWorkerRequest,
+  NullCalibWorkerResponse,
+} from "../../lib/null-calibration.worker";
+import { openAnalysisPanel } from "../../lib/panel-nav";
 
 interface Props {
   prices: PricePoint[];
@@ -288,6 +299,57 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
     () => bestCombination(fitPrices, tradeCompound),
     [fitPrices, tradeCompound],
   );
+
+  // === 多重性の床（ヌル較正）: ★算出期間で in-sample 最適化の「偽発見の床」を測る ===
+  // 曜日構造ゼロのサロゲートに同じ最適化を流し、その成績分布(床)と実測を並べる。
+  // 専用パネル(cal-null-calib)の軽量版(200反復)を Worker で非同期に走らせ、
+  // 「この最適プランの見かけリターンは偶然の範囲内か」をその場で判定する。
+  const floorWorkerRef = useRef<Worker | null>(null);
+  const floorReqRef = useRef(0);
+  const [floor, setFloor] = useState<NullCalibResult | null>(null);
+  const [floorLoading, setFloorLoading] = useState(false);
+  useEffect(() => {
+    const w = new Worker(new URL("../../lib/null-calibration.worker.ts", import.meta.url));
+    floorWorkerRef.current = w;
+    w.onmessage = (ev: MessageEvent<NullCalibWorkerResponse>) => {
+      if (ev.data.reqId !== floorReqRef.current) return;
+      if (ev.data.result) {
+        setFloor(ev.data.result);
+        setFloorLoading(false);
+      }
+    };
+    return () => {
+      w.terminate();
+      floorWorkerRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    const w = floorWorkerRef.current;
+    if (!w || fitPrices.length < 60) {
+      setFloor(null);
+      setFloorLoading(false);
+      return;
+    }
+    floorReqRef.current++;
+    setFloorLoading(true);
+    const params: NullCalibParams = {
+      ...DEFAULT_NULL_PARAMS,
+      nIter: 200,
+      mode: "slotShuffle",
+      evalMode: "inSample",
+      compound: tradeCompound,
+      costBps,
+      gapFill,
+    };
+    const req: NullCalibWorkerRequest = { reqId: floorReqRef.current, prices: fitPrices, params };
+    w.postMessage(req);
+  }, [fitPrices, tradeCompound, costBps, gapFill]);
+  const floorOk = floor?.ok ? floor : null;
+  const flTot = floorOk?.stats.totalReturn ?? null;
+  const flFi = floorOk?.stats.fIntraday ?? null;
+  const flFo = floorOk?.stats.fOvernight ?? null;
+  const floorStructFound = !!(flFi?.exceeds95 || flFo?.exceeds95);
+  const floorBuried = !!flTot && flTot.actual <= flTot.p95;
   useEffect(() => {
     if (specsTouched) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -643,6 +705,77 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
           )}
         </div>
 
+        {/* 多重性の床（ヌル較正）: 最適プランの見かけリターンを、曜日構造ゼロでも出る「偽発見の床」と即時照合 */}
+        <div
+          className={`mb-2 rounded border p-2.5 text-[11px] ${
+            !floorOk
+              ? "bg-gray-50 border-gray-200"
+              : floorStructFound
+                ? "bg-green-50 border-green-200"
+                : "bg-amber-50 border-amber-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="font-semibold text-gray-700">
+              多重性の床（ヌル較正・★算出期間の in-sample）
+            </span>
+            <button
+              type="button"
+              onClick={() => openAnalysisPanel("cal-null-calib")}
+              className="px-2 py-0.5 rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 whitespace-nowrap"
+              title="このセクション下部の「ヌル較正」パネルを開いて、床の分布・F検定・評価方式の比較を詳しく見る"
+            >
+              詳しく（ヌル較正パネルへ）↓
+            </button>
+          </div>
+
+          {floorLoading && !floorOk && <div className="mt-1 text-gray-400">床を計算中…</div>}
+          {!floorLoading && !floorOk && (
+            <div className="mt-1 text-gray-500">
+              算出期間が短く床を測れません（12週以上必要）。窓長を広げてください。
+            </div>
+          )}
+
+          {floorOk && flTot && flFi && flFo && (
+            <>
+              <div className="mt-1 leading-relaxed text-gray-700">
+                この窓で最適化した週内プランの累積リターン{" "}
+                <b className="font-mono">{formatMetric("totalReturn", flTot.actual)}</b> は、曜日構造が
+                完全にゼロでも 中央値{" "}
+                <b className="font-mono">{formatMetric("totalReturn", flTot.p50)}</b>・95%点{" "}
+                <b className="font-mono">{formatMetric("totalReturn", flTot.p95)}</b>{" "}
+                まで出る「偽発見の床」に対して{" "}
+                <b className="font-mono">{(flTot.pctile * 100).toFixed(0)}</b>パーセンタイル
+                <b className={floorBuried ? "text-red-700" : "text-green-700"}>
+                  {floorBuried ? "＝床の内側（偶然域）" : "＝床を突破"}
+                </b>
+                。
+              </div>
+              <div className="mt-1.5 flex items-center gap-x-2 gap-y-1 flex-wrap">
+                <span
+                  className={`px-1.5 py-0.5 rounded font-semibold text-white ${
+                    floorStructFound ? "bg-green-600" : "bg-amber-500"
+                  }`}
+                >
+                  {floorStructFound ? "曜日構造あり（F がヌル95%点を棄却）" : "曜日構造の証拠なし"}
+                </span>
+                <span className="text-gray-500">
+                  F日中 <span className="font-mono">{flFi.actual.toFixed(2)}</span>（p=
+                  {flFi.pValue.toFixed(3)}） / F夜間{" "}
+                  <span className="font-mono">{flFo.actual.toFixed(2)}</span>（p=
+                  {flFo.pValue.toFixed(3)}）
+                </span>
+              </div>
+              <div className="mt-1 text-[10px] text-gray-500 leading-relaxed">
+                <b>判定は F（曜日構造の検定）で行う。</b>総リターンが床を超えていても、それは
+                <b>床の高さ</b>を測っているだけで曜日効果の証拠ではありません（in-sample
+                最適化は真のエッジがゼロでも床を持ち上げる）。評価方法を<b>逐次WF</b>に切り替えると、
+                この床はほぼ消えます。
+              </div>
+            </>
+          )}
+        </div>
+
         {/* ロング戦略ランキング（リターン/Sharpe順） */}
         <div className="mb-2 border border-gray-100 rounded bg-white/70 p-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -838,6 +971,12 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                 {gapFill === "cash"
                   ? "「現金」: レグ外は市場から退出。滞在率が低いほどB&Hに累積で勝ちにくい。"
                   : "「ロング保有」: レグ外は常時ロング(B&Hを土台にレグで上書き)。滞在率≈100%でB&Hと公平に比較できる。"}
+                {!specsTouched && (
+                  <span className="text-amber-700">
+                    {" "}※この総リターンは in-sample 最適化の産物。上の
+                    <b>「多重性の床」</b>で偶然域か否かを必ず確認すること（判定は F で）。
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -910,7 +1049,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
           </ul>
 
           <p><span className="font-medium">指標:</span> 年率(複利は (1+総)^(252/N日)−1)/Sharpe(日次リターンの平均÷標準偏差×√252)/最大DD(資産曲線のピークからの最大下落)。</p>
-          <p><span className="font-medium">注意:</span> コストは片道bpsの線形近似で税・スリッページの非線形性や約定不成立は未考慮。滞在率は区間数ベースで日中/オーバーナイトの時間差は等価扱い(近似)。過去アノマリーは発見後に消えやすく、多数の組合せを試すと偶然有意に見える<span className="font-medium">多重比較</span>に注意。</p>
+          <p><span className="font-medium">注意:</span> コストは片道bpsの線形近似で税・スリッページの非線形性や約定不成立は未考慮。滞在率は区間数ベースで日中/オーバーナイトの時間差は等価扱い(近似)。過去アノマリーは発見後に消えやすく、多数の組合せを試すと偶然有意に見える<span className="font-medium">多重比較</span>に注意 — この見かけの成績が「偶然だけで出る床」を超えているかは、上部の<button type="button" onClick={() => openAnalysisPanel("cal-null-calib")} className="font-medium text-blue-600 hover:underline">多重性の床（ヌル較正）</button>で必ず確認する。</p>
         </AnalysisGuide>
       </div>
     </div>

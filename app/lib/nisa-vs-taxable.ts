@@ -29,6 +29,17 @@ import {
   buildPositionVector,
   type Segment,
 } from "./weekday-trade";
+import {
+  DEFAULT_MARGIN_RATE_LONG as RM_MARGIN_LONG,
+  DEFAULT_SHORT_FEE_RATE as RM_SHORT_FEE,
+  DEFAULT_MAINTENANCE as RM_MAINTENANCE,
+  MAX_LEVERAGE as RM_MAX_LEVERAGE,
+  adminFeeMonthlyRate as rmAdminFeeMonthlyRate,
+  transferFeeAnnualRate as rmTransferFeeAnnualRate,
+  DAYS_PER_MONTH,
+  DEFAULT_LOT_SIZE,
+  DEFAULT_RECORD_DATES_PER_YEAR,
+} from "./rakuten-margin";
 
 export const TAX_RATE = 0.20315; // 所得税15% + 復興特別2.1%相当 + 住民税5% = 20.315%
 export const GROWTH_QUOTA = 2_400_000; // NISA成長投資枠(年) 円
@@ -36,10 +47,11 @@ export const TSUMITATE_QUOTA = 1_200_000; // つみたて投資枠(年) 円
 export const ANNUAL_QUOTA = GROWTH_QUOTA + TSUMITATE_QUOTA; // 年間上限 360万円
 
 // 信用取引の既定パラメータ。NISAは信用不可なので、レバレッジ戦略は必ず課税口座になる。
-export const DEFAULT_MARGIN_RATE_LONG = 0.026; // 制度信用 買い方金利(年率, 目安2.6%)
-export const DEFAULT_SHORT_FEE_RATE = 0.0115; // 貸株料(年率, 目安1.15%)。逆日歩は変動なので別途注記。
-export const DEFAULT_MAINTENANCE = 0.20; // 委託保証金維持率(これを割ると追証)
-export const MAX_LEVERAGE = 3.3; // 委託保証金率30%の逆数 ≒ 現実的なレバ上限
+// 実際のコストは楽天証券・制度信用（通常）を単一ソース rakuten-margin.ts から取り込む。
+export const DEFAULT_MARGIN_RATE_LONG = RM_MARGIN_LONG; // 制度信用 買方金利(年率 2.80%)
+export const DEFAULT_SHORT_FEE_RATE = RM_SHORT_FEE; // 貸株料(年率 1.10%)。逆日歩は変動なので別途注記。
+export const DEFAULT_MAINTENANCE = RM_MAINTENANCE; // 委託保証金維持率(これを割ると追証)
+export const MAX_LEVERAGE = RM_MAX_LEVERAGE; // 委託保証金率30%の逆数 ≒ 現実的なレバ上限
 
 export type TaxModel = "yearEnd" | "withholding"; // A / B
 
@@ -59,6 +71,9 @@ export interface SimResult {
   carryCost: number; // 信用金利・貸株料で失った富(合計)
   carryLong: number; // うち買い方金利
   carryShort: number; // うち貸株料(売り建て)
+  adminFee: number; // 事務管理費で失った富(建玉1か月経過ごと・両建て課金)
+  transferFee: number; // 名義書換料で失った富(買建て・権利確定日跨ぎの期待値)
+  miscCost: number; // 諸経費合計(adminFee + transferFee)
   exposure: number; // 市場滞在率(0..1, セグメント比)
   nRoundTrips: number; // 実現(手仕舞い)回数
   volAnnual: number; // 税引前日次リターンの年率ボラ
@@ -77,11 +92,14 @@ interface SimOptions {
   marginRateLong: number; // 買い方金利(年率)
   shortFeeRate: number; // 貸株料(年率)
   maintenanceMargin: number; // 委託保証金維持率(割れで追証)
+  adminFeeMonthlyRate: number; // 事務管理費(建玉notional比・1か月あたり)。0で無効
+  transferFeeAnnualRate: number; // 名義書換料(買建notional比・年率期待値)。0で無効
 }
 
 const EMPTY_SIM: SimResult = {
   path: [], preTaxReturn: 0, afterTaxReturn: 0, grossReturn: 0, taxPaid: 0,
-  cost: 0, carryCost: 0, carryLong: 0, carryShort: 0, exposure: 0, nRoundTrips: 0,
+  cost: 0, carryCost: 0, carryLong: 0, carryShort: 0, adminFee: 0, transferFee: 0,
+  miscCost: 0, exposure: 0, nRoundTrips: 0,
   volAnnual: 0, maxDD: 0, sharpe: 0, marginCall: false, ruin: false,
 };
 
@@ -99,6 +117,8 @@ function walk(segs: Segment[], pos: number[], opts: SimOptions): SimResult {
   const rLong = opts.marginRateLong;
   const rShort = opts.shortFeeRate;
   const maint = opts.maintenanceMargin;
+  const adminRate = opts.adminFeeMonthlyRate; // 事務管理費(1か月あたり notional比)
+  const transferRate = opts.transferFeeAnnualRate; // 名義書換料(年率 notional比, 買建のみ)
 
   let acct = 1; // 口座純資産(1始まり)。摩擦・税・キャリーをすべて反映
   let acctEntry = 0; // 現トリップ開始時の口座価値(コスト控除前)
@@ -107,7 +127,8 @@ function walk(segs: Segment[], pos: number[], opts: SimOptions): SimResult {
   let ytdRealized = 0;
   let taxWithheld = 0;
   let grossMul = 1; // レバ後の純市場グロス(摩擦なし)
-  let tradeCost = 0, carryLong = 0, carryShort = 0;
+  let tradeCost = 0, carryLong = 0, carryShort = 0, adminFee = 0, transferFee = 0;
+  let tripDays = 0, adminMonths = 0; // 現トリップの継続暦日と課金済み事務管理費の月数
   let prevPos = 0, inMarketSeg = 0, nRoundTrips = 0;
   let marginCall = false, ruin = false;
 
@@ -134,7 +155,7 @@ function walk(segs: Segment[], pos: number[], opts: SimOptions): SimResult {
           acct -= delta; taxWithheld += delta;
         }
       }
-      if (p !== 0) { acctEntry = acct; sideSign = p; undMul = 1; }
+      if (p !== 0) { acctEntry = acct; sideSign = p; undMul = 1; tripDays = 0; adminMonths = 0; }
       else sideSign = 0;
       prevPos = p;
     }
@@ -150,6 +171,20 @@ function walk(segs: Segment[], pos: number[], opts: SimOptions): SimResult {
           const cc = acct * carryRate * (days / 365);
           acct -= cc;
           if (p > 0) carryLong += cc; else carryShort += cc;
+        }
+        // 名義書換料(買建のみ・年率期待値の日割り)。権利確定日跨ぎを期待値で近似。
+        if (p > 0 && transferRate > 0) {
+          const tf = acct * lev * transferRate * (days / 365);
+          acct -= tf; transferFee += tf;
+        }
+        // 事務管理費(両建て)。建玉継続が満1か月を跨ぐごとに1株11銭相当を課金。
+        // 週内で手仕舞う短期戦略は満1か月に届かず課金0になる(実際の課金ルールに忠実)。
+        if (adminRate > 0) {
+          tripDays += days;
+          while (tripDays >= (adminMonths + 1) * DAYS_PER_MONTH) {
+            const af = acct * lev * adminRate;
+            acct -= af; adminFee += af; adminMonths++;
+          }
         }
       }
       inMarketSeg++;
@@ -206,6 +241,9 @@ function walk(segs: Segment[], pos: number[], opts: SimOptions): SimResult {
     carryCost: carryLong + carryShort,
     carryLong,
     carryShort,
+    adminFee,
+    transferFee,
+    miscCost: adminFee + transferFee,
     exposure: nSeg ? inMarketSeg / nSeg : 0,
     nRoundTrips,
     volAnnual: sd * Math.sqrt(252),
@@ -233,18 +271,37 @@ export interface ComparisonInput {
   marginRateLong?: number;
   shortFeeRate?: number;
   maintenanceMargin?: number;
+  // 諸経費(事務管理費・名義書換料)。楽天証券の実額を建玉notional比に換算して計上。
+  includeAdminFee?: boolean; // 事務管理費を計上(既定 true)
+  includeTransferFee?: boolean; // 名義書換料を計上(既定 true)
+  refPrice?: number; // 諸経費換算の基準株価(円)。未指定なら prices の終値平均
+  lotSize?: number; // 売買単位(名義書換料の1単位株数, 既定100)
+  recordDatesPerYear?: number; // 権利確定日/年(名義書換料の跨ぎ回数期待値, 既定2)
 }
 
-// 現物ロング(NISA/現物BH)用: レバ1・キャリー0。
+// 諸経費換算の基準株価: prices の終値平均(0除算・欠損に頑健)。
+function meanClose(prices: PricePoint[]): number {
+  let sum = 0, n = 0;
+  for (const p of prices) { if (p.close > 0) { sum += p.close; n++; } }
+  return n > 0 ? sum / n : 0;
+}
+
+// 現物ロング(NISA/現物BH)用: レバ1・キャリー0・諸経費0(信用取引ではないため)。
 function cashOpts(taxModel: TaxModel, taxRate: number, applyTax: boolean): SimOptions {
   return {
     taxModel, taxRate, costBps: 0, applyTax, leverage: 1,
     marginRateLong: 0, shortFeeRate: 0, maintenanceMargin: DEFAULT_MAINTENANCE,
+    adminFeeMonthlyRate: 0, transferFeeAnnualRate: 0,
   };
 }
 
-// 戦略(信用可)用のオプションを input から解決。
+// 戦略(信用可)用のオプションを input から解決。諸経費は基準株価から notional 比へ換算。
 function stratOpts(input: ComparisonInput, leverageOverride?: number): SimOptions {
+  const refPrice = input.refPrice ?? meanClose(input.prices);
+  const lotSize = input.lotSize ?? DEFAULT_LOT_SIZE;
+  const recordDates = input.recordDatesPerYear ?? DEFAULT_RECORD_DATES_PER_YEAR;
+  const admin = (input.includeAdminFee ?? true) ? rmAdminFeeMonthlyRate(refPrice) : 0;
+  const transfer = (input.includeTransferFee ?? true) ? rmTransferFeeAnnualRate(refPrice, lotSize, recordDates) : 0;
   return {
     taxModel: input.taxModel,
     taxRate: input.taxRate,
@@ -254,6 +311,8 @@ function stratOpts(input: ComparisonInput, leverageOverride?: number): SimOption
     marginRateLong: input.marginRateLong ?? DEFAULT_MARGIN_RATE_LONG,
     shortFeeRate: input.shortFeeRate ?? DEFAULT_SHORT_FEE_RATE,
     maintenanceMargin: input.maintenanceMargin ?? DEFAULT_MAINTENANCE,
+    adminFeeMonthlyRate: admin,
+    transferFeeAnnualRate: transfer,
   };
 }
 
@@ -406,6 +465,7 @@ export interface LeveragePoint {
   marginCallProb: number; // 追証が発生した窓の割合
   ruinProb: number; // 破産(証拠金枯渇)した窓の割合
   carryCost: number; // 平均キャリーコスト(富比)
+  miscCost: number; // 平均諸経費(事務管理費+名義書換料, 富比)
 }
 
 export interface LeverageSweep {
@@ -441,11 +501,12 @@ export function leverageSweep(
 
   const points: LeveragePoint[] = levs.map((lev) => {
     const sOpts = stratOpts(input, lev);
-    const rets: number[] = [], dds: number[] = [], vols: number[] = [], carries: number[] = [];
+    const rets: number[] = [], dds: number[] = [], vols: number[] = [], carries: number[] = [], miscs: number[] = [];
     let mc = 0, ru = 0;
     for (const w of stratWindows) {
       const res = walk(w.segs, w.pos, sOpts);
-      rets.push(res.afterTaxReturn); dds.push(res.maxDD); vols.push(res.volAnnual); carries.push(res.carryCost);
+      rets.push(res.afterTaxReturn); dds.push(res.maxDD); vols.push(res.volAnnual);
+      carries.push(res.carryCost); miscs.push(res.miscCost);
       if (res.marginCall) mc++;
       if (res.ruin) ru++;
     }
@@ -457,6 +518,7 @@ export function leverageSweep(
       marginCallProb: mc / nW,
       ruinProb: ru / nW,
       carryCost: mean(carries),
+      miscCost: mean(miscs),
     };
   });
 
