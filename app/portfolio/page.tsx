@@ -520,10 +520,11 @@ export default function PortfolioPage() {
               subtitle: "月曜Open建玉→h日目引けで降りる戦略を銘柄×週でプール（クラスタ頑健・銘柄別異質性）",
               node: <ExitCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
-            if (tickers.length >= 4) items.push({
+            // ユニバース(大型30/主要60/貼り付け)を自前取得できるため、ウォッチリスト数に依存せず常設。
+            items.push({
               id: "pf-cross-sectional-edge",
               title: "クロスセクション・ロングショート（小エッジの棲息域）",
-              subtitle: "全銘柄を横断ランク→上位ロング/下位ショートの市場中立ブック。IC・実効ブレッドス・基本法則IR・point-in-time在籍",
+              subtitle: "ウォッチリスト or 大型30/主要60を横断ランク→上位ロング/下位ショートの市場中立ブック。IC・実効ブレッドス・基本法則IR・point-in-time在籍",
               node: <CrossSectionalEdgeChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             return items.length > 0 ? (
