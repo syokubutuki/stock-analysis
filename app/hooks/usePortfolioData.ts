@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PricePoint, StockData } from "../lib/types";
+import { getCached, putCached, DEFAULT_TTL_MS } from "../lib/price-cache";
 
 export interface FetchedStock {
   prices: PricePoint[];
@@ -17,8 +18,17 @@ const CONCURRENCY = 4;
 const memCache = new Map<string, FetchedStock>();
 
 async function fetchOne(ticker: string): Promise<FetchedStock> {
+  // L1: セッション内メモリ
   const cached = memCache.get(ticker);
   if (cached) return cached;
+  // L2: IndexedDB(ページ再読込を跨ぐ永続キャッシュ・TTL内なら Yahoo を叩かない)
+  const idb = await getCached(ticker, DEFAULT_TTL_MS);
+  if (idb) {
+    const result: FetchedStock = { prices: idb.prices, name: idb.name };
+    memCache.set(ticker, result);
+    return result;
+  }
+  // L3: Yahoo 実取得
   try {
     const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`);
     const json = (await res.json()) as StockData & { error?: string };
@@ -27,6 +37,7 @@ async function fetchOne(ticker: string): Promise<FetchedStock> {
     }
     const result: FetchedStock = { prices: json.prices ?? [], name: json.name ?? ticker };
     memCache.set(ticker, result);
+    if (result.prices.length > 0) void putCached(ticker, result.name, result.prices);
     return result;
   } catch {
     return { prices: [], name: ticker, error: "通信エラー" };
