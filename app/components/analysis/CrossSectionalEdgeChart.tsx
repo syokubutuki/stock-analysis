@@ -16,6 +16,7 @@ import {
 } from "../../lib/cross-sectional-edge";
 import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
+import { clearCache, cacheStats, type CacheStats } from "../../lib/price-cache";
 import { MARGIN_KIND_ORDER, MARGIN_KIND_LABEL, resolveMarginRate, type MarginKind } from "../../lib/rakuten-margin";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -56,7 +57,13 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
   const [pasteTickers, setPasteTickers] = useState<string[]>([]);
   const [fetched, setFetched] = useState<{ prices: Record<string, PricePoint[]>; names: Record<string, string> }>({ prices: {}, names: {} });
   const [fetching, setFetching] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [progress, setProgress] = useState({ done: 0, total: 0, fromCache: 0 });
+  // キャッシュ制御: 更新(強制再取得) / 削除 / 状況表示
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const forceRef = useRef(false);
+  const [cache, setCache] = useState<CacheStats | null>(null);
+  const refreshCacheStats = () => { cacheStats().then(setCache).catch(() => {}); };
+  useEffect(() => { refreshCacheStats(); }, []);
 
   // 選択ユニバースのティッカー列
   const uniTickers = useMemo<string[]>(() => {
@@ -65,14 +72,20 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
     return getUniverse(uniMode)?.tickers.map((t) => t.ticker) ?? [];
   }, [uniMode, tickers, pasteTickers]);
 
-  // 非ウォッチリスト時は自前で取得
+  // 非ウォッチリスト時は自前で取得(3層キャッシュ: メモリ→IndexedDB→Yahoo)
   useEffect(() => {
     if (uniMode === "watchlist") return;
     if (uniTickers.length === 0) { setFetched({ prices: {}, names: {} }); return; }
     const ctrl = new AbortController();
+    const force = forceRef.current; // 「更新」ボタン押下時のみ true
+    forceRef.current = false;
     setFetching(true);
-    setProgress({ done: 0, total: uniTickers.length });
-    fetchUniverse(uniTickers, (done, total) => setProgress({ done, total }), ctrl.signal)
+    setProgress({ done: 0, total: uniTickers.length, fromCache: 0 });
+    fetchUniverse(uniTickers, {
+      onProgress: (done, total, fromCache) => setProgress({ done, total, fromCache }),
+      signal: ctrl.signal,
+      forceRefresh: force,
+    })
       .then((res) => {
         if (ctrl.signal.aborted) return;
         const prices: Record<string, PricePoint[]> = {};
@@ -84,9 +97,9 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         if (preset) for (const t of preset.tickers) if (!nm[t.ticker]) nm[t.ticker] = t.name;
         setFetched({ prices, names: nm });
       })
-      .finally(() => { if (!ctrl.signal.aborted) setFetching(false); });
+      .finally(() => { if (!ctrl.signal.aborted) { setFetching(false); refreshCacheStats(); } });
     return () => ctrl.abort();
-  }, [uniMode, uniTickers]);
+  }, [uniMode, uniTickers, refreshNonce]);
 
   const activePrices = uniMode === "watchlist" ? pricesByTicker : fetched.prices;
   const activeNames = uniMode === "watchlist" ? (names ?? {}) : fetched.names;
@@ -151,8 +164,36 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         <button onClick={() => setUniMode("paste")} className={`px-2 py-0.5 rounded border ${uniMode === "paste" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}>
           貼り付け
         </button>
-        {fetching && <span className="text-blue-600">取得中… {progress.done}/{progress.total}</span>}
-        {!fetching && uniMode !== "watchlist" && <span className="text-gray-400">{activeCount}銘柄 読込済</span>}
+        {fetching && <span className="text-blue-600">取得中… {progress.done}/{progress.total}{progress.fromCache > 0 ? `（キャッシュ${progress.fromCache}）` : ""}</span>}
+        {!fetching && uniMode !== "watchlist" && (
+          <>
+            <span className="text-gray-400">{activeCount}銘柄 読込済</span>
+            <button
+              onClick={() => { forceRef.current = true; setRefreshNonce((n) => n + 1); }}
+              className="px-2 py-0.5 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+              title="キャッシュを無視して Yahoo から最新を取り直す"
+            >
+              ↻ 更新
+            </button>
+          </>
+        )}
+      </div>
+      {/* キャッシュ状況 */}
+      <div className="flex items-center gap-2 text-[10px] text-gray-400">
+        <span>
+          価格キャッシュ(IndexedDB): {cache ? `${cache.count}銘柄` : "—"}
+          {cache && cache.newestAt ? `・最終取得 ${new Date(cache.newestAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
+          <span className="text-gray-300">（8時間TTL・再読込ではYahoo再取得なし）</span>
+        </span>
+        {cache && cache.count > 0 && (
+          <button
+            onClick={() => { clearCache().then(() => { refreshCacheStats(); forceRef.current = true; setRefreshNonce((n) => n + 1); }); }}
+            className="underline hover:text-gray-600"
+            title="保存済みの価格キャッシュを全消去して取り直す"
+          >
+            削除
+          </button>
+        )}
       </div>
       {uniMode === "paste" && (
         <div className="flex flex-wrap items-center gap-2">
