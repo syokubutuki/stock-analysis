@@ -792,6 +792,10 @@ const WeeklyAnalogOosChart = dynamic(
   () => import("./components/analysis/WeeklyAnalogOosChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const WeekEmbeddingChart = dynamic(
+  () => import("./components/analysis/WeekEmbeddingChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const TpSlOptimizerChart = dynamic(
   () => import("./components/analysis/TpSlOptimizerChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1871,6 +1875,7 @@ export default function AnalysisPage() {
                       { id: "cal-today-bin", title: "今日の値動き → リターンビン即時判断（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
                       { id: "cal-weekly-analog", title: "今週の軌跡アナログ比較（似た形／前夜米国ビンで絞って先読み）", node: <WeeklyAnalogChart prices={allPrices} ticker={data.ticker} /> },
                       { id: "cal-weekly-analog-oos", title: "今週の軌跡アナログ 予測力OOS検証（IC・方向的中率・多重比較補正）", node: <WeeklyAnalogOosChart prices={allPrices} /> },
+                      { id: "cal-week-embed", title: "週内Embedding（週の関数PCA・固有週アトラス／形→翌週リターンの予測力を大域検定）", node: <WeekEmbeddingChart prices={allPrices} /> },
                       { id: "cal-weekday-cond", title: "曜日 × 値動きビン 条件付き分析（インタラクティブ）", node: <WeekdayConditionalChart prices={filteredPrices} /> },
                       { id: "cal-monday-gap", title: "月曜ギャップ解剖（週初めの「下げて始まる」を層別）", node: <MondayGapChart prices={allPrices} /> },
                     ],
