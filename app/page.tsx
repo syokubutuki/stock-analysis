@@ -1187,14 +1187,14 @@ export default function AnalysisPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto flex items-start justify-between gap-4">
-          <div>
+        <div className="max-w-7xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold text-gray-900">株価構造分析</h1>
             <p className="text-sm text-gray-500 mt-1">
               市場の隠れた構造をデータから抽出する
             </p>
           </div>
-          <div className="shrink-0 flex items-center gap-2">
+          <div className="shrink-0 flex items-center flex-wrap gap-2">
             <Link
               href="/axioms"
               className="text-sm text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50"
