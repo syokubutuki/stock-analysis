@@ -24,6 +24,7 @@ import {
   TargetEval,
   HELD_BADGE_META,
   TARGET_BADGE_META,
+  emptyDigest,
 } from "../lib/signal-digest";
 import {
   PortfolioSnapshot,
@@ -117,6 +118,7 @@ interface Row {
   diff: DiffResult;
   urgent: boolean; // 要対応(損切り警告 / エントリー好機 / 変化あり)
   sparkCloses: number[]; // 直近終値(ミニチャート用)
+  note?: string; // 取得失敗など、判定理由の代わりに出す注記
 }
 
 const COLOR_CLASS: Record<string, string> = {
@@ -241,8 +243,28 @@ export default function PortfolioPage() {
     const out: Row[] = [];
     for (const item of watchlist) {
       const digest = digests[item.ticker];
-      if (!digest) continue; // まだ Worker から届いていない
       const kind = effectiveKind(item);
+      if (!digest) {
+        // digest 未着。取得が完了(=data にエントリあり)していて価格ゼロ/エラーなら
+        // 「取得失敗」として必ず行を出す(お気に入りとポートフォリオの銘柄を常に揃える)。
+        // それ以外(未取得/計算中)は一時状態なので出さない。
+        const fetched = data[item.ticker];
+        if (fetched && (fetched.error || fetched.prices.length === 0)) {
+          out.push({
+            item,
+            kind,
+            digest: emptyDigest(item.ticker, item.name || item.ticker, []),
+            badge: "取得失敗",
+            badgeColor: "red",
+            priority: 8,
+            diff: { changed: false, reasons: [], isNew: false },
+            urgent: false,
+            sparkCloses: [],
+            note: `データを取得できません（${fetched.error || "履歴なし"}）。コード誤り/上場廃止の可能性。上部の「再取得」か、この行の「×」で削除を。`,
+          });
+        }
+        continue;
+      }
       const sparkCloses = (data[item.ticker]?.prices ?? [])
         .slice(-40)
         .map((p) => p.close);
@@ -632,7 +654,7 @@ function ListRow({
   const dist = row.target?.distanceToEntryPct ?? null;
   const stats = d.ok ? signalStats(d) : [];
   const reason =
-    (row.held?.reasons ?? row.target?.reasons ?? []).join(" / ") || "—";
+    row.note ?? ((row.held?.reasons ?? row.target?.reasons ?? []).join(" / ") || "—");
 
   return (
     <div className={`border-l-4 ${BORDER_CLASS[row.badgeColor] ?? "border-l-gray-300"} hover:bg-blue-50/30`}>

@@ -108,7 +108,7 @@ function logReturns(closes: number[]): number[] {
   return r;
 }
 
-function emptyDigest(ticker: string, name: string, prices: PricePoint[]): SignalDigest {
+export function emptyDigest(ticker: string, name: string, prices: PricePoint[]): SignalDigest {
   const last = prices[prices.length - 1];
   return {
     ticker,
