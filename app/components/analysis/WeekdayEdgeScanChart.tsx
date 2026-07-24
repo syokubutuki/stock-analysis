@@ -66,6 +66,12 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(30);   // 再生速度(本/秒)
   const [loop, setLoop] = useState(true);   // 最新に到達したら先頭へ戻す
+  // 週内クロックの縦(リターン)軸スケール。
+  //  - "off":      現状の自動伸縮(窓の中身に合わせる)。
+  //  - "envelope": この窓長で取りうる全ローリング位置の累積振幅を包む固定スケール(0対称)。
+  //  - "manual":   手動 ±yManual%。
+  const [yFix, setYFix] = useState<"off" | "envelope" | "manual">("off");
+  const [yManual, setYManual] = useState(0.5); // 手動固定時の片側レンジ(%)
   const winEndRef = useRef(winEnd);
   useEffect(() => { winEndRef.current = winEnd; }, [winEnd]);
   // 銘柄・期間の切替でデータ長が変わったら全期間・最新起点に戻す。
@@ -75,6 +81,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     setWinLen(prices.length);
     setWinEnd(prices.length);
     setPlaying(false);
+    setYFix("off");
   }, [prices.length]);
 
   const effEnd = winEnd > 0 ? Math.min(winEnd, prices.length) : prices.length;
@@ -165,6 +172,30 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     return { totalDays, minN: Math.min(...counts), maxN: Math.max(...counts) };
   }, [windowAnalysis]);
 
+  // 縦軸「固定(全位置)」用のエンベロープ: 現在の窓長 effWinLen を保ったまま
+  // 全ローリング位置をスライドし、累積パス |C(j)| の最大値を求める(0対称の片側レンジ)。
+  // これに合わせて軸を固定すれば、窓の位置を動かしてもどの位置でもクリップせず、
+  // 局面ごとの振幅の大小を目盛で直接比較できる。位置数は最大~200点に間引いて軽量化。
+  const yEnvelope = useMemo(() => {
+    const L = effWinLen;
+    if (L < 60 || L >= prices.length) {
+      // 単一窓(全期間など): 全期間の累積振幅をそのまま採用。
+      // atomAnalysis は prices のみ依存で安定 → 再生(winEnd変化)中に再計算されない。
+      return Math.max(...atomAnalysis.cumulative.map((v) => Math.abs(v)), 0.0001);
+    }
+    const step = Math.max(1, Math.floor((prices.length - L) / 200));
+    let maxAbs = 0.0001;
+    for (let end = L; end <= prices.length; end += step) {
+      const a = analyzeAtoms(prices.slice(end - L, end));
+      for (const v of a.cumulative) { const av = Math.abs(v); if (av > maxAbs) maxAbs = av; }
+    }
+    return maxAbs;
+  }, [prices, effWinLen, atomAnalysis]);
+
+  // drawClock に渡す固定レンジ(片側)。null=自動伸縮。
+  const clockFixedRange =
+    yFix === "off" ? null : yFix === "manual" ? Math.max(0.0001, yManual / 100) : yEnvelope;
+
   // === エッジ・スペクトル(10素片の平均±SEと有意性) ===
   const drawSpectrum = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[]) => {
     const r = initCanvas(canvas, 220); if (!r) return;
@@ -229,13 +260,15 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   }, []);
 
   // === 週内クロック(累積平均リターン曲線) ===
-  const drawClock = useCallback((canvas: HTMLCanvasElement, cum: number[], atoms: AtomStat[], best: { from: number; to: number } | null) => {
+  const drawClock = useCallback((canvas: HTMLCanvasElement, cum: number[], atoms: AtomStat[], best: { from: number; to: number } | null, fixedRange: number | null) => {
     const r = initCanvas(canvas, 200); if (!r) return;
     const { ctx, width, height } = r;
     const pad = { top: 16, bottom: 34, left: 52, right: 12 };
     const plotW = width - pad.left - pad.right;
     const plotH = height - pad.top - pad.bottom;
-    const lo = Math.min(...cum), hi = Math.max(...cum);
+    // fixedRange 指定時は 0 対称の固定スケール。未指定なら窓の中身に合わせて自動伸縮。
+    const lo = fixedRange != null ? -fixedRange : Math.min(...cum);
+    const hi = fixedRange != null ? fixedRange : Math.max(...cum);
     const range = hi - lo || 0.001;
     const toY = (v: number) => pad.top + plotH * (1 - (v - lo) / range);
     const toX = (i: number) => pad.left + (plotW * i) / (cum.length - 1);
@@ -259,6 +292,10 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
       ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
     }
 
+    // 累積線・マーカーはプロット領域にクリップ(手動固定でレンジが小さいと曲線が枠外へ出るため)
+    ctx.save();
+    ctx.beginPath(); ctx.rect(pad.left, pad.top, plotW, plotH); ctx.clip();
+
     // 累積線
     ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 2;
     ctx.beginPath();
@@ -276,6 +313,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     };
     mark(minI, "#16a34a", "谷=買");
     mark(maxI, "#dc2626", "山=売");
+    ctx.restore();
 
     // x軸ラベル(素片境界)
     ctx.fillStyle = "#666"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
@@ -328,9 +366,9 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
   useEffect(() => {
     if (spectrumRef.current) drawSpectrum(spectrumRef.current, windowAnalysis.atoms);
-    if (clockRef.current) drawClock(clockRef.current, windowAnalysis.cumulative, windowAnalysis.atoms, windowAnalysis.bestLong);
+    if (clockRef.current) drawClock(clockRef.current, windowAnalysis.cumulative, windowAnalysis.atoms, windowAnalysis.bestLong, clockFixedRange);
     if (atomYearRef.current) drawAtomYear(atomYearRef.current, atomAnalysis.atoms, atomAnalysis.yearly);
-  }, [atomAnalysis, windowAnalysis, drawSpectrum, drawClock, drawAtomYear]);
+  }, [atomAnalysis, windowAnalysis, clockFixedRange, drawSpectrum, drawClock, drawAtomYear]);
 
   if (prices.length < 60) {
     return <div className="text-xs text-gray-400 p-3">データが不足しています(60営業日以上必要)。</div>;
@@ -484,6 +522,41 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           <span className="text-gray-400">
             {" "}｜対象 {clockSample.totalDays.toLocaleString()} 営業日（各曜日 n={clockSample.minN}〜{clockSample.maxN} 週）から算出
           </span>
+        </div>
+        {/* 縦(リターン)軸スケール */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] mb-1">
+          <span className="text-gray-500 font-medium">縦軸</span>
+          <div className="inline-flex rounded overflow-hidden border border-gray-200">
+            {([["off", "自動"], ["envelope", "固定(全位置)"], ["manual", "固定(手動)"]] as [typeof yFix, string][]).map(([m, lbl]) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setYFix(m)}
+                className={`px-2 py-0.5 ${yFix === m ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+              >{lbl}</button>
+            ))}
+          </div>
+          {yFix === "manual" && (
+            <label className="flex items-center gap-1 text-gray-500">
+              ±
+              <input
+                type="number"
+                min={0.05}
+                step={0.05}
+                value={yManual}
+                onChange={(e) => setYManual(Math.max(0.01, Number(e.target.value) || 0.01))}
+                className="w-16 border rounded px-1 py-0.5 text-right"
+                aria-label="縦軸の片側レンジ(%)"
+              />
+              %
+            </label>
+          )}
+          {yFix === "envelope" && (
+            <span className="text-gray-400">±{(yEnvelope * 100).toFixed(3)}%（この窓長の全ローリング位置を包む）</span>
+          )}
+          {yFix !== "off" && (
+            <span className="text-gray-400">窓の位置・窓長を動かしても目盛が固定されるので、局面ごとの振幅の大小をそのまま比較できます。</span>
+          )}
         </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={clockRef} /></div>
         <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
