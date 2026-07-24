@@ -94,6 +94,10 @@ const ParticipationPremiumChart = dynamic(
   () => import("../components/analysis/ParticipationPremiumChart"),
   { ssr: false }
 );
+const ParticipationCrossChart = dynamic(
+  () => import("../components/analysis/ParticipationCrossChart"),
+  { ssr: false }
+);
 const SelectionTiltChart = dynamic(
   () => import("../components/analysis/SelectionTiltChart"),
   { ssr: false }
@@ -477,6 +481,13 @@ export default function PortfolioPage() {
               title: "参加の価値：株式プレミアムという床（株式原論 C24）",
               subtitle: "何を保有するか＝まず市場に参加する価値を実測。実現プレミアム±SE・t値／参加のg・最大DD／エントリー時刻スイープ（タイミング無関係と床の不安定性）",
               node: <ParticipationPremiumChart />,
+            });
+            // 系C24 横断: 市場1本の床のあとに、全銘柄の床を並べてソート比較。
+            if (tickers.length >= 1) items.push({
+              id: "pf-participation-cross",
+              title: "床の銘柄横断比較：各銘柄の実現プレミアム（株式原論 C24）",
+              subtitle: "全銘柄に参加の価値を実測しソート比較。プレミアム±SE・t値・g・最大DD・床<0窓率／市場の床を基準線に重ね生存者バイアスに注意しつつ横断で床の不確かさを体感",
+              node: <ParticipationCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // 系C25: 床（C24）の一段先＝特性チルトで床を底上げできるかの前向き検証。
             items.push({
