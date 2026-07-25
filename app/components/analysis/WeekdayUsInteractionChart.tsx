@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createChart,
+  LineSeries,
+  LineStyle,
+  type IChartApi,
+  type Time,
+} from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import {
   Cell,
@@ -47,6 +54,9 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 const bp = (v: number) => `${v >= 0 ? "+" : ""}${(v * 10000).toFixed(1)}bp`;
 const num = (v: number, d = 2) => (isFinite(v) ? v.toFixed(d) : "—");
 const pStr = (p: number) => (p < 0.001 ? "<0.001" : p.toFixed(3));
+
+// 曜日ごとの色。⑥の3ペインと年別ヒートマップで共通に使う。
+const DOW_COLOR = ["#dc2626", "#ea580c", "#16a34a", "#2563eb", "#7c3aed"];
 
 // ---------------------------------------------------------------------------
 // A: 曜日別スピルオーバーβ（95%CI付き）と共通βの帯
@@ -283,6 +293,9 @@ function drawAsym(
 export default function WeekdayUsInteractionChart({ prices }: Props) {
   const betaRef = useRef<HTMLCanvasElement>(null);
   const asymRef = useRef<HTMLCanvasElement>(null);
+  const rollRef = useRef<HTMLDivElement>(null);
+  const qRef = useRef<HTMLDivElement>(null);
+  const brkRef = useRef<HTMLDivElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const reqIdRef = useRef(0);
 
@@ -290,6 +303,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
   const [nBins, setNBins] = useState(DEFAULT_WU_PARAMS.nBins);
   const [nIter, setNIter] = useState(DEFAULT_WU_PARAMS.nIter);
   const [costBps, setCostBps] = useState(DEFAULT_WU_PARAMS.costBps);
+  const [rollWeeks, setRollWeeks] = useState(DEFAULT_WU_PARAMS.rollWeeks);
   const [usTicker, setUsTicker] = useState("^GSPC");
   const [result, setResult] = useState<WuResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -298,8 +312,8 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
   const { prices: usPrices, loading: usLoading, error: usError } = useUsDaily(usTicker);
 
   const params: WuParams = useMemo(
-    () => ({ ...DEFAULT_WU_PARAMS, target, nBins, nIter, costBps }),
-    [target, nBins, nIter, costBps],
+    () => ({ ...DEFAULT_WU_PARAMS, target, nBins, nIter, costBps, rollWeeks }),
+    [target, nBins, nIter, costBps, rollWeeks],
   );
 
   useEffect(() => {
@@ -347,6 +361,139 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
     const init = initCanvas(c, 270);
     if (init) drawAsym(init.ctx, init.width, init.height, main, target === "over");
   }, [main, target]);
+
+  // ⑥ 時代依存：ローリングβ / ローリングQ / 構造変化 sup-Wald の3ペイン。
+  // 横軸が日付で、期間の細部を拡大して見る価値があるので lightweight-charts を使う。
+  // コンテナは result が出てから条件レンダリングされるため、依存に result を入れる。
+  const era = result?.ok ? result.era : null;
+  useEffect(() => {
+    if (!era || !rollRef.current || !qRef.current || !brkRef.current) return;
+    if (era.rolling.length < 5) return;
+
+    const mk = (el: HTMLDivElement, height: number) =>
+      createChart(el, {
+        layout: { background: { color: "#ffffff" }, textColor: "#333" },
+        grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f5f5f5" } },
+        width: el.clientWidth,
+        height,
+        crosshair: { mode: 0 },
+        rightPriceScale: { visible: true },
+        timeScale: { timeVisible: false },
+      });
+
+    const c1 = mk(rollRef.current, 230);
+    const c2 = mk(qRef.current, 130);
+    const c3 = mk(brkRef.current, 130);
+
+    // 同じ窓末日付が重複しないよう保険をかける（時刻は昇順かつ一意である必要がある）
+    const seen = new Set<string>();
+    const pts = era.rolling.filter((p) => {
+      if (seen.has(p.date)) return false;
+      seen.add(p.date);
+      return true;
+    });
+
+    for (let d = 0; d < 5; d++) {
+      const s = c1.addSeries(LineSeries, {
+        color: DOW_COLOR[d],
+        lineWidth: 2,
+        title: target === "over" ? `${WD[d + 1]}夜` : `${WD[d + 1]}曜`,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      s.setData(
+        pts
+          .filter((p) => isFinite(p.beta[d]))
+          .map((p) => ({ time: p.date as Time, value: p.beta[d] })),
+      );
+    }
+    const pooledS = c1.addSeries(LineSeries, {
+      color: "#9ca3af",
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+      title: "共通β",
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    pooledS.setData(
+      pts.filter((p) => isFinite(p.pooled)).map((p) => ({ time: p.date as Time, value: p.pooled })),
+    );
+
+    const qs = c2.addSeries(LineSeries, {
+      color: "#111827",
+      lineWidth: 2,
+      title: "Q（曜日差）",
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    qs.setData(pts.map((p) => ({ time: p.date as Time, value: p.q })));
+    qs.createPriceLine({
+      price: era.chi2Crit95,
+      color: "#dc2626",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "χ²(4) 95%",
+    });
+
+    if (era.brk) {
+      const bs = c3.addSeries(LineSeries, {
+        color: "#7c3aed",
+        lineWidth: 2,
+        title: "sup-Wald",
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      const bseen = new Set<string>();
+      bs.setData(
+        era.brk.grid
+          .filter((g) => {
+            if (bseen.has(g.date)) return false;
+            bseen.add(g.date);
+            return true;
+          })
+          .map((g) => ({ time: g.date as Time, value: g.w })),
+      );
+      bs.createPriceLine({
+        price: era.brk.crit95,
+        color: "#dc2626",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "置換95%",
+      });
+    }
+
+    // 時間軸の同期は「同じ x 点を持つ」β と Q のあいだだけに限る。
+    // 両者は同一の窓末日付列なのでロジカル(バー番号)同期が厳密に一致する。
+    // sup-Wald は x が「分割点」で意味も張る期間も違うため、独立させる
+    // （異なる範囲どうしを相互に setVisibleRange すると、互いに範囲を
+    //  狭め合うラチェットが起きて表示が勝手に縮んでいく）。
+    const charts: IChartApi[] = [c1, c2, c3];
+    for (const c of charts) c.timeScale().fitContent();
+    let lock = false;
+    const pair: IChartApi[] = [c1, c2];
+    for (const src of pair) {
+      src.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        if (lock) return;
+        lock = true;
+        const r = src.timeScale().getVisibleLogicalRange();
+        if (r) for (const dst of pair) if (dst !== src) dst.timeScale().setVisibleLogicalRange(r);
+        lock = false;
+      });
+    }
+
+    const onResize = () => {
+      if (rollRef.current) c1.applyOptions({ width: rollRef.current.clientWidth });
+      if (qRef.current) c2.applyOptions({ width: qRef.current.clientWidth });
+      if (brkRef.current) c3.applyOptions({ width: brkRef.current.clientWidth });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      for (const c of charts) c.remove();
+    };
+  }, [era, target]);
 
   // 交互作用セルの表示補助
   const binLabels = useMemo(() => {
@@ -454,6 +601,20 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
             {[500, 1000, 2000].map((v) => (
               <option key={v} value={v}>
                 {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">ローリング窓</span>
+          <select
+            className="border border-gray-200 rounded px-1 py-0.5"
+            value={rollWeeks}
+            onChange={(e) => setRollWeeks(Number(e.target.value))}
+          >
+            {[52, 104, 156].map((v) => (
+              <option key={v} value={v}>
+                {v}週（各曜日{v}本）
               </option>
             ))}
           </select>
@@ -1009,6 +1170,231 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
             </div>
           </section>
 
+          {/* ---------- ⑥ 時代依存 ---------- */}
+          <section className="mt-5">
+            <h4 className="text-xs font-semibold text-gray-700">
+              ⑥ 時代依存：いつ・どう変わったか
+            </h4>
+            <p className="mt-1 text-[10px] text-gray-500 leading-relaxed">
+              答える問い：<b>その構造は今もあるのか、それとも昔の話か。</b>{" "}
+              ⑤の前半/後半は「時代依存があるかもしれない」と気づく最低限で、
+              <b>いつ・どう変わったかは見えません</b>。ここでは連続的な推移として見ます。
+              ホイールでズーム、ドラッグで移動できます（上の2ペインは同じ窓末日付なので時間軸が同期します。sup-Wald は x が「分割点」で意味が違うため独立です）。
+            </p>
+
+            {era && era.rolling.length >= 5 ? (
+              <>
+                {era.brk && (
+                  <div
+                    className={`mt-2 rounded p-2 text-[11px] border ${
+                      era.brk.pPerm < 0.05
+                        ? "bg-amber-50 border-amber-200 text-amber-900"
+                        : "bg-gray-50 border-gray-200 text-gray-600"
+                    }`}
+                  >
+                    <b>構造変化点</b>：sup-Wald = {num(era.brk.bestW)}（置換 p ={" "}
+                    {pStr(era.brk.pPerm)}、ヌル95%点 {num(era.brk.crit95)}）、最も割れる時点は{" "}
+                    <b>{era.brk.bestDate}</b>。
+                    {era.brk.pPerm < 0.05
+                      ? " β のベクトルはこの時点の前後で有意に違います。全期間の推定値は「平均された別物」なので、直近側だけで再推定してください。"
+                      : " 全期間で β が一定という仮定は棄却されません。⑤で前半/後半の p が割れていても、それは分割位置の任意性の範囲です。"}
+                  </div>
+                )}
+
+                <div className="mt-2">
+                  <div className="text-[10px] text-gray-500 mb-0.5">
+                    ローリング曜日別β（窓 {era.rollWeeks}週＝各曜日 {era.rollWeeks}本・窓末で描画）。
+                    線が交差・反転していれば「どの曜日が効くか」自体が時代で入れ替わっています。
+                  </div>
+                  <div ref={rollRef} />
+                  <div className="flex flex-wrap gap-3 mt-1 text-[10px]">
+                    {[1, 2, 3, 4, 5].map((d) => (
+                      <span key={d} className="flex items-center gap-1">
+                        <span
+                          className="inline-block w-3 h-0.5"
+                          style={{ background: DOW_COLOR[d - 1] }}
+                        />
+                        <span style={{ color: DOW_COLOR[d - 1] }}>{dn(d)}</span>
+                      </span>
+                    ))}
+                    <span className="flex items-center gap-1 text-gray-400">
+                      <span className="inline-block w-3 h-0.5 bg-gray-400" />
+                      共通β
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-[10px] text-gray-500 mb-0.5">
+                    ローリング Q（曜日差そのものの強さ）。赤線＝χ²(4) の95%点 9.49。
+                    <b>この線を超えている区間が「曜日差が立っていた時代」</b>です。
+                  </div>
+                  <div ref={qRef} />
+                </div>
+
+                {era.brk && (
+                  <div className="mt-3">
+                    <div className="text-[10px] text-gray-500 mb-0.5">
+                      sup-Wald（各時点で前後に割ったときの β ベクトルの差）。<b>横軸は「分割点の日付」</b>で上2ペイン（窓末）とは意味が違うため、ズームは独立です。山の位置が変化点の候補、赤線＝置換ヌルの95%点。
+                    </div>
+                    <div ref={brkRef} />
+                  </div>
+                )}
+
+                {era.brk && (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="text-gray-500 border-b border-gray-200">
+                          <th className="text-left py-1 pr-2 font-medium">区間</th>
+                          <th className="text-right py-1 px-2 font-medium">n</th>
+                          {[1, 2, 3, 4, 5].map((d) => (
+                            <th key={d} className="text-right py-1 px-2 font-medium">
+                              {dn(d)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          {
+                            k: "before",
+                            label: `〜 ${era.brk.bestDate} 以前`,
+                            n: era.brk.nBefore,
+                            b: era.brk.beforeBeta,
+                            se: era.brk.beforeSe,
+                          },
+                          {
+                            k: "after",
+                            label: `${era.brk.bestDate} 以降`,
+                            n: era.brk.nAfter,
+                            b: era.brk.afterBeta,
+                            se: era.brk.afterSe,
+                          },
+                        ].map((row) => (
+                          <tr key={row.k} className="border-b border-gray-100">
+                            <td className="py-1 pr-2 text-gray-700">{row.label}</td>
+                            <td className="py-1 px-2 text-right text-gray-500">{row.n}</td>
+                            {[0, 1, 2, 3, 4].map((d) => (
+                              <td key={d} className="py-1 px-2 text-right text-gray-900">
+                                {num(row.b[d])}
+                                <span className="text-gray-400"> ±{num(1.96 * row.se[d])}</span>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        <tr className="bg-gray-50">
+                          <td className="py-1 pr-2 text-gray-600" colSpan={2}>
+                            差（以降 − 以前）
+                          </td>
+                          {[0, 1, 2, 3, 4].map((d) => {
+                            const diff = era.brk!.afterBeta[d] - era.brk!.beforeBeta[d];
+                            const s = Math.sqrt(
+                              era.brk!.afterSe[d] ** 2 + era.brk!.beforeSe[d] ** 2,
+                            );
+                            const z = s > 0 ? diff / s : NaN;
+                            return (
+                              <td
+                                key={d}
+                                className={`py-1 px-2 text-right font-medium ${
+                                  Math.abs(z) > 1.96 ? "text-red-700" : "text-gray-500"
+                                }`}
+                              >
+                                {num(diff)}
+                                <span className="text-gray-400"> ({num(z)}SE)</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* 年別 β ヒートマップ */}
+                {era.yearly.length > 0 && (
+                  <div className="mt-3 overflow-x-auto">
+                    <div className="text-[10px] text-gray-500 mb-0.5">
+                      年別 β（各年・各曜日で独立に推定）。色は共通βからの乖離で、
+                      <span className="text-red-700">赤</span>＝共通より小さい／
+                      <span className="text-green-700">緑</span>＝大きい。
+                      <b>年をまたいで符号や順位が入れ替わるなら、それは構造ではなく標本ゆらぎです。</b>
+                    </div>
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="text-gray-500">
+                          <th className="text-left py-1 pr-2 font-medium">年</th>
+                          {[1, 2, 3, 4, 5].map((d) => (
+                            <th key={d} className="py-1 px-1 font-medium text-center">
+                              {dn(d)}
+                            </th>
+                          ))}
+                          <th className="text-right py-1 px-2 font-medium">共通β</th>
+                          <th className="text-right py-1 pl-2 font-medium">Q（p）</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {era.yearly.map((yb) => (
+                          <tr key={yb.year}>
+                            <td className="py-1 pr-2 text-gray-700">{yb.year}</td>
+                            {[0, 1, 2, 3, 4].map((d) => {
+                              if (!isFinite(yb.beta[d]))
+                                return (
+                                  <td key={d} className="py-1 px-1 text-center text-gray-300">
+                                    —
+                                  </td>
+                                );
+                              const dev = yb.beta[d] - yb.pooled;
+                              const mag = Math.min(1, Math.abs(dev) / 0.5);
+                              const col =
+                                dev >= 0
+                                  ? `rgba(22,163,74,${0.06 + 0.45 * mag})`
+                                  : `rgba(220,38,38,${0.06 + 0.45 * mag})`;
+                              return (
+                                <td key={d} className="py-0.5 px-0.5">
+                                  <div
+                                    className="rounded-sm px-1 py-1 text-center text-gray-900"
+                                    style={{ background: col }}
+                                    title={`n=${yb.n[d]} / se=${num(yb.se[d])}`}
+                                  >
+                                    {num(yb.beta[d])}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            <td className="py-1 px-2 text-right text-gray-600">
+                              {num(yb.pooled)}
+                            </td>
+                            <td
+                              className={`py-1 pl-2 text-right ${
+                                yb.pWald < 0.05 ? "text-green-700 font-medium" : "text-gray-400"
+                              }`}
+                            >
+                              {num(yb.q)}（{pStr(yb.pWald)}）
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+                      年別の Q は 1年ぶん（各曜日 約50本）しかないので、
+                      <b>個別の年の p 値は検出力がほぼありません</b>
+                      。ここで見るべきは有意性ではなく<b>符号と順位の安定性</b>です。
+                      またローリング窓は重なっているので、Q が連続して95%線を超えていても
+                      それは独立した証拠の積み重ねではありません（多重性も未補正）。
+                      判定はあくまで①の全期間 Q と、この節の sup-Wald で行ってください。
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mt-2 text-[11px] text-gray-500">
+                期間が短く、ローリング推定に必要な窓が取れません（ローリング窓を短くするか、
+                期間を10年にしてください）。
+              </div>
+            )}
+          </section>
+
           <p className="mt-4 text-[10px] text-gray-400 leading-relaxed">
             {result.nDays}日 / {result.nWeeks}週 / 置換{main ? result.params.nIter : 0}回 × 4標本。
             ドライバ＝{US_DRIVERS.find((d) => d.ticker === usTicker)?.label ?? usTicker}
@@ -1198,6 +1584,59 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
           <b>3分位を既定にしているのはこのためです</b>。5分位は「形を見る」ためだけに使ってください。
         </p>
 
+        <p className="font-medium text-gray-700 mt-3">
+          9-2. 時代依存をどう見るか（⑥）— sup-Wald 構造変化検定
+        </p>
+        <p>
+          前半/後半の2分割は「時代依存があるかもしれない」と気づく最低限であって、
+          <b>いつ・どう変わったかは見えません</b>。しかも分割位置は恣意的で、
+          真の変化点がずれていれば検出力を失います。そこで⑥では3つの見方を重ねます。
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>
+            <b>ローリング曜日別β</b>：窓を1週ずつ滑らせて各曜日の β を再推定します。
+            線が交差・反転していれば「どの曜日が効くか」自体が時代で入れ替わっており、
+            全期間の推定値は<b>平均された別物</b>ということになります。
+          </li>
+          <li>
+            <b>ローリング Q</b>：曜日差そのものの強さの推移です。χ²(4) の95%点 9.49
+            を超えている区間が「曜日差が立っていた時代」。
+            <b>窓は重なっているので、連続して超えていても独立した証拠の積み重ねではありません</b>
+            （多重性も未補正）。あくまで形を見るためのものです。
+          </li>
+          <li>
+            <b>sup-Wald 構造変化検定</b>：分割点を全探索し、前後で β ベクトルがどれだけ違うかの
+            Wald 統計量の<b>最大値</b>を取ります。
+          </li>
+        </ul>
+        <p className="pl-2">
+          {"W(τ) = Σ_d (b_d^{前} − b_d^{後})² / (se_d^{前}² + se_d^{後}²),   sup-Wald = max_τ W(τ)"}
+        </p>
+        <p>
+          「最大を取る」操作をしているので、<b>χ² 分布をそのまま当てはめてはいけません</b>
+          （これは maxT と同じ問題です）。帰無分布は置換で作ります：
+          <b>週をブロック単位で並べ替える</b>。単純な週シャッフルだとボラティリティ・
+          クラスタリング（緩やかなレジーム）まで壊してしまい、実測の sup-Wald が
+          不当に大きく見えます。そこで四半期（13週）ぶんのブロックで局所の粘りを残しています。
+        </p>
+        <p>
+          なお sup-Wald の<b>探索</b>だけは古典的 SE を使っています。HC3 は分割ごとに残差が必要で
+          前置き集計できず、全探索×置換の計算量に乗らないためです。実測と帰無で同じ統計量を
+          使う以上、置換検定としての妥当性は保たれます（効率は落ちます）。
+          <b>表示する係数はすべて HC3 で取り直しています</b>。
+        </p>
+        <p>
+          <b>棄却されたときの意味は重大です</b>。「全期間の β」は存在しない量を推定していたことに
+          なるので、直近側の区間だけで推定し直し、①〜④の判断もその区間でやり直してください。
+          棄却されないなら、⑤で前半/後半の p が割れて見えても、それは分割位置の任意性の範囲です。
+        </p>
+        <p>
+          <b>年別 β の表</b>は最も粗いが最も直感的な見方です。1年ぶん（各曜日 約50本）しかないので
+          <b>個別の年の p 値には検出力がほぼありません</b>。ここで見るべきは有意性ではなく、
+          <b>符号と順位の安定性</b>です。年をまたいで順位が入れ替わるなら、
+          全期間 p 値が示すよりずっと危険です。
+        </p>
+
         <p className="font-medium text-gray-700 mt-3">10. 結果の読み方（推奨する順番）</p>
         <ol className="list-decimal pl-4 space-y-1">
           <li>
@@ -1223,6 +1662,11 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
             <b>⑤で連休除外・時代分割に耐えるか。</b>連休除外で崩れるなら、
             見つけていたのは「連休明けの情報量」であって曜日ではありません
             （それはそれで暦から事前に分かるので、むしろ使いやすい条件です）。
+          </li>
+          <li>
+            <b>⑥で今もあるのかを確認する。</b>sup-Wald が棄却したら全期間の β は
+            存在しない量なので、直近側の区間で全部やり直します。棄却しなくても、
+            ローリング Q が直近で沈んでいるなら建玉は小さくすべきです。
           </li>
         </ol>
 

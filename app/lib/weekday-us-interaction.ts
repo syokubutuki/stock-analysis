@@ -817,6 +817,8 @@ export interface WuParams {
   nIter: number;
   seed: number;
   costBps: number;
+  rollWeeks: number; // ローリング窓（週）。各曜日はこの本数ぶんの標本になる
+  nIterBreak: number; // 構造変化検定の置換回数
 }
 
 export const DEFAULT_WU_PARAMS: WuParams = {
@@ -825,13 +827,352 @@ export const DEFAULT_WU_PARAMS: WuParams = {
   nIter: 1000,
   seed: 20260726,
   costBps: 10,
+  rollWeeks: 104,
+  nIterBreak: 300,
 };
+
+// =============================================================================
+// 時代依存（era）: いつ・どう変わったか
+// =============================================================================
+// 前半/後半の2分割は「時代依存があるかもしれない」と気づく最低限であって、
+// いつ・どう変わったかは見えない。ここでは3つの見方を提供する:
+//   (a) ローリング曜日別β … 連続的な推移。どの曜日がいつ動いたか
+//   (b) ローリング Q       … 「曜日差そのもの」がいつ立ったか（χ²(4)の95%点=9.49と比較）
+//   (c) sup-Wald 構造変化点 … 分割点を全探索し、最も割れる時点とその有意性
+export interface RollPoint {
+  date: string; // 窓末の日付
+  beta: number[]; // 5曜日
+  pooled: number;
+  q: number;
+  n: number;
+}
+
+export interface YearBeta {
+  year: number;
+  beta: number[];
+  se: number[];
+  n: number[];
+  pooled: number;
+  q: number;
+  pWald: number;
+}
+
+export interface BreakResult {
+  grid: { date: string; w: number }[]; // 分割点ごとの Wald
+  bestDate: string;
+  bestW: number;
+  pPerm: number;
+  crit95: number; // 置換ヌルの95%点
+  beforeBeta: number[];
+  beforeSe: number[];
+  afterBeta: number[];
+  afterSe: number[];
+  nBefore: number;
+  nAfter: number;
+}
+
+export interface EraResult {
+  rollWeeks: number;
+  rolling: RollPoint[];
+  yearly: YearBeta[];
+  brk: BreakResult | null;
+  chi2Crit95: number; // χ²(4) の95%点
+}
+
+// 添字リスト上での曜日別単回帰（HC3）。ローリング/年別のように呼び出し回数が
+// 少ない経路で使う素直な実装。
+function fitIdx(
+  y: number[],
+  u: number[],
+  dow: number[],
+  idx: number[],
+  minN: number,
+): { beta: number[]; se: number[]; n: number[] } {
+  const cnt = new Array(5).fill(0);
+  const Su = new Array(5).fill(0);
+  const Suu = new Array(5).fill(0);
+  const Sy = new Array(5).fill(0);
+  const Suy = new Array(5).fill(0);
+  for (const i of idx) {
+    const d = dow[i] - 1;
+    cnt[d]++;
+    Su[d] += u[i];
+    Suu[d] += u[i] * u[i];
+    Sy[d] += y[i];
+    Suy[d] += u[i] * y[i];
+  }
+  const a = new Array(5).fill(NaN);
+  const b = new Array(5).fill(NaN);
+  const i00 = new Array(5).fill(0);
+  const i01 = new Array(5).fill(0);
+  const i11 = new Array(5).fill(0);
+  for (let d = 0; d < 5; d++) {
+    const n = cnt[d];
+    if (n < minN) continue;
+    const ub = Su[d] / n;
+    const sxx = Suu[d] - n * ub * ub;
+    if (!(sxx > 0)) continue;
+    b[d] = (Suy[d] - ub * Sy[d]) / sxx;
+    a[d] = Sy[d] / n - b[d] * ub;
+    const det = n * sxx;
+    i00[d] = Suu[d] / det;
+    i01[d] = -Su[d] / det;
+    i11[d] = n / det;
+  }
+  const m00 = new Array(5).fill(0);
+  const m01 = new Array(5).fill(0);
+  const m11 = new Array(5).fill(0);
+  for (const i of idx) {
+    const d = dow[i] - 1;
+    if (!isFinite(b[d])) continue;
+    const e = y[i] - a[d] - b[d] * u[i];
+    const h = i00[d] + 2 * i01[d] * u[i] + i11[d] * u[i] * u[i];
+    const w = (e * e) / Math.max(1e-12, (1 - Math.min(0.9995, h)) ** 2);
+    m00[d] += w;
+    m01[d] += w * u[i];
+    m11[d] += w * u[i] * u[i];
+  }
+  const se = new Array(5).fill(NaN);
+  for (let d = 0; d < 5; d++) {
+    if (!isFinite(b[d])) continue;
+    const v =
+      i01[d] * i01[d] * m00[d] + 2 * i01[d] * i11[d] * m01[d] + i11[d] * i11[d] * m11[d];
+    se[d] = Math.sqrt(Math.max(0, v));
+  }
+  return { beta: b, se, n: cnt };
+}
+
+// 分割点探索用の軽量な十分統計量。HC3 は分割ごとに残差が要って前置き集計できないため、
+// sup-Wald の探索だけは古典的 SE で行う（実測と帰無で同じ統計量を使う以上、
+// 置換検定としての妥当性は保たれる。表示する係数は HC3 で取り直す）。
+interface Suff {
+  n: Float64Array;
+  Su: Float64Array;
+  Suu: Float64Array;
+  Sy: Float64Array;
+  Suy: Float64Array;
+  Syy: Float64Array;
+}
+function newSuff(): Suff {
+  const z = () => new Float64Array(5);
+  return { n: z(), Su: z(), Suu: z(), Sy: z(), Suy: z(), Syy: z() };
+}
+// 分割点ごとに呼ばれる最内ループなので、一切アロケートせず両側を同時に展開する。
+function waldSplit(pre: Suff, tot: Suff, minN: number): number {
+  let w = 0;
+  for (let d = 0; d < 5; d++) {
+    const n1 = pre.n[d];
+    const n2 = tot.n[d] - n1;
+    if (n1 < minN || n2 < minN) continue;
+
+    const ub1 = pre.Su[d] / n1;
+    const sxx1 = pre.Suu[d] - n1 * ub1 * ub1;
+    if (!(sxx1 > 0)) continue;
+    const b1 = (pre.Suy[d] - ub1 * pre.Sy[d]) / sxx1;
+    const a1 = pre.Sy[d] / n1 - b1 * ub1;
+    const v1 =
+      Math.max(0, pre.Syy[d] - a1 * pre.Sy[d] - b1 * pre.Suy[d]) / (n1 - 2) / sxx1;
+
+    const Su2 = tot.Su[d] - pre.Su[d];
+    const Suu2 = tot.Suu[d] - pre.Suu[d];
+    const Sy2 = tot.Sy[d] - pre.Sy[d];
+    const Suy2 = tot.Suy[d] - pre.Suy[d];
+    const Syy2 = tot.Syy[d] - pre.Syy[d];
+    const ub2 = Su2 / n2;
+    const sxx2 = Suu2 - n2 * ub2 * ub2;
+    if (!(sxx2 > 0)) continue;
+    const b2 = (Suy2 - ub2 * Sy2) / sxx2;
+    const a2 = Sy2 / n2 - b2 * ub2;
+    const v2 = Math.max(0, Syy2 - a2 * Sy2 - b2 * Suy2) / (n2 - 2) / sxx2;
+
+    if (!(v1 > 0) || !(v2 > 0)) continue;
+    w += (b1 - b2) ** 2 / (v1 + v2);
+  }
+  return w;
+}
+
+function computeEra(
+  y: number[],
+  u: number[],
+  dow: number[],
+  week: number[],
+  dates: string[],
+  params: WuParams,
+): EraResult {
+  const n = y.length;
+
+  // --- 週ごとの添字（時系列順） ---
+  const weekIds: number[] = [];
+  const weekIdx = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    let a = weekIdx.get(week[i]);
+    if (!a) {
+      a = [];
+      weekIdx.set(week[i], a);
+      weekIds.push(week[i]);
+    }
+    a.push(i);
+  }
+  const W = weekIds.length;
+
+  // --- (a)(b) ローリング ---
+  const rolling: RollPoint[] = [];
+  const win = Math.max(26, Math.min(params.rollWeeks, Math.max(26, W - 4)));
+  for (let s = 0; s + win <= W; s++) {
+    const idx: number[] = [];
+    for (let k = s; k < s + win; k++) {
+      const a = weekIdx.get(weekIds[k]);
+      if (a) for (const i of a) idx.push(i);
+    }
+    if (idx.length < 60) continue;
+    const f = fitIdx(y, u, dow, idx, 15);
+    const h = qStat(Float64Array.from(f.beta), Float64Array.from(f.se));
+    let last = dates[idx[0]];
+    for (const i of idx) if (dates[i] > last) last = dates[i];
+    rolling.push({ date: last, beta: f.beta, pooled: h.pooled, q: h.q, n: idx.length });
+  }
+
+  // --- 年別 ---
+  const yearMap = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const yr = Number(dates[i].slice(0, 4));
+    const a = yearMap.get(yr);
+    if (a) a.push(i);
+    else yearMap.set(yr, [i]);
+  }
+  const yearly: YearBeta[] = [];
+  for (const yr of Array.from(yearMap.keys()).sort((a, b) => a - b)) {
+    const idx = yearMap.get(yr) ?? [];
+    if (idx.length < 60) continue;
+    const f = fitIdx(y, u, dow, idx, 15);
+    const h = qStat(Float64Array.from(f.beta), Float64Array.from(f.se));
+    yearly.push({
+      year: yr,
+      beta: f.beta,
+      se: f.se,
+      n: f.n,
+      pooled: h.pooled,
+      q: h.q,
+      pWald: chiSquareSurvival(h.q, h.df),
+    });
+  }
+
+  // --- (c) sup-Wald による構造変化点 ---
+  // 帰無は「週をブロック単位で並べ替える」。単純な週シャッフルだと
+  // ボラティリティ・クラスタリング（緩やかなレジーム）まで壊してしまい、
+  // 実測の sup-Wald が不当に大きく見える。四半期ぶんのブロックで局所の粘りを残す。
+  const minN = 40;
+  const minFrac = 0.2;
+  const stepW = Math.max(1, Math.round(W / 120));
+  const splits: number[] = [];
+  for (let k = Math.floor(W * minFrac); k <= Math.ceil(W * (1 - minFrac)); k += stepW) splits.push(k);
+
+  const evalOrder = (order: number[]): { sup: number; grid: number[] } => {
+    const run = newSuff();
+    const tot = newSuff();
+    for (let i = 0; i < n; i++) {
+      const d = dow[i] - 1;
+      tot.n[d]++;
+      tot.Su[d] += u[i];
+      tot.Suu[d] += u[i] * u[i];
+      tot.Sy[d] += y[i];
+      tot.Suy[d] += u[i] * y[i];
+      tot.Syy[d] += y[i] * y[i];
+    }
+    const grid: number[] = [];
+    let sp = 0;
+    let sup = 0;
+    for (let k = 0; k < order.length; k++) {
+      const a = weekIdx.get(weekIds[order[k]]);
+      if (a) {
+        for (const i of a) {
+          const d = dow[i] - 1;
+          run.n[d]++;
+          run.Su[d] += u[i];
+          run.Suu[d] += u[i] * u[i];
+          run.Sy[d] += y[i];
+          run.Suy[d] += u[i] * y[i];
+          run.Syy[d] += y[i] * y[i];
+        }
+      }
+      while (sp < splits.length && splits[sp] === k + 1) {
+        const w = waldSplit(run, tot, minN);
+        grid.push(w);
+        if (w > sup) sup = w;
+        sp++;
+      }
+    }
+    return { sup, grid };
+  };
+
+  const identity = Array.from({ length: W }, (_, i) => i);
+  const obs = evalOrder(identity);
+
+  let brk: BreakResult | null = null;
+  if (splits.length >= 3 && obs.grid.length === splits.length) {
+    const rnd = mulberry32(params.seed + 7717);
+    const blockW = 13;
+    const nBlocks = Math.ceil(W / blockW);
+    let ge = 0;
+    const nulls: number[] = [];
+    for (let it = 0; it < params.nIterBreak; it++) {
+      const order: number[] = [];
+      const blocks = Array.from({ length: nBlocks }, (_, i) => i);
+      for (let i = blocks.length - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1));
+        const t = blocks[i];
+        blocks[i] = blocks[j];
+        blocks[j] = t;
+      }
+      for (const b of blocks) {
+        for (let k = b * blockW; k < Math.min(W, (b + 1) * blockW); k++) order.push(k);
+      }
+      const r = evalOrder(order);
+      nulls.push(r.sup);
+      if (r.sup >= obs.sup - 1e-12) ge++;
+    }
+    nulls.sort((a, b) => a - b);
+
+    let bi = 0;
+    for (let i = 1; i < obs.grid.length; i++) if (obs.grid[i] > obs.grid[bi]) bi = i;
+    const cut = splits[bi];
+    const beforeIdx: number[] = [];
+    const afterIdx: number[] = [];
+    for (let k = 0; k < W; k++) {
+      const a = weekIdx.get(weekIds[k]);
+      if (!a) continue;
+      for (const i of a) (k < cut ? beforeIdx : afterIdx).push(i);
+    }
+    const fb = fitIdx(y, u, dow, beforeIdx, 20);
+    const fa = fitIdx(y, u, dow, afterIdx, 20);
+    const dateAt = (k: number) => {
+      const a = weekIdx.get(weekIds[Math.min(W - 1, Math.max(0, k))]) ?? [];
+      return a.length ? dates[a[0]] : dates[0];
+    };
+    brk = {
+      grid: splits.map((k, i) => ({ date: dateAt(k), w: obs.grid[i] })),
+      bestDate: dateAt(cut),
+      bestW: obs.grid[bi],
+      pPerm: (ge + 1) / (params.nIterBreak + 1),
+      crit95: quantileSorted(nulls, 0.95),
+      beforeBeta: fb.beta,
+      beforeSe: fb.se,
+      afterBeta: fa.beta,
+      afterSe: fa.se,
+      nBefore: beforeIdx.length,
+      nAfter: afterIdx.length,
+    };
+  }
+
+  return { rollWeeks: win, rolling, yearly, brk, chi2Crit95: 9.4877 };
+}
 
 export interface WuResult {
   ok: boolean;
   reason?: string;
   main: WuOne | null;
   robust: WuOne[];
+  era: EraResult | null;
   params: WuParams;
   nDays: number;
   nWeeks: number;
@@ -845,6 +1186,7 @@ export function emptyWu(params: WuParams, reason: string): WuResult {
     reason,
     main: null,
     robust: [],
+    era: null,
     params,
     nDays: 0,
     nWeeks: 0,
@@ -1147,11 +1489,21 @@ export function runWeekdayUs(
   for (let d = 1; d <= 5; d++) hoursByDow[d] = hCnt[d] ? hSum[d] / hCnt[d] : 0;
   for (const db of main.dows) db.meanHours = hoursByDow[db.dow];
 
+  const era = computeEra(
+    y,
+    u,
+    dw,
+    wk,
+    keep.map((d) => d.date),
+    params,
+  );
+
   const weekSet = new Set(days.map((d) => d.week));
   return {
     ok: true,
     main,
     robust,
+    era,
     params,
     nDays: days.length,
     nWeeks: weekSet.size,
