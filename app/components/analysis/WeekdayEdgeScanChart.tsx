@@ -71,8 +71,11 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   //  - "off":      現状の自動伸縮(窓の中身に合わせる)。
   //  - "envelope": この窓長で取りうる全ローリング位置の累積振幅を包む固定スケール(0対称)。
   //  - "manual":   手動 ±yManual%。
+  // このモードはスペクトルと週内クロックで共有する(同じ窓の2つの見方なので、
+  // 片方だけ自動伸縮だと「振幅が変わったのか目盛が変わったのか」が読めなくなる)。
   const [yFix, setYFix] = useState<"off" | "envelope" | "manual">("off");
-  const [yManual, setYManual] = useState(0.5); // 手動固定時の片側レンジ(%)
+  const [yManual, setYManual] = useState(0.5);       // 手動固定時の片側レンジ(%): 週内クロック(累積)
+  const [yManualSpec, setYManualSpec] = useState(0.2); // 同: エッジ・スペクトル(素片平均)
   const winEndRef = useRef(winEnd);
   useEffect(() => { winEndRef.current = winEnd; }, [winEnd]);
   // 銘柄・期間の切替でデータ長が変わったら全期間・最新起点に戻す。
@@ -194,30 +197,40 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   }, [windowAnalysis]);
 
   // 縦軸「固定(全位置)」用のエンベロープ: 現在の窓長 effWinLen を保ったまま
-  // 全ローリング位置をスライドし、累積パス |C(j)| の最大値を求める(0対称の片側レンジ)。
-  // これに合わせて軸を固定すれば、窓の位置を動かしてもどの位置でもクリップせず、
-  // 局面ごとの振幅の大小を目盛で直接比較できる。位置数は最大~200点に間引いて軽量化。
+  // 全ローリング位置をスライドし、どの位置でもクリップしない片側レンジ(0対称)を求める。
+  // これに合わせて軸を固定すれば、窓を動かしても目盛が動かず、局面ごとの
+  // 「振幅そのものの大小」を直接比較できる。位置数は最大~200点に間引いて軽量化。
+  //  - clock:    累積パス |C(j)| の最大
+  //  - spectrum: 素片の |μ_k| + SE_k の最大(誤差バーの先端まで入るように)
   const yEnvelope = useMemo(() => {
+    const specOf = (atoms: AtomStat[]) => Math.max(...atoms.map((a) => Math.abs(a.mean) + a.se), 0.00005);
     const L = effWinLen;
     if (L >= prices.length) {
-      // 単一窓(全期間): その唯一の窓の累積振幅をそのまま採用。
+      // 単一窓(全期間): その唯一の窓の振幅をそのまま採用。
       // atomAnalysis は prices のみ依存で安定 → 再生(winEnd変化)中に再計算されない。
-      return Math.max(...atomAnalysis.cumulative.map((v) => Math.abs(v)), 0.0001);
+      return {
+        clock: Math.max(...atomAnalysis.cumulative.map((v) => Math.abs(v)), 0.0001),
+        spectrum: specOf(atomAnalysis.atoms),
+      };
     }
-    // 短窓ほど各素片平均が平滑化されず累積振幅が大きく振れるため、全期間値では
-    // 包み切れずクリップされる。窓長に依らず必ず全ローリング位置を走査して max|C| を採る。
+    // 短窓ほど各素片平均が平滑化されず振幅が大きく振れるため、全期間値では包み切れず
+    // クリップされる。窓長に依らず必ず全ローリング位置を走査して最大値を採る。
     const step = Math.max(1, Math.floor((prices.length - L) / 200));
-    let maxAbs = 0.0001;
+    let clock = 0.0001, spectrum = 0.00005;
     for (let end = L; end <= prices.length; end += step) {
       const a = analyzeAtoms(prices.slice(end - L, end));
-      for (const v of a.cumulative) { const av = Math.abs(v); if (av > maxAbs) maxAbs = av; }
+      for (const v of a.cumulative) { const av = Math.abs(v); if (av > clock) clock = av; }
+      const s = specOf(a.atoms); if (s > spectrum) spectrum = s;
     }
-    return maxAbs;
+    return { clock, spectrum };
   }, [prices, effWinLen, atomAnalysis]);
 
-  // drawClock に渡す固定レンジ(片側)。null=自動伸縮。
+  // 各図に渡す固定レンジ(片側)。null=自動伸縮。モードは2図で共有し、
+  // 手動値だけは桁が違う(素片平均 ≪ 累積)ので図ごとに持つ。
   const clockFixedRange =
-    yFix === "off" ? null : yFix === "manual" ? Math.max(0.0001, yManual / 100) : yEnvelope;
+    yFix === "off" ? null : yFix === "manual" ? Math.max(0.0001, yManual / 100) : yEnvelope.clock;
+  const spectrumFixedRange =
+    yFix === "off" ? null : yFix === "manual" ? Math.max(0.00005, yManualSpec / 100) : yEnvelope.spectrum;
 
   // === 原系列ミニマップ(全期間の株価 + 現在の窓の位置) ===
   // 時間軸チャートだが、ここでの目的は「全履歴のどこを集計しているか」の一望と
@@ -345,13 +358,14 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   }, []);
 
   // === エッジ・スペクトル(10素片の平均±SEと有意性) ===
-  const drawSpectrum = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[]) => {
+  const drawSpectrum = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[], fixedRange: number | null) => {
     const r = initCanvas(canvas, 220); if (!r) return;
     const { ctx, width, height } = r;
     const pad = { top: 16, bottom: 36, left: 52, right: 12 };
     const plotW = width - pad.left - pad.right;
     const plotH = height - pad.top - pad.bottom;
-    const maxAbs = Math.max(...atoms.map((a) => Math.abs(a.mean) + a.se), 0.0005);
+    // fixedRange 指定時は 0 対称の固定スケール。未指定なら窓の中身に合わせて自動伸縮。
+    const maxAbs = fixedRange != null ? fixedRange : Math.max(...atoms.map((a) => Math.abs(a.mean) + a.se), 0.0005);
     const zeroY = pad.top + plotH / 2;
 
     // y軸グリッド
@@ -366,6 +380,10 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     const n = atoms.length;
     const slotW = plotW / n;
     const barW = slotW * 0.55;
+
+    // バー・誤差バー・★はプロット領域にクリップ(固定レンジが小さいと枠外へ出るため)
+    ctx.save();
+    ctx.beginPath(); ctx.rect(pad.left, pad.top, plotW, plotH); ctx.clip();
     for (let i = 0; i < n; i++) {
       const a = atoms[i];
       const cx = pad.left + (i + 0.5) * slotW;
@@ -391,8 +409,13 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         ctx.fillStyle = "#2563eb"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(st, cx, (barH >= 0 ? seTop : seBot) + (barH >= 0 ? -3 : 10));
       }
+    }
+    ctx.restore();
 
-      // ラベル(曜日色分け)
+    // ラベル(曜日色分け)はプロット領域の外なのでクリップ解除後に描く
+    for (let i = 0; i < n; i++) {
+      const a = atoms[i];
+      const cx = pad.left + (i + 0.5) * slotW;
       ctx.fillStyle = a.kind === "overnight" ? "#7c3aed" : "#0891b2";
       ctx.font = "8px sans-serif"; ctx.textAlign = "center";
       ctx.save();
@@ -514,10 +537,10 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
   useEffect(() => {
     if (overviewRef.current) drawOverview(overviewRef.current, prices, effEnd - effWinLen, effEnd, winMode);
-    if (spectrumRef.current) drawSpectrum(spectrumRef.current, windowAnalysis.atoms);
+    if (spectrumRef.current) drawSpectrum(spectrumRef.current, windowAnalysis.atoms, spectrumFixedRange);
     if (clockRef.current) drawClock(clockRef.current, windowAnalysis.cumulative, windowAnalysis.atoms, windowAnalysis.bestLong, clockFixedRange);
     if (atomYearRef.current) drawAtomYear(atomYearRef.current, atomAnalysis.atoms, atomAnalysis.yearly);
-  }, [prices, effEnd, effWinLen, winMode, resizeTick, atomAnalysis, windowAnalysis, clockFixedRange, drawOverview, drawSpectrum, drawClock, drawAtomYear]);
+  }, [prices, effEnd, effWinLen, winMode, resizeTick, atomAnalysis, windowAnalysis, clockFixedRange, spectrumFixedRange, drawOverview, drawSpectrum, drawClock, drawAtomYear]);
 
   if (prices.length < 60) {
     return <div className="text-xs text-gray-400 p-3">データが不足しています(60営業日以上必要)。</div>;
@@ -680,26 +703,10 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             </p>
           </>
         )}
-      </div>
 
-      {/* ===== (A) エッジ・スペクトル / 週内クロック(同じ窓の2つの見方を並べて同時に見る) ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 items-start">
-      <div>
-        <div className="text-xs text-gray-500 mb-1">エッジ・スペクトル: 週内10素片の平均対数リターン(±標準誤差・有意性)</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={spectrumRef} /></div>
-      </div>
-
-      {/* ===== (A) 週内クロック ===== */}
-      <div>
-        <div className="text-xs text-gray-500 mb-1">
-          週内クロック: 素片を時間順に積み上げた累積平均リターン(谷で買い・山で売り)
-          <span className="text-gray-400">
-            {" "}｜対象 {clockSample.totalDays.toLocaleString()} 営業日（各曜日 n={clockSample.minN}〜{clockSample.maxN} 週）から算出
-          </span>
-        </div>
-        {/* 縦(リターン)軸スケール */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] mb-1">
-          <span className="text-gray-500 font-medium">縦軸</span>
+        {/* 縦(リターン)軸スケール: スペクトルと週内クロックで共通 */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] pt-1.5 border-t border-gray-200">
+          <span className="text-gray-600 font-medium">縦軸（スペクトル・週内クロック共通）</span>
           <div className="inline-flex rounded overflow-hidden border border-gray-200">
             {([["off", "自動"], ["envelope", "固定(全位置)"], ["manual", "固定(手動)"]] as [typeof yFix, string][]).map(([m, lbl]) => (
               <button
@@ -711,26 +718,66 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             ))}
           </div>
           {yFix === "manual" && (
-            <label className="flex items-center gap-1 text-gray-500">
-              ±
-              <input
-                type="number"
-                min={0.05}
-                step={0.05}
-                value={yManual}
-                onChange={(e) => setYManual(Math.max(0.01, Number(e.target.value) || 0.01))}
-                className="w-16 border rounded px-1 py-0.5 text-right"
-                aria-label="縦軸の片側レンジ(%)"
-              />
-              %
-            </label>
+            <>
+              {/* 素片平均(≈0.1%台)と累積(≈1%台)は桁が違うので入力は図ごと */}
+              <label className="flex items-center gap-1 text-gray-500">
+                スペクトル ±
+                <input
+                  type="number"
+                  min={0.01}
+                  step={0.05}
+                  value={yManualSpec}
+                  onChange={(e) => setYManualSpec(Math.max(0.005, Number(e.target.value) || 0.005))}
+                  className="w-16 border rounded px-1 py-0.5 text-right"
+                  aria-label="エッジ・スペクトルの縦軸の片側レンジ(%)"
+                />
+                %
+              </label>
+              <label className="flex items-center gap-1 text-gray-500">
+                クロック ±
+                <input
+                  type="number"
+                  min={0.05}
+                  step={0.05}
+                  value={yManual}
+                  onChange={(e) => setYManual(Math.max(0.01, Number(e.target.value) || 0.01))}
+                  className="w-16 border rounded px-1 py-0.5 text-right"
+                  aria-label="週内クロックの縦軸の片側レンジ(%)"
+                />
+                %
+              </label>
+            </>
           )}
           {yFix === "envelope" && (
-            <span className="text-gray-400">±{(yEnvelope * 100).toFixed(3)}%（この窓長の全ローリング位置を包む）</span>
+            <span className="text-gray-400">
+              スペクトル ±{(yEnvelope.spectrum * 100).toFixed(3)}% ／ クロック ±{(yEnvelope.clock * 100).toFixed(3)}%
+              （この窓長の全ローリング位置を包む）
+            </span>
           )}
           {yFix !== "off" && (
             <span className="text-gray-400">窓の位置・窓長を動かしても目盛が固定されるので、局面ごとの振幅の大小をそのまま比較できます。</span>
           )}
+        </div>
+      </div>
+
+      {/* ===== (A) エッジ・スペクトル / 週内クロック(同じ窓の2つの見方を並べて同時に見る) ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 items-start">
+      <div>
+        <div className="text-xs text-gray-500 mb-1">
+          エッジ・スペクトル: 週内10素片の平均対数リターン(±標準誤差・有意性)
+          {yFix !== "off" && <span className="text-blue-500">｜縦軸固定 ±{(spectrumFixedRange! * 100).toFixed(3)}%</span>}
+        </div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={spectrumRef} /></div>
+      </div>
+
+      {/* ===== (A) 週内クロック ===== */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">
+          週内クロック: 素片を時間順に積み上げた累積平均リターン(谷で買い・山で売り)
+          <span className="text-gray-400">
+            {" "}｜対象 {clockSample.totalDays.toLocaleString()} 営業日（各曜日 n={clockSample.minN}〜{clockSample.maxN} 週）から算出
+          </span>
+          {yFix !== "off" && <span className="text-blue-500">｜縦軸固定 ±{(clockFixedRange! * 100).toFixed(3)}%</span>}
         </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={clockRef} /></div>
       </div>
@@ -881,6 +928,12 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             帯をドラッグ（またはローリング＋▶再生）して曲線の形が窓の位置でころころ変わるなら、そのエッジは局面固有＝将来に持ち越せない。
             窓内の騰落・年率σの表示は、その窓が強気/弱気・平穏/荒れのどれかを一言で示す。</li>
           <li><span className="font-medium">エッジ・スペクトル:</span> 濃い緑/赤+★が付いた素片に、週内リターンの偏りが集中している。</li>
+          <li><span className="font-medium">縦軸の固定（スペクトル・クロック共通）:</span> 自動伸縮のままだと、窓を動かしたとき
+            「振幅が変わった」のか「目盛が変わった」のか区別できず、<span className="font-medium">形しか比べられない</span>。
+            「固定(全位置)」はその窓長で取りうる全ローリング位置を包む目盛に揃えるので、
+            どの局面のエッジが<span className="font-medium">絶対値として大きいか</span>を直接比較できる
+            （例: 平穏期の素片平均は目盛いっぱいに見えても、暴落期に比べれば数分の一しかない）。
+            2図で同じモードが効くため、素片単位の偏り(スペクトル)と積み上げ後の到達点(クロック)を同じ土俵で読める。</li>
           <li><span className="font-medium">素片×年ヒートマップ:</span> 横に同色が続く素片=毎年効く持続的なエッジ。1年だけ極端な色=その年固有の偶然で、平均がそれに引っ張られている疑い。色が左右で反転していればアノマリーの減衰・消滅。</li>
           <li><span className="font-medium">ランキング表:</span> p_adj&lt;0.05(青ハイライト) かつ 年次勝率が高く 前後半✓ かつ ブートCIが0をまたがない——この4条件を満たす行が、最も信頼に足る好機。</li>
         </ul>
