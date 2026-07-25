@@ -46,6 +46,7 @@ const SORT_LABELS: Record<ScanSort, string> = {
 };
 
 export default function WeekdayEdgeScanChart({ prices }: Props) {
+  const overviewRef = useRef<HTMLCanvasElement>(null);
   const spectrumRef = useRef<HTMLCanvasElement>(null);
   const clockRef = useRef<HTMLCanvasElement>(null);
   const atomYearRef = useRef<HTMLCanvasElement>(null);
@@ -95,6 +96,26 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   const barsAfter = prices.length - effEnd; // 窓の右端から最新までの本数(ローリング位置)
   const winStartDate = windowedPrices[0]?.time ?? "";
   const winEndDate = windowedPrices[windowedPrices.length - 1]?.time ?? "";
+
+  // 窓が「どういう局面か」を一言で添えるための素性(騰落・年率ボラ)。
+  // スペクトル/クロックの形と、原系列上の位置(上昇局面か暴落局面か)を結び付けて読むため。
+  const winStats = useMemo(() => {
+    const w = windowedPrices;
+    if (w.length < 3) return null;
+    const rs: number[] = [];
+    for (let i = 1; i < w.length; i++) rs.push(Math.log(w[i].close / w[i - 1].close));
+    const m = rs.reduce((s, v) => s + v, 0) / rs.length;
+    const v2 = rs.reduce((s, v) => s + (v - m) * (v - m), 0) / Math.max(1, rs.length - 1);
+    return { ret: Math.log(w[w.length - 1].close / w[0].close), vol: Math.sqrt(v2 * 252) };
+  }, [windowedPrices]);
+
+  // リサイズ時にCanvas群を再描画する(2カラム→1カラムの折返しで幅が変わるため)
+  const [resizeTick, setResizeTick] = useState(0);
+  useEffect(() => {
+    const onResize = () => setResizeTick((t) => t + 1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // 固定窓長プリセットを設定(ローリングでも共通)。最新起点では右端を最新に保つ。
   const setLen = useCallback((n: number) => {
@@ -197,6 +218,131 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   // drawClock に渡す固定レンジ(片側)。null=自動伸縮。
   const clockFixedRange =
     yFix === "off" ? null : yFix === "manual" ? Math.max(0.0001, yManual / 100) : yEnvelope;
+
+  // === 原系列ミニマップ(全期間の株価 + 現在の窓の位置) ===
+  // 時間軸チャートだが、ここでの目的は「全履歴のどこを集計しているか」の一望と
+  // ドラッグでの窓移動(ブラシ)。ズーム/パンで全体像が失われると役目を果たさないため、
+  // 例外的に Canvas2D を採用する。
+  const overviewGeom = useRef<{ left: number; plotW: number; n: number } | null>(null);
+  const dragRef = useRef<{ grabOffset: number } | null>(null);
+
+  const drawOverview = useCallback((canvas: HTMLCanvasElement, pts: PricePoint[], from: number, to: number, mode: "latest" | "rolling") => {
+    const r = initCanvas(canvas, 128); if (!r) return;
+    const { ctx, width, height } = r;
+    const pad = { top: 12, bottom: 18, left: 52, right: 12 };
+    const plotW = width - pad.left - pad.right;
+    const plotH = height - pad.top - pad.bottom;
+    const n = pts.length;
+    if (n < 2 || plotW <= 0) return;
+    overviewGeom.current = { left: pad.left, plotW, n };
+
+    // 対数スケール(10年で数倍動く系列でも窓ごとの相対変化を等しく見せる)
+    let lo = Infinity, hi = -Infinity;
+    for (const p of pts) { const v = Math.log(p.close); if (v < lo) lo = v; if (v > hi) hi = v; }
+    const rng = hi - lo || 0.001;
+    const toX = (i: number) => pad.left + (plotW * i) / (n - 1);
+    const toY = (v: number) => pad.top + plotH * (1 - (Math.log(v) - lo) / rng);
+
+    // 年グリッド
+    ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    let prevYear = "";
+    for (let i = 0; i < n; i++) {
+      const y = pts[i].time.slice(0, 4);
+      if (y !== prevYear) {
+        if (prevYear) {
+          ctx.strokeStyle = "#eceff3"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(toX(i), pad.top); ctx.lineTo(toX(i), pad.top + plotH); ctx.stroke();
+          ctx.fillStyle = "#b0b6be"; ctx.fillText(`'${y.slice(2)}`, toX(i), height - 6);
+        }
+        prevYear = y;
+      }
+    }
+
+    // 窓の帯
+    const x0 = toX(Math.max(0, from));
+    const x1 = toX(Math.min(n - 1, to - 1));
+    ctx.fillStyle = "rgba(37,99,235,0.10)";
+    ctx.fillRect(x0, pad.top, Math.max(2, x1 - x0), plotH);
+
+    // 価格ライン: 全期間は淡いグレー、窓の中だけ青で太く
+    ctx.strokeStyle = "#c6cbd2"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) { const x = toX(i), y = toY(pts[i].close); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.stroke();
+    ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = Math.max(0, from); i < Math.min(n, to); i++) {
+      const x = toX(i), y = toY(pts[i].close);
+      if (i === Math.max(0, from)) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // 窓の両端(ローリング時は右端＝いま集計を打ち切っている時点)
+    ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 1;
+    for (const [x, solid] of [[x0, mode === "latest"], [x1, true]] as [number, boolean][]) {
+      ctx.setLineDash(solid ? [] : [3, 2]);
+      ctx.beginPath(); ctx.moveTo(x, pad.top - 3); ctx.lineTo(x, pad.top + plotH + 3); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // 掴める端のハンドル
+    ctx.fillStyle = "#2563eb";
+    ctx.fillRect(x0 - 1.5, pad.top - 5, 3, 5);
+    ctx.fillRect(x1 - 1.5, pad.top - 5, 3, 5);
+
+    // y軸(価格)
+    ctx.fillStyle = "#aab0b8"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    for (let i = 0; i <= 2; i++) {
+      const v = Math.exp(lo + (rng * i) / 2);
+      ctx.fillText(v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1), pad.left - 5, pad.top + plotH * (1 - i / 2) + 3);
+    }
+
+    // 窓の期間ラベル(帯の上)
+    ctx.fillStyle = "#2563eb"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
+    const lbl = `${pts[Math.max(0, from)]?.time ?? ""} 〜 ${pts[Math.min(n - 1, to - 1)]?.time ?? ""}`;
+    const tw = ctx.measureText(lbl).width;
+    ctx.fillText(lbl, Math.min(Math.max(pad.left, x0), width - pad.right - tw), 9);
+  }, []);
+
+  // ミニマップ上のドラッグで窓を動かす(ローリング=位置、最新起点=窓長)
+  const idxFromPointer = useCallback((e: React.PointerEvent<HTMLCanvasElement>): number | null => {
+    const g = overviewGeom.current; if (!g) return null;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = (e.clientX - rect.left - g.left) / g.plotW;
+    return Math.max(0, Math.min(g.n - 1, Math.round(t * (g.n - 1))));
+  }, []);
+
+  const moveWindowTo = useCallback((idx: number) => {
+    if (winMode === "rolling") {
+      const off = dragRef.current?.grabOffset ?? Math.floor(effWinLen / 2);
+      const start = Math.max(0, Math.min(prices.length - effWinLen, idx - off));
+      setWinEnd(start + effWinLen);
+    } else {
+      // 最新起点: 掴んだ点が窓の左端になる = 窓長を決める
+      setWinLen(Math.max(60, Math.min(prices.length, prices.length - idx)));
+      setWinEnd(prices.length);
+    }
+  }, [winMode, effWinLen, prices.length]);
+
+  const onOverviewDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const idx = idxFromPointer(e); if (idx === null) return;
+    setPlaying(false);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const start = effEnd - effWinLen;
+    // 窓の内側を掴んだらその相対位置を保って平行移動、外側なら掴んだ点を中心へ
+    dragRef.current = { grabOffset: idx >= start && idx < effEnd ? idx - start : Math.floor(effWinLen / 2) };
+    moveWindowTo(idx);
+  }, [idxFromPointer, moveWindowTo, effEnd, effWinLen]);
+
+  const onOverviewMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragRef.current) return;
+    const idx = idxFromPointer(e); if (idx === null) return;
+    moveWindowTo(idx);
+  }, [idxFromPointer, moveWindowTo]);
+
+  const onOverviewUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    dragRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  }, []);
 
   // === エッジ・スペクトル(10素片の平均±SEと有意性) ===
   const drawSpectrum = useCallback((canvas: HTMLCanvasElement, atoms: AtomStat[]) => {
@@ -367,10 +513,11 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   }, []);
 
   useEffect(() => {
+    if (overviewRef.current) drawOverview(overviewRef.current, prices, effEnd - effWinLen, effEnd, winMode);
     if (spectrumRef.current) drawSpectrum(spectrumRef.current, windowAnalysis.atoms);
     if (clockRef.current) drawClock(clockRef.current, windowAnalysis.cumulative, windowAnalysis.atoms, windowAnalysis.bestLong, clockFixedRange);
     if (atomYearRef.current) drawAtomYear(atomYearRef.current, atomAnalysis.atoms, atomAnalysis.yearly);
-  }, [atomAnalysis, windowAnalysis, clockFixedRange, drawSpectrum, drawClock, drawAtomYear]);
+  }, [prices, effEnd, effWinLen, winMode, resizeTick, atomAnalysis, windowAnalysis, clockFixedRange, drawOverview, drawSpectrum, drawClock, drawAtomYear]);
 
   if (prices.length < 60) {
     return <div className="text-xs text-gray-400 p-3">データが不足しています(60営業日以上必要)。</div>;
@@ -415,6 +562,12 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             <span className="text-gray-400">（{effWinLen.toLocaleString()}本 ≈{(effWinLen / 252).toFixed(1)}年 / {clockSample.totalDays.toLocaleString()}営業日）</span>
             {isFullWindow && <span className="text-gray-400"> ・全期間</span>}
           </span>
+          {winStats && (
+            <span className="text-gray-400">
+              窓内 <span className={`font-mono ${colorCls(winStats.ret)}`}>{winStats.ret >= 0 ? "+" : ""}{(winStats.ret * 100).toFixed(1)}%</span>
+              {" "}・年率σ <span className="font-mono text-gray-600">{(winStats.vol * 100).toFixed(1)}%</span>
+            </span>
+          )}
         </div>
 
         {/* 窓長プリセット(共通) */}
@@ -438,6 +591,24 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             >全期間</button>
           )}
         </div>
+
+        {/* 原系列ミニマップ: 全履歴のどこを集計しているかを一望し、ドラッグで窓を動かす */}
+        <div className="w-full rounded border border-gray-200 bg-white overflow-hidden">
+          <canvas
+            ref={overviewRef}
+            className="touch-none cursor-ew-resize"
+            onPointerDown={onOverviewDown}
+            onPointerMove={onOverviewMove}
+            onPointerUp={onOverviewUp}
+            onPointerCancel={onOverviewUp}
+          />
+        </div>
+        <p className="text-[10px] text-gray-400">
+          青い帯＝いま下のスペクトル／週内クロックが集計している期間（原系列の対数スケール）。
+          {winMode === "rolling"
+            ? "帯をドラッグすると窓ごと平行移動、帯の外をクリックするとその日を中心に移動します。"
+            : "グラフをドラッグすると掴んだ日が窓の左端になり、窓長が変わります（右端は常に最新）。"}
+        </p>
 
         {winMode === "latest" ? (
           <>
@@ -511,7 +682,8 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
         )}
       </div>
 
-      {/* ===== (A) エッジ・スペクトル ===== */}
+      {/* ===== (A) エッジ・スペクトル / 週内クロック(同じ窓の2つの見方を並べて同時に見る) ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 items-start">
       <div>
         <div className="text-xs text-gray-500 mb-1">エッジ・スペクトル: 週内10素片の平均対数リターン(±標準誤差・有意性)</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={spectrumRef} /></div>
@@ -561,7 +733,12 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           )}
         </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={clockRef} /></div>
-        <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+      </div>
+      </div>
+
+      {/* 最良窓(週内クロックの最大/最小連続部分和) */}
+      <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           {bl && (
             <div className="p-2 bg-green-50 rounded border border-green-100">
               <span className="text-gray-500">最良ロング窓(素片の最大連続和):</span>{" "}
@@ -698,6 +875,11 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
         <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
         <ul className="list-disc pl-4 space-y-1">
+          <li><span className="font-medium">原系列ミニマップ:</span> 青い帯が、その下のスペクトル・週内クロックが集計している期間そのもの。
+            曜日効果は<span className="font-medium">局面依存</span>なので、「いま見ている曲線がどの相場から出てきたのか」を必ず突き合わせる。
+            上昇トレンド中の窓では全素片が上方に、暴落局面の窓では夜間素片だけが大きく負に振れる、といった形で現れる。
+            帯をドラッグ（またはローリング＋▶再生）して曲線の形が窓の位置でころころ変わるなら、そのエッジは局面固有＝将来に持ち越せない。
+            窓内の騰落・年率σの表示は、その窓が強気/弱気・平穏/荒れのどれかを一言で示す。</li>
           <li><span className="font-medium">エッジ・スペクトル:</span> 濃い緑/赤+★が付いた素片に、週内リターンの偏りが集中している。</li>
           <li><span className="font-medium">素片×年ヒートマップ:</span> 横に同色が続く素片=毎年効く持続的なエッジ。1年だけ極端な色=その年固有の偶然で、平均がそれに引っ張られている疑い。色が左右で反転していればアノマリーの減衰・消滅。</li>
           <li><span className="font-medium">ランキング表:</span> p_adj&lt;0.05(青ハイライト) かつ 年次勝率が高く 前後半✓ かつ ブートCIが0をまたがない——この4条件を満たす行が、最も信頼に足る好機。</li>
