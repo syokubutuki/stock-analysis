@@ -178,11 +178,13 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   // 局面ごとの振幅の大小を目盛で直接比較できる。位置数は最大~200点に間引いて軽量化。
   const yEnvelope = useMemo(() => {
     const L = effWinLen;
-    if (L < 60 || L >= prices.length) {
-      // 単一窓(全期間など): 全期間の累積振幅をそのまま採用。
+    if (L >= prices.length) {
+      // 単一窓(全期間): その唯一の窓の累積振幅をそのまま採用。
       // atomAnalysis は prices のみ依存で安定 → 再生(winEnd変化)中に再計算されない。
       return Math.max(...atomAnalysis.cumulative.map((v) => Math.abs(v)), 0.0001);
     }
+    // 短窓ほど各素片平均が平滑化されず累積振幅が大きく振れるため、全期間値では
+    // 包み切れずクリップされる。窓長に依らず必ず全ローリング位置を走査して max|C| を採る。
     const step = Math.max(1, Math.floor((prices.length - L) / 200));
     let maxAbs = 0.0001;
     for (let end = L; end <= prices.length; end += step) {
