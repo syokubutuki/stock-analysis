@@ -30,10 +30,30 @@ interface Props {
 
 type SortKey = "amp" | "ticker" | "name" | "n";
 const SORTS: { key: SortKey; label: string; hint: string }[] = [
-  { key: "amp", label: "日中パス振幅", hint: "平均パスの山谷幅(最大−最小)が大きい順。値動きの形がはっきりした銘柄を上に。" },
+  { key: "amp", label: "日中パス振幅", hint: "平均パスの山谷幅(最大−最小)が大きい順。値動きの形がはっきりした銘柄を上に。集計する曜日(全曜日の最大/平均, または単一曜日)は右のボタンで選ぶ。" },
   { key: "ticker", label: "銘柄コード", hint: "ティッカーの昇順。" },
   { key: "name", label: "名称", hint: "銘柄名の五十音/アルファベット順。" },
   { key: "n", label: "データ数", hint: "そのビンの立会日数が多い順(標本が厚い銘柄を上に)。" },
+];
+
+// 振幅ソートの集計対象。null=全曜日の最大, "mean"=全曜日の平均, 数値=その曜日単独。
+type AmpScope = number | "max" | "mean";
+const AMP_SCOPES: { value: AmpScope; label: string; hint: string }[] = [
+  { value: "max", label: "最大", hint: "月〜金のうち最も振幅の大きい曜日の値で並べる(どこか1日でも大きく動く銘柄が上)。" },
+  { value: "mean", label: "平均", hint: "月〜金の振幅の平均で並べる(週を通して動く銘柄が上)。" },
+  ...CROSS_WD_ORDER.map((wd) => ({
+    value: wd as AmpScope,
+    label: CROSS_WD_LABELS[wd],
+    hint: `${CROSS_WD_LABELS[wd]}のセルの振幅だけで並べる(その曜日に最も動く銘柄が上)。`,
+  })),
+];
+
+// 形状スパークラインの縦軸スケール。
+type SparkScale = "cell" | "row" | "all";
+const SPARK_SCALES: { value: SparkScale; label: string; hint: string }[] = [
+  { value: "all", label: "全銘柄共通", hint: "表内の全セル(横断平均行を含む)で同じ縦軸(±最大|パス|)。1%あたりの高さが全セルで等しくなり、どの銘柄・どの曜日が大きく動くかを形の大きさそのもので比較できる。小さい銘柄は平坦に潰れる。" },
+  { value: "row", label: "銘柄内共通", hint: "各銘柄(行)の中で縦軸を共通化。銘柄間の値動きの大きさの差を打ち消し、その銘柄の中でどの曜日が大きいかを比較する(個別株分析の曜日パス図と同じ見え方)。" },
+  { value: "cell", label: "各セル自動", hint: "セルごとに山谷レンジへ自動フィット。大きさは比べられないが、小さな銘柄でも形(山谷の時刻)がはっきり見える。" },
 ];
 
 const US_MODES: { value: UsMode; label: string; formula: string }[] = [
@@ -57,6 +77,22 @@ interface Metric {
   hint: string;
 }
 
+// 1セル(銘柄×曜日)の日内パス振幅 = 平均累積パスの山谷幅(最大−最小)。値動きの形の大きさ。
+function cellAmplitude(c: CellStats): number {
+  if (!c.path || c.path.length === 0) return 0;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of c.path) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  return hi > lo ? hi - lo : 0;
+}
+
+// 1セルの平均パスの最大絶対値(寄り基準)。共通縦軸 ±maxAbs を作るときのスケール源。
+function cellMaxAbs(c: CellStats | null): number {
+  if (!c || !c.path) return 0;
+  let m = 0;
+  for (const v of c.path) { const a = Math.abs(v); if (a > m) m = a; }
+  return m;
+}
+
 const METRICS: Metric[] = [
   // リターン
   { key: "intraday", label: "日中(寄→引)", group: "リターン", color: "div", fmt: "pctS", get: (c) => c.intraday, p: (c) => c.intradayP, hint: "寄付で買い引けで売った平均。日中トレードの素の期待値。" },
@@ -66,6 +102,7 @@ const METRICS: Metric[] = [
   { key: "mfe", label: "上値到達(高/寄)", group: "値幅・到達", color: "div", fmt: "pctS", get: (c) => c.mfe, hint: "寄付から高値までの平均。日中どこまで上げたか=利確余地。" },
   { key: "mae", label: "下値到達(安/寄)", group: "値幅・到達", color: "div", fmt: "pctS", get: (c) => c.mae, hint: "寄付から安値までの平均(通常マイナス)。含み損の深さ=ストップ目安。" },
   { key: "range", label: "日中レンジ(高/安)", group: "値幅・到達", color: "seq", fmt: "pct", get: (c) => c.range, hint: "高値÷安値の平均。その日の値動きの大きさ。" },
+  { key: "ampl", label: "パス振幅(山谷幅)", group: "値幅・到達", color: "seq", fmt: "pct", get: cellAmplitude, hint: "平均累積パスの最大−最小。『平均すると残る』方向性の大きさで、日々のレンジ(打ち消し前)とは別物。これが大きい曜日ほど日内の形にエッジがある。並び替えの『日中パス振幅』と同じ量。" },
   { key: "vol", label: "ボラ(日中σ)", group: "値幅・到達", color: "seq", fmt: "pct", get: (c) => c.vol, hint: "日中リターンの標準偏差。ばらつき=リスク。" },
   // 質
   { key: "winRate", label: "勝率(引>寄)", group: "トレード質", color: "divHalf", fmt: "pct0", get: (c) => c.winRate, hint: "引けが寄りを上回った日の割合。50%が中立。" },
@@ -166,6 +203,9 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
   const [selBinRaw, setSelBinRaw] = useState<number | null>(null);
   const [metricKey, setMetricKey] = useState("intraday");
   const [sortKey, setSortKey] = useState<SortKey>("amp");
+  const [ampScope, setAmpScope] = useState<AmpScope>("max");
+  // 形状セルの縦軸。既定=全銘柄共通(振幅の大小をそのまま目で比較できる)。
+  const [sparkScale, setSparkScale] = useState<SparkScale>("all");
   // 対象期間: 0=全期間/最新 の既定なので、データ長が変わっても破綻しない(effectでのreset不要)。
   const [winMode, setWinMode] = useState<"latest" | "rolling">("latest");
   const [winLen, setWinLen] = useState(0); // 窓長(立会日). 0=全期間
@@ -492,8 +532,50 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                 {s.label}
               </button>
             ))}
+            {sortKey === "amp" && (
+              <span className="inline-flex items-center gap-1 flex-wrap ml-1 pl-2 border-l border-gray-200">
+                <span className="text-gray-400 text-[10px]">振幅の曜日:</span>
+                {AMP_SCOPES.map((a) => (
+                  <button
+                    key={String(a.value)}
+                    onClick={() => setAmpScope(a.value)}
+                    title={a.hint}
+                    className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      ampScope === a.value ? "bg-amber-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </span>
+            )}
             {onRename && <span className="text-[10px] text-gray-400">｜銘柄名の ✎ で名称を編集(ウォッチリストに保存)</span>}
           </div>
+
+          {metric.key === "shape" && (
+            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+              <span className="text-gray-500">形状の縦軸:</span>
+              {SPARK_SCALES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setSparkScale(s.value)}
+                  title={s.hint}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    sparkScale === s.value ? "bg-slate-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+              <span className="text-[10px] text-gray-400">
+                {sparkScale === "cell"
+                  ? "セルごとに自動フィット（大きさは比較不可・形だけ見る）"
+                  : sparkScale === "row"
+                  ? "銘柄内で軸固定（同じ行の曜日どうしが比較可）"
+                  : "全銘柄で軸固定（表全体で振幅をそのまま比較可）"}
+              </span>
+            </div>
+          )}
 
           <CrossHeatmap
             result={result}
@@ -501,6 +583,8 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
             ctx={ctx}
             names={names}
             sortKey={sortKey}
+            ampScope={ampScope}
+            sparkScale={sparkScale}
             onRename={onRename}
           />
 
@@ -523,28 +607,51 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
         <p className="font-medium text-gray-700 mt-3">2. 指標の定義(O=寄, H=高, L=安, C=引, P=前日引)</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>リターン</strong>: 日中=ln(C/O)、前日比=ln(C/P)(オーバーナイト込み・実損益に近い)、ギャップ=ln(O/P)(夜間の窓)。</li>
-          <li><strong>値幅・到達</strong>: 上値到達=ln(H/O)(利確余地)、下値到達=ln(L/O)(含み損の深さ=ストップ目安)、日中レンジ=ln(H/L)、ボラ=日中リターンのσ。</li>
+          <li><strong>値幅・到達</strong>: 上値到達=ln(H/O)(利確余地)、下値到達=ln(L/O)(含み損の深さ=ストップ目安)、日中レンジ=ln(H/L)、ボラ=日中リターンのσ、<strong>パス振幅</strong>=max_t r̄(t) − min_t r̄(t)（平均累積パス r̄(t)=mean ln(P_t/O) の山谷幅）。日中レンジが「各日の値幅を平均したもの(方向が打ち消される前)」なのに対し、パス振幅は「平均してもなお残る方向性の大きさ」。レンジは大きいのに振幅が小さい＝日々よく動くが方向がバラバラ(エッジなし)、両方大きい＝時間帯の癖が一貫。</li>
           <li><strong>トレード質</strong>: 勝率=C&gt;Oの割合、終値位置=(C−L)/(H−L)(1=大引け天井/0=引け安)、シャープ=日中平均/σ。</li>
           <li><strong>時刻</strong>: 上値ピーク/最安時刻=平均累積パスの最大/最小時間、高値/安値時刻=日中の高安を付けた時刻の中央値。前者は『銘柄全体で均した山谷』、後者は『各日が実際に高安を付けた時刻の代表値』で、両者はズレうる(平均パスは打ち消し合いで山谷が緩み時刻が中央寄りに、各日の実測は極値なのでばらつく)。</li>
-          <li><strong>形状＋高安時刻</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) を各セルにスパークライン描画し、上記4時刻を1枚に重ねて同時表示(● 上値ピーク/最安=平均パス基準、▽△ 高値/安値時刻中央=各日実測)。●と▽△の横のズレで両者の違いを一目で読める。縦軸は<strong>各セルの山谷レンジに自動フィット</strong>し、原系列のように形状をはっきり見せる(共通スケールだと大振幅セルに他が潰される)。振幅の大きさは左上に山谷幅(%)を数値表示して銘柄間比較を担保。灰帯は平均の±1標準誤差(σ/√n; 日次±1σ~1-2%だと平均パス~0.1-0.5%が潰れるため。枠でクリップし、帯が枠を超えるほど平均が不確か)。破線は寄り(0)の水準。</li>
+          <li><strong>形状＋高安時刻</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) を各セルにスパークライン描画し、上記4時刻を1枚に重ねて同時表示(● 上値ピーク/最安=平均パス基準、▽△ 高値/安値時刻中央=各日実測)。●と▽△の横のズレで両者の違いを一目で読める。縦軸は3通りから選べる(下記)。振幅の大きさは左上に山谷幅(%)を数値表示。灰帯は平均の±1標準誤差(σ/√n; 日次±1σ~1-2%だと平均パス~0.1-0.5%が潰れるため。枠でクリップし、帯が枠を超えるほど平均が不確か)。破線は寄り(0)の水準。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">3. 集計と対象期間</p>
+        <p className="font-medium text-gray-700 mt-3">3. 形状セルの縦軸(振幅の視覚比較)</p>
+        <p>
+          {"スパークラインは1セルが小さいため、縦軸の取り方で『何が比較できるか』が変わる。目的に応じて切り替える。"}
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>全銘柄共通（既定）</strong>: 表内の全セル(横断平均行を含む)で縦軸を ±max|r̄(t)|×1.05 に固定。<strong>1%あたりの高さが全セルで等しい</strong>ので、銘柄間・曜日間の振幅の差がそのまま形の大きさとして目に入る。値動きの小さい銘柄は平坦な線になる(それが正しい表現)。個別株分析の曜日パス図が全曜日で ±maxAbs を共有しているのと同じ流儀を、銘柄方向へ拡張したもの。</li>
+          <li><strong>銘柄内共通</strong>: 行(銘柄)ごとに縦軸を固定。値がさ・ボラの銘柄間差を打ち消し、「この銘柄の中でどの曜日が大きいか」に集中できる。個別株分析の同一分析と同じ見え方。</li>
+          <li><strong>各セル自動</strong>: セルごとに山谷レンジへフィット。大きさは比較できないが、振幅の小さいセルでも山谷の<em>時刻</em>(形の位相)が読める。共通軸で潰れたセルの形を確認したいときに使う。</li>
+        </ul>
+        <p>
+          {"数値で厳密に比べたいときは、指標『パス振幅(山谷幅)』を選べば同じ量が%のヒートマップになる(色の濃さ=振幅の大きさ)。形で見る=共通軸、数で見る=パス振幅指標、の2枚を往復するのが早い。"}
+        </p>
+
+        <p className="font-medium text-gray-700 mt-3">4. 並び替え(曜日別の振幅)</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>{"『日中パス振幅』ソートは、集計する曜日を 最大 / 平均 / 月〜金の単一曜日 から選べる。最大=週のどこか1日でも大きく動く銘柄が上、平均=週を通してよく動く銘柄が上、単一曜日=その曜日に最も動く銘柄が上。"}</li>
+          <li>{"『火曜だけ大きく動く銘柄群』のような曜日固有のランキングを作るには単一曜日を選ぶ。行見出しの振幅%も選んだ曜日の値に切り替わる(その曜日のセルが空の行は最下部)。"}</li>
+          <li>{"共通軸(全銘柄)＋単一曜日ソートの組み合わせが、この分析の中心的な使い方: 上位行ほど大きな形、下位ほど平坦、という並びになり『その曜日にどの銘柄がどれだけ動くか』を1画面で把握できる。"}</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">5. 集計と対象期間</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>{"前夜米国ビンの境界は『対象期間内・全銘柄共通』に取る(日付デデュープした米国リターンを順位分割)。銘柄横断で同じ地合いを比較するため。"}</li>
           <li>{"対象期間はローリング可能。最新起点(窓長可変・右端は最新)または窓長固定で位置をスライド。エッジがどの時期に現れ・消えたか、期間依存かを確認できる。"}</li>
           <li>{"横断平均行は全銘柄の該当日をプールし、日中リターンを『日付クラスタ頑健SE』で検定(同一営業日の全銘柄相関を吸収)。実効標本数nEffも併記。"}</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">4. 投資判断への活用</p>
+        <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>今夜の前夜米国は寄り前に確定(上部バナー)。そのビン列で、明日の曜日に最も効く銘柄・向き・利確/損切り時刻を選ぶ。前日比とギャップの分解で「窓で取るか日中で取るか」も判断。</li>
+          <li>振幅は<strong>建玉サイズの手がかり</strong>: 同じ勝率・同じ方向なら振幅の大きい銘柄ほど1回の値幅が取れる。逆に振幅が小さいのに有意★が出ているセルは、手数料・スプレッドで消える大きさかを必ず確認する(振幅%が往復コストを下回るなら実行不能)。</li>
           <li>上値到達/下値到達で利確幅とストップ幅の当たりを、終値位置/ピーク時刻で手仕舞い時刻を、勝率/シャープでエッジの質を確認。</li>
           <li>横断平均で共通と確認できた条件だけ採用し、1銘柄だけのシグナルは見送る(過学習回避)。全銘柄同方向＝ブックが地合いに集中(分散不足)、逆行銘柄はヘッジ候補。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
+        <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
+          <li>{"振幅は『大きさ』であって『信頼性』ではない。n が小さいセルは平均パスが偶然の1〜2日に引っ張られて大振幅に見える(平均は n の平方根で収束するため、n=3 のセルは n=30 の約3倍ばらつく)。振幅で並べたら必ず n と灰帯(±1標準誤差)の広さを合わせて見る。帯が枠を突き抜けるセルの振幅は信用しない。"}</li>
+          <li>{"共通軸で平坦に見えるセルにもエッジはありうる(振幅が小さくても方向が一貫していれば有効)。大きさと有意性は別軸なので、共通軸で当たりを付けたら日中/前日比の★とシャープで裏を取る。"}</li>
           <li>{"前夜米国ビン×曜日で母集団を細分するため各セルは薄い(nを常時表示)。ローリングや5分位で更に薄くなる。横断平均行(プール)でのみ実効標本が確保されやすい。"}</li>
           <li>{"横断平均は『銘柄が似た反応をする』前提。値がさ/低位・業種・米国連動度が大きく違う銘柄を混ぜると平均が歪む。"}</li>
           <li>{"多重比較(銘柄×曜日×ビン×指標×期間)で見かけの有意が出やすい。★の数でなく横断的一貫性・nEff・期間頑健性を重視。"}</li>
@@ -557,26 +664,49 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
 
 // ───────────────────────── ヒートマップ表 ─────────────────────────
 
-// 1行(銘柄)の日内パス振幅=各曜日セルの平均パス山谷幅の最大。値動きの形のはっきり度合い。
-function rowAmplitude(r: CrossRow): number {
-  let mx = 0;
-  for (const c of r.cells) {
-    if (!c || c.path.length === 0) continue;
-    let lo = Infinity, hi = -Infinity;
-    for (const v of c.path) { if (v < lo) lo = v; if (v > hi) hi = v; }
-    if (hi - lo > mx) mx = hi - lo;
+// 横断平均行の行キー(銘柄コードと衝突しない値)。
+const CONSENSUS_KEY = " consensus";
+
+function ampScopeLabel(scope: AmpScope): string {
+  return typeof scope === "number" ? CROSS_WD_LABELS[scope] : scope === "mean" ? "平均" : "最大";
+}
+
+// 1行(銘柄)の日内パス振幅を、指定した曜日スコープで集計する。
+//  "max"  = 月〜金のうち最大 / "mean" = 月〜金の平均 / 数値 = その曜日単独
+// 単一曜日を選べば「その曜日に最も動く銘柄」で行を並べられる。
+function rowAmplitude(r: CrossRow, scope: AmpScope = "max"): number {
+  if (typeof scope === "number") {
+    const i = CROSS_WD_ORDER.indexOf(scope);
+    const c = i >= 0 ? r.cells[i] : null;
+    return c ? cellAmplitude(c) : -1; // 該当曜日が空の行は最下部へ
   }
-  return mx;
+  let mx = 0, sum = 0, k = 0;
+  for (const c of r.cells) {
+    if (!c) continue;
+    const a = cellAmplitude(c);
+    if (a > mx) mx = a;
+    sum += a; k++;
+  }
+  return scope === "mean" ? (k > 0 ? sum / k : -1) : mx;
+}
+
+// 共通縦軸(±yMax)。scope 内の全セルで 1% あたりの高さを揃えるための上限。
+function scaleMaxAbs(cells: (CellStats | null)[]): number {
+  let m = 0;
+  for (const c of cells) { const a = cellMaxAbs(c); if (a > m) m = a; }
+  return m;
 }
 
 function CrossHeatmap({
-  result, metric, ctx, names, sortKey, onRename,
+  result, metric, ctx, names, sortKey, ampScope, sparkScale, onRename,
 }: {
   result: NonNullable<ReturnType<typeof computeCrossRows>>;
   metric: Metric;
   ctx: ColorCtx;
   names?: Record<string, string>;
   sortKey: SortKey;
+  ampScope: AmpScope;
+  sparkScale: SparkScale;
   onRename?: (ticker: string, name: string) => void;
 }) {
   const { timeLabels, grid } = result;
@@ -586,18 +716,50 @@ function CrossHeatmap({
     const rows = [...result.rows];
     const nm = (t: string) => names?.[t] || t;
     switch (sortKey) {
-      case "amp": rows.sort((a, b) => rowAmplitude(b) - rowAmplitude(a)); break;
+      case "amp": rows.sort((a, b) => rowAmplitude(b, ampScope) - rowAmplitude(a, ampScope)); break;
       case "ticker": rows.sort((a, b) => a.ticker.localeCompare(b.ticker)); break;
       case "name": rows.sort((a, b) => nm(a.ticker).localeCompare(nm(b.ticker), "ja")); break;
       case "n": rows.sort((a, b) => b.nTotal - a.nTotal); break;
     }
     return rows;
-  }, [result.rows, sortKey, names]);
+  }, [result.rows, sortKey, ampScope, names]);
 
-  const renderCell = (c: CellStats | null, consensusP?: number) => {
+  // 形状セルの共通縦軸。"all"=表全体(横断平均行も含む), "row"=行ごと, "cell"=なし(自動フィット)。
+  const globalMaxAbs = useMemo(() => {
+    if (sparkScale !== "all") return 0;
+    const all: (CellStats | null)[] = [];
+    for (const r of result.rows) all.push(...r.cells);
+    all.push(...result.consensus);
+    return scaleMaxAbs(all);
+  }, [result.rows, result.consensus, sparkScale]);
+
+  const rowMaxAbs = useMemo(() => {
+    const m = new Map<string, number>();
+    if (sparkScale !== "row") return m;
+    for (const r of result.rows) m.set(r.ticker, scaleMaxAbs(r.cells));
+    m.set(CONSENSUS_KEY, scaleMaxAbs(result.consensus));
+    return m;
+  }, [result.rows, result.consensus, sparkScale]);
+
+  // 各セルに渡す共通軸(±yMax)。0/未定義なら PathSpark 側で自動フィット。
+  const yMaxFor = (rowKey: string): number => {
+    if (sparkScale === "all") return globalMaxAbs;
+    if (sparkScale === "row") return rowMaxAbs.get(rowKey) ?? 0;
+    return 0;
+  };
+
+  const renderCell = (c: CellStats | null, consensusP?: number, rowKey = "") => {
     if (!c || c.n < 1) return <span className="text-gray-300">—</span>;
     if (metric.key === "shape") {
-      return <PathSpark cell={c} grid={grid} timeLabels={timeLabels} />;
+      return (
+        <PathSpark
+          cell={c}
+          grid={grid}
+          timeLabels={timeLabels}
+          yMax={yMaxFor(rowKey)}
+          scaleMode={sparkScale}
+        />
+      );
     }
     const v = metric.get(c);
     const bg = cellBg(metric, v, ctx);
@@ -636,13 +798,14 @@ function CrossHeatmap({
                   ticker={r.ticker}
                   name={names?.[r.ticker]}
                   n={r.nTotal}
-                  ampl={rowAmplitude(r)}
+                  ampl={rowAmplitude(r, ampScope)}
+                  amplLabel={ampScopeLabel(ampScope)}
                   onRename={onRename}
                   mode={nameCol}
                 />
               </td>
               {r.cells.map((c, i) => (
-                <td key={i} className="px-0.5 py-0.5 text-center align-middle">{renderCell(c)}</td>
+                <td key={i} className="px-0.5 py-0.5 text-center align-middle">{renderCell(c, undefined, r.ticker)}</td>
               ))}
             </tr>
           ))}
@@ -657,7 +820,7 @@ function CrossHeatmap({
             {result.consensus.map((c: ConsensusCell | null, i) => (
               <td key={i} className="px-0.5 py-0.5 text-center align-middle"
                 title={c ? `のべ${c.n}｜独立${c.nDays}日｜実効${c.nEff.toFixed(1)}` : undefined}>
-                {renderCell(c, c && metric.key === "intraday" ? c.intradayCrP : undefined)}
+                {renderCell(c, c && metric.key === "intraday" ? c.intradayCrP : undefined, CONSENSUS_KEY)}
               </td>
             ))}
           </tr>
@@ -676,8 +839,24 @@ function CrossHeatmap({
       {metric.key === "shape" && (
         <div className="flex flex-col gap-0.5 text-[10px] text-gray-500 mt-1.5">
           <div>
-            寄り基準の平均累積パス。<span className="text-slate-600 font-medium">縦は各セルの山谷レンジに自動フィット</span>（原系列のように形状をはっきり表示）。
-            <span className="text-gray-400">左上の%＝山谷の振幅（大きさはここで比較）</span>、<span className="text-slate-600">灰帯＝平均の±1標準誤差 σ/√n（枠でクリップ; 帯が枠を超えるほど不確か）</span>。
+            寄り基準の平均累積パス。
+            {sparkScale === "cell" ? (
+              <>
+                <span className="text-slate-600 font-medium">縦は各セルの山谷レンジに自動フィット</span>（形状をはっきり表示。大きさの比較は不可）。
+                <span className="text-gray-400">左上の%＝山谷の振幅（大きさはここで比較）</span>、
+              </>
+            ) : (
+              <>
+                <span className="text-slate-600 font-medium">
+                  縦軸は{sparkScale === "all" ? "全銘柄・全曜日で共通" : "銘柄ごとに共通"}
+                  {globalMaxAbs > 0 && sparkScale === "all" && `（±${(globalMaxAbs * 1.05 * 100).toFixed(2)}%）`}
+                </span>
+                （1%あたりの高さが{sparkScale === "all" ? "表全体" : "その行"}で等しく、
+                <span className="text-gray-700 font-medium">振幅の大小をそのまま形の大きさとして比較できる</span>。平坦なセル＝動きが小さい）。
+                <span className="text-gray-400">左上の%＝山谷の振幅、</span>
+              </>
+            )}
+            <span className="text-slate-600">灰帯＝平均の±1標準誤差 σ/√n（枠でクリップ; 帯が枠を超えるほど不確か）</span>。
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
             <span><span style={{ color: SP_GREEN }} className="font-bold">●</span> 上値ピーク時刻（平均パス最大＝利確目安）</span>
@@ -697,21 +876,21 @@ function CrossHeatmap({
 // 銘柄行の見出し。名称(あれば)+ 銘柄コードを併記し、onRename があれば ✎ でインライン編集。
 // 編集結果は親(ポートフォリオ)経由でウォッチリストに保存され、名称表示の不整合を解消できる。
 // mode="code" では列を細めるため銘柄コードだけを出し、名称/振幅はツールチップに送る。
-function RowHeader({ ticker, name, n, ampl, onRename, mode }: {
-  ticker: string; name?: string; n: number; ampl: number;
+function RowHeader({ ticker, name, n, ampl, amplLabel, onRename, mode }: {
+  ticker: string; name?: string; n: number; ampl: number; amplLabel: string;
   onRename?: (ticker: string, name: string) => void;
   mode: NameColMode;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name ?? "");
   const hasName = !!name && name !== ticker;
-  const amplPct = `${(ampl * 100).toFixed(ampl >= 0.01 ? 1 : 2)}%`;
+  const amplPct = ampl < 0 ? "—" : `${(ampl * 100).toFixed(ampl >= 0.01 ? 1 : 2)}%`;
   // td の左右padding(px-2=8px×2)を除いた実効幅。truncate を効かせるため内側にも上限を置く。
   const innerW = { maxWidth: NAME_COL_W[mode] - 16 };
 
   if (mode === "code") {
     return (
-      <div style={innerW} title={`${hasName ? `${name}（${ticker}）` : ticker}｜n=${n}｜振幅${amplPct}`}>
+      <div style={innerW} title={`${hasName ? `${name}（${ticker}）` : ticker}｜n=${n}｜振幅(${amplLabel})${amplPct}`}>
         <div className="font-mono font-medium text-gray-700 truncate">{ticker}</div>
         <div className="text-[9px] text-gray-400 tabular-nums truncate">n={n}</div>
       </div>
@@ -757,34 +936,50 @@ function RowHeader({ ticker, name, n, ampl, onRename, mode }: {
       <div className="text-[9px] text-gray-400 tabular-nums flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
         {hasName && <span className="font-mono">{ticker}</span>}
         <span>n={n}</span>
-        <span className="text-gray-300">振幅{amplPct}</span>
+        <span className="text-gray-300" title={`日内パス振幅（${amplLabel}）= 平均累積パスの山谷幅`}>
+          振幅{amplLabel === "最大" ? "" : `(${amplLabel})`}{amplPct}
+        </span>
       </div>
     </div>
   );
 }
 
-// 1セルの日内平均パス ミニチャート。縦は「そのセルの平均パス自身のレンジ」に自動フィットし、
-// 原系列のように形状をはっきり見せる(共通スケールだと大振幅セルに潰される)。振幅そのものは
-// 左上に山谷幅(%)を数値表示し、銘柄間比較を担保。灰帯=平均の±1標準誤差(σ/√n, 枠でクリップ)。
-// さらに4つの時刻マーカーを重ねる:
+// 1セルの日内平均パス ミニチャート。縦軸は2通り:
+//  - yMax>0 (共通軸): ±yMax の対称軸。全銘柄(または行内)で 1% あたりの高さが揃うので、
+//    振幅の大小を形の大きさとして直接比較できる。個別株分析の曜日パス図(±maxAbs)と同じ流儀。
+//  - yMax=0 (自動フィット): そのセルの平均パス自身のレンジに合わせる。大きさは比較不可だが
+//    小さい銘柄でも形(山谷の時刻)がはっきり見える。
+// いずれの場合も振幅そのものは左上に山谷幅(%)を数値表示して比較を担保。
+// 灰帯=平均の±1標準誤差(σ/√n, 枠でクリップ)。さらに4つの時刻マーカーを重ねる:
 //  ● 上値ピーク時刻 / 最安時刻   = 平均累積パスの最大/最小(緑/赤の丸, パス上)
 //  ▽ 高値時刻中央 / △ 安値時刻中央 = 各日実測の高安時刻の中央値(緑/赤の三角, 上端/下端)
 // ●と▽△の横のズレが「均された山谷」と「典型的な高安の時刻」の違いを表す。
 const SP_GREEN = "#16a34a", SP_RED = "#dc2626";
-function PathSpark({ cell, grid, timeLabels }: {
+function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
   cell: CellStats; grid: BinGrid; timeLabels: string[];
+  yMax?: number; // >0 なら ±yMax の共通軸。0 ならセル自動フィット。
+  scaleMode?: SparkScale;
 }) {
   const { path, band, peakIdx, troughIdx, highMin, lowMin } = cell;
   const W = 104, H = 54, padX = 6, padTop = 9, padBot = 9;
   const G = path.length;
   if (G < 2) return <span className="text-gray-300">—</span>;
 
-  // 縦スケール: 平均パス自身の [min, max] にフィット(帯ではなく線でフィット→形状が枠いっぱい)
-  let lo = Infinity, hi = -Infinity;
-  for (let g = 0; g < G; g++) { if (path[g] < lo) lo = path[g]; if (path[g] > hi) hi = path[g]; }
-  const ampl = hi - lo; // 山谷の振幅(寄り基準)
-  const padV = Math.max(ampl * 0.18, 2e-5);
-  lo -= padV; hi += padV;
+  // 山谷の振幅(寄り基準)は縦軸モードによらず同じ量。
+  let pLo = Infinity, pHi = -Infinity;
+  for (let g = 0; g < G; g++) { if (path[g] < pLo) pLo = path[g]; if (path[g] > pHi) pHi = path[g]; }
+  const ampl = pHi - pLo;
+
+  // 縦スケール。共通軸: 0を中央に置いた ±yMax(1.05倍の余白)。自動: 平均パス自身の [min,max]。
+  let lo: number, hi: number;
+  const fixed = yMax > 0;
+  if (fixed) {
+    const m = yMax * 1.05;
+    lo = -m; hi = m;
+  } else {
+    const padV = Math.max(ampl * 0.18, 2e-5);
+    lo = pLo - padV; hi = pHi + padV;
+  }
   const spanV = hi - lo || 1e-6;
   const plotH = H - padTop - padBot;
 
@@ -807,8 +1002,11 @@ function PathSpark({ cell, grid, timeLabels }: {
   const zeroY = yRaw(0); // 寄り基準(0=始値)
 
   const amplPct = `${(ampl * 100).toFixed(ampl >= 0.01 ? 1 : 2)}%`;
+  const axisDesc = fixed
+    ? `縦=${scaleMode === "all" ? "全銘柄共通" : "銘柄内共通"}の固定軸 ±${(yMax * 1.05 * 100).toFixed(2)}%（他セルと大きさを直接比較可）`
+    : "縦=自セルの山谷に自動フィット（大きさの比較は不可）";
   const title =
-    `平均パス形状（寄り基準の累積対数リターン, 縦=自セルの山谷に自動フィット, 灰帯=±1標準誤差 σ/√n）\n` +
+    `平均パス形状（寄り基準の累積対数リターン, ${axisDesc}, 灰帯=±1標準誤差 σ/√n）\n` +
     `山谷の振幅 ${amplPct}\n` +
     `● 上値ピーク時刻 ${timeLabels[peakIdx] ?? ""}（平均パス最大）\n` +
     `▽ 高値時刻・中央 ${minuteToLabel(Math.round(highMin))}（各日実測）\n` +
