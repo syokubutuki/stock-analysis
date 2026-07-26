@@ -3,6 +3,12 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // Search Console のプロパティは https://stock-analysis.vercel.app に一本化する。
+  // sitemap.ts の BASE と必ず一致させること（食い違うとサイトマップが対象範囲外で弾かれる）。
+  metadataBase: new URL("https://stock-analysis.vercel.app"),
+  verification: {
+    google: "ofoMx5OtnknPc6zhkrBc9iHZOWR69gj9HdjcPOf0B0o",
+  },
   title: "株価構造分析 | 市場の隠れた構造をデータから抽出",
   description:
     "株価時系列の構造分析ツール。FFT・ウェーブレット・EMD・DFA・エントロピー・Recurrence Plotなど多角的な分析で市場の隠れた構造を可視化。",
