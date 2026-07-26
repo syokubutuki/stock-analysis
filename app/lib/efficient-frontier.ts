@@ -55,6 +55,9 @@ export interface EfficientFrontierResult {
   // 超過リターンが全て非正で正のシャープが得られない場合は null。
   tangencyLongOnly: PortfolioPoint | null;
   minVarLongOnly: PortfolioPoint | null; // 空売り無し(上限付き)最小分散
+  // 空売り無し(上限付き)で幾何成長率 g = μ − σ²/2 を最大化する点。docs §G6。
+  // 接点(最大シャープ)とは別の場所にあり、iso-growth 等高線が実現可能領域に接する点。
+  maxGrowthLongOnly: PortfolioPoint | null;
   maxWeight: number; // 適用した1銘柄上限 (1=制約なし)
 
   // 比較ベースライン(素朴な配分則)。等加重・リスクパリティ・逆ボラ。
@@ -299,6 +302,55 @@ function maxSharpeLongOnly(
   return best;
 }
 
+// 空売り無し(w≥0, Σw=1, 上限cap)で幾何成長率 g = wᵀμ − wᵀΣw/2 を最大化する。
+// docs/correlation-growth-drag-visualization.md §G6「最大成長点」。
+// 目的関数は μ が線形・wᵀΣw が凸(Σは半正定値)なので g は**凹**。したがって射影勾配上昇は
+// 大域最適に収束する(シャープ比最大化が擬凹で多スタートを要したのとは対照的)。
+//   ∂g/∂wᵢ = μᵢ − (Σw)ᵢ
+// なお現金を混ぜられる(Σw≤1 を許す)場合の最大成長点は接点のレバレッジ調整に一致するため、
+// ここでは「フル投資(Σw=1)の中でどこが最速か」を解く。接点(最大シャープ)とは別の点になる。
+function maxGrowthLongOnly(
+  mu: number[],
+  S: number[][],
+  inits: number[][],
+  cap = 1
+): { weights: number[]; mu: number; sigma: number; growth: number } | null {
+  const proj = (v: number[]) => (cap < 1 ? projectCappedSimplex(v, cap) : projectSimplex(v));
+  const evalW = (w: number[]) => {
+    const v = Math.max(quad(S, w), 0);
+    const m = dot(w, mu);
+    return { g: m - v / 2, sg: Math.sqrt(v), m };
+  };
+  let best: { weights: number[]; mu: number; sigma: number; growth: number } | null = null;
+  for (const init of inits) {
+    let w = proj(init.slice());
+    let cur = evalW(w);
+    let lr = 1;
+    for (let iter = 0; iter < 400; iter++) {
+      const Sw = matVec(S, w);
+      const grad = mu.map((mi, i) => mi - Sw[i]);
+      let improved = false;
+      for (let bt = 0; bt < 30; bt++) {
+        const cand = proj(w.map((wi, i) => wi + lr * grad[i]));
+        const cs = evalW(cand);
+        if (cs.g > cur.g + 1e-14) {
+          w = cand;
+          cur = cs;
+          lr *= 1.3;
+          improved = true;
+          break;
+        }
+        lr *= 0.5;
+      }
+      if (!improved || lr < 1e-12) break;
+    }
+    if (!best || cur.g > best.growth) {
+      best = { weights: w.slice(), mu: cur.m, sigma: cur.sg, growth: cur.g };
+    }
+  }
+  return best;
+}
+
 // 乱数 (seeded, 再現性のため)
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0;
@@ -515,6 +567,17 @@ export function efficientFrontier(
       }
     : null;
 
+  // --- 最大成長点(空売り無し・フル投資): g = μ − σ²/2 の最大化。docs §G6 ---
+  const maxGrowthRaw = maxGrowthLongOnly(mu, S, loInits, maxWeight);
+  const maxGrowthPoint: PortfolioPoint | null = maxGrowthRaw
+    ? {
+        weights: maxGrowthRaw.weights,
+        mu: maxGrowthRaw.mu,
+        sigma: maxGrowthRaw.sigma,
+        sharpe: sharpeOf(maxGrowthRaw.mu, maxGrowthRaw.sigma),
+      }
+    : null;
+
   // --- 比較ベースライン(素朴な配分則) ---
   const pointOf = (w: number[]): PortfolioPoint => {
     const m = dot(w, mu);
@@ -551,6 +614,7 @@ export function efficientFrontier(
     cloudMinVol: minVol,
     tangencyLongOnly,
     minVarLongOnly: minVarLongOnlyPoint,
+    maxGrowthLongOnly: maxGrowthPoint,
     maxWeight,
     baselines,
   };

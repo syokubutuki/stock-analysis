@@ -473,8 +473,10 @@ export function orderByCorrelation(
 
 // ───────────────────────── シミュレーション（U1 / S1 / S2・Phase2-3） ─────────────────────────
 
-// seeded RNG（プロジェクト既存の mulberry32 パターン）
-function mulberry32(seed: number): () => number {
+// seeded RNG（プロジェクト既存の mulberry32 パターン）。
+// U3 エルゴード性デモ（GrowthIntuitionPanel）でもコイン投げに使うため export する。
+// 同じ手続きを二重定義しないための共有。
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;

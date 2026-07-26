@@ -9,6 +9,7 @@ import {
   EfficientFrontierResult,
   PortfolioPoint,
 } from "../../lib/efficient-frontier";
+import { geometricGrowth, doublingYears } from "../../lib/growth-drag";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 
@@ -119,6 +120,29 @@ function ShapeGlyph({ shape, color }: { shape: MarkerShape; color: string }) {
 const PAD = { left: 56, right: 16, top: 16, bottom: 40 };
 const HEIGHT = 420;
 
+// G6 iso-growth 等高線の色（docs/correlation-growth-drag-visualization.md §G6）。
+// 「最大成長点」は接点(最大シャープ)と別の場所にあることを示す主役なので独立した色を持たせる。
+const ISO_COLOR = "#a5b4fc";
+const ISO_LABEL = "#6366f1";
+const GROWTH_COLOR = "#7c3aed";
+
+// 等高線の刻み幅を「切りのいい値」に丸める。2〜5 の間を 2.5 で刻めるようにしてある
+// （そうしないと等高線が 3 本程度に減って地形が読めなくなる範囲が出る）。
+function niceStep(raw: number): number {
+  if (!(raw > 0)) return 0.01;
+  const exp = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw / exp;
+  const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+  return m * exp;
+}
+
+// 倍化年数の表示（YourPortfolioDragPanel と同じ規則）。g ≤ 0 は「永遠に来ない」。
+function yearsLabel(y: number): string {
+  if (!isFinite(y)) return "永遠に来ない";
+  if (y > 200) return "200年超";
+  return `${y.toFixed(1)}年`;
+}
+
 export default function EfficientFrontierChart({ data, window: win = 250 }: Props) {
   const [open, setOpen] = useState(true);
   const [rfPct, setRfPct] = useState(0.5); // 年率Rf(%)
@@ -128,6 +152,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
   const [useMuShrink, setUseMuShrink] = useState(true); // μ の Bayes-Stein 収縮
   const [maxWeightPct, setMaxWeightPct] = useState(100); // 1銘柄上限(%)。100=制約なし
   const [showBaselines, setShowBaselines] = useState(true); // 比較ベースラインの表示
+  const [showIso, setShowIso] = useState(true); // G6: iso-growth 等高線と最大成長点
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number; vol: number; ret: number } | null>(null);
 
@@ -186,6 +211,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     result.curve.forEach((p) => push(p.sigma, p.mu));
     if (result.tangencyLongOnly) push(result.tangencyLongOnly.sigma, result.tangencyLongOnly.mu);
     if (result.minVarLongOnly) push(result.minVarLongOnly.sigma, result.minVarLongOnly.mu);
+    if (result.maxGrowthLongOnly) push(result.maxGrowthLongOnly.sigma, result.maxGrowthLongOnly.mu);
     if (result.tangency) push(result.tangency.sigma, result.tangency.mu);
     if (benchPoint) push(benchPoint.sigma, benchPoint.mu);
     result.baselines.forEach((b) => push(b.point.sigma, b.point.mu));
@@ -253,6 +279,51 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     ctx.rotate(-Math.PI / 2);
     ctx.fillText("年率期待リターン μ", 0, 0);
     ctx.restore();
+
+    // G6: iso-growth 等高線 g = μ − σ²/2 ⇔ μ = g + σ²/2（docs §G6）
+    // 上に凸ではなく「下に凸(上向き)の放物線群」。σ が大きいほど、同じ g を保つのに
+    // より高い μ が必要になる ＝ ボラティリティ税の分だけ上へ持ち上がる。
+    // フロンティアは右上へ伸びながらこの等高線群を**下向きに横切る**ので、
+    // 「フロンティアの右上端＝最も儲かる点」ではないことが図として見える。
+    // 雲や曲線の下に敷くため、グリッドの直後・雲の前に薄く描く。
+    if (showIso) {
+      // 描画範囲の四隅から g の値域を取る（g は σ について単調減少・μ について単調増加）
+      const gLo = geometricGrowth(bounds.yMin, bounds.xMax);
+      const gHi = geometricGrowth(bounds.yMax, bounds.xMin);
+      const step = niceStep((gHi - gLo) / 9); // 8〜10本になるよう刻む
+      ctx.font = "9px sans-serif";
+      // ラベルはプロット幅の 70% 付近に置く（右端に全部溜まると読めない）
+      const labelX = PAD.left + plotW * 0.7;
+      for (let g = Math.ceil(gLo / step) * step; g <= gHi + 1e-12; g += step) {
+        const pts: { x: number; y: number }[] = [];
+        const M = 80;
+        for (let i = 0; i <= M; i++) {
+          const sg = bounds.xMin + ((bounds.xMax - bounds.xMin) * i) / M;
+          const m = g + (sg * sg) / 2; // 等高線の定義式
+          if (m < bounds.yMin || m > bounds.yMax) continue;
+          pts.push({ x: sx(sg), y: sy(m) });
+        }
+        if (pts.length < 2) continue;
+        ctx.strokeStyle = ISO_COLOR;
+        ctx.lineWidth = Math.abs(g) < 1e-9 ? 1.6 : 1; // g=0 の等高線だけ少し強く
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // 目標 x に最も近い可視点へラベル。雲の上に載っても読めるよう白フチをつける。
+        let lab = pts[0];
+        for (const p of pts) if (Math.abs(p.x - labelX) < Math.abs(lab.x - labelX)) lab = p;
+        const text = `g=${(g * 100).toFixed(0)}%`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.strokeText(text, lab.x, lab.y - 2);
+        ctx.fillStyle = ISO_LABEL;
+        ctx.fillText(text, lab.x, lab.y - 2);
+      }
+    }
 
     // B: モンテカルロ雲(ロングオンリー)
     const shs = result.cloud.map((p) => p.sharpe).sort((a, b) => a - b);
@@ -413,11 +484,70 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       }
     }
 
+    // G6: 最大成長点を通る等高線だけは雲の上に濃く描く。この等高線が実現可能領域に
+    // **接している**ことが「そこが最速」の視覚的な証明になる。
+    const growthPt = showIso ? result.maxGrowthLongOnly : null;
+    if (growthPt) {
+      const gStar = geometricGrowth(growthPt.mu, growthPt.sigma);
+      ctx.strokeStyle = GROWTH_COLOR;
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i <= 80; i++) {
+        const sg = bounds.xMin + ((bounds.xMax - bounds.xMin) * i) / 80;
+        const m = gStar + (sg * sg) / 2;
+        if (m < bounds.yMin || m > bounds.yMax) {
+          started = false;
+          continue;
+        }
+        const px = sx(sg), py = sy(m);
+        if (!started) {
+          ctx.moveTo(px, py);
+          started = true;
+        } else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // ロングオンリー(上限付き)最小分散。形状: ■
     const minVolPt = result.minVarLongOnly ?? result.cloudMinVol;
     marker(minVolPt, "#0ea5e9", "square", "最小分散(LO)", "sw");
     // 空売り無しの接点=市場ポートフォリオ。形状: ★(既定の主役)
     if (result.tangencyLongOnly) marker(result.tangencyLongOnly, "#dc2626", "star", "接点(市場)", "ne");
+    // G6: 最大成長点(g = μ − σ²/2 最大・フル投資)。形状: ▲
+    // 接点(★)と重ならないのが要点。ラベルには Sharpe ではなく g を出す。
+    if (growthPt) {
+      const x = sx(growthPt.sigma), y = sy(growthPt.mu);
+      ctx.fillStyle = GROWTH_COLOR;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      drawMarkerShape(ctx, x, y, "triangle");
+      ctx.fill();
+      ctx.stroke();
+      const text = `最大成長  g=${(geometricGrowth(growthPt.mu, growthPt.sigma) * 100).toFixed(1)}%`;
+      ctx.font = "bold 10px sans-serif";
+      const tw = ctx.measureText(text).width;
+      const padX = 4, padY = 2.5, gap = 9;
+      // ★(右上)・■最小分散(左下)とラベルがぶつからないよう、▲は右下へ逃がす
+      let bx = x + gap;
+      let by = y + gap;
+      if (bx + tw + padX * 2 > width - PAD.right) bx = x - gap - tw - padX * 2;
+      if (bx < PAD.left) bx = PAD.left;
+      if (by + 10 + padY * 2 > height - PAD.bottom) by = y - gap - (10 + padY * 2);
+      const bw = tw + padX * 2, bh = 10 + padY * 2;
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.strokeStyle = GROWTH_COLOR;
+      ctx.lineWidth = 1;
+      roundRect(ctx, bx, by, bw, bh, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = GROWTH_COLOR;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, bx + padX, by + bh / 2 + 0.5);
+    }
     // 空売り可(閉形式)の特異点。形状: ◆GMV。トグル時のみ参照表示。
     if (showShort) marker(result.gmv, "#2563eb", "diamond", "GMV(空売り可)", "nw");
 
@@ -434,7 +564,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [result, bounds, hover, showShort, benchPoint, showBaselines]);
+  }, [result, bounds, hover, showShort, benchPoint, showBaselines, showIso]);
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -547,6 +677,10 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   <input type="checkbox" checked={showBaselines} onChange={(e) => setShowBaselines(e.target.checked)} />
                   <span>ベースライン(1/N・RP・IV)</span>
                 </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={showIso} onChange={(e) => setShowIso(e.target.checked)} />
+                  <span>成長率の等高線 g=μ−σ²/2 と最大成長点</span>
+                </label>
                 <span className="flex items-center gap-1.5">
                   <span className="font-medium">1銘柄上限</span>
                   <input
@@ -583,6 +717,12 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                 <LineLegend color="#f59e0b" label="資本市場線 CML" dashed />
                 <PointLegend shape="star" color="#dc2626" label="接点=市場ポートフォリオ(空売り無し)" />
                 <PointLegend shape="square" color="#0ea5e9" label="最小分散(空売り無し)" />
+                {showIso && result.maxGrowthLongOnly && (
+                  <PointLegend shape="triangle" color={GROWTH_COLOR} label="最大成長点(g=μ−σ²/2 最大)" />
+                )}
+                {showIso && (
+                  <LineLegend color={ISO_COLOR} label="成長率 g の等高線(薄) / 最大成長点を通る等高線(濃紫)" dashed />
+                )}
                 {benchPoint && (
                   <span className="flex items-center gap-1.5">
                     <svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#1d4ed8" /></svg>
@@ -601,10 +741,51 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                 <span className="text-gray-400">点群=ランダム配分(色=シャープ比 青低→緑→赤高)</span>
               </div>
 
+              {/* G6: 等高線の読み方（フロンティアの右上端＝最良ではない） */}
+              {showIso && result.maxGrowthLongOnly && result.tangencyLongOnly && (
+                <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs text-gray-700">
+                  <div className="font-semibold text-violet-800">
+                    フロンティアの右上端は「最も儲かる点」ではありません
+                  </div>
+                  <p className="mt-1">
+                    薄い破線は<strong>実質成長率 g = μ − σ²/2 が同じ点を結んだ等高線</strong>です。
+                    σ が大きいほど同じ g を保つのに高い μ が必要になるため、等高線は
+                    <strong>右へ行くほど持ち上がります</strong>。フロンティアは右上へ伸びながら
+                    この等高線群を<strong>下向きに横切る</strong>——つまり右上へ行くほど g は下がります。
+                    濃い紫の破線が実現可能領域に<strong>接する</strong>点（▲）が、実際に資産が最も速く増える配分です。
+                  </p>
+                  <p className="mt-1.5 tabular-nums">
+                    ★接点(最大シャープ)：μ {(result.tangencyLongOnly.mu * 100).toFixed(1)}% / σ{" "}
+                    {(result.tangencyLongOnly.sigma * 100).toFixed(1)}% /{" "}
+                    <strong>g {(geometricGrowth(result.tangencyLongOnly.mu, result.tangencyLongOnly.sigma) * 100).toFixed(1)}%</strong>{" "}
+                    （2倍まで{" "}
+                    {yearsLabel(doublingYears(geometricGrowth(result.tangencyLongOnly.mu, result.tangencyLongOnly.sigma)))}）
+                    <br />▲最大成長点：μ {(result.maxGrowthLongOnly.mu * 100).toFixed(1)}% / σ{" "}
+                    {(result.maxGrowthLongOnly.sigma * 100).toFixed(1)}% /{" "}
+                    <strong className="text-violet-800">
+                      g {(geometricGrowth(result.maxGrowthLongOnly.mu, result.maxGrowthLongOnly.sigma) * 100).toFixed(1)}%
+                    </strong>{" "}
+                    （2倍まで{" "}
+                    {yearsLabel(doublingYears(geometricGrowth(result.maxGrowthLongOnly.mu, result.maxGrowthLongOnly.sigma)))}）
+                  </p>
+                  <p className="mt-1.5 text-[10px] text-gray-500">
+                    ★と▲が離れているほど「シャープ比の最良」と「増える速さの最良」が食い違っています。
+                    2つが一致するのは Rf=0 かつレバレッジ自由のときだけで、
+                    <strong>シャープ比は成長率の代理指標にすぎません</strong>。
+                    なお ▲ は<strong>フル投資(Σw=1・現金なし)</strong>の中での最速点です。現金を混ぜられるなら
+                    最大成長は「接点 × ケリー比率 λ*=(μ−Rf)/σ²」で達成され、そちらの方が上に来ます
+                    （その扱いは「相関だけを動かす：三本の崖」パネル）。
+                  </p>
+                </div>
+              )}
+
               {/* 代表ポートフォリオの構成(チャートのマーカーと色・形で対応) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 <WeightTable shape="star" color="#dc2626" title="接点(市場)ポートフォリオ" subtitle="最大シャープ・空売り無し(実装可能)" point={result.tangencyLongOnly} tickers={result.tickers} names={names} riskFree={result.riskFree} />
                 <WeightTable shape="square" color="#0ea5e9" title="最小分散" subtitle="空売り無し・低リスク重視" point={result.minVarLongOnly ?? result.cloudMinVol} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                {showIso && (
+                  <WeightTable shape="triangle" color={GROWTH_COLOR} title="最大成長点" subtitle="g=μ−σ²/2 最大・空売り無し・フル投資" point={result.maxGrowthLongOnly} tickers={result.tickers} names={names} riskFree={result.riskFree} />
+                )}
                 {showShort && (
                   <WeightTable shape="diamond" color="#2563eb" title="GMV(大域最小分散)" subtitle="期待リターン推定に頑健・空売り可" point={result.gmv} tickers={result.tickers} names={names} riskFree={result.riskFree} />
                 )}
@@ -619,6 +800,9 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                       : null,
                     result.minVarLongOnly
                       ? { label: "最小分散(空売り無し)", point: result.minVarLongOnly, accent: "#0ea5e9" }
+                      : null,
+                    showIso && result.maxGrowthLongOnly
+                      ? { label: "最大成長点(g最大)", point: result.maxGrowthLongOnly, accent: GROWTH_COLOR }
                       : null,
                     ...result.baselines.map((b) => ({ label: b.label, point: b.point, accent: "#64748b" })),
                   ].filter((r): r is { label: string; point: PortfolioPoint; accent: string } => r !== null)}
@@ -679,7 +863,67 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   <li><strong>ベースライン(1/N・RP・IV)</strong>: 等加重・リスクパリティ・逆ボラ加重の位置を重ねる。特に <strong>1/N は理論最適を実運用で上回りやすい</strong>謙虚な基準。</li>
                 </ul>
 
-                <p className="font-medium text-gray-700 mt-3">7. 注意点</p>
+                <p className="font-medium text-gray-700 mt-3">
+                  7. 成長率の等高線と最大成長点(iso-growth / G6)
+                </p>
+                <p>
+                  平均分散平面は「リスクとリターン」の地図ですが、
+                  <strong>あなたの資産が実際に増える速さ</strong>はその2つの<em>組み合わせ</em>で決まります。
+                  単純リターンの算術平均を μ、ボラを σ とすると、資産が増える速さ(幾何平均・実質成長率)は
+                </p>
+                <p className="font-mono text-[11px] bg-white rounded px-2 py-1">g ≈ μ − σ²/2</p>
+                <p>
+                  （{" log(1+x) ≈ x − x²/2 "} を期待値に取り {" E[x²] ≈ σ² "} としたもの。対数正規なら厳密）。
+                  この {" σ²/2 "} が<strong>ボラティリティ・ドラッグ（ボラティリティ税）</strong>で、
+                  値動きが荒いだけで自動的に取られる目減り分です。g が一定になる点の集合は
+                </p>
+                <p className="font-mono text-[11px] bg-white rounded px-2 py-1">μ = g + σ²/2</p>
+                <p>
+                  すなわち<strong>上向きの放物線</strong>で、これを薄い破線で重ねたものが iso-growth 等高線です。
+                  右へ行くほど等高線が持ち上がるのは、σ が大きいほど同じ g を保つのに高い μ が
+                  必要になるからです。フロンティアは右上へ伸びながらこの等高線群を
+                  <strong>下向きに横切る</strong>ので、<strong>右上端は最良ではありません</strong>。
+                </p>
+                <p>
+                  <strong>最大成長点(▲)</strong>は、空売り無し・フル投資({" w≥0, Σw=1 "})の中で
+                  {" g = wᵀμ − wᵀΣw/2 "} を最大化した配分です。μ が線形・{" wᵀΣw "} が凸なので g は
+                  <strong>凹関数</strong>——射影勾配上昇で大域最適に届きます(シャープ比最大化は擬凹で
+                  多スタートを要するのとは対照的)。一階条件は
+                </p>
+                <p className="font-mono text-[11px] bg-white rounded px-2 py-1">
+                  μ − Σw = 0 （制約が効かない内点解なら w ∝ Σ⁻¹μ）
+                </p>
+                <p>
+                  接点(★)は {" w ∝ Σ⁻¹(μ − Rf·1) "} を Σw=1 に正規化した点なので、
+                  <strong>両者は Rf=0 かつスケール自由でない限り一致しません</strong>。
+                  フロンティア上では、等高線の傾き {" dμ/dσ = σ "} とフロンティアの傾きが等しくなる点が ▲ です。
+                </p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>
+                    <strong>読み方</strong>: ★と▲の距離が「シャープ比の最良」と「増える速さの最良」の食い違い。
+                    比較表の Sharpe 列と g 列で最良行がずれることを確認できる。
+                  </li>
+                  <li>
+                    <strong>活用</strong>: 長期の資産形成が目的なら、最大化すべきは Sharpe ではなく g。
+                    倍化年数 {" ln2/g "} で見ると「Sharpe が 0.05 高い」より「g が 1% 高い」の方が効く。
+                  </li>
+                  <li>
+                    <strong>現金・レバレッジを許すなら</strong>: 最大成長は「接点 × ケリー比率
+                    {" λ* = (μ_tan−Rf)/σ_tan² "}」で達成され、{" g_max = Rf + Sharpe²/2 "}。
+                    このときだけシャープ比最大化と成長率最大化が同じ答えを出す
+                    （▲はあくまで<strong>現金なし</strong>の制約下の最速点）。
+                  </li>
+                  <li>
+                    <strong>μ の定義について（重要な注記）</strong>: このパネルの μ は対数リターンの平均を
+                    年率化したもので、厳密な算術平均より {" σ²/2 "} 程度小さい保守側の量です。
+                    したがって等高線から読む g は<strong>実際の幾何成長率より控えめ</strong>になります。
+                    実データの厳密な3項分解（算術 μ と対数 Σ を使い分けたもの）は
+                    「相関が食べた分：期待リターンと『実際に増える速さ』のズレ」パネルを参照してください。
+                    等高線の<strong>形と、★≠▲という結論はこの定義差に依存しません</strong>。
+                  </li>
+                </ul>
+
+                <p className="font-medium text-gray-700 mt-3">8. 注意点</p>
                 <ul className="list-disc pl-4 space-y-1">
                   <li><strong>期待リターン μ の推定は極めて不安定</strong>。過去平均をそのまま使うフロンティア(特に接点)は将来に外れやすく、過学習しやすい。実務では GMV やリスクパリティの方が頑健なことが多い。</li>
                   <li>銘柄数が標本数に近い・高相関だと Σ が特異に近づき逆行列が暴れる。本実装は必要時に対角へ収縮(リッジ λ)を加えて安定化する(ヘッダに λ 表示)。</li>
@@ -715,26 +959,37 @@ function BaselineTable({ rows }: { rows: { label: string; point: PortfolioPoint;
             <th className="py-1 px-2 font-medium text-right">μ</th>
             <th className="py-1 px-2 font-medium text-right">σ</th>
             <th className="py-1 px-2 font-medium text-right">Sharpe</th>
+            {/* G6: シャープ比の隣に「実際に増える速さ」を必ず並べる(docs §S3) */}
+            <th className="py-1 px-2 font-medium text-right">g=μ−σ²/2</th>
+            <th className="py-1 px-2 font-medium text-right">2倍まで</th>
             <th className="py-1 pl-2 font-medium text-right">有効銘柄数</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className="border-b border-gray-100">
-              <td className="py-1 pr-2 text-gray-700">
-                <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.accent }} />
-                {r.label}
-              </td>
-              <td className="py-1 px-2 text-right text-gray-600">{(r.point.mu * 100).toFixed(1)}%</td>
-              <td className="py-1 px-2 text-right text-gray-600">{(r.point.sigma * 100).toFixed(1)}%</td>
-              <td className="py-1 px-2 text-right font-medium text-gray-800">{r.point.sharpe.toFixed(2)}</td>
-              <td className="py-1 pl-2 text-right text-gray-500">{effN(r.point.weights).toFixed(1)}</td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const g = geometricGrowth(r.point.mu, r.point.sigma);
+            return (
+              <tr key={r.label} className="border-b border-gray-100">
+                <td className="py-1 pr-2 text-gray-700">
+                  <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.accent }} />
+                  {r.label}
+                </td>
+                <td className="py-1 px-2 text-right text-gray-600">{(r.point.mu * 100).toFixed(1)}%</td>
+                <td className="py-1 px-2 text-right text-gray-600">{(r.point.sigma * 100).toFixed(1)}%</td>
+                <td className="py-1 px-2 text-right font-medium text-gray-800">{r.point.sharpe.toFixed(2)}</td>
+                <td className={`py-1 px-2 text-right font-medium ${g > 0 ? "text-gray-800" : "text-red-700"}`}>
+                  {(g * 100).toFixed(1)}%
+                </td>
+                <td className="py-1 px-2 text-right text-gray-500">{yearsLabel(doublingYears(g))}</td>
+                <td className="py-1 pl-2 text-right text-gray-500">{effN(r.point.weights).toFixed(1)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <p className="text-[10px] text-gray-400 mt-1">
         在サンプル(過去)での位置。<strong>1/N は理論最適を実運用でしばしば上回る</strong>ため、真の優劣は下のアウトオブサンプル検証で確認を。有効銘柄数=分散が実質何銘柄に効いているか。
+        <strong>Sharpe が最良の行と g が最良の行は一致しません</strong>——長期の資産の伸びを決めるのは g のほう(倍化年数 ln2/g)。
       </p>
     </div>
   );

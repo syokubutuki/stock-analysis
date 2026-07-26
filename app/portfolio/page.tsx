@@ -43,6 +43,10 @@ import { BacktestResult } from "../lib/badge-backtest";
 import AccordionSection, { AccordionItem } from "../components/analysis/AccordionSection";
 import dynamic from "next/dynamic";
 
+const GrowthIntuitionPanel = dynamic(
+  () => import("../components/analysis/GrowthIntuitionPanel"),
+  { ssr: false }
+);
 const CorrelationDragChart = dynamic(
   () => import("../components/analysis/CorrelationDragChart"),
   { ssr: false }
@@ -535,7 +539,14 @@ export default function PortfolioPage() {
               node: <SelectionTiltChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // リスク分析(pf-risk)を読む前に「なぜリスクを見る必要があるのか」を体で分からせる層。
-            // 合成データ側（相関だけを動かす直感）→ 実データ側（自分のポートフォリオの分解）の順。
+            // 数式ゼロの直感（データ不要）→ 合成データ（相関だけを動かす）→ 実データ（自分の分解）の順。
+            // 相関の話に入る前に「算術平均と幾何平均は別物」だけを先に体に入れる。データ不要なので常設。
+            items.push({
+              id: "pf-growth-intuition",
+              title: "なぜ「期待リターン」は嘘をつくのか：±x%ゲームとコイン投げ",
+              subtitle: "クリックするたび資産が動く±x%ゲーム（平均は0%のままなのに減る）／Petersのコイン投げで100人が1回 vs 1人が100回（エルゴード性）／±x%往復表でボラティリティ税σ²/2の正体を確認。データ不要・数式ゼロ",
+              node: <GrowthIntuitionPanel />,
+            });
             items.push({
               id: "pf-corr-drag",
               title: "相関だけを動かす：三本の崖と、同期していく値動き",
