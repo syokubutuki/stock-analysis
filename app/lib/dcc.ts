@@ -205,53 +205,66 @@ export function computeDCC(aligned: AlignedReturns): DCCResult {
   };
 }
 
-// ---- 下落日相関(危機時の代理) ----
-// 等加重バスケットの下位 quantile に入る日だけで相関を計算する。
-export interface DownsideCorr {
+// ---- 危機レジーム相関(高ボラ局面で実現する相関) ----
+//
+// 【重要】レジームを「同時点の等加重バスケットのリターンが下位q分位」で切ってはいけない。
+// バスケットは共通ファクターの代理なので、その実現値の片側テールで標本を切ると、
+// 部分標本内のファクター分散が切り詰められ、相関が機械的に下がる
+// (Boyer-Gibson-Loretan 1999 / Forbes-Rigobon 2002 の条件付けバイアス)。2変量正規なら
+//   ρ_A = ρ · √{(1+δ) / (1+δρ²)},  δ = Var(x|A)/Var(x) − 1
+// で、片側切断は δ<0 すなわち ρ_A < ρ。相関一定の合成データに対してすら
+// 「危機時ほど相関が低い」という逆の答えが出る(全標本が両部分標本を上回るのが検知サイン)。
+// n=2 ではバスケットが (x+y)/2 そのものなので正の相関の方向を直接切り詰める最悪ケースだが、
+// n が増えると個別ノイズが平均で消えてバスケット≒共通ファクターに収束するため、切り詰めが
+// ほぼ純粋にファクター分散へ効くようになる。どの n でもバイアスは消えない。
+//
+// そこで危機レジームは **直近 lookback 日のバスケット実現ボラが上位 q 分位** で定義する。
+// 当日のリターンを条件にしないのでこのバイアスが入らず、判定に当日の情報を使わない
+// (先読み無し)ため実運用でも成立するレジーム定義になる。
+//
+// なお高ボラ標本では δ>0 のぶん相関が持ち上がる。これは条件付けの副作用ではなく
+// 「高ボラ局面で実際に実現する相関」なので、ボラを別途固定して相関だけ差し替える
+// ストレスVaRの用途には整合的。ただし上下対称な定義なので「下落時だけ相関が上がる」という
+// 非対称性の検証には使えない(それには exceedance correlation を2変量正規のヌルと比べる必要がある)。
+export interface StressCorr {
   ok: boolean;
-  matrix: number[][];
-  avg: number; // 下落日の平均相関
+  reason: string; // ok=false のときの理由(UI表示用)
+  matrix: number[][]; // 高ボラ標本の相関行列
+  avg: number; // 高ボラ標本の平均相関
+  avgCalm: number; // 低ボラ標本(補集合)の平均相関 — 比較用
   nDays: number;
+  nCalm: number;
+  lookback: number;
+  quantile: number;
 }
 
-export function downsideCorrelation(
-  aligned: AlignedReturns,
-  quantile = 0.25
-): DownsideCorr {
-  const { tickers, returns } = aligned;
-  const n = tickers.length;
-  const T = n > 0 ? returns[0].length : 0;
-  if (n < 2 || T < 20) return { ok: false, matrix: [], avg: 0, nDays: 0 };
+function std(a: number[]): number {
+  if (a.length < 2) return 0;
+  const m = mean(a);
+  let s = 0;
+  for (const v of a) s += (v - m) * (v - m);
+  return Math.sqrt(s / (a.length - 1));
+}
 
-  // 等加重バスケットの日次リターン
-  const basket: number[] = [];
-  for (let t = 0; t < T; t++) {
-    let s = 0;
-    for (let i = 0; i < n; i++) s += returns[i][t];
-    basket.push(s / n);
-  }
-  const sorted = [...basket].sort((x, y) => x - y);
-  const thresh = sorted[Math.floor(quantile * (sorted.length - 1))];
-  const days: number[] = [];
-  for (let t = 0; t < T; t++) if (basket[t] <= thresh) days.push(t);
-  if (days.length < 10) return { ok: false, matrix: [], avg: 0, nDays: days.length };
-
+// 指定日だけを抜き出した Pearson 相関行列(部分標本内で平均を取り直す)
+function corrSubset(
+  returns: number[][],
+  days: number[]
+): { matrix: number[][]; avg: number } {
+  const n = returns.length;
   const matrix: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+  const m = returns.map((r) => mean(days.map((t) => r[t])));
   let s = 0;
   let c = 0;
   for (let i = 0; i < n; i++) {
     matrix[i][i] = 1;
     for (let j = i + 1; j < n; j++) {
-      const ai = days.map((t) => returns[i][t]);
-      const aj = days.map((t) => returns[j][t]);
-      const mi = mean(ai);
-      const mj = mean(aj);
       let cov = 0;
       let vi = 0;
       let vj = 0;
-      for (let k = 0; k < days.length; k++) {
-        const di = ai[k] - mi;
-        const dj = aj[k] - mj;
+      for (const t of days) {
+        const di = returns[i][t] - m[i];
+        const dj = returns[j][t] - m[j];
         cov += di * dj;
         vi += di * di;
         vj += dj * dj;
@@ -263,5 +276,62 @@ export function downsideCorrelation(
       c++;
     }
   }
-  return { ok: true, matrix, avg: c > 0 ? s / c : 0, nDays: days.length };
+  return { matrix, avg: c > 0 ? s / c : 0 };
+}
+
+export function stressCorrelation(
+  aligned: AlignedReturns,
+  opts: { quantile?: number; lookback?: number } = {}
+): StressCorr {
+  const quantile = opts.quantile ?? 0.25;
+  const lookback = opts.lookback ?? 60; // 約13週
+  const { tickers, returns } = aligned;
+  const n = tickers.length;
+  const T = n > 0 ? returns[0].length : 0;
+  const fail = (reason: string): StressCorr => ({
+    ok: false, reason, matrix: [], avg: 0, avgCalm: 0,
+    nDays: 0, nCalm: 0, lookback, quantile,
+  });
+
+  if (n < 2) return fail("銘柄数不足");
+  // 部分標本の日数が銘柄数を下回ると相関行列がランク落ちし、ストレスVaRがさらに過小評価になる。
+  const minDays = Math.max(20, n + 5);
+  if (T <= lookback + minDays) return fail(`期間不足(リターン${T}日 / 助走${lookback}日)`);
+
+  // 等加重バスケットの日次リターン
+  const basket: number[] = [];
+  for (let t = 0; t < T; t++) {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += returns[i][t];
+    basket.push(s / n);
+  }
+
+  // 直近 lookback 日の実現ボラ。t 日自身のリターンは含めない(=当日寄付時点で既知)。
+  const trail: { t: number; v: number }[] = [];
+  for (let t = lookback; t < T; t++) trail.push({ t, v: std(basket.slice(t - lookback, t)) });
+
+  const cut = [...trail].sort((a, b) => b.v - a.v)[
+    Math.floor(quantile * (trail.length - 1))
+  ].v;
+  const stressDays: number[] = [];
+  const calmDays: number[] = [];
+  for (const x of trail) (x.v >= cut ? stressDays : calmDays).push(x.t);
+  if (stressDays.length < minDays)
+    return fail(`高ボラ標本不足(${stressDays.length}日 / 最低${minDays}日)`);
+  if (calmDays.length < minDays)
+    return fail(`低ボラ標本不足(${calmDays.length}日 / 最低${minDays}日)`);
+
+  const hi = corrSubset(returns, stressDays);
+  const lo = corrSubset(returns, calmDays);
+  return {
+    ok: true,
+    reason: "",
+    matrix: hi.matrix,
+    avg: hi.avg,
+    avgCalm: lo.avg,
+    nDays: stressDays.length,
+    nCalm: calmDays.length,
+    lookback,
+    quantile,
+  };
 }

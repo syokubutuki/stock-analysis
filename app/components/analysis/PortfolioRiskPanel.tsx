@@ -10,7 +10,7 @@ import {
   portfolioRisk,
   stressRiskFromCorr,
 } from "../../lib/portfolio-risk";
-import { computeDCC, downsideCorrelation } from "../../lib/dcc";
+import { computeDCC, stressCorrelation } from "../../lib/dcc";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -58,15 +58,17 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
     if (!dccOpen || aligned.tickers.length < 2) return null;
     const d = computeDCC(aligned);
     if (!d.ok) return null;
-    const down = downsideCorrelation(aligned, 0.25);
+    // 危機レジームは「直近60日のバスケット実現ボラが上位25%」で定義する。
+    // 同時点のリターンで切ると条件付けバイアスで相関が機械的に下がる(dcc.ts の解説を参照)。
+    const stress = stressCorrelation(aligned, { quantile: 0.25, lookback: 60 });
     // 相関だけを差し替えてVaRを比較(ボラは現在の条件付きσで固定)
     const calm = stressRiskFromCorr(aligned, rawWeights, d.uncondR, d.condVols);
     const now = stressRiskFromCorr(aligned, rawWeights, d.currentR, d.condVols);
     const crash =
-      down.ok && down.matrix.length === aligned.tickers.length
-        ? stressRiskFromCorr(aligned, rawWeights, down.matrix, d.condVols)
+      stress.ok && stress.matrix.length === aligned.tickers.length
+        ? stressRiskFromCorr(aligned, rawWeights, stress.matrix, d.condVols)
         : null;
-    return { d, down, calm, now, crash };
+    return { d, stress, calm, now, crash };
   }, [dccOpen, aligned, rawWeights]);
 
   const yen = (v: number) => `¥${Math.round(v).toLocaleString()}`;
@@ -241,17 +243,30 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
             {dccOpen && (
               dcc ? (
                 <div className="mt-3 space-y-4">
-                  {/* 平時 → 現在 → ピーク */}
+                  {/* 無条件 → 現在 → ピーク → 高ボラ局面 */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <Card label="平時の平均相関" value={dcc.d.uncondAvgCorr.toFixed(2)} />
+                    <Card label="無条件の平均相関" value={dcc.d.uncondAvgCorr.toFixed(2)} sub="全期間(Q̄)" />
                     <Card
                       label="現在の平均相関"
                       value={dcc.d.currentAvgCorr.toFixed(2)}
                       color={dcc.d.currentAvgCorr > dcc.d.uncondAvgCorr + 0.1 ? "text-red-600" : "text-gray-800"}
-                      sub={`平時比 ${dcc.d.currentAvgCorr >= dcc.d.uncondAvgCorr ? "+" : ""}${(dcc.d.currentAvgCorr - dcc.d.uncondAvgCorr).toFixed(2)}`}
+                      sub={`無条件比 ${dcc.d.currentAvgCorr >= dcc.d.uncondAvgCorr ? "+" : ""}${(dcc.d.currentAvgCorr - dcc.d.uncondAvgCorr).toFixed(2)}`}
                     />
                     <Card label="期間ピーク相関" value={dcc.d.peakAvgCorr.toFixed(2)} />
-                    <Card label="下落日の平均相関" value={dcc.down.ok ? dcc.down.avg.toFixed(2) : "—"} sub={dcc.down.ok ? `下位25%・${dcc.down.nDays}日` : "データ不足"} color="text-red-600" />
+                    <Card
+                      label="高ボラ局面の平均相関"
+                      value={dcc.stress.ok ? dcc.stress.avg.toFixed(2) : "—"}
+                      sub={
+                        dcc.stress.ok
+                          ? `直近${dcc.stress.lookback}日ボラ上位25%・${dcc.stress.nDays}日(低ボラ側 ${dcc.stress.avgCalm.toFixed(2)})`
+                          : dcc.stress.reason
+                      }
+                      color={
+                        dcc.stress.ok && dcc.stress.avg > dcc.stress.avgCalm + 0.05
+                          ? "text-red-600"
+                          : "text-gray-800"
+                      }
+                    />
                   </div>
 
                   {/* 平均相関の推移 */}
@@ -267,15 +282,32 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                         相関シナリオ別の日次VaR95(ボラは現在水準で固定、相関のみ差し替え)
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <ScenarioCard label="平時相関" risk={dcc.calm} totalMV={risk.totalMarketValue} yen={yen} />
+                        <ScenarioCard label="無条件相関" risk={dcc.calm} totalMV={risk.totalMarketValue} yen={yen} />
                         <ScenarioCard label="現在(DCC)" risk={dcc.now} totalMV={risk.totalMarketValue} yen={yen} highlight />
-                        <ScenarioCard label="下落日相関(危機)" risk={dcc.crash} totalMV={risk.totalMarketValue} yen={yen} danger />
+                        <ScenarioCard label="高ボラ相関(危機)" risk={dcc.crash} totalMV={risk.totalMarketValue} yen={yen} danger />
                       </div>
-                      {dcc.crash?.ok && dcc.calm.ok && dcc.calm.var95Pct > 0 && (
+                      {dcc.crash?.ok && dcc.calm.ok && dcc.calm.var95Pct > 0 ? (
                         <p className="text-[10px] text-gray-500 mt-2">
-                          危機時は相関上昇で分散効果が消え、VaRが平時比 約
-                          {(dcc.crash.var95Pct / dcc.calm.var95Pct).toFixed(2)}倍に拡大。
+                          {dcc.crash.var95Pct >= dcc.calm.var95Pct ? (
+                            <>
+                              高ボラ局面では相関上昇で分散効果が薄れ、VaRが無条件比 約
+                              {(dcc.crash.var95Pct / dcc.calm.var95Pct).toFixed(2)}倍に拡大。
+                            </>
+                          ) : (
+                            <>
+                              この標本では高ボラ局面の相関が無条件を下回っており、VaRは無条件比 約
+                              {(dcc.crash.var95Pct / dcc.calm.var95Pct).toFixed(2)}倍(=拡大していない)。
+                              銘柄数・期間が少ないと推定誤差でこうなることがあるため、危機の想定を緩めてよい根拠にはしない。
+                            </>
+                          )}
                         </p>
+                      ) : (
+                        !dcc.stress.ok && (
+                          <p className="text-[10px] text-gray-400 mt-2">
+                            危機シナリオは算出できません({dcc.stress.reason})。60日の助走を取ったうえで
+                            高ボラ局面を十分な日数集める必要があるため、短い分析窓(デイトレ)では表示されません。
+                          </p>
+                        )
                       )}
                     </div>
                   )}
@@ -301,14 +333,37 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                     <p className="font-medium text-gray-700 mt-3">3. 用語</p>
                     <ul className="list-disc pl-4 space-y-1">
                       <li><strong>標準化残差 z</strong>: リターンをその時々のボラで割り、ボラ変動の影響を除いた「純粋な連動成分」。</li>
-                      <li><strong>下落日相関</strong>: バスケットが下位25%下落した日だけで測った相関。危機時相関の簡便な代理。</li>
+                      <li><strong>高ボラ局面の相関</strong>: 等加重バスケットの<strong>直近60日(約13週)の実現ボラ</strong>が上位25%に入る日だけで測った相関。危機時相関の代理。</li>
                       <li><strong>ストレスVaR</strong>: ボラを現在水準に固定し、相関だけを各シナリオに差し替えて計算したVaR。相関上昇の影響だけを取り出す。</li>
                     </ul>
+
+                    <p className="font-medium text-gray-700 mt-3">3-2. なぜ「暴落した日」で切らないのか(条件付けバイアス)</p>
+                    <p>
+                      危機レジームを「その日のバスケット・リターンが下位25%」で定義するのは<strong>誤り</strong>です。
+                      バスケットは共通ファクターの代理なので、その実現値の片側テールで標本を切ると、
+                      部分標本内のファクター分散そのものが切り詰められ、相関が機械的に下がります
+                      (Boyer-Gibson-Loretan 1999 / Forbes-Rigobon 2002)。2変量正規なら条件付け後の相関は
+                      {" ρ_A = ρ·√{(1+δ)/(1+δρ²)}, δ = Var(x|A)/Var(x) − 1 "} で、片側切断は δ&lt;0 すなわち
+                      {" ρ_A < ρ "}。相関を一定にした合成データですら「危機時ほど相関が低い」という逆の答えが出ます。
+                      <strong>全期間の相関が2つの部分標本のどちらより高い</strong>ときはこのバイアスを疑ってください。
+                    </p>
+                    <p className="mt-1">
+                      本パネルは代わりに<strong>直近60日の実現ボラが上位25%の日</strong>でレジームを定義します。
+                      当日のリターンを条件にしないのでこのバイアスが入らず、判定に当日の情報を使わない
+                      (先読み無し)ため<strong>寄付の時点で「今日は危機レジームか」を判定できる</strong>=実運用でも使える定義です。
+                    </p>
+                    <p className="mt-1">
+                      ただし高ボラ標本は δ&gt;0 のぶん相関が持ち上がります。これは条件付けの副作用ではなく
+                      「高ボラ局面で実際に実現する相関」であり、ボラを現在水準に固定して相関だけ差し替える
+                      ストレスVaRの用途には整合的です。一方この定義は<strong>上下対称</strong>なので、
+                      「下落時<em>だけ</em>相関が上がる」という非対称性の検証には使えません。
+                    </p>
                     <p className="font-medium text-gray-700 mt-3">4. 結果の読み方</p>
                     <ul className="list-disc pl-4 space-y-1">
-                      <li>「現在の平均相関」が「平時」を大きく上回る=既に連動が高まり、分散が効きにくい局面。</li>
+                      <li>「現在の平均相関」が「無条件」を大きく上回る=既に連動が高まり、分散が効きにくい局面。</li>
                       <li>推移グラフのスパイク=過去に相関が急騰した(危機が起きた)時点。</li>
-                      <li>危機シナリオVaRが平時の何倍か=暴落時にどれだけリスクが膨らむかの目安。</li>
+                      <li>「高ボラ局面の相関」がカッコ内の低ボラ側を大きく上回る=荒れた相場で分散効果が実際に剥がれる銘柄構成。差が小さければ、この構成は高ボラ局面でも分散が保たれている。</li>
+                      <li>危機シナリオVaRが無条件の何倍か=荒れた相場でどれだけリスクが膨らむかの目安。</li>
                     </ul>
                     <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
                     <ul className="list-disc pl-4 space-y-1">
@@ -318,7 +373,11 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                     <p className="font-medium text-gray-700 mt-3">6. 注意点</p>
                     <ul className="list-disc pl-4 space-y-1">
                       <li>a,bはペアワイズ複合尤度の粗いグリッド推定。厳密な多変量MLEではない。</li>
-                      <li>下落日相関は標本が少ないと不安定(最低10日必要)。</li>
+                      <li>
+                        高ボラ局面の相関は、60日の助走に加えて部分標本が最低 max(20, 銘柄数+5)日必要
+                        (日数が銘柄数を下回ると相関行列がランク落ちし、ストレスVaRが過小評価になるため)。
+                        デイトレ窓(60日)では条件を満たさず表示されません。
+                      </li>
                       <li>ストレスVaRは正規パラメトリック(ファットテール未考慮)。履歴VaRは上の合算リスク欄を参照。</li>
                     </ul>
                   </AnalysisGuide>
