@@ -19,6 +19,31 @@ interface Props {
 
 const bp = (v: number) => `${(v * 10000).toFixed(1)}bp`;
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+const yen = (v: number) => `${Math.round(v).toLocaleString()}円`;
+
+const CAPITAL_KEY = "pf-entry-sizing-capital";
+const LOT_KEY = "pf-entry-sizing-lot";
+
+// 発注単位（単元株）。日本株は原則100株単位、それ以外は1株。
+function autoLot(ticker: string): number {
+  return /\.(T|JP)$/i.test(ticker) ? 100 : 1;
+}
+
+// 注文画面で検索するのは銘柄コードなので、コードを必ず前に出す。
+function codeName(ticker: string, name: string): string {
+  return name && name !== ticker ? `${ticker} ${name}` : ticker;
+}
+
+export interface OrderRow {
+  ticker: string;
+  label: string;
+  price: number;
+  lot: number;
+  shares: number;
+  amount: number;
+  realizedWeight: number; // 単元丸め後の実配分
+  targetWeight: number;
+}
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
   const parent = canvas.parentElement;
@@ -38,9 +63,12 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 }
 
 // ① 銘柄別の配分：単独ケリー（相関無視）と最適配分を並べ、オーバーベットを見せる
-function drawAllocation(ctx: CanvasRenderingContext2D, width: number, height: number, r: WeeklyAllocResult) {
-  const ml = 96;
-  const mr = 56;
+function drawAllocation(
+  ctx: CanvasRenderingContext2D, width: number, height: number,
+  r: WeeklyAllocResult, orders: Map<string, OrderRow>
+) {
+  const ml = 148;
+  const mr = 72;
   const mt = 26;
   const mb = 18;
   const plotW = width - ml - mr;
@@ -65,10 +93,21 @@ function drawAllocation(ctx: CanvasRenderingContext2D, width: number, height: nu
   const sorted = [...r.perStock].sort((a, b) => b.weight - a.weight);
   sorted.forEach((s, i) => {
     const cy = mt + rowH * (i + 0.5);
-    ctx.fillStyle = "#4b5563";
-    ctx.font = "10px sans-serif";
+    // 注文時に検索するのは銘柄コードなので、コードを太字で前置し、社名は幅に収まる分だけ
     ctx.textAlign = "right";
-    ctx.fillText(s.name.length > 12 ? `${s.name.slice(0, 11)}…` : s.name, ml - 6, cy + 3);
+    ctx.font = "10px sans-serif";
+    ctx.fillStyle = "#9ca3af";
+    const nm = s.name && s.name !== s.ticker ? s.name : "";
+    const codeW = ctx.measureText(s.ticker).width;
+    let shown = nm;
+    while (shown.length > 1 && ctx.measureText(`${shown} `).width + codeW > ml - 12) {
+      shown = shown.slice(0, -1);
+    }
+    if (shown && shown !== nm) shown = `${shown.slice(0, -1)}…`;
+    if (shown) ctx.fillText(shown, ml - 8 - codeW - 4, cy + 3);
+    ctx.fillStyle = "#374151";
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillText(s.ticker, ml - 6, cy + 3);
 
     const h = Math.min(rowH * 0.34, 9);
     ctx.fillStyle = "rgba(156,163,175,0.55)";
@@ -76,10 +115,14 @@ function drawAllocation(ctx: CanvasRenderingContext2D, width: number, height: nu
     ctx.fillStyle = "rgba(37,99,235,0.8)";
     ctx.fillRect(ml, cy + 1, Math.max(0, x(s.weight) - ml), h);
 
+    const o = orders.get(s.ticker);
     ctx.fillStyle = "#1f2937";
     ctx.font = "10px sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(pct(s.weight), Math.max(x(s.weight), ml) + 4, cy + 8);
+    ctx.fillText(
+      o && o.shares > 0 ? `${pct(s.weight)} / ${o.shares.toLocaleString()}株` : pct(s.weight),
+      Math.max(x(s.weight), ml) + 4, cy + 8
+    );
   });
 
   // 現金
@@ -251,6 +294,23 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
   const [maxWeight, setMaxWeight] = useState(0.3);
   const [budget, setBudget] = useState(1);
   const [muShrink, setMuShrink] = useState(true);
+  // 総資産・単元設定は銘柄に依存しないので保存して使い回す。
+  // このコンポーネントは ssr:false の動的インポートなので、初期化時に localStorage を読んでよい。
+  const [capital, setCapital] = useState(() => {
+    const c = Number(localStorage.getItem(CAPITAL_KEY));
+    return isFinite(c) && c > 0 ? c : 1_000_000;
+  });
+  const [lotMode, setLotMode] = useState<"auto" | "100" | "1">(() => {
+    const l = localStorage.getItem(LOT_KEY);
+    return l === "auto" || l === "100" || l === "1" ? l : "auto";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(CAPITAL_KEY, String(capital));
+  }, [capital]);
+  useEffect(() => {
+    localStorage.setItem(LOT_KEY, lotMode);
+  }, [lotMode]);
 
   const result = useMemo(() => {
     const stocks: TickerPrices[] = tickers
@@ -261,13 +321,36 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
     });
   }, [tickers, pricesByTicker, names, side, exitDay, kellyFraction, maxWeight, budget, muShrink]);
 
+  // 配分% → 実際に出す株数。単元株に切り捨てるので、実配分は目標からズレる。
+  const orders = useMemo(() => {
+    const m = new Map<string, OrderRow>();
+    if (!result.ok) return m;
+    for (const s of result.perStock) {
+      const px = pricesByTicker[s.ticker]?.[(pricesByTicker[s.ticker]?.length ?? 0) - 1]?.close ?? 0;
+      const lot = lotMode === "auto" ? autoLot(s.ticker) : Number(lotMode);
+      const shares = px > 0 ? Math.floor((capital * s.weight) / (px * lot)) * lot : 0;
+      const amount = shares * px;
+      m.set(s.ticker, {
+        ticker: s.ticker,
+        label: codeName(s.ticker, s.name),
+        price: px,
+        lot,
+        shares,
+        amount,
+        realizedWeight: capital > 0 ? amount / capital : 0,
+        targetWeight: s.weight,
+      });
+    }
+    return m;
+  }, [result, pricesByTicker, capital, lotMode]);
+
   useEffect(() => {
     if (!result.ok) return;
     const draw = () => {
       const a = allocRef.current;
       if (a) {
         const init = initCanvas(a, 60 + 22 * (result.perStock.length + 1));
-        if (init) drawAllocation(init.ctx, init.width, init.height, result);
+        if (init) drawAllocation(init.ctx, init.width, init.height, result, orders);
       }
       const s = slotRef.current;
       if (s) {
@@ -283,7 +366,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
     draw();
     window.addEventListener("resize", draw);
     return () => window.removeEventListener("resize", draw);
-  }, [result]);
+  }, [result, orders]);
 
   if (!result.ok) {
     return (
@@ -305,6 +388,10 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
   const concentrateOk = monIsBest || (r.monVsAvg.diff > 0 && monEdgeSignificant);
   const hindsightGap = r.hindsight.best - r.hindsight.monOpen;
   const reachableGap = r.hindsight.equalAll - r.hindsight.monOpen;
+  const orderRows = [...orders.values()];
+  const totalAmount = orderRows.reduce((s, o) => s + o.amount, 0);
+  const totalShares = orderRows.reduce((s, o) => s + o.shares, 0);
+  const noPrice = orderRows.some((o) => o.price <= 0);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -365,6 +452,26 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           <input type="checkbox" checked={muShrink} onChange={(e) => setMuShrink(e.target.checked)} />
           <span className="text-gray-500">μを横断コンセンサスへ縮小</span>
         </label>
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">総資産</span>
+          <input
+            type="number"
+            min={0}
+            step={100000}
+            className="border border-gray-200 rounded px-1 py-0.5 w-28 text-right"
+            value={capital}
+            onChange={(e) => setCapital(Math.max(0, Number(e.target.value)))}
+          />
+          <span className="text-gray-400">円</span>
+        </label>
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">売買単位</span>
+          <select className="border border-gray-200 rounded px-1 py-0.5" value={lotMode} onChange={(e) => setLotMode(e.target.value as "auto" | "100" | "1")}>
+            <option value="auto">自動（日本株=100株）</option>
+            <option value="100">100株</option>
+            <option value="1">1株</option>
+          </select>
+        </label>
       </div>
 
       {/* 判定 */}
@@ -391,7 +498,8 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           <table className="w-full text-[11px] border-collapse">
             <thead>
               <tr className="text-gray-500 border-b border-gray-200">
-                <th className="text-left py-1 pr-2 font-medium">銘柄</th>
+                <th className="text-left py-1 pr-2 font-medium">コード</th>
+                <th className="text-left py-1 pr-2 font-medium">銘柄名</th>
                 <th className="text-right py-1 px-2 font-medium">μ（生）</th>
                 <th className="text-right py-1 px-2 font-medium">SE</th>
                 <th className="text-right py-1 px-2 font-medium">縮小b</th>
@@ -399,25 +507,45 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 <th className="text-right py-1 px-2 font-medium">週次σ</th>
                 <th className="text-right py-1 px-2 font-medium">Sharpe</th>
                 <th className="text-right py-1 px-2 font-medium">単独ケリー</th>
-                <th className="text-right py-1 pl-2 font-medium">配分</th>
+                <th className="text-right py-1 px-2 font-medium">配分</th>
+                <th className="text-right py-1 px-2 font-medium">現在値</th>
+                <th className="text-right py-1 px-2 font-medium bg-blue-50/70">株数</th>
+                <th className="text-right py-1 px-2 font-medium">概算金額</th>
+                <th className="text-right py-1 pl-2 font-medium">実配分</th>
               </tr>
             </thead>
             <tbody>
-              {[...r.perStock].sort((a, b) => b.weight - a.weight).map((s) => (
-                <tr key={s.ticker} className={`border-b border-gray-100 ${s.weight > 1e-6 ? "" : "text-gray-400"}`}>
-                  <td className="py-1 pr-2 text-gray-700">{s.name}</td>
-                  <td className="py-1 px-2 text-right">{bp(s.muRaw)}</td>
-                  <td className="py-1 px-2 text-right text-gray-500">±{bp(s.se)}</td>
-                  <td className={`py-1 px-2 text-right ${s.b < 0.3 ? "text-amber-600" : "text-gray-600"}`}>{s.b.toFixed(2)}</td>
-                  <td className="py-1 px-2 text-right font-medium text-gray-900">{bp(s.muShrunk)}</td>
-                  <td className="py-1 px-2 text-right text-gray-600">{pct(s.sigma)}</td>
-                  <td className="py-1 px-2 text-right text-gray-600">{s.sharpe.toFixed(2)}</td>
-                  <td className="py-1 px-2 text-right text-gray-500">{pct(s.soloKelly)}</td>
-                  <td className="py-1 pl-2 text-right font-semibold text-blue-700">{pct(s.weight)}</td>
-                </tr>
-              ))}
+              {[...r.perStock].sort((a, b) => b.weight - a.weight).map((s) => {
+                const o = orders.get(s.ticker);
+                const drift = o ? o.realizedWeight - s.weight : 0;
+                return (
+                  <tr key={s.ticker} className={`border-b border-gray-100 ${s.weight > 1e-6 ? "" : "text-gray-400"}`}>
+                    <td className="py-1 pr-2 font-mono font-medium text-gray-800 whitespace-nowrap">{s.ticker}</td>
+                    <td className="py-1 pr-2 text-gray-600">{s.name === s.ticker ? "—" : s.name}</td>
+                    <td className="py-1 px-2 text-right">{bp(s.muRaw)}</td>
+                    <td className="py-1 px-2 text-right text-gray-500">±{bp(s.se)}</td>
+                    <td className={`py-1 px-2 text-right ${s.b < 0.3 ? "text-amber-600" : "text-gray-600"}`}>{s.b.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-right font-medium text-gray-900">{bp(s.muShrunk)}</td>
+                    <td className="py-1 px-2 text-right text-gray-600">{pct(s.sigma)}</td>
+                    <td className="py-1 px-2 text-right text-gray-600">{s.sharpe.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-right text-gray-500">{pct(s.soloKelly)}</td>
+                    <td className="py-1 px-2 text-right font-semibold text-blue-700">{pct(s.weight)}</td>
+                    <td className="py-1 px-2 text-right text-gray-600">{o && o.price > 0 ? yen(o.price) : "—"}</td>
+                    <td className="py-1 px-2 text-right font-semibold text-gray-900 bg-blue-50/70 whitespace-nowrap">
+                      {o && o.price > 0 ? `${o.shares.toLocaleString()}株` : "—"}
+                      {o && o.price > 0 && o.shares === 0 && (
+                        <span className="ml-1 text-[9px] font-normal text-amber-600">1単元({yen(o.price * o.lot)})に届かず</span>
+                      )}
+                    </td>
+                    <td className="py-1 px-2 text-right text-gray-700">{o ? yen(o.amount) : "—"}</td>
+                    <td className={`py-1 pl-2 text-right ${Math.abs(drift) > 0.02 ? "text-amber-600 font-medium" : "text-gray-500"}`}>
+                      {o ? pct(o.realizedWeight) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
               <tr className="border-t border-gray-300 text-gray-600">
-                <td className="py-1 pr-2 font-medium">合計 / 現金</td>
+                <td className="py-1 pr-2 font-medium" colSpan={2}>合計 / 現金</td>
                 <td className="py-1 px-2 text-right" colSpan={3}>
                   横断コンセンサス μ̄ = {bp(r.muGrand)} ±{bp(r.muGrandSe)}
                 </td>
@@ -426,12 +554,26 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                   ポート週次 μ {bp(r.port.mu)} / σ {pct(r.port.sigma)}
                 </td>
                 <td className="py-1 px-2 text-right">{pct(r.soloSum)}</td>
-                <td className="py-1 pl-2 text-right font-semibold">
+                <td className="py-1 px-2 text-right font-semibold">
                   {pct(r.exposure)}<span className="text-emerald-600"> / {pct(r.cash)}</span>
+                </td>
+                <td className="py-1 px-2" />
+                <td className="py-1 px-2 text-right font-semibold bg-blue-50/70">{totalShares.toLocaleString()}株</td>
+                <td className="py-1 px-2 text-right font-semibold">{yen(totalAmount)}</td>
+                <td className="py-1 pl-2 text-right font-semibold">
+                  {pct(capital > 0 ? totalAmount / capital : 0)}
                 </td>
               </tr>
             </tbody>
           </table>
+          <p className="mt-1 text-[10px] text-gray-500">
+            発注金額合計 <b>{yen(totalAmount)}</b> / 総資産 {yen(capital)}
+            {budget <= 1
+              ? ` → 未使用現金 ${yen(capital - totalAmount)}（うち単元丸めによる余り ${yen(Math.max(0, r.exposure * capital - totalAmount))}）`
+              : ` → 自己資金を ${yen(Math.max(0, totalAmount - capital))} 超過（信用建玉ぶん。実効レバレッジ ${(capital > 0 ? totalAmount / capital : 0).toFixed(2)}倍）`}
+            。現在値は各銘柄の最新終値です（実際の約定は月曜の寄付なので、発注前に株数を再計算してください）。
+            {noPrice && <span className="text-amber-600"> 一部の銘柄で現在値が取得できず、株数を算出できていません。</span>}
+          </p>
           <p className="mt-1 text-[10px] text-gray-400">
             μ̃ は経験ベイズ縮小後（b=τ²/(τ²+SE²)。b が小さい銘柄は「その銘柄固有のエッジ」が推定誤差に埋もれており、横断平均に寄せられます）。
             Σ は Ledoit-Wolf 収縮。配分は max μ̃ᵀw − (1/2f)·wᵀΣw s.t. 0≤w≤{pct(maxWeight)}, Σw≤{pct(budget)} の解。
@@ -657,17 +799,38 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           {" w = clip(v−τ, 0, cap)"}（τ≥0、Σw {"<"} budget なら τ=0＝現金が残る）の形で二分探索できます。
         </p>
 
-        <p className="font-medium text-gray-700 mt-3">3. 数式：なぜ「単独ケリーの合算」が破綻するか</p>
+        <p className="font-medium text-gray-700 mt-3">3. 数式：なぜ「単独ケリー」がオーバーベットになるのか</p>
         <p>
-          全銘柄を同じ月曜に建てて同じ日に降りるので、r<sub>t</sub> の各成分は強く<b>横断相関</b>します。
-          平均ペア相関を ρ̄ とすると、独立な賭けの本数は
+          表の「単独ケリー」列は、その銘柄<b>だけ</b>を持つと仮定したときの最適建玉 f·μ<sub>i</sub>/σ<sub>i</sub>² です。
+          正しい答え w* = f·Σ⁻¹μ と見比べると、<b>単独ケリーは Σ の非対角成分（＝銘柄間の共分散）を丸ごと無視した式</b>だと分かります。
+          実際 Σ が対角行列（相関ゼロ）なら Σ⁻¹μ の第 i 成分はちょうど μ<sub>i</sub>/σ<sub>i</sub>² で、両者は一致します。
+          <b>単独ケリーが正しくなるのは「銘柄同士が全く連動しないとき」だけ</b>です。
         </p>
-        <p>{"N_eff = N / (1 + (N−1)·ρ̄)"}</p>
         <p>
-          になります。例えば N=10、ρ̄=0.5 なら N<sub>eff</sub> ≈ 1.8。<b>10銘柄に分散しても実質2銘柄分のリスク分散しかありません。</b>
-          このとき銘柄ごとに単独ケリー μ<sub>i</sub>/σ<sub>i</sub>² を計算して足すと、総エクスポージャーは
-          およそ N/N<sub>eff</sub> ≈ 5倍のオーバーベットになります。上のバッジに出る「オーバーベット倍率」がその比です。
-          コイン投げに例えるなら、10枚のコインを同時に投げているつもりで、実際は2枚のコインの結果を5回ずつ数えているようなものです。
+          ところが全銘柄を同じ月曜に建てて同じ日に降りるので、r<sub>t</sub> の各成分は強く<b>横断相関</b>します。
+          相関がある場合に何が起きるかは、全銘柄が同じ σ・同じ μ・相関が一律 ρ という単純な場合で厳密に解けます。この Σ の逆行列を使うと
+        </p>
+        <p>{"w*_i = (f/σ²)·μ / (1 + (N−1)ρ)     一方   単独ケリー_i = (f/σ²)·μ"}</p>
+        <p>
+          つまり正解は<b>単独ケリーを (1+(N−1)ρ) で割った値</b>です。合計で見ると
+        </p>
+        <p>{"Σ(単独ケリー) / Σ(正しい配分) = 1 + (N−1)·ρ̄ = N / N_eff"}</p>
+        <p>
+          となり、上のバッジに出る<b>オーバーベット倍率は N/N<sub>eff</sub> にほぼ一致</b>します
+          （この等式が厳密に成り立つのは σ・μ・ρ が全銘柄で等しい理想化のときで、実データでは近似です。
+          また総建玉が上限に張り付いている場合は、その打ち切りぶんも倍率に上乗せされるため N/N<sub>eff</sub> より大きく出ます）。
+        </p>
+        <p>
+          直感的には、単独ケリーは「各銘柄が独立にリスクを取ってくれる」と仮定して建玉を積みます。
+          しかし実際には全員が同じ市場ファクタで一緒に上下するので、10銘柄に分けても<b>ポートフォリオの分散は10分の1にならない</b>。
+          分母（リスク）が想定より大きいのに、分子（期待値）だけを銘柄数ぶん足しているのが、オーバーベットの正体です。
+          コイン投げに例えるなら、10枚のコインを同時に投げているつもりで、実際は2枚のコインの結果を5回ずつ数えているようなもの。
+          「分散しているから安全」と思って建玉を増やした結果、破産確率の高い集中投資になっている、という取り違えです。
+          N=10、ρ̄=0.5 なら N<sub>eff</sub> ≈ 1.8 で、単独ケリーの合算は約5.5倍の建玉になります。
+        </p>
+        <p>
+          なお表の単独ケリー列自体は「相関を無視するとどれだけ過大な数字が出るか」を見るための対照であって、
+          <b>発注に使ってよいのは「配分」列（と、それを株数に落とした列）だけ</b>です。
         </p>
 
         <p className="font-medium text-gray-700 mt-3">4. 数式：μ の経験ベイズ縮小（これをやらないと数字が嘘になる）</p>
@@ -728,7 +891,18 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
 
         <p className="font-medium text-gray-700 mt-3">8. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><b>発注サイズの決定</b>：①の配分列をそのまま「その銘柄に振る資産%」として使えます。ケリー係数 f は 1/4 から始めるのが実務的（推定誤差込みだとフルケリーは理論上も過大）。</li>
+          <li>
+            <b>発注サイズの決定</b>：総資産を入力すると、①の表の<b>「株数」列がそのまま発注数量</b>になります
+            （株数 = ⌊総資産 × 配分% ÷ 現在値 ÷ 売買単位⌋ × 売買単位。日本株は100株単位に切り捨て）。
+            銘柄コード列で証券会社の検索窓に入力してください。ケリー係数 f は 1/4 から始めるのが実務的です
+            （推定誤差込みだとフルケリーは理論上も過大）。
+          </li>
+          <li>
+            <b>「実配分」列のズレに注意</b>：単元株への切り捨てがあるので、実配分は目標配分と一致しません。
+            資金が小さいほど、また株価が高い銘柄ほどズレは大きくなります（差が2%を超えると橙で表示）。
+            株数が 0 になる銘柄は「1単元すら買えない」ということなので、その銘柄を諦めるか、
+            銘柄数を絞って1銘柄あたりの配分を厚くするかの判断が必要です。
+          </li>
           <li><b>銘柄数の見直し</b>：N<sub>eff</sub> が小さいなら、銘柄を足すより<b>相関の低い銘柄に入れ替える</b>方が効きます。同業種の重複を削る判断材料になります。</li>
           <li><b>執行の設計</b>：③で k {">"} 1 が選ばれるなら、月曜に一括ではなく週内で分けて建てる。k=1 なら分割はコストの無駄です。</li>
           <li><b>待ちルールの採否</b>：④のOOSが月寄固定に勝てないなら、待たずに月寄で建てる。判断を増やさない方が期待値が高い、という結論を数字で確認できます。</li>
@@ -741,6 +915,11 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           <li><b>Σ は時変</b>。ここでは全期間一定として推定しています。危機局面では相関が1に寄り、N<sub>eff</sub> はさらに落ちます（＝表示より実際は分散が効きません）。</li>
           <li><b>月曜が休場の週は除外</b>しています（月寄という基準点が取れないため）。連休明けの週は構造が違う可能性があり、その分は別途「休場コンテキスト別曜日分析」で見てください。</li>
           <li><b>コスト・執行控除前</b>。スロット分割は発注回数を k 倍にするため、③の CE 改善が手数料・スプレッドを上回るか確認が必要です。</li>
+          <li>
+            <b>株数は最新終値ベースの目安</b>です。実際の約定は月曜の寄付なので、金曜終値から窓が開けば必要金額はズレます。
+            発注直前に総資産と株数を再計算してください。また単元未満株（S株・ミニ株）を使う場合は売買単位を1株に切り替えると、
+            配分のズレはほぼ消えますが手数料率は不利になるのが普通です。
+          </li>
           <li><b>後知恵の最良スロットは目標にしてはいけません</b>。あれは到達不能な上限で、そこを基準に「月曜は損だ」と考えるのは典型的な誤読です。</li>
           <li><b>スロットや出口を選ぶこと自体が多重検定</b>です。ここで最良に見えたスロットも、選択バイアス込みで割り引いて読んでください（④のOOS対決がその割引を実際に行う唯一の欄です）。</li>
           <li>
