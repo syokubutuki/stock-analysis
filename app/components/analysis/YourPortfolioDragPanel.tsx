@@ -17,16 +17,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { WatchlistItem, effectiveKind } from "../../lib/watchlist";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
-import { alignReturns } from "../../lib/portfolio-risk";
+import { alignReturns, portfolioRisk, type RiskComponent } from "../../lib/portfolio-risk";
 import {
   annualStats,
   decomposeDrag,
   incrementalLedger,
   orderByCorrelation,
+  varianceConcentration,
   EMPTY_DECOMP,
   type DragDecomp,
   type LedgerMode,
   type LedgerRow,
+  type VarianceConcentration,
 } from "../../lib/growth-drag";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -58,6 +60,9 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
   // 建玉が無いユーザーでも意味を持つように、等ウェイトへ切り替えられる（仕様書 §10.2）。
   const [source, setSource] = useState<WeightSource>("held");
   const [ledgerMode, setLedgerMode] = useState<LedgerMode>("add");
+  // 総建玉 W（現金を含む資産に対する株式の比率）。100% がフル現物、200% が信用2倍。
+  // 3項分解の期待項は W に比例、ドラッグ項は W の二乗で効く（仕様書 §1）。
+  const [exposure, setExposure] = useState(1);
 
   const base = useMemo(() => {
     const series = Object.entries(data)
@@ -87,22 +92,28 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
   // 建玉が2銘柄未満なら自動的に等ウェイトへ倒す（表示が空になるのを避ける）。
   const effSource: WeightSource = source === "held" && hasHeld ? "held" : "equal";
 
-  // ── 3項分解（G2 / U5 / S3 の共通の元） ────────────────────────────────
-  const decomp: DragDecomp = useMemo(() => {
-    if (aligned.tickers.length < 2) return EMPTY_DECOMP;
-    const st = annualStats(aligned);
-    const w = new Array(aligned.tickers.length).fill(0);
+  // ── 構成比（合計1）。総建玉 W はこの上に掛ける ────────────────────────
+  const shares: number[] = useMemo(() => {
+    const n = aligned.tickers.length;
+    const w = new Array(n).fill(0);
+    if (n === 0) return w;
     if (effSource === "held") {
       aligned.tickers.forEach((t, i) => {
         const mv = rawWeights[t] ?? 0;
         w[i] = totalMV > 0 ? mv / totalMV : 0;
       });
     } else {
-      const n = aligned.tickers.length;
       for (let i = 0; i < n; i++) w[i] = 1 / n;
     }
-    return decomposeDrag(st.mu, st.cov, w);
+    return w;
   }, [aligned, effSource, rawWeights, totalMV]);
+
+  // ── 3項分解（G2 / U5 / S3 の共通の元） ────────────────────────────────
+  const decomp: DragDecomp = useMemo(() => {
+    if (aligned.tickers.length < 2) return EMPTY_DECOMP;
+    const st = annualStats(aligned);
+    return decomposeDrag(st.mu, st.cov, shares.map((s) => s * exposure));
+  }, [aligned, shares, exposure]);
 
   // 円換算の基準額。建玉があればその評価額、無ければ100万円を仮の投下資金とする。
   const capital = effSource === "held" && totalMV > 0 ? totalMV : 1_000_000;
@@ -119,8 +130,48 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
       seed = [...universe].sort((a, b) => (rawWeights[b] ?? 0) - (rawWeights[a] ?? 0))[0];
     }
     const order = orderByCorrelation(aligned, universe, seed);
-    return incrementalLedger(aligned, order, ledgerMode, names);
-  }, [aligned, effSource, heldTickers, rawWeights, ledgerMode, names]);
+    return incrementalLedger(aligned, order, ledgerMode, names, undefined, exposure);
+  }, [aligned, effSource, heldTickers, rawWeights, ledgerMode, names, exposure]);
+
+  // ── T3 分割 vs 追加（総建玉スライダーとは独立の定義比較） ──────────────
+  const splitAdd = useMemo(() => {
+    if (aligned.tickers.length < 2) return null;
+    const st = annualStats(aligned);
+    const active: number[] = shares.map((s) => (s > 1e-12 ? 1 : 0));
+    const n = active.reduce((a, b) => a + b, 0);
+    if (n < 2) return null;
+    const split = decomposeDrag(st.mu, st.cov, active.map((a) => a / n));
+    const add = decomposeDrag(st.mu, st.cov, active);
+    // 出発点＝構成比が最大の1銘柄に全額を集中させた場合。
+    // 「分割で σ_p が下がる／追加で上がる」は、この1銘柄を基準にした比較。
+    let top = -1;
+    for (let i = 0; i < active.length; i++) {
+      if (active[i] && (top < 0 || shares[i] > shares[top])) top = i;
+    }
+    const solo = decomposeDrag(st.mu, st.cov, active.map((_, i) => (i === top ? 1 : 0)));
+    return { split, add, solo, n, soloTicker: top >= 0 ? aligned.tickers[top] : "" };
+  }, [aligned, shares]);
+
+  // ── G5 リスクの二つの顔（配分 / PCTR / 主成分） ────────────────────────
+  const faces = useMemo(() => {
+    if (aligned.tickers.length < 2) return null;
+    // PCTR は既存 portfolio-risk.ts の実装をそのまま流用する（仕様書 §G5）。
+    // 等ウェイト表示のときは各銘柄の時価が等しい仮想の建玉を渡す。
+    const rw: Record<string, number> = {};
+    aligned.tickers.forEach((t, i) => {
+      if (shares[i] > 1e-12) rw[t] = shares[i];
+    });
+    const risk = portfolioRisk(aligned, rw);
+    if (!risk.ok || risk.components.length < 2) return null;
+
+    const st = annualStats(aligned);
+    const idx = aligned.tickers
+      .map((t, i) => (shares[i] > 1e-12 ? i : -1))
+      .filter((i) => i >= 0);
+    const R = idx.map((a) => idx.map((b) => st.corr[a][b]));
+    const pc: VarianceConcentration = varianceConcentration(R, 3);
+    return { components: risk.components, pc };
+  }, [aligned, shares]);
 
   // ── G2 ウォーターフォール（横軸=リターン値の静的図なので Canvas2D） ──────
   const wfCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -132,6 +183,17 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
     window.addEventListener("resize", draw);
     return () => window.removeEventListener("resize", draw);
   }, [decomp, capital]);
+
+  // ── G5 リスクの二つの顔（円グラフ3枚・静的図なので Canvas2D） ────────────
+  const facesCanvas = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = facesCanvas.current;
+    if (!canvas || !faces) return;
+    const draw = () => drawTwoFaces(canvas, faces.components, faces.pc, names);
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
+  }, [faces, names]);
 
   if (aligned.tickers.length < 2) {
     return (
@@ -172,12 +234,41 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
             </button>
           </div>
         </label>
+        {/* 総建玉 W: 期待は W に比例、ドラッグは W の二乗（仕様書 §1） */}
+        <label className="flex flex-col text-xs text-gray-500">
+          総建玉（資産に対する株式の比率）
+          <span className="mt-0.5 flex items-center gap-2">
+            <input
+              type="range"
+              min={0.05}
+              max={3}
+              step={0.05}
+              value={exposure}
+              onChange={(e) => setExposure(Number(e.target.value))}
+              className="w-40 accent-gray-700"
+            />
+            <span className="w-12 text-right tabular-nums font-semibold text-gray-700">
+              {(exposure * 100).toFixed(0)}%
+            </span>
+            {exposure !== 1 && (
+              <button
+                onClick={() => setExposure(1)}
+                className="text-[10px] text-blue-600 underline"
+              >
+                100%に戻す
+              </button>
+            )}
+          </span>
+        </label>
+
         <div className="text-[11px] text-gray-400 pb-1">
           {effSource === "held"
             ? `建玉${decomp.nAssets}銘柄・評価額 ¥${Math.round(totalMV).toLocaleString()}`
             : `全${decomp.nAssets}銘柄を等ウェイト（仮の投下資金100万円で円換算）`}
           {" / "}
           直近{HORIZON_CONFIG[horizon].window}本・年率換算
+          {exposure !== 1 &&
+            ` / 総建玉${(exposure * 100).toFixed(0)}%として計算（構成比はそのまま）`}
           {!hasHeld && source === "held" && " / 建玉が2銘柄未満のため等ウェイト表示"}
         </div>
       </div>
@@ -252,8 +343,8 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
             </>
           )}
           {capitalIsReal
-            ? ` 円は評価額 ${manYen(totalMV)} に対する年額。`
-            : " 円は仮の投下資金100万円に対する年額。"}
+            ? ` 円は総資産 ${manYen(totalMV)}（＝総建玉100%のときの株式時価）に対する年額。`
+            : " 円は仮の総資産100万円に対する年額。"}
         </p>
       </div>
 
@@ -443,6 +534,192 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
         )}
       </div>
 
+      {/* ── G5 リスクの二つの顔 ─────────────────────────────────────────── */}
+      {faces && (
+        <div>
+          <div className="text-xs font-semibold text-gray-700 mb-1.5">
+            リスクの二つの顔：見た目の分散と、本当の分散
+          </div>
+          <canvas ref={facesCanvas} className="w-full" />
+          <p className="mt-1 text-[11px] text-gray-500">
+            左＝お金の配り方（見た目の分散）。中＝<strong>リスク寄与率 PCTR</strong>
+            （そのリスクを誰が作っているか）。右＝主成分の寄与率（値動きの型がいくつあるか）。
+            {(() => {
+              // 「配分とリスクのズレ」が最も大きい銘柄を名指しする。
+              // 上位N銘柄の合計だと両者がほぼ一致してしまい、ズレが見えないことがある。
+              let top = faces.components[0];
+              for (const c of faces.components) {
+                if (c.pctr - c.weight > top.pctr - top.weight) top = c;
+              }
+              const gap = top.pctr - top.weight;
+              if (gap < 0.03) {
+                return (
+                  <>
+                    {" "}この2枚はほぼ同じ形＝
+                    <strong>お金の配り方どおりのリスク配分</strong>になっています
+                    （最大のズレでも{(gap * 100).toFixed(1)}ポイント）。
+                  </>
+                );
+              }
+              return (
+                <>
+                  {" "}
+                  <strong>{top.ticker}</strong> はお金では
+                  <strong>{(top.weight * 100).toFixed(0)}%</strong>なのに、
+                  <strong className="text-red-600">
+                    リスクでは{(top.pctr * 100).toFixed(0)}%
+                  </strong>
+                  を作っています（+{(gap * 100).toFixed(0)}ポイント）。
+                </>
+              );
+            })()}{" "}
+            そして値動きの{" "}
+            <strong className="text-red-600">
+              {(faces.pc.pc1 * 100).toFixed(0)}%
+            </strong>{" "}
+            が第1主成分（＝全銘柄に共通の1つの波）で説明できます。
+            {faces.pc.pc1 > 0.5 && (
+              <strong> あなたのポートフォリオは、実質1つの賭けです。</strong>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* ── T3 分割 vs 追加 ──────────────────────────────────────────────── */}
+      {splitAdd && (
+        <div>
+          <div className="text-xs font-semibold text-gray-700 mb-1.5">
+            分割 vs 追加：同じ「{splitAdd.n}銘柄に分散」でも、正体が違う
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-gray-300 text-gray-500">
+                  <th className="text-left py-1 px-2 font-medium"> </th>
+                  <th className="text-right py-1 px-2 font-medium">
+                    出発点：1銘柄に集中
+                    <div className="font-normal text-gray-400">
+                      {manYen(capital)}を{splitAdd.soloTicker}だけに
+                    </div>
+                  </th>
+                  <th className="text-right py-1 px-2 font-medium text-green-700">
+                    A: 分割
+                    <div className="font-normal text-gray-400">
+                      {manYen(capital)}を{splitAdd.n}分割
+                    </div>
+                  </th>
+                  <th className="text-right py-1 px-2 font-medium text-red-700">
+                    B: 追加
+                    <div className="font-normal text-gray-400">
+                      各銘柄に{manYen(capital)}ずつ
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-100">
+                  <td className="py-1.5 px-2 text-gray-600">総建玉</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">100%</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    100%<span className="text-gray-400">（不変）</span>
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-red-700 font-semibold">
+                    {(splitAdd.add.exposure * 100).toFixed(0)}%
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="py-1.5 px-2 text-gray-600">期待リターン</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {pct(splitAdd.solo.expected)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {pct(splitAdd.split.expected)}
+                    <span className="text-gray-400">（ほぼ不変）</span>
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-blue-700">
+                    {pct(splitAdd.add.expected)}{" "}
+                    <span className="text-green-600">↑{splitAdd.n}倍</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="py-1.5 px-2 text-gray-600">σ_p（振れ幅）</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {pctAbs(splitAdd.solo.sigmaP)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-green-700">
+                    {pctAbs(splitAdd.split.sigmaP)} ↓
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-red-700">
+                    {pctAbs(splitAdd.add.sigmaP)} ↑
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="py-1.5 px-2 text-gray-600">ドラッグ</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    −{pctAbs(splitAdd.solo.soloDrag + splitAdd.solo.corrDrag)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-green-700">
+                    −{pctAbs(splitAdd.split.soloDrag + splitAdd.split.corrDrag)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-red-700">
+                    −{pctAbs(splitAdd.add.soloDrag + splitAdd.add.corrDrag)}
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <td className="py-1.5 px-2 text-gray-700 font-medium">実質成長率 g</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums font-semibold">
+                    {pct(splitAdd.solo.growth)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums font-semibold text-green-700">
+                    {pct(splitAdd.split.growth)}{" "}
+                    {splitAdd.split.growth > splitAdd.solo.growth ? "↑" : "↓"}
+                  </td>
+                  <td
+                    className={`py-1.5 px-2 text-right tabular-nums font-semibold ${
+                      splitAdd.add.growth < splitAdd.split.growth ? "text-red-700" : "text-gray-800"
+                    }`}
+                  >
+                    {pct(splitAdd.add.growth)}{" "}
+                    {splitAdd.add.growth < splitAdd.split.growth ? "↓" : "↑"}
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="py-1.5 px-2 text-gray-600">2倍まで</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {yearsLabel(splitAdd.solo.doublingYears)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-green-700">
+                    {yearsLabel(splitAdd.split.doublingYears)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-red-700">
+                    {yearsLabel(splitAdd.add.doublingYears)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-2 text-gray-600">正体</td>
+                  <td className="py-1.5 px-2 text-right text-gray-500">集中</td>
+                  <td className="py-1.5 px-2 text-right font-semibold text-green-700">
+                    本物の分散
+                  </td>
+                  <td className="py-1.5 px-2 text-right font-semibold text-red-700">
+                    レバレッジ
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1 text-[11px] text-gray-500">
+            A は<strong>資金を分ける</strong>操作、B は<strong>資金を足す</strong>操作です。
+            A なら相関が1未満である限り成長率は必ず改善しますが、B は期待リターンが{splitAdd.n}倍に
+            なる代わりにドラッグが{splitAdd.n}²倍の方向に効くので、相関次第で悪化します。
+            <strong className="text-red-700">
+              「分散投資したつもりが、実際はレバレッジを掛けていただけ」＝ B を A だと思っている状態。
+            </strong>{" "}
+            この表は総建玉スライダーとは独立で、定義どおり A=100% / B={splitAdd.n}×100% で計算しています。
+          </p>
+        </div>
+      )}
+
       <AnalysisGuide title="幾何成長率とボラティリティ・ドラッグの詳細理論">
         <p className="font-medium text-gray-700">1. 手法の概要</p>
         <p>
@@ -531,6 +808,21 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
           <li>
             <strong>倍化年数</strong>: {" ln2/g "}。成長率を「2倍になるまで何年か」に翻訳したもの。
           </li>
+          <li>
+            <strong>総建玉 W</strong>: 現金を含む資産に対する株式の比率。100% がフル現物、200% が信用2倍。
+            期待項は W に<strong>比例</strong>、ドラッグ項は W の<strong>二乗</strong>で効く。
+          </li>
+          <li>
+            <strong>リスク寄与率 PCTR</strong>: {" w_i(Σw)_i / σ_p² "}（合計1）。
+            ポートフォリオ全体の分散のうち、その銘柄が作り出している割合。
+            お金の配分と違って<strong>相関を通じた波及も含む</strong>ので、
+            少数の銘柄に偏りやすい。
+          </li>
+          <li>
+            <strong>主成分の寄与率</strong>: 相関行列 R の固有値 λ_k を対角和 n で割ったもの。
+            第1主成分 PC1 が大きいほど「全銘柄が共通の1つの波に乗っている」＝
+            <strong>値動きの型が1つしかない</strong>。
+          </li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">4. 直感的な例え</p>
@@ -581,6 +873,24 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
           </li>
           <li>
             倍化年数が「永遠に来ない」と出たら、g ≤ 0。期待リターンが正でも資産は増えません。
+          </li>
+          <li>
+            <strong>円グラフの左と中で色の面積が食い違うほど危ない</strong>。
+            お金は10%しか置いていない銘柄がリスクの30%を作っているなら、
+            それはあなたのポートフォリオの「本当の重心」がそこにあるということ。
+          </li>
+          <li>
+            <strong>PC1 が 50% を超えたら、実質1つの賭け</strong>。銘柄数をいくら増やしても、
+            値動きの型が1つしかないなら分散にはなっていません。
+          </li>
+          <li>
+            <strong>分割 vs 追加の表は、同じ「N銘柄に分散」の2つの意味を切り分けます</strong>。
+            A（分割）は必ず改善、B（追加）は相関次第で悪化。自分がやっているのがどちらかを
+            総建玉の行で確認してください。
+          </li>
+          <li>
+            <strong>総建玉スライダー</strong>を動かすと、期待リターンは直線的に、ドラッグは
+            二乗で伸びます。成長率が折り返す（下がり始める）建玉が、あなたの上限の目安です。
           </li>
         </ul>
 
@@ -634,6 +944,165 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
         </ul>
       </AnalysisGuide>
     </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// G5 リスクの二つの顔（Canvas2D・円グラフ3枚）
+// 円グラフは横軸が時間でない静的図なので規約どおり Canvas2D。
+// 左と中は「同じ色＝同じ銘柄」を厳守する（見た目の分散と本当の分散を目で重ねるため）。
+// ────────────────────────────────────────────────────────────────────────────
+const PIE_COLORS = [
+  "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed",
+  "#0891b2", "#db2777", "#65a30d", "#ea580c", "#0d9488",
+  "#4f46e5", "#b91c1c", "#15803d", "#a16207", "#6d28d9",
+];
+
+function drawTwoFaces(
+  canvas: HTMLCanvasElement,
+  components: RiskComponent[],
+  pc: VarianceConcentration,
+  names: Record<string, string>
+) {
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  const width = parent.clientWidth;
+  if (width <= 0) return;
+  const height = 232;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, width, height);
+
+  // 配分の大きい順に固定し、両方の円で同じ順・同じ色を使う
+  const order = [...components].sort((a, b) => b.weight - a.weight);
+  const colorOf = (i: number) => PIE_COLORS[i % PIE_COLORS.length];
+
+  const colW = width / 3;
+  const r = Math.max(34, Math.min(58, colW * 0.3));
+  const cy = 26 + r;
+
+  const pie = (
+    cx: number,
+    slices: { v: number; color: string }[],
+    title: string,
+    sub: string
+  ) => {
+    ctx.textAlign = "center";
+    ctx.font = "bold 11px sans-serif";
+    ctx.fillStyle = "#374151";
+    ctx.fillText(title, cx, 14);
+    ctx.font = "10px sans-serif";
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText(sub, cx, 26);
+
+    const total = slices.reduce((s, x) => s + Math.max(x.v, 0), 0) || 1;
+    let a0 = -Math.PI / 2;
+    for (const s of slices) {
+      const frac = Math.max(s.v, 0) / total;
+      const a1 = a0 + frac * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      ctx.strokeStyle = "#fafafa";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      a0 = a1;
+    }
+  };
+
+  // ① 資産配分
+  pie(
+    colW * 0.5,
+    order.map((c, i) => ({ v: c.weight, color: colorOf(i) })),
+    "見た目の分散",
+    "お金の配り方"
+  );
+  // ② リスク寄与率 PCTR
+  pie(
+    colW * 1.5,
+    order.map((c, i) => ({ v: Math.max(c.pctr, 0), color: colorOf(i) })),
+    "本当の分散",
+    "リスク寄与率 PCTR"
+  );
+  // ③ 主成分の寄与率
+  const pcSlices = [
+    ...pc.shares.map((v, i) => ({
+      v,
+      color: i === 0 ? "#dc2626" : i === 1 ? "#f59e0b" : "#3b82f6",
+    })),
+    { v: pc.rest, color: "#d1d5db" },
+  ];
+  pie(colW * 2.5, pcSlices, "値動きの型はいくつか", "主成分の寄与率");
+
+  // 凡例（上位3件＋その他）
+  const legend = (cx: number, rows: { label: string; color: string; v: number }[]) => {
+    let y = cy + r + 16;
+    ctx.textAlign = "left";
+    ctx.font = "10px sans-serif";
+    for (const row of rows) {
+      const x = cx - colW * 0.42;
+      ctx.fillStyle = row.color;
+      ctx.fillRect(x, y - 7, 8, 8);
+      ctx.fillStyle = "#4b5563";
+      const maxW = colW * 0.84 - 44;
+      let label = row.label;
+      while (ctx.measureText(label).width > maxW && label.length > 2) {
+        label = label.slice(0, -1);
+      }
+      ctx.fillText(label, x + 12, y);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#111827";
+      ctx.fillText(`${(row.v * 100).toFixed(0)}%`, cx + colW * 0.42, y);
+      ctx.textAlign = "left";
+      y += 13;
+    }
+  };
+
+  const top = order.slice(0, 3);
+  const restW = order.slice(3).reduce((s, c) => s + c.weight, 0);
+  const restP = order.slice(3).reduce((s, c) => s + Math.max(c.pctr, 0), 0);
+  legend(
+    colW * 0.5,
+    [
+      ...top.map((c, i) => ({
+        label: `${c.ticker} ${names[c.ticker] ?? ""}`.trim(),
+        color: colorOf(i),
+        v: c.weight,
+      })),
+      ...(order.length > 3 ? [{ label: `他${order.length - 3}銘柄`, color: "#d1d5db", v: restW }] : []),
+    ]
+  );
+  legend(
+    colW * 1.5,
+    [
+      ...top.map((c, i) => ({
+        label: `${c.ticker} ${names[c.ticker] ?? ""}`.trim(),
+        color: colorOf(i),
+        v: Math.max(c.pctr, 0),
+      })),
+      ...(order.length > 3 ? [{ label: `他${order.length - 3}銘柄`, color: "#d1d5db", v: restP }] : []),
+    ]
+  );
+  legend(
+    colW * 2.5,
+    [
+      ...pc.shares.map((v, i) => ({
+        label: `第${i + 1}主成分`,
+        color: i === 0 ? "#dc2626" : i === 1 ? "#f59e0b" : "#3b82f6",
+        v,
+      })),
+      { label: "その他", color: "#d1d5db", v: pc.rest },
+    ]
   );
 }
 
@@ -736,17 +1205,22 @@ function drawWaterfall(canvas: HTMLCanvasElement, d: DragDecomp, capital: number
       yTop + 24
     );
 
-    // ラベル: 棒の右に置き、はみ出すなら棒の中に右寄せ
+    // ラベル: ①棒の右 ②（右に出ないなら）棒の中に白抜き ③（棒が細くて入らないなら）棒の左
+    // ドラッグの棒は短くなりがちで、②のまま描くと背景に白文字が乗って読めなくなる。
     ctx.font = s.strong ? "bold 12px sans-serif" : "12px sans-serif";
     const textW = ctx.measureText(s.label).width;
     if (x1 + 8 + textW < width - padR) {
       ctx.textAlign = "left";
       ctx.fillStyle = s.strong ? s.color : "#4b5563";
       ctx.fillText(s.label, x1 + 8, yTop + 14);
-    } else {
+    } else if (w > textW + 14) {
       ctx.textAlign = "right";
       ctx.fillStyle = "#ffffff";
       ctx.fillText(s.label, x1 - 6, yTop + 14);
+    } else {
+      ctx.textAlign = "right";
+      ctx.fillStyle = s.strong ? s.color : "#4b5563";
+      ctx.fillText(s.label, x0 - 8, yTop + 14);
     }
   });
 

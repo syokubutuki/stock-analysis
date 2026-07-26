@@ -21,8 +21,11 @@ export interface SSAResult {
 /**
  * Power iteration with deflation for top-r eigenvectors of symmetric matrix C
  * (Adapted from dmd.ts pattern)
+ *
+ * growth-drag.ts の主成分寄与率（G5「リスクの二つの顔」）からも呼ぶため export する。
+ * 挙動は変更していない。
  */
-function powerIterationEigen(
+export function powerIterationEigen(
   C: number[][],
   m: number,
   r: number

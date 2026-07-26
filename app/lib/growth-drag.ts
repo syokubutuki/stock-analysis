@@ -28,6 +28,7 @@
 // すべて純関数・O(N²) 以下（N ≤ 30 のウォッチリスト規模）。Worker 不要。
 
 import { AlignedReturns } from "./portfolio-risk";
+import { powerIterationEigen } from "./ssa";
 
 export const TRADING_DAYS = 252;
 
@@ -280,6 +281,37 @@ export function peakExposure(mu: number, sigmaEff: number): number {
   return mu / v;
 }
 
+// ───────────────────────── 主成分の集中度（G5 3枚目の円グラフ） ─────────────────────────
+
+/**
+ * 相関行列 R の固有値から「あなたのポートフォリオは実質いくつの賭けか」を主成分で見る。
+ * 相関行列の対角和は必ず n なので、寄与率は λ_k / n。PC1 が大きいほど
+ * 「全銘柄が同じ1つの因子に乗っている」＝実質1つの賭け。
+ *
+ * 固有値は既存の powerIterationEigen（ssa.ts）を再利用する（同じ数値手続きを二重定義しない）。
+ * 上位 topK 個だけを求め、残差は「その他」として 1 本にまとめる。
+ */
+export interface VarianceConcentration {
+  /** 上位主成分の寄与率（合計 ≤ 1）。降順。 */
+  shares: number[];
+  /** 上位に入らなかったぶんの合計。 */
+  rest: number;
+  /** PC1 の寄与率。 */
+  pc1: number;
+  n: number;
+}
+
+export function varianceConcentration(R: number[][], topK = 3): VarianceConcentration {
+  const n = R.length;
+  if (n === 0) return { shares: [], rest: 0, pc1: 0, n: 0 };
+  if (n === 1) return { shares: [1], rest: 0, pc1: 1, n: 1 };
+  const k = Math.max(1, Math.min(topK, n));
+  const { eigvals } = powerIterationEigen(R, n, k);
+  const shares = eigvals.map((v) => Math.max(0, Math.min(1, v / n)));
+  const used = shares.reduce((s, v) => s + v, 0);
+  return { shares, rest: Math.max(0, 1 - used), pc1: shares[0] ?? 0, n };
+}
+
 // ───────────────────────── 台帳（T1） ─────────────────────────
 
 /**
@@ -312,13 +344,17 @@ export interface LedgerRow {
 /**
  * 銘柄を order の順に1つずつ組み入れていく台帳。
  * 期待リターンの列が伸び続ける一方で、成長率の列がどこで沈み始めるかを見せる。
+ *
+ * exposure は総建玉の倍率（既定 1 ＝ 従来どおり）。"split" なら常に exposure、
+ * "add" なら k×exposure が総建玉になる。
  */
 export function incrementalLedger(
   aligned: AlignedReturns,
   order: string[],
   mode: LedgerMode,
   names?: Record<string, string>,
-  periodsPerYear: number = TRADING_DAYS
+  periodsPerYear: number = TRADING_DAYS,
+  exposure: number = 1
 ): LedgerRow[] {
   const st = annualStats(aligned, periodsPerYear);
   const pos = new Map<string, number>();
@@ -346,7 +382,7 @@ export function incrementalLedger(
     included.push(next);
     const k = included.length;
     const w = new Array(aligned.tickers.length).fill(0);
-    for (const i of included) w[i] = mode === "split" ? 1 / k : 1;
+    for (const i of included) w[i] = mode === "split" ? exposure / k : exposure;
 
     const d = decomposeDrag(st.mu, st.cov, w);
     rows.push({
