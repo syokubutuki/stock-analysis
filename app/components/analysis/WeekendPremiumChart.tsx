@@ -129,7 +129,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold text-gray-800">
-          週末プレミアム μ_w：週末を「持つべきか／飛ばすべきか」
+          週末プレミアム μ_w：週末保有の有無によるリターン差
         </h3>
         <span className="text-[10px] text-gray-400">
           日次を 日中／平日夜間／週末ギャップ に分解し、週末ギャップの正体を測る
@@ -156,9 +156,9 @@ export default function WeekendPremiumChart({ prices }: Props) {
           >
             <div className="font-semibold">
               {holdSignificant
-                ? "週末は持つべき — 飛ばすとSharpeが有意に悪化"
+                ? "過去データでは週末保有側が優位 — 飛ばすとSharpeが有意に悪化"
                 : skipSignificant
-                  ? "週末は飛ばすべき — 飛ばすとSharpeが有意に改善"
+                  ? "過去データでは週末回避側が優位 — 飛ばすとSharpeが有意に改善"
                   : "週末を持つ／飛ばすは、統計的にほぼ引き分け"}
             </div>
             <div className="mt-1 leading-relaxed">

@@ -1655,7 +1655,7 @@ export default function AnalysisPage() {
                     {
                       group: "アトラクタ・埋め込み・位相",
                       items: [
-                        { id: "sa-nonlinear", title: "投資シグナル統合ダッシュボード", node: <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} /> },
+                        { id: "sa-nonlinear", title: "アトラクタ指標の統合ビュー（条件の該当状況）", node: <AttractorSignalDashboard prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "nl-embedding", title: "埋め込みパラメータ最適化", node: <EmbeddingOptimizer prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "nl-attractor", title: "アトラクタ探索（Takens埋め込み）", node: <AttractorExplorer prices={filteredPrices} seriesMode={seriesMode} /> },
                         { id: "nl-weekly-phase", title: "週内位相アトラクタ（動力学的週内アノマリー）", node: <WeeklyPhaseAttractorChart prices={filteredPrices} seriesMode={seriesMode} /> },
@@ -1873,7 +1873,7 @@ export default function AnalysisPage() {
                       { id: "cal-weekday-us-interaction", title: "曜日 × 前夜米国：交互作用の解剖（曜日別スピルオーバーβ・上下非対称・セルmaxT）", node: <WeekdayUsInteractionChart prices={filteredPrices} /> },
                       { id: "cal-timing-value", title: "タイミング判断の価値検定（SPA：カレンダー戦略一族 vs B&H・スヌーピング補正）", node: <TimingValueChart prices={allPrices} /> },
                       { id: "cal-weekday-vs-bh", title: "月→金戦略 vs バイ&ホールド 統計的優位性検定", node: <WeekdayVsBuyHoldChart prices={filteredPrices} /> },
-                      { id: "cal-weekend-premium", title: "週末プレミアム μ_w：週末を持つべきか／飛ばすべきか（区間分解）", node: <WeekendPremiumChart prices={filteredPrices} /> },
+                      { id: "cal-weekend-premium", title: "週末プレミアム μ_w：週末保有の有無によるリターン差（区間分解）", node: <WeekendPremiumChart prices={filteredPrices} /> },
                       { id: "cal-optimal-exit", title: "状態依存の最適手仕舞い（月曜Open建玉→いつ降りるか・後退帰納法）", node: <OptimalExitChart prices={filteredPrices} /> },
                       { id: "cal-nisa-vs-taxable", title: "NISA(非課税・持ち切り) vs 現物(課税・曜日戦略) 税引後・レバレッジ比較", node: <NisaVsTaxableChart prices={allPrices} /> },
                       { id: "cal-spiral", title: "カレンダー螺旋ヒートマップ", node: <SpiralHeatmap prices={filteredPrices} period={period} /> },
@@ -1882,7 +1882,7 @@ export default function AnalysisPage() {
                       { id: "cal-event-effect", title: "カレンダー・イベント効果（月末/SQ/連休/季節の先行きリターン）", node: <CalendarEffectChart prices={filteredPrices} /> },
                       { id: "cal-event-calendar", title: "イベントカレンダー条件付け（FOMC/CPI/雇用統計/日銀/SQ の先行きリターン）", node: <EventCalendarChart prices={filteredPrices} /> },
                       { id: "cal-session-gap", title: "休場コンテキスト別 曜日値動き（連休・祝日の歪み検出）", node: <SessionGapChart prices={filteredPrices} /> },
-                      { id: "cal-today-bin", title: "今日の値動き → リターンビン即時判断（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
+                      { id: "cal-today-bin", title: "今日の値動きが該当するリターンビン：同条件の過去分布（曜日非依存）", node: <TodayBinChart prices={filteredPrices} /> },
                       { id: "cal-weekly-analog", title: "今週の軌跡アナログ比較（似た形／前夜米国ビンで絞って先読み）", node: <WeeklyAnalogChart prices={allPrices} ticker={data.ticker} /> },
                       { id: "cal-weekly-analog-oos", title: "今週の軌跡アナログ 予測力OOS検証（IC・方向的中率・多重比較補正）", node: <WeeklyAnalogOosChart prices={allPrices} /> },
                       { id: "cal-week-embed", title: "週内Embedding（週の関数PCA・固有週アトラス／形→翌週リターンの予測力を大域検定）", node: <WeekEmbeddingChart prices={allPrices} /> },
@@ -1981,7 +1981,7 @@ export default function AnalysisPage() {
                       group: "確率過程モデル",
                       items: [
                         { id: "sim-jump", title: "Merton ジャンプ拡散モデル", node: <JumpDiffusionChart prices={filteredPrices} /> },
-                        { id: "sim-optstop", title: "最適停止（売り時の閾値）", node: <OptimalStoppingChart prices={filteredPrices} /> },
+                        { id: "sim-optstop", title: "最適停止問題：閾値の理論解", node: <OptimalStoppingChart prices={filteredPrices} /> },
                         { id: "sim-vg", title: "Variance Gamma 過程", node: <VarianceGammaChart prices={filteredPrices} /> },
                         { id: "sim-fbm", title: "分数ブラウン運動（fBM）", node: <FBMChart prices={filteredPrices} /> },
                       ],

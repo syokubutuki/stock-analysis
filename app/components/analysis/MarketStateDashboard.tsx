@@ -378,7 +378,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
 
       {/* Interpretation */}
       <div className="bg-blue-50 rounded p-2 mb-3 text-xs">
-        <span className="font-medium text-blue-700">判断: </span>
+        <span className="font-medium text-blue-700">状態の要約: </span>
         <span className="text-blue-600">{marketState.interpretation}</span>
       </div>
 
@@ -501,12 +501,16 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
               totalScore = clamp(rawScore, -100, +100)
             </div>
             <ul className="list-disc pl-4 space-y-1 text-xs">
-              <li>+50以上: 強い買いシグナル</li>
-              <li>+20〜+50: 弱い買いシグナル</li>
-              <li>-20〜+20: 中立</li>
-              <li>-50〜-20: 弱い売りシグナル</li>
-              <li>-50以下: 強い売りシグナル</li>
+              <li>+50以上: 上昇トレンドが強く、加速も伴う状態</li>
+              <li>+20〜+50: 上昇トレンドが弱く現れている状態</li>
+              <li>-20〜+20: 方向性が判別できない状態</li>
+              <li>-50〜-20: 下降トレンドが弱く現れている状態</li>
+              <li>-50以下: 下降トレンドが強く、加速も伴う状態</li>
             </ul>
+            <p className="mt-2 text-xs text-gray-500">
+              スコアはトレンド強度と加速度の合成値であり、売買を推奨するものではない。
+              符号が続く保証はなく、レジーム転換時に最も大きく外れる。
+            </p>
           </div>
 
           <div>
