@@ -68,7 +68,7 @@ function mean(a: number[]): number {
 }
 
 // ガウス・ジョルダン法による逆行列(部分ピボット選択)。特異なら null。
-function invertMatrix(src: number[][]): number[][] | null {
+export function invertMatrix(src: number[][]): number[][] | null {
   const n = src.length;
   // [A | I] の拡大行列
   const a = src.map((row, i) => [
@@ -112,7 +112,7 @@ function quad(Sigma: number[][], w: number[]): number {
 // Ledoit-Wolf 収縮(恒等スケール・ターゲット)。日次リターンから標本共分散 S(1/T)を作り、
 // Σ_shrunk = δ·μ_avg·I + (1−δ)·S を返す。δ* は解析的な最適収縮強度。
 // 参照: Ledoit & Wolf (2004) "A well-conditioned estimator...". 恒等ターゲットは ρ=0 なので δ=κ/T=(π/γ)/T。
-function ledoitWolf(returns: number[][], means: number[]): { cov: number[][]; delta: number } {
+export function ledoitWolf(returns: number[][], means: number[]): { cov: number[][]; delta: number } {
   const k = returns.length;
   const T = returns[0]?.length ?? 0;
   const S: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));

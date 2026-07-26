@@ -87,6 +87,10 @@ const ExitCrossChart = dynamic(
   () => import("../components/analysis/ExitCrossChart"),
   { ssr: false }
 );
+const WeeklyAllocationChart = dynamic(
+  () => import("../components/analysis/WeeklyAllocationChart"),
+  { ssr: false }
+);
 const CrossSectionalEdgeChart = dynamic(
   () => import("../components/analysis/CrossSectionalEdgeChart"),
   { ssr: false }
@@ -552,6 +556,13 @@ export default function PortfolioPage() {
               title: "曜日固定エグジット 横断：週内どこで降りるのが最良か",
               subtitle: "月曜Open建玉→h日目引けで降りる戦略を銘柄×週でプール（クラスタ頑健・銘柄別異質性）",
               node: <ExitCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            // 出口(pf-exit-cross)の対になる入口＋サイズ。「何%を・いつ建てるか」を1本の最適化として解く。
+            if (tickers.length >= 2) items.push({
+              id: "pf-entry-sizing",
+              title: "週次エントリー配分・タイミング配分：どの銘柄に何%、いつ建てるか",
+              subtitle: "縮小μ×Ledoit-Wolf Σのケリー配分(現金・1銘柄上限つき)＋実効銘柄数N_eff／後知恵ギャップ／時間分散k掃引CE／待つ価値の最適停止OOS",
+              node: <WeeklyAllocationChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // ユニバース(大型30/主要60/貼り付け)を自前取得できるため、ウォッチリスト数に依存せず常設。
             items.push({
