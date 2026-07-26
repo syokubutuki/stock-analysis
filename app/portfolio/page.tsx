@@ -91,6 +91,10 @@ const WeeklyAllocationChart = dynamic(
   () => import("../components/analysis/WeeklyAllocationChart"),
   { ssr: false }
 );
+const EntryVsBenchmarkChart = dynamic(
+  () => import("../components/analysis/EntryVsBenchmarkChart"),
+  { ssr: false }
+);
 const CrossSectionalEdgeChart = dynamic(
   () => import("../components/analysis/CrossSectionalEdgeChart"),
   { ssr: false }
@@ -563,6 +567,13 @@ export default function PortfolioPage() {
               title: "週次エントリー配分・タイミング配分：どの銘柄に何%、いつ建てるか",
               subtitle: "縮小μ×Ledoit-Wolf Σのケリー配分(現金・1銘柄上限つき)＋実効銘柄数N_eff／後知恵ギャップ／時間分散k掃引CE／待つ価値の最適停止OOS",
               node: <WeeklyAllocationChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            // 配分(pf-entry-sizing)を固定したまま「エントリー戦略だけ」を差し替えて Buy&Hold と比べる。
+            if (tickers.length >= 2) items.push({
+              id: "pf-entry-vs-bh",
+              title: "エントリー戦略 vs Buy&Hold：違いは「週内のどこで建てるか」だけ",
+              subtitle: "同一銘柄・同一配分・同一出口で6戦略(B&H/固定/ランダム/均等/後知恵Best/最悪Worst)を比較。CAGR・Sharpe・Sortino・Calmar・DD・PF・回転率＋差分の95%CI/クラスタ頑健t/p/効果量。総リターンを市場・銘柄選択・資金配分・エントリーに加法分解",
+              node: <EntryVsBenchmarkChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // ユニバース(大型30/主要60/貼り付け)を自前取得できるため、ウォッチリスト数に依存せず常設。
             items.push({

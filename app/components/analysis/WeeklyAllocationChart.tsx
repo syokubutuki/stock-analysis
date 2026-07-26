@@ -8,6 +8,7 @@ import {
   TickerPrices,
   Side,
   EXIT_LABEL,
+  growthRatio,
 } from "../../lib/weekly-allocation";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -283,10 +284,96 @@ function drawSplit(ctx: CanvasRenderingContext2D, width: number, height: number,
   ctx.fillText("分割数 k（1=月寄に全額）", ml + plotW / 2, mt + plotH + 24);
 }
 
+// ⑤ 成長率カーブ g(λ)/g_max = 2λ − λ²。現在の配分が崖のどこに立つかを示す。
+function drawGrowth(ctx: CanvasRenderingContext2D, width: number, height: number, r: WeeklyAllocResult) {
+  const ml = 44;
+  const mr = 14;
+  const mt = 26;
+  const mb = 34;
+  const plotW = width - ml - mr;
+  const plotH = height - mt - mb;
+  const s = r.stress;
+
+  ctx.fillStyle = "#374151";
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("成長率カーブ g(λ)/g_max = 2λ − λ²（λ=フルケリー比。λ=2 で成長率ゼロ）", 4, 14);
+
+  const lamMax = Math.max(3, ...[s.lambdaOpt, s.lambdaOptStress, s.lambdaSolo, s.lambdaSoloStress].map((v) => v * 1.15));
+  const xOf = (l: number) => ml + (l / lamMax) * plotW;
+  const yOf = (g: number) => mt + plotH * (1 - (g + 1) / 2); // g ∈ [−1, 1] を描画域に
+
+  // 領域の塗り分け（λ>2 = 成長率マイナス）
+  ctx.fillStyle = "rgba(220,38,38,0.07)";
+  ctx.fillRect(xOf(2), mt, Math.max(0, ml + plotW - xOf(2)), plotH);
+
+  // ゼロ線・最大線
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.lineWidth = 1;
+  [0, 1].forEach((g) => {
+    ctx.beginPath();
+    ctx.moveTo(ml, yOf(g));
+    ctx.lineTo(ml + plotW, yOf(g));
+    ctx.stroke();
+  });
+
+  // カーブ
+  ctx.strokeStyle = "#2563eb";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i <= 200; i++) {
+    const l = (i / 200) * lamMax;
+    const g = Math.max(-1, growthRatio(l));
+    if (i === 0) ctx.moveTo(xOf(l), yOf(g));
+    else ctx.lineTo(xOf(l), yOf(g));
+  }
+  ctx.stroke();
+
+  const marks: { l: number; label: string; color: string }[] = [
+    { l: s.lambdaOpt, label: "最適配分", color: "#1d4ed8" },
+    { l: s.lambdaOptStress, label: "最適配分＠危機Σ", color: "#7c3aed" },
+    { l: s.lambdaSolo, label: "単独ケリー", color: "#d97706" },
+    { l: s.lambdaSoloStress, label: "単独ケリー＠危機Σ", color: "#dc2626" },
+  ];
+  marks.forEach((m, i) => {
+    if (!(m.l > 0)) return;
+    const g = Math.max(-1, growthRatio(m.l));
+    const px = xOf(Math.min(m.l, lamMax));
+    const py = yOf(g);
+    ctx.strokeStyle = m.color;
+    ctx.setLineDash([2, 2]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px, mt + plotH);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = m.color;
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = px > ml + plotW * 0.6 ? "right" : "left";
+    ctx.fillText(`${m.label} λ=${m.l.toFixed(2)}`, px + (px > ml + plotW * 0.6 ? -6 : 6), mt + 12 + i * 11);
+  });
+
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "9px sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText("g_max", ml - 4, yOf(1) + 3);
+  ctx.fillText("0", ml - 4, yOf(0) + 3);
+  ctx.textAlign = "center";
+  ctx.fillText("λ = 0", ml, mt + plotH + 14);
+  ctx.fillText("λ = 2（成長率ゼロ）", xOf(2), mt + plotH + 14);
+  ctx.fillText(`λ = ${lamMax.toFixed(1)}`, ml + plotW, mt + plotH + 14);
+  ctx.fillText("フルケリー比 λ", ml + plotW / 2, mt + plotH + 27);
+}
+
 export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }: Props) {
   const allocRef = useRef<HTMLCanvasElement>(null);
   const slotRef = useRef<HTMLCanvasElement>(null);
   const splitRef = useRef<HTMLCanvasElement>(null);
+  const growthRef = useRef<HTMLCanvasElement>(null);
 
   const [side, setSide] = useState<Side>("long");
   const [exitDay, setExitDay] = useState(5);
@@ -361,6 +448,11 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
       if (p) {
         const init = initCanvas(p, 190);
         if (init) drawSplit(init.ctx, init.width, init.height, result);
+      }
+      const g = growthRef.current;
+      if (g && result.stress.ok) {
+        const init = initCanvas(g, 220);
+        if (init) drawGrowth(init.ctx, init.width, init.height, result);
       }
     };
     draw();
@@ -775,6 +867,120 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
         </details>
       </div>
 
+      {/* ⑤ 危機時Σ */}
+      {r.stress.ok && (
+        <div className="mt-4">
+          <div className="text-[11px] font-medium text-gray-700">
+            ⑤ 危機時Σ：「テールでは相関が1に寄る」を数値で確かめる
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="rounded border border-gray-200 p-2">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-200">
+                    <th className="text-left py-0.5 font-medium">レジーム</th>
+                    <th className="text-right py-0.5 font-medium">週数</th>
+                    <th className="text-right py-0.5 font-medium">平均相関 ρ̄</th>
+                    <th className="text-right py-0.5 font-medium">実効銘柄数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-0.5 text-gray-700">平穏（上位{pct(1 - r.stress.q)}）</td>
+                    <td className="py-0.5 text-right text-gray-500">{r.stress.nCalm}</td>
+                    <td className="py-0.5 text-right">{r.stress.rhoCalm.toFixed(3)}</td>
+                    <td className="py-0.5 text-right">{r.stress.nEffCalm.toFixed(1)}</td>
+                  </tr>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-0.5 text-gray-700">全期間</td>
+                    <td className="py-0.5 text-right text-gray-500">{r.nWeeks}</td>
+                    <td className="py-0.5 text-right">{r.stress.rhoAll.toFixed(3)}</td>
+                    <td className="py-0.5 text-right">{r.stress.nEffAll.toFixed(1)}</td>
+                  </tr>
+                  <tr className="bg-red-50/60">
+                    <td className="py-0.5 font-medium text-gray-800">危機（下位{pct(r.stress.q)}）</td>
+                    <td className="py-0.5 text-right text-gray-500">{r.stress.nStress}</td>
+                    <td className="py-0.5 text-right font-semibold text-red-700">{r.stress.rhoStress.toFixed(3)}</td>
+                    <td className="py-0.5 text-right font-semibold text-red-700">{r.stress.nEffStress.toFixed(1)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-1 text-[10px] text-gray-500">
+                危機レジーム＝<b>直近13週のバスケット実現ボラが上位{pct(r.stress.q)}</b>の週。
+                同時点の下落率で切ると共通ファクターの実現値を条件付けすることになり、相関が機械的に下がってしまう
+                （条件付けバイアス）ため、<b>その週の始まりの時点で既知の情報だけ</b>で切っています。
+                {r.stress.rhoStress > r.stress.rhoCalm + 0.03
+                  ? ` 高ボラ期に相関が ${r.stress.rhoCalm.toFixed(2)} → ${r.stress.rhoStress.toFixed(2)} へ上がり、実効銘柄数は ${r.stress.nEffCalm.toFixed(1)} → ${r.stress.nEffStress.toFixed(1)} に目減りします。分散は必要なときに効きません。`
+                  : " この標本では高ボラ期の相関上昇は目立ちません（真に無いのか、この期間に大きな危機が入っていないだけかは区別できません）。"}
+              </p>
+            </div>
+            <div className="rounded border border-gray-200 p-2">
+              <div className="text-[11px] text-gray-700">
+                同じ配分のσ：平時 <b>{pct(r.stress.sigmaAll)}</b> → 危機Σで測ると <b className="text-red-700">{pct(r.stress.sigmaStress)}</b>
+                （<b>{(r.stress.sigmaAll > 0 ? r.stress.sigmaStress / r.stress.sigmaAll : 1).toFixed(2)}倍</b>）
+              </div>
+              <div className="mt-1 text-[11px] text-gray-700">
+                危機Σで組み直した総建玉 <b>{pct(r.stress.exposureStress)}</b>（現行 {pct(r.exposure)}）。
+                そのとき失う期待リターンは週次 {bp(r.stress.muCostStress)}／年率 {pct(r.stress.muCostStress * 52)}。
+              </div>
+              <p className="mt-1 text-[10px] text-gray-500">
+                これが「危機を織り込んで保守化する代金」です。Σ を危機側に置き換えると建玉は下がり、
+                平時のリターンをこの分だけ諦めることになります。相関無視で建玉を増やすのとは正反対の方向です。
+              </p>
+            </div>
+          </div>
+          <div className="mt-2">
+            <canvas ref={growthRef} />
+          </div>
+          <div className="mt-1 overflow-x-auto">
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-200">
+                  <th className="text-left py-1 pr-2 font-medium">配分の作り方</th>
+                  <th className="text-right py-1 px-2 font-medium">λ（平時Σ）</th>
+                  <th className="text-right py-1 px-2 font-medium">成長率 g/g_max</th>
+                  <th className="text-right py-1 px-2 font-medium">λ（危機Σ）</th>
+                  <th className="text-right py-1 px-2 font-medium">成長率 g/g_max</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: "相関を織り込んだ最適配分（採用）", l: r.stress.lambdaOpt, ls: r.stress.lambdaOptStress, hi: true },
+                  { label: "単独ケリーの合算（相関を無視）", l: r.stress.lambdaSolo, ls: r.stress.lambdaSoloStress, hi: false },
+                ].map((x) => {
+                  const g = growthRatio(x.l);
+                  const gs = growthRatio(x.ls);
+                  return (
+                    <tr key={x.label} className={`border-b border-gray-100 ${x.hi ? "bg-blue-50/60" : ""}`}>
+                      <td className="py-1 pr-2 text-gray-700">{x.label}</td>
+                      <td className="py-1 px-2 text-right font-medium">{x.l.toFixed(2)}</td>
+                      <td className={`py-1 px-2 text-right ${g < 0 ? "text-red-600 font-semibold" : "text-gray-700"}`}>{g.toFixed(2)}</td>
+                      <td className={`py-1 px-2 text-right font-medium ${x.ls > 2 ? "text-red-600" : ""}`}>{x.ls.toFixed(2)}</td>
+                      <td className={`py-1 px-2 text-right ${gs < 0 ? "text-red-600 font-semibold" : "text-gray-700"}`}>{gs.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {r.stress.lambdaOpt < 0.5 && (
+              <p className="mt-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-1.5">
+                <b>λ が 1 を大きく下回っていますが、レバレッジを掛けろという意味ではありません。</b>
+                これは総建玉上限（現在 {pct(budget)}）と1銘柄上限が効いて、フルケリー点まで張れていないという状態です。
+                そもそもフルケリーは「μ・Σ が正しく既知」「リターンが正規分布」「連続的に建玉調整できる」という
+                現実には成り立たない前提の上限値で、推定誤差・ファットテール・ジャンプを入れると実際の最適点はずっと左にあります。
+                この表は<b>右へ行き過ぎていないかを確認するため</b>のもので、左に余裕があることを利用の推奨と読まないでください。
+              </p>
+            )}
+            <p className="mt-1 text-[10px] text-gray-500">
+              λ はフルケリー比（λ=1 が成長率最大、λ=2 で成長率ゼロ、λ&gt;2 は資産が減る領域）。
+              {r.stress.lambdaSoloStress > 2
+                ? ` 単独ケリーの合算は危機Σの下で λ=${r.stress.lambdaSoloStress.toFixed(2)} となり、成長率が負の領域に入ります。「相関を無視してリターンを追う」が実際には長期成長率を削る操作であることが、この行に出ています。`
+                : ` この設定では単独ケリー合算も危機Σの下で λ=${r.stress.lambdaSoloStress.toFixed(2)} に留まっています（f を上げると比例して右に動くので、f を大きくする前にこの表を確認してください）。`}
+            </p>
+          </div>
+        </div>
+      )}
+
       <AnalysisGuide title="週次エントリー配分・タイミング配分の詳細理論">
         <p className="font-medium text-gray-700">1. 何をしているか — 2つの問いは1つの最適化</p>
         <p>
@@ -878,7 +1084,60 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           評価は週単位のインターリーブ2分割OOS（偶数週で学習→奇数週で検定、および逆）。同一週を学習と検定に跨がせないので、横断相関の漏れが起きません。
         </p>
 
-        <p className="font-medium text-gray-700 mt-3">7. 結果の読み方</p>
+        <p className="font-medium text-gray-700 mt-3">7. 数式：危機時Σ と 成長率カーブ（⑤）</p>
+        <p>
+          「テールではどうせ相関が1に寄るのだから、平時は相関を無視してリターンを追う方が伸びるのでは」という直観は、
+          前半は正しく後半が逆です。⑤はそれを数値で確かめる層です。
+        </p>
+        <p>
+          まず危機レジームを切り出して Σ を推定します。ここで<b>切り方に落とし穴があります</b>。
+          「その週のバスケット・リターンが下位 q 分位」で切ると、共通ファクターの実現値そのものを条件付けすることになり、
+          部分標本内でのファクター分散が切り詰められて<b>相関が機械的に下がります</b>
+          （Boyer-Gibson-Loretan 1999、Forbes-Rigobon 2002 の条件付けバイアス。実際この方式だと
+          「危機時の方が相関が低い」という現実と逆の結果が出ます）。
+          そこで本実装では危機レジームを<b>直近13週のバスケット実現ボラが上位 q 分位</b>で定義しています。
+          同時点のリターンを条件にしないのでバイアスが入らず、しかも<b>月曜寄付の時点で判定できる</b>ため、
+          実際の運用でも使えるレジーム定義になっています。
+          相関が上がっていれば、実効銘柄数 N<sub>eff</sub> が平穏時より小さくなるのが表に出ます。
+        </p>
+        <p>
+          次に、方向 w に沿ってスカラー s 倍の建玉を持つときの長期成長率
+        </p>
+        <p>{"g(s) = s·(μᵀw) − (s²/2)·(wᵀΣw)"}</p>
+        <p>
+          を最大にする s* = (μᵀw)/(wᵀΣw) を求めます。いま持っているのは s=1 なので、
+          <b>現在の建玉がフルケリーの何倍か</b>は
+        </p>
+        <p>{"λ = 1/s* = (wᵀΣw) / (μᵀw)"}</p>
+        <p>
+          で測れます。このとき成長率は最大値に対して
+        </p>
+        <p>{"g(λ)/g_max = 2λ − λ²"}</p>
+        <p>
+          となり、<b>λ=1 で最大、λ=2 で成長率ちょうどゼロ、λ&gt;2 では資産が減っていきます</b>（期待値は増え続けるのに、です）。
+          グラフ上に4点を打っています：最適配分／単独ケリー合算のそれぞれを、平時Σと危機Σで測った位置です。
+        </p>
+        <p>
+          ここが核心です。<b>Σ が危機側に振れると λ は大きくなる方向にしか動きません</b>
+          （分子 wᵀΣw が増えるため）。つまり「テールで相関が上がる」という前提を真に受けるなら、
+          導かれる結論は「建玉を増やしてよい」ではなく<b>「今の建玉ですら過大かもしれない」</b>です。
+          相関を無視した単独ケリー合算は、平時Σですでに λ が大きく、危機Σではさらに右へ動きます。
+          「相関を無視してリターンを追う」は、算術平均のリターンを増やす代わりに幾何平均（＝実際に増える資産）を削る操作です。
+        </p>
+        <p>
+          なお分数ケリー f はこの λ を丸ごとスケールします（f を半分にすれば λ も半分）。
+          f=1/4 なら多少のオーバーベットは吸収されますが、f を上げた瞬間に4点がまとめて右へ動いて崖に近づきます。
+          <b>f を上げる前に必ずこの表の「危機Σ」列を見てください。</b>
+        </p>
+        <p>
+          <b>λ が 1 より小さいことをレバレッジの推奨と読まないでください。</b>
+          フルケリー（λ=1）は「μ・Σ が正しく既知」「リターンが正規分布」「連続的に建玉を調整できる」という、
+          現実には成り立たない前提の上での上限値です。推定誤差・ファットテール・約定の飛び（ジャンプ）を入れると
+          実際の最適点はこれよりずっと左にあります。この層の役割は<b>右へ行き過ぎていないかの確認</b>であって、
+          左の余白を埋めることではありません。
+        </p>
+
+        <p className="font-medium text-gray-700 mt-3">8. 結果の読み方</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><b>実効銘柄数 N<sub>eff</sub></b>：これが銘柄数よりずっと小さいなら、銘柄を増やしても分散効果はほぼ増えません。同業種を並べているサインです。</li>
           <li><b>オーバーベット倍率</b>：単独ケリーの単純合計 ÷ 最適配分の総建玉。2倍を超えるなら、素朴な足し算のサイジングは実質ダブルレバに相当します。</li>
@@ -889,7 +1148,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           <li><b>④のOOS対決</b>：OOSで「待つ」が月寄固定を上回らないなら、待ちルールは後知恵です。IS との差が過剰最適化の大きさそのものです。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">8. 投資判断への活用</p>
+        <p className="font-medium text-gray-700 mt-3">9. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
             <b>発注サイズの決定</b>：総資産を入力すると、①の表の<b>「株数」列がそのまま発注数量</b>になります
@@ -909,7 +1168,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
           <li><b>現金比率の根拠</b>：地合いが悪く μ̃ が縮んだ局面では自動的に現金比率が上がります。感覚ではなく μ̃/Σ の関係として説明できるサイジングになります。</li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">9. 注意点・限界</p>
+        <p className="font-medium text-gray-700 mt-3">10. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><b>μ の推定は本質的に難しい</b>。縮小してもなお μ̃ の不確かさが最大のリスクです。分数ケリーはその保険であって、消してはくれません。</li>
           <li><b>Σ は時変</b>。ここでは全期間一定として推定しています。危機局面では相関が1に寄り、N<sub>eff</sub> はさらに落ちます（＝表示より実際は分散が効きません）。</li>

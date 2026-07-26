@@ -88,6 +88,7 @@ function trailingSigma(prices: PricePoint[], beforeIdx: number, lookback: number
 
 export interface TickerWeek {
   key: string; // 週キー（その週の月曜日）
+  base: number; // 月寄価格（z の基準点であり、Buy&Hold 連鎖の接続点）
   slotRet: (number | null)[]; // スロット s で建て、出口まで持ったときのリターン（side適用後）
   slotZ: (number | null)[]; // 月寄基準の累積対数リターン / σ（side適用後。高い=不利な建値）
   sigma: number;
@@ -150,11 +151,96 @@ export function buildTickerWeeks(
       slotZ.push((Math.log(px / base) / sigma) * sgn);
     }
     if (slotRet[0] === null) continue; // 月寄が取れない週は使わない
-    weeks.push({ key, slotRet, slotZ, sigma });
+    weeks.push({ key, base, slotRet, slotZ, sigma });
   }
 
   weeks.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { weeks, skippedNoMonday };
+}
+
+// ───────────────────────── 共通パネル（配分・Buy&Hold比較で共有） ─────────────────────────
+
+export interface PanelStock {
+  ticker: string;
+  name: string;
+}
+
+export interface AllocPanel {
+  stocks: PanelStock[];
+  commonKeys: string[]; // 全銘柄で揃った週（昇順）
+  nSlots: number;
+  slotLabels: string[];
+  skippedNoMonday: number;
+  R: number[][]; // K×T 基準プラン（月寄建て→出口）のリターン
+  RS: (number | null)[][][]; // K×T×S スロット別リターン
+  ZS: (number | null)[][][]; // K×T×S 月寄比 z
+  BH: (number | null)[][]; // K×T 保有し続けた場合の週次リターン（月寄→翌採用週の月寄）
+}
+
+// 「月曜が揃っている週」だけを共通軸として、銘柄×週×スロットの表を作る。
+// BH は同じ月寄を接続点にした連鎖なので、複利すると実際の Buy&Hold と一致する。
+export function buildPanel(
+  stocks: TickerPrices[], side: Side, exitDay: number
+): { panel: AllocPanel } | { error: string } {
+  const nSlots = Math.max(1, Math.min(SLOTS.length, 2 * exitDay - 1));
+  const slotLabels = SLOTS.slice(0, nSlots).map((s) => s.label);
+
+  const usable = stocks.filter((s) => s.prices.length >= 260);
+  if (usable.length < 2) return { error: "有効な銘柄が不足（2銘柄以上・各260本以上必要）" };
+
+  const built = usable.map((s) => ({
+    ticker: s.ticker,
+    name: s.name ?? s.ticker,
+    ...buildTickerWeeks(s.prices, side, exitDay),
+  }));
+  const kept = built.filter((b) => b.weeks.length >= 40);
+  if (kept.length < 2) return { error: "トレード週の取れる銘柄が不足（各40週以上必要）" };
+
+  const counts = new Map<string, number>();
+  for (const b of kept) for (const w of b.weeks) counts.set(w.key, (counts.get(w.key) ?? 0) + 1);
+  const commonKeys = Array.from(counts.entries())
+    .filter(([, c]) => c === kept.length)
+    .map(([k]) => k)
+    .sort();
+  if (commonKeys.length < 40) {
+    return { error: `全銘柄で揃う週が不足（${commonKeys.length}週。40週以上必要）` };
+  }
+  const keyIndex = new Map(commonKeys.map((k, i) => [k, i]));
+  const T = commonKeys.length;
+  const K = kept.length;
+  const sgn = side === "long" ? 1 : -1;
+
+  const R: number[][] = Array.from({ length: K }, () => new Array(T).fill(0));
+  const RS: (number | null)[][][] = Array.from({ length: K }, () =>
+    Array.from({ length: T }, () => new Array<number | null>(nSlots).fill(null))
+  );
+  const ZS: (number | null)[][][] = Array.from({ length: K }, () =>
+    Array.from({ length: T }, () => new Array<number | null>(nSlots).fill(null))
+  );
+  const BH: (number | null)[][] = Array.from({ length: K }, () => new Array<number | null>(T).fill(null));
+
+  kept.forEach((b, i) => {
+    const base = new Array<number>(T).fill(0);
+    for (const w of b.weeks) {
+      const t = keyIndex.get(w.key);
+      if (t === undefined) continue;
+      base[t] = w.base;
+      R[i][t] = w.slotRet[0]!;
+      for (let s = 0; s < nSlots; s++) { RS[i][t][s] = w.slotRet[s]; ZS[i][t][s] = w.slotZ[s]; }
+    }
+    for (let t = 0; t < T - 1; t++) {
+      if (base[t] > 0 && base[t + 1] > 0) BH[i][t] = (base[t + 1] / base[t] - 1) * sgn;
+    }
+  });
+
+  return {
+    panel: {
+      stocks: kept.map((b) => ({ ticker: b.ticker, name: b.name })),
+      commonKeys, nSlots, slotLabels,
+      skippedNoMonday: built.reduce((s, b) => s + b.skippedNoMonday, 0),
+      R, RS, ZS, BH,
+    },
+  };
 }
 
 // ───────────────────────── 制約集合への射影 ─────────────────────────
@@ -234,6 +320,142 @@ function safeInverse(S: number[][]): number[][] | null {
     if (inv) return inv;
   }
   return null;
+}
+
+// ───────────────────────── 危機時Σ と 成長率カーブ ─────────────────────────
+// 「テール時にはどうせ相関が1に寄る」という直観を数値化する層。
+//
+// 【重要】レジームの切り方に落とし穴がある。「その週のバスケット・リターンが下位q分位」で切ると、
+// 共通ファクターの実現値そのものを条件付けすることになり、部分標本内でのファクター分散が
+// 切り詰められて、相関が機械的に下がる（Boyer-Gibson-Loretan 1999, Forbes-Rigobon 2002 の
+// 条件付けバイアス）。実際この方式では「危機時の方が相関が低い」という逆の結果が出る。
+// そこで危機レジームは **事前に分かる情報＝直近L週のバスケット実現ボラ** で定義する。
+// 同時点のリターンを条件にしないのでバイアスが入らず、しかも月曜寄付の時点で判定できる
+// （＝実際に運用で使えるレジーム定義でもある）。
+//
+// 平時Σで組んだ配分がその Σ の下でフルケリーの何倍に化けるかを測る。
+//
+// 方向 w に沿ってスカラー s 倍の建玉を持つときの成長率は
+//   g(s) = s·(μᵀw) − (s²/2)·(wᵀΣw)
+// で、これを最大にする s* = (μᵀw)/(wᵀΣw)。いま持っているのは s=1 なので、
+// 「フルケリー比」は λ = 1/s* = (wᵀΣw)/(μᵀw)。
+//   g(λ)/g_max = 2λ − λ²   … λ=1 で最大、λ=2 で成長率ゼロ、λ>2 で資産は減っていく。
+export function lambdaOf(w: number[], S: number[][], mu: number[]): number {
+  const num = quad(S, w);
+  const den = dot(mu, w);
+  if (!(den > 0) || !(num > 0)) return 0;
+  return num / den;
+}
+
+export function growthRatio(lambda: number): number {
+  return 2 * lambda - lambda * lambda;
+}
+
+function avgCorr(S: number[][]): number {
+  const k = S.length;
+  let sum = 0;
+  let n = 0;
+  for (let a = 0; a < k; a++) {
+    for (let b = a + 1; b < k; b++) {
+      const d = Math.sqrt(Math.max(S[a][a], 1e-18) * Math.max(S[b][b], 1e-18));
+      if (d > 0) { sum += S[a][b] / d; n++; }
+    }
+  }
+  return n > 0 ? sum / n : 0;
+}
+
+export interface StressResult {
+  ok: boolean;
+  q: number; // 下位分位（例 0.2 = 悪い方から2割の週）
+  nStress: number;
+  nCalm: number;
+  rhoAll: number;
+  rhoCalm: number;
+  rhoStress: number;
+  nEffAll: number;
+  nEffCalm: number;
+  nEffStress: number;
+  sigmaAll: number; // 最適配分の週次σ（平時Σ）
+  sigmaStress: number; // 同じ配分を危機Σで測ったσ
+  lambdaOpt: number; // 最適配分のフルケリー比（平時Σ）
+  lambdaOptStress: number; // 同じ配分を危機Σで測ったフルケリー比
+  lambdaSolo: number; // 単独ケリー配分のフルケリー比（平時Σ）
+  lambdaSoloStress: number; // 同上（危機Σ）
+  weightsStress: number[]; // 危機Σで組み直した配分
+  exposureStress: number;
+  muCostStress: number; // 危機Σで組み直すと平時の期待リターンをいくら落とすか（週次）
+}
+
+function nEffFromRho(K: number, rho: number): number {
+  const d = 1 + (K - 1) * rho;
+  return d > 1e-6 ? Math.min(K, K / d) : K;
+}
+
+// 危機レジーム（等加重バスケットの下位q分位の週）でΣを推定して比較する
+export function computeStress(
+  R: number[][], mu: number[], wOpt: number[], wSolo: number[],
+  gamma: number, cap: number, budget: number, q = 0.2
+): StressResult {
+  const K = R.length;
+  const T = R[0]?.length ?? 0;
+  const empty: StressResult = {
+    ok: false, q, nStress: 0, nCalm: 0,
+    rhoAll: 0, rhoCalm: 0, rhoStress: 0, nEffAll: K, nEffCalm: K, nEffStress: K,
+    sigmaAll: 0, sigmaStress: 0,
+    lambdaOpt: 0, lambdaOptStress: 0, lambdaSolo: 0, lambdaSoloStress: 0,
+    weightsStress: new Array(K).fill(0), exposureStress: 0, muCostStress: 0,
+  };
+  if (K < 2 || T < 60) return empty;
+
+  const basket: number[] = [];
+  for (let t = 0; t < T; t++) {
+    let s = 0;
+    for (let i = 0; i < K; i++) s += R[i][t];
+    basket.push(s / K);
+  }
+
+  // 直近L週のバスケット実現ボラ（その週の始まりの時点で既知＝先読み無し）
+  const L = 13;
+  const trail: { t: number; v: number }[] = [];
+  for (let t = L; t < T; t++) trail.push({ t, v: std(basket.slice(t - L, t)) });
+  if (trail.length < 50) return empty;
+  const cut = [...trail].sort((a, b) => b.v - a.v)[Math.max(0, Math.floor(q * (trail.length - 1)))].v;
+  const stressT: number[] = [];
+  const calmT: number[] = [];
+  for (const x of trail) (x.v >= cut ? stressT : calmT).push(x.t);
+  if (stressT.length < 15 || calmT.length < 15) return empty;
+
+  const sub = (idx: number[]) => R.map((row) => idx.map((t) => row[t]));
+  const Rs = sub(stressT);
+  const Rc = sub(calmT);
+  const Sall = ledoitWolf(R, R.map((r) => mean(r))).cov;
+  const Sstress = ledoitWolf(Rs, Rs.map((r) => mean(r))).cov;
+  const Scalm = ledoitWolf(Rc, Rc.map((r) => mean(r))).cov;
+
+  const rhoAll = avgCorr(Sall);
+  const rhoStress = avgCorr(Sstress);
+  const rhoCalm = avgCorr(Scalm);
+
+  // 危機Σで組み直した配分（μ は平時のまま＝「リスクだけ危機想定に置き換える」）
+  const wStress = solveKelly(mu, Sstress, gamma, cap, budget);
+
+  return {
+    ok: true, q,
+    nStress: stressT.length, nCalm: calmT.length,
+    rhoAll, rhoCalm, rhoStress,
+    nEffAll: nEffFromRho(K, rhoAll),
+    nEffCalm: nEffFromRho(K, rhoCalm),
+    nEffStress: nEffFromRho(K, rhoStress),
+    sigmaAll: Math.sqrt(Math.max(quad(Sall, wOpt), 0)),
+    sigmaStress: Math.sqrt(Math.max(quad(Sstress, wOpt), 0)),
+    lambdaOpt: lambdaOf(wOpt, Sall, mu),
+    lambdaOptStress: lambdaOf(wOpt, Sstress, mu),
+    lambdaSolo: lambdaOf(wSolo, Sall, mu),
+    lambdaSoloStress: lambdaOf(wSolo, Sstress, mu),
+    weightsStress: wStress,
+    exposureStress: wStress.reduce((s, x) => s + x, 0),
+    muCostStress: dot(mu, wOpt) - dot(mu, wStress),
+  };
 }
 
 // ───────────────────────── 戦略の要約 ─────────────────────────
@@ -431,6 +653,9 @@ export interface WeeklyAllocResult {
   equalSplit: StratStat;
   // 「待つ − 月寄固定」の対応のある差（同一週=1クラスタ）。Sharpeの大小比較だけで判定しないための門番。
   waitVsMon: { diff: number; se: number; t: number; nEff: number };
+
+  // ⑤ 危機時Σ（「テールでは相関が1に寄る」を数値化する層）
+  stress: StressResult;
 }
 
 export interface AllocOptions {
@@ -440,6 +665,7 @@ export interface AllocOptions {
   maxWeight?: number; // 1銘柄上限（既定=0.3）
   budget?: number; // 総エクスポージャー上限（既定=1.0＝レバ無し）
   muShrink?: boolean;
+  stressQuantile?: number; // 危機レジームとみなす下位分位（既定=0.2）
 }
 
 function emptyStrat(): StratStat {
@@ -475,51 +701,14 @@ export function computeWeeklyAllocation(
     policy: solveEntryPolicy([], nSlots),
     waitOOS: emptyStrat(), waitIS: emptyStrat(), monFixed: emptyStrat(), equalSplit: emptyStrat(),
     waitVsMon: { diff: 0, se: 0, t: 0, nEff: 0 },
+    stress: computeStress([], [], [], [], 1, 1, 1),
   };
 
-  const usable = stocks.filter((s) => s.prices.length >= 260);
-  if (usable.length < 2) return { ...empty, reason: "有効な銘柄が不足（2銘柄以上・各260本以上必要）" };
-
-  // 各銘柄を週×スロット表に
-  const built = usable.map((s) => ({
-    ticker: s.ticker,
-    name: s.name ?? s.ticker,
-    ...buildTickerWeeks(s.prices, side, exitDay),
-  }));
-  const kept = built.filter((b) => b.weeks.length >= 40);
-  if (kept.length < 2) return { ...empty, reason: "トレード週の取れる銘柄が不足（各40週以上必要）" };
-
-  // 共通週（全銘柄で揃う週だけを共分散パネルに使う）
-  const counts = new Map<string, number>();
-  for (const b of kept) for (const w of b.weeks) counts.set(w.key, (counts.get(w.key) ?? 0) + 1);
-  const commonKeys = Array.from(counts.entries())
-    .filter(([, c]) => c === kept.length)
-    .map(([k]) => k)
-    .sort();
-  if (commonKeys.length < 40) {
-    return { ...empty, reason: `全銘柄で揃う週が不足（${commonKeys.length}週。40週以上必要）` };
-  }
-  const keyIndex = new Map(commonKeys.map((k, i) => [k, i]));
+  const bp = buildPanel(stocks, side, exitDay);
+  if ("error" in bp) return { ...empty, reason: bp.error };
+  const { R, RS, ZS, commonKeys, stocks: kept } = bp.panel;
   const T = commonKeys.length;
   const K = kept.length;
-
-  // 銘柄 × 共通週 の「基準プラン（月寄建て → exitDay引け）」リターン行列
-  const R: number[][] = Array.from({ length: K }, () => new Array(T).fill(0));
-  // 銘柄 × 共通週 × スロット
-  const RS: (number | null)[][][] = Array.from({ length: K }, () =>
-    Array.from({ length: T }, () => new Array<number | null>(nSlots).fill(null))
-  );
-  const ZS: (number | null)[][][] = Array.from({ length: K }, () =>
-    Array.from({ length: T }, () => new Array<number | null>(nSlots).fill(null))
-  );
-  kept.forEach((b, i) => {
-    for (const w of b.weeks) {
-      const t = keyIndex.get(w.key);
-      if (t === undefined) continue;
-      R[i][t] = w.slotRet[0]!;
-      for (let s = 0; s < nSlots; s++) { RS[i][t][s] = w.slotRet[s]; ZS[i][t][s] = w.slotZ[s]; }
-    }
-  });
 
   // ───────── ① μ の経験ベイズ縮小 ─────────
   const muRaw = R.map((r) => mean(r));
@@ -730,7 +919,7 @@ export function computeWeeklyAllocation(
     nWeeks: T,
     from: commonKeys[0],
     to: commonKeys[commonKeys.length - 1],
-    skippedNoMonday: built.reduce((s, b) => s + b.skippedNoMonday, 0),
+    skippedNoMonday: bp.panel.skippedNoMonday,
     nSlots,
     slotLabels,
     perStock,
@@ -753,5 +942,6 @@ export function computeWeeklyAllocation(
     monFixed: summarize(monR, monR.map(() => 0)),
     equalSplit: summarize(eqR, eqR.map(() => (nSlots - 1) / 2)),
     waitVsMon,
+    stress: computeStress(R, muTilde, w, soloKelly, gamma, cap, budget, opts.stressQuantile ?? 0.2),
   };
 }
