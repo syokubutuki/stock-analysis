@@ -1,9 +1,10 @@
 import { MetadataRoute } from "next";
 
-// 公開URLは stock-analysis.vercel.app と stock-analysis-self.vercel.app の
-// 2つのエイリアスが両方200を返す。sitemap・Search Console 登録・canonical は
-// 下記 BASE に一本化して重複コンテンツ扱いを避ける。
-const BASE = "https://stock-analysis.vercel.app";
+// 本プロジェクトの公開ドメインは stock-analysis-self.vercel.app のみ。
+// stock-analysis.vercel.app は別アカウントの無関係なサイト（stock-analysis-ui）が
+// 使用しており、当方の所有ではない。sitemap・canonical・Search Console の
+// プロパティはすべて下記 BASE に揃える。
+const BASE = "https://stock-analysis-self.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

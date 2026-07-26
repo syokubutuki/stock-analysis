@@ -3,9 +3,10 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  // Search Console のプロパティは https://stock-analysis.vercel.app に一本化する。
+  // 当プロジェクトの公開ドメインは stock-analysis-self.vercel.app のみ。
+  // stock-analysis.vercel.app は別アカウントの無関係なサイトなので使用しない。
   // sitemap.ts の BASE と必ず一致させること（食い違うとサイトマップが対象範囲外で弾かれる）。
-  metadataBase: new URL("https://stock-analysis.vercel.app"),
+  metadataBase: new URL("https://stock-analysis-self.vercel.app"),
   verification: {
     google: "ofoMx5OtnknPc6zhkrBc9iHZOWR69gj9HdjcPOf0B0o",
   },
