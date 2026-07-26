@@ -43,6 +43,14 @@ import { BacktestResult } from "../lib/badge-backtest";
 import AccordionSection, { AccordionItem } from "../components/analysis/AccordionSection";
 import dynamic from "next/dynamic";
 
+const CorrelationDragChart = dynamic(
+  () => import("../components/analysis/CorrelationDragChart"),
+  { ssr: false }
+);
+const YourPortfolioDragPanel = dynamic(
+  () => import("../components/analysis/YourPortfolioDragPanel"),
+  { ssr: false }
+);
 const PortfolioRiskPanel = dynamic(
   () => import("../components/analysis/PortfolioRiskPanel"),
   { ssr: false }
@@ -525,6 +533,21 @@ export default function PortfolioPage() {
               title: "対象選択による床の底上げ：横断ドリフト・チルト（株式原論 C25）",
               subtitle: "特性(モメンタム/低ボラ/短期反転/トレンド)で対象をチルトし市場等加重(床)への超過ドリフトΔμを前向き検証。t値ハードル(C16)＋BH-FDR＋N_eff(C20)＋生存者バイアス診断。大半は床未達が誠実な既定",
               node: <SelectionTiltChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            // リスク分析(pf-risk)を読む前に「なぜリスクを見る必要があるのか」を体で分からせる層。
+            // 合成データ側（相関だけを動かす直感）→ 実データ側（自分のポートフォリオの分解）の順。
+            items.push({
+              id: "pf-corr-drag",
+              title: "相関だけを動かす：三本の崖と、同期していく値動き",
+              subtitle: "ρスライダー1本でN本の値動きが同じ形に揃っていく同期アニメ／g(建玉%)の放物線をρ=0・0.5・0.8で重ね、現在地ドットは動かないのに崖だけが手前にずり寄る／実質銘柄数N_effと隠れレバレッジのリアルタイム表示",
+              node: <CorrelationDragChart />,
+            });
+            // 期待リターンは増えているのに長期成長率は下がる、を実データのウォーターフォールで示す。
+            if (dn >= 2) items.push({
+              id: "pf-growth-drag",
+              title: "相関が食べた分：期待リターンと「実際に増える速さ」のズレ",
+              subtitle: "g = W·μ − 単独ドラッグ − 相関ドラッグ の3項分解をウォーターフォールで／隠れレバレッジ√(N/N_eff)と実質銘柄数／1銘柄ずつ足す台帳(期待↑ vs 成長率↓)／倍化年数への翻訳",
+              node: <YourPortfolioDragPanel data={data} watchlist={watchlist} horizon={horizon} />,
             });
             if (dn >= 2) items.push({ id: "pf-risk", title: "ポートフォリオ・リスク分析", node: <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} /> });
             if (dn >= 2) items.push({ id: "pf-frontier", title: "効率的フロンティア・CML", node: <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
