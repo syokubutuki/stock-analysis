@@ -220,29 +220,56 @@ function projectScore(x: number[], colMean: number[], eigen: EigenWeek[]): numbe
 
 // ───────────────────────── kNN-IC(形空間で翌週リターンが予測できるか) ─────────────────────────
 
-// 2Dアトラス座標(coords)上で、各点の nextRet を k近傍平均で LOO 予測し、実測との相関(IC)を返す。
-// refMask=null なら全点参照(in-sample, 自己除外)。refIdx を渡すと「その集合のみ近傍参照」(OOS)。
-function knnIc(
-  coords: number[][], y: number[], k: number,
-  queryIdx: number[], refIdx: number[]
-): { ic: number; hit: number; pred: number[]; act: number[] } {
-  const pred: number[] = [], act: number[] = [];
+// 近傍表: 各クエリ週の k近傍(参照集合内)のインデックス列。
+// 重要: 近傍関係は coords/queryIdx/refIdx/k だけで決まり、y(翌週リターン)には依存しない。
+// 順列検定は y をシャッフルするだけなので、近傍表は一度作れば全順列で使い回せる。
+// (旧実装は順列ごとに距離行列を再構築+再ソートしており、10年データで約57秒かかっていた)
+interface NeighborTable {
+  queries: number[]; // 実際に予測できたクエリ(参照数 < k の点は除外済み)
+  nbr: Int32Array; // queries[q] の近傍 = nbr[q*k .. q*k+k-1]
+  k: number;
+}
+
+// 2Dアトラス座標(coords)上で、各クエリ点の k近傍(自己除外)を距離順に求める。
+function buildNeighbors(
+  coords: number[][], k: number, queryIdx: number[], refIdx: number[]
+): NeighborTable {
+  const queries: number[] = [];
+  const flat: number[] = [];
+  const dists: { d: number; ri: number }[] = [];
   for (const qi of queryIdx) {
-    const dists: { d: number; y: number }[] = [];
+    dists.length = 0;
+    const qx = coords[qi][0], qy = coords[qi][1];
     for (const ri of refIdx) {
       if (ri === qi) continue;
-      const dx = coords[qi][0] - coords[ri][0], dy = coords[qi][1] - coords[ri][1];
-      dists.push({ d: dx * dx + dy * dy, y: y[ri] });
+      const dx = qx - coords[ri][0], dy = qy - coords[ri][1];
+      dists.push({ d: dx * dx + dy * dy, ri });
     }
     if (dists.length < k) continue;
-    dists.sort((a, b) => a.d - b.d);
-    let s = 0; for (let j = 0; j < k; j++) s += dists[j].y;
-    pred.push(s / k);
-    act.push(y[qi]);
+    dists.sort((a, b) => a.d - b.d); // 同距離は refIdx 順(V8のsortは安定)
+    queries.push(qi);
+    for (let j = 0; j < k; j++) flat.push(dists[j].ri);
+  }
+  return { queries, nbr: Int32Array.from(flat), k };
+}
+
+// 近傍表を使って kNN平均予測 ŷ と実測 y の相関(IC)・方向的中率を求める。y だけが可変。
+function icFromNeighbors(
+  nt: NeighborTable, y: number[]
+): { ic: number; hit: number; pred: number[]; act: number[] } {
+  const { queries, nbr, k } = nt;
+  const m = queries.length;
+  const pred = new Array<number>(m), act = new Array<number>(m);
+  for (let q = 0; q < m; q++) {
+    const off = q * k;
+    let s = 0;
+    for (let j = 0; j < k; j++) s += y[nbr[off + j]];
+    pred[q] = s / k;
+    act[q] = y[queries[q]];
   }
   const ic = pearson(pred, act);
   let hit = 0, hn = 0;
-  for (let i = 0; i < pred.length; i++) {
+  for (let i = 0; i < m; i++) {
     if (Math.abs(pred[i]) < 1e-12) continue;
     hn++;
     if (Math.sign(pred[i]) === Math.sign(act[i])) hit++;
@@ -284,16 +311,17 @@ function buildView(
   const coords = pca.scores.map((s) => [s[0] ?? 0, s[1] ?? 0]);
   const y = nextRet.map((v) => (v == null ? 0 : v));
 
-  // ── In-sample IC + ブロック順列ヌル ──
-  const insample = knnIc(coords, y, kNN, validIdx, validIdx);
+  // ── In-sample IC + ブロック順列ヌル(近傍表は順列不変なので1回だけ構築) ──
+  const ntIn = buildNeighbors(coords, kNN, validIdx, validIdx);
+  const insample = icFromNeighbors(ntIn, y);
   const rng = mulberry32(seed);
   let nullSum = 0, nullSumSq = 0, ge = 0;
   const yValid = validIdx.map((i) => y[i]);
+  const ymap = y.slice();
   for (let p = 0; p < nPerm; p++) {
     const yperm = blockPermute(yValid, blockWeeks, rng);
-    const ymap = y.slice();
     validIdx.forEach((idx, k) => { ymap[idx] = yperm[k]; });
-    const r = knnIc(coords, ymap, kNN, validIdx, validIdx);
+    const r = icFromNeighbors(ntIn, ymap);
     nullSum += r.ic; nullSumSq += r.ic * r.ic;
     if (r.ic >= insample.ic - 1e-15) ge++;
   }
@@ -315,18 +343,19 @@ function buildView(
       const s = projectScore(f, pcaTr.colMean, pcaTr.eigen);
       return [s[0] ?? 0, s[1] ?? 0];
     });
-    const oos = knnIc(coordsTr, y, kNN, testIdx, trainIdx);
+    const ntOos = buildNeighbors(coordsTr, kNN, testIdx, trainIdx);
+    const oos = icFromNeighbors(ntOos, y);
     oosIc = oos.ic; oosHit = oos.hit;
-    // 検証集合のラベル順列で p 値
+    // 検証集合のラベル順列で p 値(近傍は学習期のみ参照 → こちらも順列不変)
     const rng2 = mulberry32(seed ^ 0x9e3779b9);
     const yTest = testIdx.map((i) => y[i]);
     let ge2 = 0;
     const P2 = Math.min(nPerm, 400);
+    const ymap2 = y.slice();
     for (let p = 0; p < P2; p++) {
       const yperm = blockPermute(yTest, blockWeeks, rng2);
-      const ymap = y.slice();
-      testIdx.forEach((idx, k) => { ymap[idx] = yperm[k]; });
-      const r = knnIc(coordsTr, ymap, kNN, testIdx, trainIdx);
+      testIdx.forEach((idx, k) => { ymap2[idx] = yperm[k]; });
+      const r = icFromNeighbors(ntOos, ymap2);
       if (r.ic >= oosIc - 1e-15) ge2++;
     }
     oosP = (ge2 + 1) / (P2 + 1);
