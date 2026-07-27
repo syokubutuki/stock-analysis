@@ -9,7 +9,14 @@ import {
   EfficientFrontierResult,
   PortfolioPoint,
 } from "../../lib/efficient-frontier";
-import { geometricGrowth, doublingYears } from "../../lib/growth-drag";
+import {
+  geometricGrowth,
+  doublingYears,
+  doublingYearsLabel as yearsLabel,
+  isoGrowthCurve,
+  isoGrowthLevels,
+} from "../../lib/growth-drag";
+import { placeRect, type LabelRect } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 
@@ -126,21 +133,19 @@ const ISO_COLOR = "#a5b4fc";
 const ISO_LABEL = "#6366f1";
 const GROWTH_COLOR = "#7c3aed";
 
-// 等高線の刻み幅を「切りのいい値」に丸める。2〜5 の間を 2.5 で刻めるようにしてある
-// （そうしないと等高線が 3 本程度に減って地形が読めなくなる範囲が出る）。
-function niceStep(raw: number): number {
-  if (!(raw > 0)) return 0.01;
-  const exp = Math.pow(10, Math.floor(Math.log10(raw)));
-  const f = raw / exp;
-  const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-  return m * exp;
-}
-
-// 倍化年数の表示（YourPortfolioDragPanel と同じ規則）。g ≤ 0 は「永遠に来ない」。
-function yearsLabel(y: number): string {
-  if (!isFinite(y)) return "永遠に来ない";
-  if (y > 200) return "200年超";
-  return `${y.toFixed(1)}年`;
+// ラベルの白フチ縁取り。雲の点や等高線に重なっても読めるようにする。
+function outlinedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  color: string
+) {
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(255,255,255,0.92)";
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
 }
 
 export default function EfficientFrontierChart({ data, window: win = 250 }: Props) {
@@ -280,30 +285,45 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     ctx.fillText("年率期待リターン μ", 0, 0);
     ctx.restore();
 
+    // ラベルの占有矩形。以降のラベルはこれと衝突しない位置を選ぶ（重なりの根絶）。
+    const placed: LabelRect[] = [];
+
+    // 点 (x,y) の周囲に「4方向 × 複数の距離」の候補矩形を近い順に並べる。
+    // 近傍しか候補が無いと密集時に置き場所が消えてラベルが落ちるため、外側の環も用意する。
+    const ringCandidates = (
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      rings: number[] = [5, 13, 24]
+    ): LabelRect[] => {
+      const out: LabelRect[] = [];
+      for (const g of rings) {
+        out.push({ x: x + g, y: y - h / 2, w, h });
+        out.push({ x: x - g - w, y: y - h / 2, w, h });
+        out.push({ x: x + g, y: y + g, w, h });
+        out.push({ x: x - g - w, y: y - g - h, w, h });
+      }
+      return out.filter((c) => c.x >= PAD.left && c.x + c.w <= width - PAD.right);
+    };
+
     // G6: iso-growth 等高線 g = μ − σ²/2 ⇔ μ = g + σ²/2（docs §G6）
     // 上に凸ではなく「下に凸(上向き)の放物線群」。σ が大きいほど、同じ g を保つのに
     // より高い μ が必要になる ＝ ボラティリティ税の分だけ上へ持ち上がる。
     // フロンティアは右上へ伸びながらこの等高線群を**下向きに横切る**ので、
     // 「フロンティアの右上端＝最も儲かる点」ではないことが図として見える。
-    // 雲や曲線の下に敷くため、グリッドの直後・雲の前に薄く描く。
+    //
+    // 【描画順】線は雲の**下**（地形図なので主役を邪魔しない）／ラベルは雲の**上**。
+    // 以前はラベルも雲の前に描いていたため、点群に埋もれて読めなかった。
+    const isoCurves: { g: number; pts: { x: number; y: number }[] }[] = [];
     if (showIso) {
-      // 描画範囲の四隅から g の値域を取る（g は σ について単調減少・μ について単調増加）
-      const gLo = geometricGrowth(bounds.yMin, bounds.xMax);
-      const gHi = geometricGrowth(bounds.yMax, bounds.xMin);
-      const step = niceStep((gHi - gLo) / 9); // 8〜10本になるよう刻む
-      ctx.font = "9px sans-serif";
-      // ラベルはプロット幅の 70% 付近に置く（右端に全部溜まると読めない）
-      const labelX = PAD.left + plotW * 0.7;
-      for (let g = Math.ceil(gLo / step) * step; g <= gHi + 1e-12; g += step) {
-        const pts: { x: number; y: number }[] = [];
-        const M = 80;
-        for (let i = 0; i <= M; i++) {
-          const sg = bounds.xMin + ((bounds.xMax - bounds.xMin) * i) / M;
-          const m = g + (sg * sg) / 2; // 等高線の定義式
-          if (m < bounds.yMin || m > bounds.yMax) continue;
-          pts.push({ x: sx(sg), y: sy(m) });
-        }
+      const levels = isoGrowthLevels(bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax, 9);
+      for (const g of levels) {
+        const pts = isoGrowthCurve(g, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax).map(
+          (p) => ({ x: sx(p.sigma), y: sy(p.mu) })
+        );
         if (pts.length < 2) continue;
+        isoCurves.push({ g, pts });
         ctx.strokeStyle = ISO_COLOR;
         ctx.lineWidth = Math.abs(g) < 1e-9 ? 1.6 : 1; // g=0 の等高線だけ少し強く
         ctx.setLineDash([2, 3]);
@@ -311,17 +331,6 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
         pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
         ctx.stroke();
         ctx.setLineDash([]);
-        // 目標 x に最も近い可視点へラベル。雲の上に載っても読めるよう白フチをつける。
-        let lab = pts[0];
-        for (const p of pts) if (Math.abs(p.x - labelX) < Math.abs(lab.x - labelX)) lab = p;
-        const text = `g=${(g * 100).toFixed(0)}%`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.strokeText(text, lab.x, lab.y - 2);
-        ctx.fillStyle = ISO_LABEL;
-        ctx.fillText(text, lab.x, lab.y - 2);
       }
     }
 
@@ -378,8 +387,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.setLineDash([]);
     }
 
-    // 個別銘柄
-    ctx.fillStyle = "#6b7280";
+    // 個別銘柄。ラベル位置は占有矩形に登録して、以降のラベルと重ならないようにする。
     ctx.font = "10px sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
@@ -390,8 +398,12 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#6b7280";
-      ctx.fillText(a.ticker, x + 5, y);
+      const tw = ctx.measureText(a.ticker).width;
+      const cands = ringCandidates(x, y, tw, 10);
+      const spot = placeRect(cands, placed) ?? cands[0];
+      if (!spot) continue;
+      ctx.textBaseline = "middle";
+      outlinedText(ctx, a.ticker, spot.x, spot.y + 5, "#6b7280");
     }
 
     // Rf点
@@ -411,22 +423,29 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
         ctx.arc(bx, by, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#1d4ed8";
         ctx.font = "bold 10px sans-serif";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "bottom";
-        ctx.fillText(benchPoint.name, bx + 8, by - 4);
+        const tw = ctx.measureText(benchPoint.name).width;
+        const cands = ringCandidates(bx, by, tw, 11, [8, 16, 26]);
+        const spot = placeRect(cands, placed) ?? cands[0];
+        if (spot) {
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+          outlinedText(ctx, benchPoint.name, spot.x, spot.y, "#1d4ed8");
+        }
       }
     }
 
-    // マーカー描画ヘルパ。形状で種別を区別し、ラベルは白背景ピルで読みやすく、
-    // 方向(dir)を散らして近接点でのラベル衝突を避ける。
+    // マーカー描画ヘルパ。形状で種別を区別し、ラベルは白背景ピルで読みやすくする。
+    // 位置は「希望方向 → 残り3方向」の順に試し、既に置かれたラベルと重ならない最初の
+    // 候補を採る。以前は方向を固定していたため、点が近接するとピルが重なっていた。
+    // valueText でラベル末尾の値を差し替えられる（★は S=Sharpe、▲は g=成長率）。
     const marker = (
       p: { sigma: number; mu: number; sharpe: number },
       color: string,
       kind: MarkerShape,
       label: string,
-      dir: "ne" | "se" | "sw" | "nw"
+      dir: "ne" | "se" | "sw" | "nw",
+      valueText?: string
     ) => {
       const x = sx(p.sigma), y = sy(p.mu);
       ctx.fillStyle = color;
@@ -437,35 +456,67 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       ctx.stroke();
 
       // ラベル(値付き)を白背景ピルで
-      const text = `${label}  S=${p.sharpe.toFixed(2)}`;
+      const text = `${label}  ${valueText ?? `S=${p.sharpe.toFixed(2)}`}`;
       ctx.font = "bold 10px sans-serif";
       const tw = ctx.measureText(text).width;
       const padX = 4, padY = 2.5, gap = 9;
-      const right = dir === "ne" || dir === "se";
-      const below = dir === "se" || dir === "sw";
-      let bx = right ? x + gap : x - gap - tw - padX * 2;
-      let by = below ? y + gap : y - gap - (10 + padY * 2);
-      // 画面外にはみ出すなら反転
-      if (bx < PAD.left) bx = x + gap;
-      if (bx + tw + padX * 2 > width - PAD.right) bx = x - gap - tw - padX * 2;
-      if (by < PAD.top) by = y + gap;
-      if (by + 10 + padY * 2 > height - PAD.bottom) by = y - gap - (10 + padY * 2);
       const bw = tw + padX * 2, bh = 10 + padY * 2;
+      // 候補は「4方向 × 3段の距離」。近い順に試すので、空いていれば従来どおり点の隣に付き、
+      // 混み合っている場合だけ外側へ逃げる（引き出し線があるので離れても対応は追える）。
+      // 近傍4方向だけだと、点が密集したときに逃げ場が無くなってピルが重なっていた。
+      const order: Array<"ne" | "se" | "sw" | "nw"> = ["ne", "se", "nw", "sw"];
+      const rot = order.indexOf(dir);
+      const dirs = order.slice(rot).concat(order.slice(0, rot));
+      const candidates: LabelRect[] = [];
+      for (const ring of [1, 2.6, 4.4, 6.5]) {
+        const g = gap * ring;
+        for (const d of dirs) {
+          const right = d === "ne" || d === "se";
+          const below = d === "se" || d === "sw";
+          candidates.push({
+            x: right ? x + g : x - g - bw,
+            y: below ? y + g : y - g - bh,
+            w: bw,
+            h: bh,
+          });
+        }
+      }
+      // プロット外へ出る候補は落とす
+      const inside = candidates.filter(
+        (c) =>
+          c.x >= PAD.left &&
+          c.x + c.w <= width - PAD.right &&
+          c.y >= PAD.top &&
+          c.y + c.h <= height - PAD.bottom
+      );
+      const box = placeRect(inside.length ? inside : candidates, placed) ??
+        inside[0] ?? candidates[0];
+
       ctx.fillStyle = "rgba(255,255,255,0.88)";
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
-      roundRect(ctx, bx, by, bw, bh, 3);
+      roundRect(ctx, box.x, box.y, bw, bh, 3);
       ctx.fill();
+      ctx.stroke();
+      // マーカーとピルを細い引き出し線で結ぶ（離れた位置に逃げても対応が分かるように）
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(
+        Math.max(box.x, Math.min(x, box.x + bw)),
+        Math.max(box.y, Math.min(y, box.y + bh))
+      );
       ctx.stroke();
       ctx.fillStyle = color;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, bx + padX, by + bh / 2 + 0.5);
+      ctx.fillText(text, box.x + padX, box.y + bh / 2 + 0.5);
     };
 
     // 比較ベースライン(素朴な配分則)を小さな白丸で。1/N=等加重, RP=リスクパリティ, IV=逆ボラ。
+    // 丸はここで描くが、**ラベルは主役マーカーの後**に回す（3文字の脇役が ★▲■ の
+    // ラベル位置を先取りしないように、占有矩形の登録順＝優先順にする）。
+    const baselineLabels: { x: number; y: number; short: string }[] = [];
     if (showBaselines) {
-      ctx.font = "9px sans-serif";
       for (const b of result.baselines) {
         const x = sx(b.point.sigma), y = sy(b.point.mu);
         if (x < PAD.left || x > width - PAD.right) continue;
@@ -476,80 +527,94 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
         ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#64748b";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        const short = b.key === "equal" ? "1/N" : b.key === "riskparity" ? "RP" : "IV";
-        ctx.fillText(short, x + 5, y);
+        baselineLabels.push({
+          x,
+          y,
+          short: b.key === "equal" ? "1/N" : b.key === "riskparity" ? "RP" : "IV",
+        });
       }
     }
 
     // G6: 最大成長点を通る等高線だけは雲の上に濃く描く。この等高線が実現可能領域に
     // **接している**ことが「そこが最速」の視覚的な証明になる。
     const growthPt = showIso ? result.maxGrowthLongOnly : null;
+    const gStar = growthPt ? geometricGrowth(growthPt.mu, growthPt.sigma) : 0;
     if (growthPt) {
-      const gStar = geometricGrowth(growthPt.mu, growthPt.sigma);
       ctx.strokeStyle = GROWTH_COLOR;
       ctx.lineWidth = 1.8;
       ctx.setLineDash([5, 3]);
       ctx.beginPath();
-      let started = false;
-      for (let i = 0; i <= 80; i++) {
-        const sg = bounds.xMin + ((bounds.xMax - bounds.xMin) * i) / 80;
-        const m = gStar + (sg * sg) / 2;
-        if (m < bounds.yMin || m > bounds.yMax) {
-          started = false;
-          continue;
-        }
-        const px = sx(sg), py = sy(m);
-        if (!started) {
-          ctx.moveTo(px, py);
-          started = true;
-        } else ctx.lineTo(px, py);
-      }
+      isoGrowthCurve(gStar, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax).forEach((p, i) =>
+        i === 0 ? ctx.moveTo(sx(p.sigma), sy(p.mu)) : ctx.lineTo(sx(p.sigma), sy(p.mu))
+      );
       ctx.stroke();
       ctx.setLineDash([]);
     }
 
+    // 主役マーカー。ラベルは占有矩形で衝突回避するので、登録順＝優先順になる。
+    // ★接点 → ▲最大成長（G6 の対比の主役）→ ■最小分散 の順。
+    if (result.tangencyLongOnly) marker(result.tangencyLongOnly, "#dc2626", "star", "接点(市場)", "ne");
+    // G6: 最大成長点(g = μ − σ²/2 最大・フル投資)。形状: ▲
+    // ★と別の場所に立つことが要点。ラベルには Sharpe ではなく g を出す。
+    if (growthPt) {
+      marker(growthPt, GROWTH_COLOR, "triangle", "最大成長", "se", `g=${(gStar * 100).toFixed(1)}%`);
+    }
     // ロングオンリー(上限付き)最小分散。形状: ■
     const minVolPt = result.minVarLongOnly ?? result.cloudMinVol;
     marker(minVolPt, "#0ea5e9", "square", "最小分散(LO)", "sw");
-    // 空売り無しの接点=市場ポートフォリオ。形状: ★(既定の主役)
-    if (result.tangencyLongOnly) marker(result.tangencyLongOnly, "#dc2626", "star", "接点(市場)", "ne");
-    // G6: 最大成長点(g = μ − σ²/2 最大・フル投資)。形状: ▲
-    // 接点(★)と重ならないのが要点。ラベルには Sharpe ではなく g を出す。
-    if (growthPt) {
-      const x = sx(growthPt.sigma), y = sy(growthPt.mu);
-      ctx.fillStyle = GROWTH_COLOR;
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      drawMarkerShape(ctx, x, y, "triangle");
-      ctx.fill();
-      ctx.stroke();
-      const text = `最大成長  g=${(geometricGrowth(growthPt.mu, growthPt.sigma) * 100).toFixed(1)}%`;
-      ctx.font = "bold 10px sans-serif";
-      const tw = ctx.measureText(text).width;
-      const padX = 4, padY = 2.5, gap = 9;
-      // ★(右上)・■最小分散(左下)とラベルがぶつからないよう、▲は右下へ逃がす
-      let bx = x + gap;
-      let by = y + gap;
-      if (bx + tw + padX * 2 > width - PAD.right) bx = x - gap - tw - padX * 2;
-      if (bx < PAD.left) bx = PAD.left;
-      if (by + 10 + padY * 2 > height - PAD.bottom) by = y - gap - (10 + padY * 2);
-      const bw = tw + padX * 2, bh = 10 + padY * 2;
-      ctx.fillStyle = "rgba(255,255,255,0.88)";
-      ctx.strokeStyle = GROWTH_COLOR;
-      ctx.lineWidth = 1;
-      roundRect(ctx, bx, by, bw, bh, 3);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = GROWTH_COLOR;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, bx + padX, by + bh / 2 + 0.5);
-    }
     // 空売り可(閉形式)の特異点。形状: ◆GMV。トグル時のみ参照表示。
     if (showShort) marker(result.gmv, "#2563eb", "diamond", "GMV(空売り可)", "nw");
+
+    // 脇役のラベル(ベースライン 1/N・RP・IV)。主役の位置が確定した後に空いた側へ置く。
+    ctx.font = "9px sans-serif";
+    for (const b of baselineLabels) {
+      const tw = ctx.measureText(b.short).width;
+      // 主役のピルで近傍が埋まっていても外側の環へ逃げられるようにする。
+      // それでも空きが無ければ描かない（重ねるより消すほうが読める）。
+      const spot = placeRect(ringCandidates(b.x, b.y, tw, 9, [5, 13, 24, 36]), placed);
+      if (!spot) continue;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      outlinedText(ctx, b.short, spot.x, spot.y + 4.5, "#64748b");
+      // 離れた位置に逃げたときは点との対応が分かるように細い線で結ぶ
+      if (Math.abs(spot.x - b.x) > 16 || Math.abs(spot.y + 4.5 - b.y) > 16) {
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(spot.x + tw / 2, spot.y + 4.5);
+        ctx.stroke();
+      }
+    }
+
+    // G6: 等高線のラベルは**最後**（＝雲とマーカーの上）に描く。地形図の目盛りなので
+    // 優先度は最下位で、置き場所が無ければ描かない。x アンカーを水準ごとに千鳥に
+    // ずらして、ラベルが一列に溜まるのを避ける。
+    if (isoCurves.length > 0) {
+      ctx.font = "9px sans-serif";
+      const anchors = [0.86, 0.62, 0.74, 0.5, 0.38];
+      isoCurves.forEach(({ g, pts }, li) => {
+        const targetX = PAD.left + plotW * anchors[li % anchors.length];
+        let at = pts[0];
+        for (const p of pts) if (Math.abs(p.x - targetX) < Math.abs(at.x - targetX)) at = p;
+        const zero = Math.abs(g) < 1e-9;
+        const text = zero ? "g=0%（資産が増えない境界）" : `g=${(g * 100).toFixed(0)}%`;
+        const tw = ctx.measureText(text).width;
+        const spot = placeRect(
+          [
+            { x: at.x - tw / 2, y: at.y - 13, w: tw, h: 10 },
+            { x: at.x - tw / 2, y: at.y + 3, w: tw, h: 10 },
+            { x: at.x + 4, y: at.y - 12, w: tw, h: 10 },
+            { x: at.x - 4 - tw, y: at.y - 12, w: tw, h: 10 },
+          ].filter((c) => c.x >= PAD.left && c.x + c.w <= width - PAD.right),
+          placed
+        );
+        if (!spot) return;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        outlinedText(ctx, text, spot.x, spot.y, zero ? "#4f46e5" : ISO_LABEL);
+      });
+    }
 
     // ホバー十字
     if (hover) {

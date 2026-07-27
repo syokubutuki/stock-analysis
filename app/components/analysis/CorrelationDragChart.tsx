@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   TRADING_DAYS,
   doublingYears,
+  doublingYearsLabel as yearsLabel,
   effectiveN,
   generateShocks,
   growthCurve,
@@ -30,6 +31,7 @@ import {
   peakExposure,
   synthPaths,
 } from "../../lib/growth-drag";
+import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
 
 // ── 定数 ───────────────────────────────────────────────────────────────────
@@ -48,12 +50,6 @@ const REF_RHOS = [
 ];
 
 const pct = (v: number, d = 1) => `${v >= 0 ? "+" : "−"}${(Math.abs(v) * 100).toFixed(d)}%`;
-
-function yearsLabel(y: number): string {
-  if (!isFinite(y)) return "永遠に来ない";
-  if (y > 200) return "200年超";
-  return `${y.toFixed(1)}年`;
-}
 
 function expoLabel(w: number): string {
   if (!isFinite(w)) return "—";
@@ -91,6 +87,18 @@ interface CurvePt {
   g: number;
 }
 
+/** 崖の上に打つドット（現在地／危機時）。同じ建玉のまま曲線だけが入れ替わる、を表す。 */
+interface CliffDot {
+  /** 総建玉（横位置）。現在地と危機時で同じ値を使う＝「自分は何も変えていない」 */
+  exposure: number;
+  /** その建玉での成長率（縦位置） */
+  g: number;
+  label: string;
+  color: string;
+  /** true なら白抜きの丸、false なら塗り */
+  hollow: boolean;
+}
+
 interface CliffView {
   mu: number;
   sigma: number;
@@ -100,6 +108,10 @@ interface CliffView {
   refs: { rho: number; color: string; label: string; pts: CurvePt[]; peak: number }[];
   cur: CurvePt[];
   curPeak: number;
+  /** 危機時 ρ の曲線（stressRho が渡されたときだけ）。 */
+  stress: { rho: number; pts: CurvePt[]; peak: number; label: string } | null;
+  /** 崖に打つドット（現在地は必ず 1 つ、危機時があれば 2 つ）。 */
+  dots: CliffDot[];
 }
 
 interface SyncView {
@@ -111,14 +123,55 @@ interface SyncView {
   portfolio: number[];
 }
 
-export default function CorrelationDragChart() {
+/**
+ * すべて optional。省略時は従来どおりの合成データ既定値（ρ=0.5 / N=10 / μ=8% / σ=30%）で
+ * 動くため、props なしの呼び出し（/portfolio の pf-corr-drag）の挙動は不変。
+ *
+ * Phase 4（危機Σ連動）はここに実測値を流し込むだけで済むように用意してある:
+ * `stressRho` に既存 `computeStress` の危機時平均相関を渡すと、崖の上に
+ * 「平時のあなた」と「暴落時のあなた」の 2 ドットが並ぶ。
+ */
+export interface CorrelationDragChartProps {
+  /** ρ スライダーの初期値（既定 0.5 ＝ 日本株大型の実勢）。 */
+  initialRho?: number;
+  /** 総建玉の初期値（既定 1.0 ＝ フル現物）。 */
+  initialExposure?: number;
+  /** 前提の初期値。省略時は μ=8% / σ=30% / N=10。 */
+  initialAssets?: number;
+  initialMuPct?: number;
+  initialSigPct?: number;
+  /**
+   * 危機時の平均相関（実測値）。渡すと崖に危機時の曲線と第2ドットを重ねる。
+   * 未指定なら従来どおり平時の 1 ドットのみ。
+   */
+  stressRho?: number;
+  /** 第2ドットの見出し（既定「暴落時のあなた」）。 */
+  stressLabel?: string;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+export default function CorrelationDragChart({
+  initialRho = 0.5,
+  initialExposure = 1,
+  initialAssets = 10,
+  initialMuPct = 8,
+  initialSigPct = 30,
+  stressRho,
+  stressLabel = "暴落時のあなた",
+}: CorrelationDragChartProps = {}) {
   // ── コントロール ──────────────────────────────────────────────────────
-  const [rho, setRho] = useState(0.5); // 日本株大型の実勢を初期値に
-  const [exposure, setExposure] = useState(1); // 現在地＝フル現物
-  const [nAssets, setNAssets] = useState(10);
-  const [muPct, setMuPct] = useState(8);
-  const [sigPct, setSigPct] = useState(30);
+  const [rho, setRho] = useState(() => clamp(initialRho, 0, 0.95)); // 既定は日本株大型の実勢
+  const [exposure, setExposure] = useState(() => clamp(initialExposure, 0, W_MAX)); // 現在地＝フル現物
+  const [nAssets, setNAssets] = useState(() => clamp(Math.round(initialAssets), 2, 20));
+  const [muPct, setMuPct] = useState(() => clamp(initialMuPct, 0, 40));
+  const [sigPct, setSigPct] = useState(() => clamp(initialSigPct, 5, 80));
   const [sweeping, setSweeping] = useState(false);
+  // 危機時 ρ（渡されたときだけ有効）。useMemo の依存に載るので、React Compiler が
+  // 純粋と判定できる Math.min/max で直接クランプする（自前ヘルパ経由だと
+  // 「後で変更されうる値」と見なされてメモ化の保持に失敗する）。
+  const rhoStress =
+    stressRho != null && isFinite(stressRho) ? Math.min(0.99, Math.max(0, stressRho)) : null;
 
   const mu = muPct / 100;
   const sigma = sigPct / 100;
@@ -143,8 +196,34 @@ export default function CorrelationDragChart() {
   // ── G1 曲線 ────────────────────────────────────────────────────────────
   const wGrid = useMemo(() => Array.from({ length: 301 }, (_, i) => (i * W_MAX) / 300), []);
 
-  const cliff: CliffView = useMemo(
-    () => ({
+  const gCur = gAt(exposure, rho);
+  const gStress = rhoStress != null ? gAt(exposure, rhoStress) : null;
+
+  const cliff: CliffView = useMemo(() => {
+    // ドットは「同じ建玉のまま曲線だけが入れ替わる」ことを見せるため横位置を共有する。
+    // 配列は push で後から変えず、条件付きスプレッドで一度に組む（React Compiler が
+    // メモ化を保てるように＝可変オブジェクトを依存に載せない）。
+    const dots: CliffDot[] = [
+      {
+        exposure,
+        g: gAt(exposure, rho),
+        label: rhoStress != null ? "平時のあなた" : "あなたの現在地",
+        color: "#111827",
+        hollow: true,
+      },
+      ...(rhoStress != null
+        ? [
+            {
+              exposure,
+              g: gAt(exposure, rhoStress),
+              label: stressLabel,
+              color: "#b91c1c",
+              hollow: false,
+            },
+          ]
+        : []),
+    ];
+    return {
       mu,
       sigma,
       N: nAssets,
@@ -159,11 +238,18 @@ export default function CorrelationDragChart() {
       })),
       cur: growthCurve(mu, sigma, nAssets, rho, wGrid),
       curPeak: peakAt(rho),
-    }),
-    [mu, sigma, nAssets, rho, exposure, wGrid, peakAt]
-  );
-
-  const gCur = gAt(exposure, rho);
+      stress:
+        rhoStress != null
+          ? {
+              rho: rhoStress,
+              pts: growthCurve(mu, sigma, nAssets, rhoStress, wGrid),
+              peak: peakAt(rhoStress),
+              label: `危機時 ρ=${rhoStress.toFixed(2)}`,
+            }
+          : null,
+      dots,
+    };
+  }, [mu, sigma, nAssets, rho, exposure, wGrid, peakAt, gAt, rhoStress, stressLabel]);
 
   // ── U1 合成系列（乱数は N が変わったときだけ引き直す） ────────────────────
   const shocks = useMemo(
@@ -410,6 +496,18 @@ export default function CorrelationDragChart() {
           <strong className={gCur > 0 ? "text-gray-800" : "text-red-700"}>{pct(gCur)}</strong>、
           2倍になるまで <strong>{yearsLabel(doublingYears(gCur))}</strong>。
           薄赤の領域に入ったら、期待リターンが正でも資産は増えません。
+          {rhoStress != null && gStress != null && (
+            <>
+              {" "}赤い破線＝<strong>危機時 ρ={rhoStress.toFixed(2)}</strong> の崖、赤い丸が
+              {stressLabel}です。<strong>建玉は 1mm も動かしていないのに</strong>、成長率は{" "}
+              {pct(gCur)} から{" "}
+              <strong className={gStress > 0 ? "text-gray-800" : "text-red-700"}>
+                {pct(gStress)}
+              </strong>{" "}
+              へ（2倍まで {yearsLabel(doublingYears(gCur))} →{" "}
+              <strong>{yearsLabel(doublingYears(gStress))}</strong>）。
+            </>
+          )}
         </p>
       </div>
 
@@ -433,6 +531,10 @@ export default function CorrelationDragChart() {
             {[
               ...REF_RHOS.map((r) => ({ rho: r.rho, color: r.color, note: r.note, cur: false })),
               { rho, color: "#111827", note: "今のスライダー位置", cur: true },
+              // 危機時 ρ が渡されているときだけ最下段に実測の危機時を並べる
+              ...(rhoStress != null
+                ? [{ rho: rhoStress, color: "#b91c1c", note: `${stressLabel}（危機時の実測相関）`, cur: true }]
+                : []),
             ].map((r, i) => {
               const ne = effectiveN(nAssets, r.rho);
               const pk = peakAt(r.rho);
@@ -764,6 +866,7 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
   };
   d.refs.forEach((c) => scan(c.pts));
   scan(d.cur);
+  if (d.stress) scan(d.stress.pts);
   const span = hi - lo || 0.1;
   lo -= span * 0.1;
   hi += span * 0.1;
@@ -841,6 +944,12 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
 
   // 参照3本
   d.refs.forEach((c) => drawCurve(c.pts, c.color, 1.8, 0.85));
+  // 危機時 ρ の曲線（渡されたときだけ）。平時より必ず内側＝崖が手前に来る。
+  if (d.stress) {
+    ctx.setLineDash([6, 4]);
+    drawCurve(d.stress.pts, "#b91c1c", 2.4, 0.95);
+    ctx.setLineDash([]);
+  }
   // 今の ρ（太線）
   drawCurve(d.cur, "#111827", 3);
 
@@ -903,44 +1012,53 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
   ctx.font = "bold 11px sans-serif";
   ctx.textAlign = "left";
   const labelW = W_MAX * 0.85;
-  d.refs.forEach((c) => {
-    const g = c.pts[Math.round((labelW / W_MAX) * (c.pts.length - 1))]?.g ?? 0;
+  const curveLabel = (pts: CurvePt[], label: string, color: string, dy: number) => {
+    const g = pts[Math.round((labelW / W_MAX) * (pts.length - 1))]?.g ?? 0;
     const x = xOf(labelW) + 4;
-    const y = yOf(g) - 4;
+    const y = yOf(g) + dy;
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#fafafa";
-    ctx.strokeText(c.label, x, y);
-    ctx.fillStyle = c.color;
-    ctx.fillText(c.label, x, y);
-  });
+    ctx.strokeText(label, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(label, x, y);
+  };
+  d.refs.forEach((c) => curveLabel(c.pts, c.label, c.color, -4));
+  // 危機時の曲線にもラベルを付ける（ρ=0.8 の線と紛れないように少し下げる）
+  if (d.stress) curveLabel(d.stress.pts, d.stress.label, "#b91c1c", 12);
 
-  // 現在地ドット
+  // 現在地ドット（危機時 ρ が渡されていれば 2 つ。横位置は共有＝建玉は変えていない）
   const gx = xOf(d.exposure);
-  const gy = yOf(d.cur[Math.round((d.exposure / W_MAX) * (d.cur.length - 1))]?.g ?? 0);
   ctx.strokeStyle = "#111827";
   ctx.setLineDash([2, 3]);
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(gx, padT + plotH);
-  ctx.lineTo(gx, gy);
+  ctx.lineTo(gx, yOf(Math.max(...d.dots.map((t) => t.g))));
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.arc(gx, gy, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "#111827";
-  ctx.stroke();
 
-  ctx.font = "bold 11px sans-serif";
-  ctx.textAlign = gx > padL + plotW * 0.7 ? "right" : "left";
-  const ldx = gx > padL + plotW * 0.7 ? -12 : 12;
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "#fafafa";
-  ctx.strokeText("あなたの現在地", gx + ldx, gy + 4);
-  ctx.fillStyle = "#111827";
-  ctx.fillText("あなたの現在地", gx + ldx, gy + 4);
+  d.dots.forEach((dot, i) => {
+    const dy = yOf(dot.g);
+    ctx.beginPath();
+    ctx.arc(gx, dy, 7, 0, Math.PI * 2);
+    ctx.fillStyle = dot.hollow ? "#ffffff" : dot.color;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = dot.color;
+    ctx.stroke();
+
+    ctx.font = "bold 11px sans-serif";
+    const right = gx > padL + plotW * 0.7;
+    ctx.textAlign = right ? "right" : "left";
+    const ldx = right ? -12 : 12;
+    // 2 ドットが近接したときにラベルが重ならないよう、2 つ目は下側へずらす
+    const ldy = d.dots.length > 1 ? (i === 0 ? -2 : 12) : 4;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#fafafa";
+    ctx.strokeText(dot.label, gx + ldx, dy + ldy);
+    ctx.fillStyle = dot.color;
+    ctx.fillText(dot.label, gx + ldx, dy + ldy);
+  });
 
   ctx.restore();
 
@@ -954,14 +1072,6 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
   ctx.fillText("総建玉（現金を含む資産に対する株式の比率）", padL + plotW / 2, height - 6);
   ctx.textAlign = "left";
   ctx.fillText("年率の実質成長率 g", padL - 46, padT - 3);
-}
-
-function niceStep(raw: number): number {
-  if (!(raw > 0)) return 0.05;
-  const exp = Math.pow(10, Math.floor(Math.log10(raw)));
-  const f = raw / exp;
-  const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
-  return m * exp;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

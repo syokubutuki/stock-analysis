@@ -21,6 +21,7 @@ import { alignReturns, portfolioRisk, type RiskComponent } from "../../lib/portf
 import {
   annualStats,
   decomposeDrag,
+  doublingYearsLabel as yearsLabel,
   incrementalLedger,
   orderByCorrelation,
   varianceConcentration,
@@ -43,12 +44,8 @@ type WeightSource = "held" | "equal";
 const pct = (v: number, d = 1) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
 const pctAbs = (v: number, d = 1) => `${(Math.abs(v) * 100).toFixed(d)}%`;
 
-// 倍化年数の表示。g ≤ 0 は「永遠に来ない」（仕様書 §S3）。
-function yearsLabel(y: number): string {
-  if (!isFinite(y)) return "永遠に来ない";
-  if (y > 200) return "200年超";
-  return `${y.toFixed(1)}年`;
-}
+// 倍化年数の表示（「永遠に来ない」＝ g ≤ 0・仕様書 §S3）は growth-drag.ts の
+// doublingYearsLabel に集約した。doublingYears() が Infinity を返す契約と一対のため。
 
 function manYen(v: number): string {
   const m = v / 10000;

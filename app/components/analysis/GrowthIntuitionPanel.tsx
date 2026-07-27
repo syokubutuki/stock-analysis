@@ -21,7 +21,8 @@
 // 乱数は growth-drag.ts の mulberry32 を import して使う（同じ手続きを二重定義しない）。
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { mulberry32 } from "../../lib/growth-drag";
+import { doublingYearsLabel, doublingYears, mulberry32 } from "../../lib/growth-drag";
+import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
 
 // ── 定数 ───────────────────────────────────────────────────────────────────
@@ -280,8 +281,16 @@ export default function GrowthIntuitionPanel() {
               交互に10回押す
             </button>
             <button
+              onClick={() => setMoves((prev) => prev.slice(0, -1))}
+              disabled={game.n === 0}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-600 text-xs hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white"
+            >
+              1回戻す
+            </button>
+            <button
               onClick={() => setMoves([])}
-              className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-600 text-xs hover:bg-gray-50"
+              disabled={game.n === 0}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-600 text-xs hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white"
             >
               リセット
             </button>
@@ -627,8 +636,9 @@ export default function GrowthIntuitionPanel() {
             −50% の後は +100% が必要（③の表の逆算）。撤退ラインを決める根拠になります。
           </li>
           <li>
-            成長率は %ではなく<strong>倍化年数</strong>で持つ。g=7% なら 9.9年、g=5% なら 13.9年。
-            「2% の差」は「4年の差」です。
+            成長率は %ではなく<strong>倍化年数</strong>で持つ。g=7% なら{" "}
+            {doublingYearsLabel(doublingYears(0.07))}、g=5% なら{" "}
+            {doublingYearsLabel(doublingYears(0.05))}。「2% の差」は「4年の差」です。
           </li>
         </ul>
 
@@ -758,6 +768,18 @@ function drawGame(canvas: HTMLCanvasElement, path: number[], arith: number) {
   });
   ctx.stroke();
   ctx.setLineDash([]);
+  // 破線が何かを図の中で言う（本文を読まなくても分かるように）
+  if (n > 0) {
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "left";
+    outlined(
+      ctx,
+      `平均リターン（${arith >= 0 ? "+" : "−"}${(Math.abs(arith) * 100).toFixed(1)}%）どおりなら`,
+      xOf(0) + 6,
+      yOf(expected[Math.min(2, n)]) - 6,
+      "#64748b"
+    );
+  }
 
   // 実際の資産（青の実線 + 節点）
   ctx.strokeStyle = "#1d4ed8";
@@ -817,16 +839,6 @@ function drawGame(canvas: HTMLCanvasElement, path: number[], arith: number) {
   }
 }
 
-// 目盛りの刻み幅を切りのいい値へ。2.5 を刻みに入れておかないと 2〜5 の間が 5 に丸められ、
-// 目盛りが 1 本しか出ない範囲（例: 幅 21万 → 50万刻み）が生じる。
-function niceStep(raw: number): number {
-  if (!(raw > 0)) return 1;
-  const exp = Math.pow(10, Math.floor(Math.log10(raw)));
-  const f = raw / exp;
-  const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-  return m * exp;
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // U3 左: 100人が1回ずつ（Canvas2D・横軸はリターン% ＝ 分布なので規約どおり）
 // 1回のコイン投げは2値なので、ヒストグラムの階級は 2 本。1人＝1個の丸で積む
@@ -883,11 +895,20 @@ function drawPeople(canvas: HTMLCanvasElement, people: number[], mean: number) {
       ctx.fillStyle = color;
       ctx.fill();
     }
-    // 階級のラベル（率と人数）
+    // 階級のラベル（表/裏・率・人数）。1回のコイン投げは2値なので、この2本が全て。
     ctx.textAlign = "center";
-    ctx.font = "bold 11px sans-serif";
     const topY = baseY - 8 - Math.ceil(count / cols) * rowH;
-    outlined(ctx, `${count}人`, cx, Math.max(topY, padT + 10), color);
+    const ly = Math.max(topY, padT + 22);
+    ctx.font = "bold 11px sans-serif";
+    outlined(ctx, `${count}人`, cx, ly, color);
+    ctx.font = "10px sans-serif";
+    outlined(
+      ctx,
+      r > 0 ? "表 +50%" : "裏 −40%",
+      cx,
+      ly - 12,
+      r > 0 ? "#15803d" : "#b91c1c"
+    );
   };
 
   drawColumn(COIN_DOWN, nDown, "#dc2626");
@@ -1034,11 +1055,15 @@ function drawSinglePath(canvas: HTMLCanvasElement, path: number[]) {
   });
   ctx.stroke();
 
-  // ラベル（2本の理論線）
+  // ラベル（2本の理論線 ＋ 実際の軌跡）
   ctx.font = "bold 10px sans-serif";
   ctx.textAlign = "right";
   outlined(ctx, "期待値どおり +5%/回", xOf(n) - 4, yOf(gEnsemble * n) - 5, "#2563eb");
   outlined(ctx, "実質 −5.1%/回", xOf(n) - 4, yOf(gTime * n) + 12, "#b45309");
+  // 太い赤線が何かを図の中で言う。中間点の少し下に置く（線と重ならない側）。
+  const mid = Math.floor(n / 2);
+  ctx.textAlign = "left";
+  outlined(ctx, "あなた1人の軌跡", xOf(mid) + 6, yOf(logs[mid]) + 16, "#dc2626");
 
   // 終端
   const ey = yOf(logs[n]);

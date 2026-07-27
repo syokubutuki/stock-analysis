@@ -27,6 +27,7 @@
 //
 // すべて純関数・O(N²) 以下（N ≤ 30 のウォッチリスト規模）。Worker 不要。
 
+import { niceTicks } from "./axis-scale";
 import { AlignedReturns } from "./portfolio-risk";
 import { powerIterationEigen } from "./ssa";
 
@@ -75,6 +76,17 @@ export function hiddenLeverage(N: number, nEff: number): number {
 export function doublingYears(g: number): number {
   if (!(g > 1e-9)) return Infinity;
   return Math.LN2 / g;
+}
+
+/**
+ * 倍化年数の表示。「永遠に来ない」という言い回しは doublingYears() が Infinity を返す
+ * 契約と一対なので、関数の隣に置いて各パネルで書き写さないようにする
+ * （YourPortfolioDragPanel / CorrelationDragChart / EfficientFrontierChart / GrowthIntuitionPanel 共通）。
+ */
+export function doublingYearsLabel(y: number): string {
+  if (!isFinite(y)) return "永遠に来ない";
+  if (y > 200) return "200年超";
+  return `${y.toFixed(1)}年`;
 }
 
 // ───────────────────────── 年率統計（対数→算術の橋渡し） ─────────────────────────
@@ -279,6 +291,53 @@ export function peakExposure(mu: number, sigmaEff: number): number {
   const v = sigmaEff * sigmaEff;
   if (!(v > 1e-18)) return Infinity;
   return mu / v;
+}
+
+// ─────────────── iso-growth 等高線（G6・μ–σ 平面に重ねる地形図） ───────────────
+//
+// g = μ − σ²/2 が一定になる点の集合は μ = g + σ²/2、すなわち**上向きの放物線**。
+// σ が大きいほど同じ g を保つのに高い μ が必要になる ＝ ボラティリティ税の分だけ上へ
+// 持ち上がる。効率的フロンティアはこの等高線群を下向きに横切るので、
+// 「フロンティアの右上端＝最も儲かる点」ではないことが図として出る。
+//
+// 描画（ピクセル変換）から独立した純粋なジオメトリなのでライブラリ側に置く。
+
+/**
+ * μ–σ 平面の矩形 [sigmaLo, sigmaHi] × [muLo, muHi] を覆う等高線の水準 g を列挙する。
+ * g は σ について単調減少・μ について単調増加なので、値域は四隅から決まる。
+ */
+export function isoGrowthLevels(
+  sigmaLo: number,
+  sigmaHi: number,
+  muLo: number,
+  muHi: number,
+  target = 9
+): number[] {
+  const gLo = geometricGrowth(muLo, sigmaHi); // 右下の隅が最小
+  const gHi = geometricGrowth(muHi, sigmaLo); // 左上の隅が最大
+  return niceTicks(gLo, gHi, target);
+}
+
+/**
+ * 水準 g の等高線 μ = g + σ²/2 を σ ∈ [sigmaLo, sigmaHi] で標本化する。
+ * muLo/muHi の外に出る点は落とす（矩形でクリップした可視部分だけを返す）。
+ */
+export function isoGrowthCurve(
+  g: number,
+  sigmaLo: number,
+  sigmaHi: number,
+  muLo: number,
+  muHi: number,
+  samples = 80
+): { sigma: number; mu: number }[] {
+  const out: { sigma: number; mu: number }[] = [];
+  for (let i = 0; i <= samples; i++) {
+    const sigma = sigmaLo + ((sigmaHi - sigmaLo) * i) / samples;
+    const mu = g + (sigma * sigma) / 2;
+    if (mu < muLo || mu > muHi) continue;
+    out.push({ sigma, mu });
+  }
+  return out;
 }
 
 // ───────────────────────── 主成分の集中度（G5 3枚目の円グラフ） ─────────────────────────
