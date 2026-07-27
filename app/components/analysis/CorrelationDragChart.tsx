@@ -20,8 +20,13 @@
 //        規約から意図的に逸脱して Canvas2D を採用する（仕様書に理由を明記済み）。
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PortfolioData } from "../../hooks/usePortfolioData";
+import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
+import { alignReturns, correlationMatrix } from "../../lib/portfolio-risk";
+import { stressCorrelation } from "../../lib/dcc";
 import {
   TRADING_DAYS,
+  annualStats,
   doublingYears,
   doublingYearsLabel as yearsLabel,
   effectiveN,
@@ -124,25 +129,33 @@ interface SyncView {
 }
 
 /**
- * すべて optional。省略時は従来どおりの合成データ既定値（ρ=0.5 / N=10 / μ=8% / σ=30%）で
- * 動くため、props なしの呼び出し（/portfolio の pf-corr-drag）の挙動は不変。
+ * すべて optional。何も渡さなければ従来どおりの合成データ既定値（ρ=0.5 / N=10 / μ=8% /
+ * σ=30%）で動くため、データが無いユーザーでもこのパネルは意味を持つ（常時表示可）。
  *
- * Phase 4（危機Σ連動）はここに実測値を流し込むだけで済むように用意してある:
- * `stressRho` に既存 `computeStress` の危機時平均相関を渡すと、崖の上に
- * 「平時のあなた」と「暴落時のあなた」の 2 ドットが並ぶ。
+ * Phase 4（危機Σ連動）: `data` を渡すと、平時／危機時の平均相関・銘柄数・平均ボラを
+ * **実測値**で初期化し、崖の上に「平時のあなた」と「暴落時のあなた」の 2 ドットを並べる。
+ * 危機レジームの定義は既存 `stressCorrelation`（dcc.ts）に委ねる。
  */
 export interface CorrelationDragChartProps {
-  /** ρ スライダーの初期値（既定 0.5 ＝ 日本株大型の実勢）。 */
+  /**
+   * 実測の元データ（/portfolio のウォッチリスト）。渡すと ρ・N・σ の初期値が実測値になる。
+   * 省略すると合成データのみ（従来の挙動）。
+   */
+  data?: PortfolioData;
+  /** リターン窓の指定。data を渡すときだけ意味を持つ（既定 "swing"）。 */
+  horizon?: Horizon;
+  /** ρ スライダーの初期値。指定すると実測値より優先（既定は実測 → 無ければ 0.5）。 */
   initialRho?: number;
   /** 総建玉の初期値（既定 1.0 ＝ フル現物）。 */
   initialExposure?: number;
-  /** 前提の初期値。省略時は μ=8% / σ=30% / N=10。 */
+  /** 前提の初期値。指定すると実測値より優先（既定は実測 → 無ければ N=10 / σ=30%）。 */
   initialAssets?: number;
-  initialMuPct?: number;
   initialSigPct?: number;
+  /** 期待リターン μ の初期値（%）。**μ は実測しない**（後述の理由）。既定 8%。 */
+  initialMuPct?: number;
   /**
-   * 危機時の平均相関（実測値）。渡すと崖に危機時の曲線と第2ドットを重ねる。
-   * 未指定なら従来どおり平時の 1 ドットのみ。
+   * 危機時の平均相関。指定すると実測値より優先。渡された（または実測できた）ときだけ
+   * 崖に危機時の曲線と第2ドットを重ねる。
    */
   stressRho?: number;
   /** 第2ドットの見出し（既定「暴落時のあなた」）。 */
@@ -151,27 +164,102 @@ export interface CorrelationDragChartProps {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/** 危機レジームの定義（dcc.ts の stressCorrelation に渡す）。PortfolioRiskPanel と同一。 */
+const STRESS_OPTS = { quantile: 0.25, lookback: 60 };
+
+export interface MeasuredInputs {
+  n: number;
+  tickers: string[];
+  /** 年率ボラの平均（%）。 */
+  avgVolPct: number;
+  /** 全期間の平均相関。 */
+  rhoAll: number;
+  /** 平時（低ボラ標本）の平均相関。 */
+  rhoCalm: number | null;
+  /** 危機時（高ボラ標本）の平均相関。 */
+  rhoStress: number | null;
+  /** 危機時が測れなかった理由（期間不足など）。 */
+  reason: string;
+  nStressDays: number;
+  nCalmDays: number;
+  periods: number;
+}
+
 export default function CorrelationDragChart({
-  initialRho = 0.5,
+  data,
+  horizon = "swing",
+  initialRho,
   initialExposure = 1,
-  initialAssets = 10,
+  initialAssets,
   initialMuPct = 8,
-  initialSigPct = 30,
+  initialSigPct,
   stressRho,
   stressLabel = "暴落時のあなた",
 }: CorrelationDragChartProps = {}) {
+  // ── 実測（data を渡されたときだけ） ────────────────────────────────────
+  // 危機レジームは「直近60日のバスケット実現ボラが上位25%の日」。同時点のリターンで
+  // 切ると条件付けバイアスで相関が機械的に**下がる**ため、事前に分かるボラで切る
+  // （dcc.ts の解説を参照。危機を軽く見せる＝安全に見える間違いになる）。
+  const measured: MeasuredInputs | null = useMemo(() => {
+    if (!data) return null;
+    const series = Object.entries(data)
+      .filter(([, v]) => v.prices.length > 2)
+      .map(([ticker, v]) => ({ ticker, prices: v.prices }));
+    if (series.length < 2) return null;
+    const aligned = alignReturns(series, HORIZON_CONFIG[horizon].window);
+    if (aligned.tickers.length < 2) return null;
+
+    const st = annualStats(aligned);
+    const avgVol = st.vol.reduce((s, v) => s + v, 0) / st.vol.length;
+    const stress = stressCorrelation(aligned, STRESS_OPTS);
+    return {
+      n: aligned.tickers.length,
+      tickers: aligned.tickers,
+      avgVolPct: avgVol * 100,
+      rhoAll: correlationMatrix(aligned).avgCorr,
+      rhoCalm: stress.ok ? stress.avgCalm : null,
+      rhoStress: stress.ok ? stress.avg : null,
+      reason: stress.reason,
+      nStressDays: stress.nDays,
+      nCalmDays: stress.nCalm,
+      periods: st.periods,
+    };
+  }, [data, horizon]);
+
   // ── コントロール ──────────────────────────────────────────────────────
-  const [rho, setRho] = useState(() => clamp(initialRho, 0, 0.95)); // 既定は日本株大型の実勢
+  // ρ・N・σ は「ユーザーが触るまでは実測値（無ければ既定値）に追従する」。
+  // null = 未操作。データは非同期に届くので、useState の初期値に実測を入れてしまうと
+  // 到着前の空データで固定されてしまう。効果（useEffect）での setState はこの
+  // プロジェクトの lint で禁じられているため、**派生値で解決する**。
+  const [rhoUser, setRhoUser] = useState<number | null>(null);
+  const [nUser, setNUser] = useState<number | null>(null);
+  const [sigUser, setSigUser] = useState<number | null>(null);
   const [exposure, setExposure] = useState(() => clamp(initialExposure, 0, W_MAX)); // 現在地＝フル現物
-  const [nAssets, setNAssets] = useState(() => clamp(Math.round(initialAssets), 2, 20));
   const [muPct, setMuPct] = useState(() => clamp(initialMuPct, 0, 40));
-  const [sigPct, setSigPct] = useState(() => clamp(initialSigPct, 5, 80));
   const [sweeping, setSweeping] = useState(false);
-  // 危機時 ρ（渡されたときだけ有効）。useMemo の依存に載るので、React Compiler が
+
+  // 自動追従値（props > 実測 > 既定）。useMemo の依存に載るので、React Compiler が
   // 純粋と判定できる Math.min/max で直接クランプする（自前ヘルパ経由だと
   // 「後で変更されうる値」と見なされてメモ化の保持に失敗する）。
+  const rhoAuto = Math.min(0.95, Math.max(0, initialRho ?? measured?.rhoCalm ?? measured?.rhoAll ?? 0.5));
+  const nAuto = Math.min(20, Math.max(2, Math.round(initialAssets ?? measured?.n ?? 10)));
+  // 実測ボラは端数が長いので 0.1% 刻みに丸める（入力欄の幅に収まらないため）
+  const sigAuto =
+    Math.round(Math.min(80, Math.max(5, initialSigPct ?? measured?.avgVolPct ?? 30)) * 10) / 10;
+
+  const rho = rhoUser ?? rhoAuto;
+  const nAssets = nUser ?? nAuto;
+  const sigPct = sigUser ?? sigAuto;
+  /** 実測値に追従している（＝ユーザーが触っていない）か。 */
+  const followsMeasured = measured != null && rhoUser === null && nUser === null && sigUser === null;
+
+  // 危機時 ρ。props 指定が最優先、無ければ実測。
+  const rhoStressMeasured = measured?.rhoStress ?? null;
+  const rhoStressRaw = stressRho ?? rhoStressMeasured;
   const rhoStress =
-    stressRho != null && isFinite(stressRho) ? Math.min(0.99, Math.max(0, stressRho)) : null;
+    rhoStressRaw != null && isFinite(rhoStressRaw)
+      ? Math.min(0.99, Math.max(0, rhoStressRaw))
+      : null;
 
   const mu = muPct / 100;
   const sigma = sigPct / 100;
@@ -198,6 +286,12 @@ export default function CorrelationDragChart({
 
   const gCur = gAt(exposure, rho);
   const gStress = rhoStress != null ? gAt(exposure, rhoStress) : null;
+  // 白丸の見出し。実測の平時 ρ に追従しているときだけ「平時のあなた」と言い切る
+  // （スライダーを危機時に合わせた状態で「平時」と表示すると嘘になる）。
+  const baseDotLabel =
+    measured != null && rhoUser === null && measured.rhoCalm != null
+      ? "平時のあなた"
+      : "あなたの現在地";
 
   const cliff: CliffView = useMemo(() => {
     // ドットは「同じ建玉のまま曲線だけが入れ替わる」ことを見せるため横位置を共有する。
@@ -207,7 +301,7 @@ export default function CorrelationDragChart({
       {
         exposure,
         g: gAt(exposure, rho),
-        label: rhoStress != null ? "平時のあなた" : "あなたの現在地",
+        label: baseDotLabel,
         color: "#111827",
         hollow: true,
       },
@@ -249,7 +343,7 @@ export default function CorrelationDragChart({
           : null,
       dots,
     };
-  }, [mu, sigma, nAssets, rho, exposure, wGrid, peakAt, gAt, rhoStress, stressLabel]);
+  }, [mu, sigma, nAssets, rho, exposure, wGrid, peakAt, gAt, rhoStress, stressLabel, baseDotLabel]);
 
   // ── U1 合成系列（乱数は N が変わったときだけ引き直す） ────────────────────
   const shocks = useMemo(
@@ -340,7 +434,7 @@ export default function CorrelationDragChart({
           next = 0;
           sweepDirRef.current = 1;
         }
-        setRho(Math.round(next * 100) / 100);
+        setRhoUser(Math.round(next * 100) / 100);
       }
 
       // 1 年ぶんの窓を流す
@@ -365,6 +459,97 @@ export default function CorrelationDragChart({
 
   return (
     <div className="space-y-5">
+      {/* ── 実測バナー（Phase 4: 危機Σ連動） ───────────────────────────── */}
+      {measured && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-xs font-semibold text-gray-700">
+              あなたのウォッチリスト {measured.n} 銘柄の実測
+            </span>
+            <span className="text-[11px] text-gray-400 tabular-nums">
+              {measured.periods}日 / {HORIZON_CONFIG[horizon].label}
+            </span>
+            {followsMeasured ? (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                実測値に追従中
+              </span>
+            ) : (
+              <button
+                onClick={() => {
+                  setSweeping(false);
+                  setRhoUser(null);
+                  setNUser(null);
+                  setSigUser(null);
+                }}
+                className="text-[10px] px-2 py-0.5 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
+              >
+                ↩ 実測値に戻す
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-700 tabular-nums">
+            {measured.rhoCalm != null && (
+              <span>
+                平時 ρ ={" "}
+                <strong className="text-gray-900">{measured.rhoCalm.toFixed(2)}</strong>
+                <span className="text-gray-400"> （{measured.nCalmDays}日）</span>
+              </span>
+            )}
+            <span>
+              全期間 ρ = <strong className="text-gray-900">{measured.rhoAll.toFixed(2)}</strong>
+            </span>
+            {rhoStressMeasured != null && (
+              <span>
+                危機時 ρ ={" "}
+                <strong className="text-red-700">{rhoStressMeasured.toFixed(2)}</strong>
+                <span className="text-gray-400"> （{measured.nStressDays}日）</span>
+              </span>
+            )}
+            <span className="text-gray-500">
+              1銘柄の平均ボラ σ = {measured.avgVolPct.toFixed(0)}%
+            </span>
+          </div>
+          {rhoStressMeasured == null && (
+            <p className="mt-1 text-[11px] text-amber-700">
+              危機時の相関は算出できませんでした（{measured.reason || "期間不足"}）。
+              期間の長い窓を選ぶと測れる場合があります。
+            </p>
+          )}
+          {rhoStressMeasured != null && measured.rhoCalm != null && (
+            <>
+              <p className="mt-1 text-[11px] text-gray-500">
+                危機レジームの定義は<strong>「直近60日のバスケット実現ボラが上位25%の日」</strong>。
+                同時点の下落率で切ると相関が機械的に下がる（条件付けバイアス）ため、
+                <strong>事前に分かるボラ</strong>で切っています。
+                {measured.rhoAll > measured.rhoCalm && measured.rhoAll > rhoStressMeasured && (
+                  <strong className="text-amber-700">
+                    {" "}※ 全期間が両部分標本より高いのはバイアスの検知サインです。
+                  </strong>
+                )}
+              </p>
+              {/* 「危機時は相関が上がる」は一般的な傾向にすぎない。実測が逆に出たときに
+                  上がった前提の文言を出すと嘘になるので、向きで文面を変える。 */}
+              {rhoStressMeasured <= measured.rhoCalm && (
+                <p className="mt-1 text-[11px] text-amber-700">
+                  ※ この標本では<strong>危機時の相関が平時より低く</strong>出ました
+                  （{rhoStressMeasured.toFixed(2)} ≤ {measured.rhoCalm.toFixed(2)}）。
+                  「荒れた相場では必ず相関が上がる」は一般的な傾向にすぎず、
+                  <strong>あなたの組み合わせでは成り立っていない</strong>という実測結果です。
+                  ただし危機時は全体の25%（{measured.nStressDays}日）だけの部分標本で標準誤差が大きく、
+                  <strong>次の危機で同じとは限りません</strong>。銘柄を入れ替えたり窓を長くすると
+                  向きが変わることもあります。
+                </p>
+              )}
+            </>
+          )}
+          <p className="mt-1 text-[11px] text-gray-500">
+            <strong>期待リターン μ だけは実測しません</strong>（既定 {muPct}%）。
+            μ の推定誤差は σ の推定誤差よりはるかに大きく、過去の平均リターンを入れると
+            崖の頂点が「予測」に見えてしまうためです。μ は下の欄で自分の想定に変えてください。
+          </p>
+        </div>
+      )}
+
       {/* ── ρ スライダー（この 1 本で全部が動く） ───────────────────────── */}
       <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -380,7 +565,7 @@ export default function CorrelationDragChart({
             value={rho}
             onChange={(e) => {
               setSweeping(false);
-              setRho(Number(e.target.value));
+              setRhoUser(Number(e.target.value));
             }}
             className="flex-1 min-w-[220px] accent-blue-600"
           />
@@ -390,7 +575,7 @@ export default function CorrelationDragChart({
                 key={r.rho}
                 onClick={() => {
                   setSweeping(false);
-                  setRho(r.rho);
+                  setRhoUser(r.rho);
                 }}
                 className="px-2 py-0.5 text-xs rounded border"
                 style={{
@@ -415,6 +600,44 @@ export default function CorrelationDragChart({
             </button>
           </div>
         </div>
+
+        {/* 実測値へのワンクリック（平時／危機時）。仕様書 §10.5 Phase 4 */}
+        {measured && (measured.rhoCalm != null || rhoStressMeasured != null) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-gray-500">実測値に合わせる</span>
+            {measured.rhoCalm != null && (
+              <button
+                onClick={() => {
+                  setSweeping(false);
+                  setRhoUser(null); // 追従に戻す（＝平時の実測値）
+                }}
+                className={`px-2 py-0.5 text-xs rounded border ${
+                  rhoUser === null
+                    ? "bg-gray-800 text-white border-gray-800"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                平時 {measured.rhoCalm.toFixed(2)}
+              </button>
+            )}
+            {rhoStressMeasured != null && (
+              <button
+                onClick={() => {
+                  setSweeping(false);
+                  setRhoUser(rhoStressMeasured);
+                }}
+                className={`px-2 py-0.5 text-xs rounded border ${
+                  rhoUser != null && Math.abs(rhoUser - rhoStressMeasured) < 1e-9
+                    ? "bg-red-700 text-white border-red-700"
+                    : "bg-white text-red-700 border-red-300 hover:bg-red-50"
+                }`}
+                title="スライダーを危機時の実測相関に合わせる（崖がどれだけ手前に来るかを太線で見る）"
+              >
+                危機時 {rhoStressMeasured.toFixed(2)}
+              </button>
+            )}
+          </div>
+        )}
         <p className="mt-1.5 text-xs text-gray-700">
           {nAssets} 銘柄に分散したつもりでも、実質は{" "}
           <strong className="text-blue-700 tabular-nums text-base">{nEff.toFixed(1)} 銘柄</strong>
@@ -499,13 +722,26 @@ export default function CorrelationDragChart({
           {rhoStress != null && gStress != null && (
             <>
               {" "}赤い破線＝<strong>危機時 ρ={rhoStress.toFixed(2)}</strong> の崖、赤い丸が
-              {stressLabel}です。<strong>建玉は 1mm も動かしていないのに</strong>、成長率は{" "}
-              {pct(gCur)} から{" "}
-              <strong className={gStress > 0 ? "text-gray-800" : "text-red-700"}>
-                {pct(gStress)}
-              </strong>{" "}
-              へ（2倍まで {yearsLabel(doublingYears(gCur))} →{" "}
-              <strong>{yearsLabel(doublingYears(gStress))}</strong>）。
+              {stressLabel}です。
+              {rhoStress > rho ? (
+                <>
+                  <strong>建玉は 1mm も動かしていないのに</strong>、相関が上がっただけで成長率は{" "}
+                  {pct(gCur)} から{" "}
+                  <strong className={gStress > 0 ? "text-gray-800" : "text-red-700"}>
+                    {pct(gStress)}
+                  </strong>{" "}
+                  へ落ち、2倍になるまでが {yearsLabel(doublingYears(gCur))} から{" "}
+                  <strong>{yearsLabel(doublingYears(gStress))}</strong> へ延びます。
+                </>
+              ) : (
+                <>
+                  この標本では危機時の相関が今の ρ={rho.toFixed(2)} より<strong>低い</strong>ため、
+                  赤い丸は白丸より<strong>上</strong>にあります（g {pct(gCur)} →{" "}
+                  {pct(gStress)}）。相関が上がるとは限らない、という実測結果です——
+                  ただし部分標本からの推定なので振れ幅は大きく、
+                  <strong>次の危機で同じ向きとは限りません</strong>。
+                </>
+              )}
             </>
           )}
         </p>
@@ -530,10 +766,25 @@ export default function CorrelationDragChart({
           <tbody>
             {[
               ...REF_RHOS.map((r) => ({ rho: r.rho, color: r.color, note: r.note, cur: false })),
-              { rho, color: "#111827", note: "今のスライダー位置", cur: true },
-              // 危機時 ρ が渡されているときだけ最下段に実測の危機時を並べる
+              {
+                rho,
+                color: "#111827",
+                note:
+                  measured && rhoUser === null
+                    ? "平時のあなた（実測）"
+                    : "今のスライダー位置",
+                cur: true,
+              },
+              // 危機時 ρ が測れた（または渡された）ときだけ最下段に並べる
               ...(rhoStress != null
-                ? [{ rho: rhoStress, color: "#b91c1c", note: `${stressLabel}（危機時の実測相関）`, cur: true }]
+                ? [
+                    {
+                      rho: rhoStress,
+                      color: "#b91c1c",
+                      note: `${stressLabel}（${stressRho != null ? "指定値" : "危機時の実測相関"}）`,
+                      cur: true,
+                    },
+                  ]
                 : []),
             ].map((r, i) => {
               const ne = effectiveN(nAssets, r.rho);
@@ -575,11 +826,20 @@ export default function CorrelationDragChart({
         </table>
       </div>
 
-      {/* 前提（μ・σ・N） */}
+      {/* 前提（μ・σ・N）。実測が使えている項目には「実測」バッジを出す。 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 border-t border-gray-100 pt-3">
-        <span className="text-gray-400">前提（合成データ）</span>
+        <span className="text-gray-400">{measured ? "前提（ρ・N・σ は実測）" : "前提（合成データ）"}</span>
         <label className="flex items-center gap-1">
           銘柄数 N
+          {measured && (
+            <span
+              className={`text-[10px] px-1 rounded ${
+                nUser === null ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {nUser === null ? "実測" : "手動"}
+            </span>
+          )}
           <input
             type="number"
             min={2}
@@ -587,13 +847,21 @@ export default function CorrelationDragChart({
             step={1}
             value={nAssets}
             onChange={(e) =>
-              setNAssets(Math.max(2, Math.min(20, Math.round(Number(e.target.value) || 10))))
+              setNUser(Math.max(2, Math.min(20, Math.round(Number(e.target.value) || 10))))
             }
             className="w-14 px-1 py-0.5 border border-gray-300 rounded text-right tabular-nums"
           />
         </label>
         <label className="flex items-center gap-1">
           期待リターン μ
+          {measured && (
+            <span
+              className="text-[10px] px-1 rounded bg-amber-100 text-amber-700"
+              title="μ は実測しません。推定誤差が σ よりはるかに大きく、崖の頂点が「予測」に見えてしまうため。"
+            >
+              仮定
+            </span>
+          )}
           <input
             type="number"
             min={0}
@@ -607,19 +875,31 @@ export default function CorrelationDragChart({
         </label>
         <label className="flex items-center gap-1">
           1銘柄のボラ σ
+          {measured && (
+            <span
+              className={`text-[10px] px-1 rounded ${
+                sigUser === null ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {sigUser === null ? "実測" : "手動"}
+            </span>
+          )}
           <input
             type="number"
             min={5}
             max={80}
             step={1}
             value={sigPct}
-            onChange={(e) => setSigPct(Math.max(5, Math.min(80, Number(e.target.value) || 30)))}
-            className="w-14 px-1 py-0.5 border border-gray-300 rounded text-right tabular-nums"
+            onChange={(e) => setSigUser(Math.max(5, Math.min(80, Number(e.target.value) || 30)))}
+            className="w-16 px-1 py-0.5 border border-gray-300 rounded text-right tabular-nums"
           />
           %
         </label>
         <span className="text-gray-400">
-          いずれも年率。既定値は μ=8% / σ=30% / N=10（日本株の大型株を想定した水準）。
+          いずれも年率。
+          {measured
+            ? "ρ・N・σ はウォッチリストの実測値、μ だけが仮定です。手で変えると「手動」に切り替わり、上の「実測値に戻す」で戻せます。"
+            : "既定値は μ=8% / σ=30% / N=10（日本株の大型株を想定した水準）。"}
         </span>
       </div>
 
@@ -802,11 +1082,61 @@ export default function CorrelationDragChart({
           </li>
         </ul>
 
-        <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
+        <p className="font-medium text-gray-700 mt-3">
+          7. 平時と危機時（実測相関の入れ方）
+        </p>
+        <p>
+          相関は定数ではありません。一般には<strong>穏やかな相場では低く、荒れると上がる</strong>
+          傾向があります。このパネルは、あなたのウォッチリストから
+          <strong>平時 ρ と危機時 ρ を別々に実測</strong>して崖の上に 2 つのドットを並べます。
+          白丸が「平時のあなた」、赤丸が「暴落時のあなた」。
+          <strong>横位置（総建玉）は同じ</strong>です——あなたは何も売買していないのに、
+          相関が上がるだけで足元の崖が手前へずり寄り、成長率だけが落ちる。それが見えます。
+        </p>
+        <p>
+          ただし<strong>これは「必ずそうなる」法則ではありません</strong>。実測すると
+          危機時 ρ が平時 ρ より<strong>低く</strong>出る組み合わせもあります（例: 金利で動く銀行株と
+          グロース株のように、荒れた局面で逆方向に振れる組み合わせ）。そのときパネルは
+          赤丸が白丸より上に来た事実をそのまま表示し、
+          <strong>「相関が上がるとは限らない」という実測結果として明示します</strong>。
+          都合のいい向きに丸めません。
+        </p>
+        <p>
+          <strong>危機レジームの定義（ここが技術的な要点）</strong>:
+          「等加重バスケットの<strong>直近60日の実現ボラが上位25%</strong>の日」を危機、残りを平時とします。
+          素朴には「バスケットのリターンが下位20%の日」で切りたくなりますが、
+          <strong>それをやると相関は機械的に下がります</strong>。共通ファクターの実現値そのものを
+          条件付けるため、部分標本内でファクター分散が切り詰められるからです
+          （Boyer-Gibson-Loretan 1999 / Forbes-Rigobon 2002 の<strong>条件付けバイアス</strong>）。
+          しかもバイアスの向きは<strong>「危機を軽く見せる」＝安全に見える間違い</strong>なので危険です。
+          そこで<strong>事前に分かる情報（過去のボラ）だけ</strong>で切ります。
+          この定義は当日の寄付時点で判定できるので、運用可能なレジーム定義にもなります。
+          検知サインは<strong>「全期間 ρ が平時 ρ と危機時 ρ の両方より高い」</strong>——
+          そうなっていたらバイアスが残っている合図で、パネルにも警告を出します。
+        </p>
+        <p>
+          実装は既存の {" stressCorrelation() "}（dcc.ts）をそのまま使っています。
+          「ポートフォリオ・リスク分析」の危機シナリオ VaR と<strong>同一の定義・同一の関数</strong>なので、
+          2 つのパネルの危機時相関は必ず一致します。この定義は上下対称なので、
+          <strong>「下落時<em>だけ</em>相関が上がる」という非対称性の検証には使えません</strong>
+          （それには exceedance correlation を2変量正規のヌルと比べる必要があります）。
+        </p>
+        <p>
+          <strong>μ だけは実測しません</strong>。ρ・N・σ は実測値を初期値に入れますが、
+          期待リターン μ は既定 8% の<strong>仮定</strong>のままにしてあります。理由は
+          「μ の推定誤差は σ の推定誤差よりはるかに大きい」から。過去の平均リターンを入れると
+          崖の頂点 {" W*=μ/σ_eff² "} が<strong>あたかも予測であるかのように</strong>見えてしまいます。
+          μ は自分の想定を手で入れて、頂点の位置がどれだけ動くかを確かめる欄として使ってください。
+        </p>
+
+        <p className="font-medium text-gray-700 mt-3">8. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
-            <strong>ここは合成データです</strong>。μ・σ・N・ρ はあなたが入れた前提であって、実測値ではありません。
-            実データでの分解は「相関が食べた分：期待リターンと『実際に増える速さ』のズレ」パネルを見てください。
+            <strong>ρ・N・σ が実測でも、崖そのものは合成モデルです</strong>。
+            アニメーションの値動きは seeded 乱数で、崖は等相関・正規分布・μ 一定という
+            単純化の上に描かれています。実データそのままの分解は
+            「相関が食べた分：期待リターンと『実際に増える速さ』のズレ」パネルを見てください。
+            ウォッチリストを渡していない場合は、ρ・N・σ も含めて全て仮定です。
           </li>
           <li>
             <strong>全ペアの相関が等しい（等相関）という単純化</strong>を置いています。現実には相関はペアごとに
@@ -818,7 +1148,14 @@ export default function CorrelationDragChart({
           </li>
           <li>
             <strong>相関は非定常で、テール時に上がる</strong>。平時 ρ=0.5 でも暴落時には 0.8〜0.9 に寄り、
-            崖はさらに手前へ来ます。危機時の相関は「ポートフォリオ・リスク分析」の DCC・危機時相関を参照。
+            崖はさらに手前へ来ます。上の 7. で実測した危機時 ρ がまさにこれです。ただし
+            <strong>次の危機が過去の危機と同じ相関になる保証はありません</strong>。
+            実測値は「最低限これくらいは上がる」という下限として読んでください。
+          </li>
+          <li>
+            <strong>危機時 ρ は部分標本（全体の25%）からの推定</strong>なので、平時 ρ より標準誤差が大きく、
+            銘柄数が多いと相関行列がランク落ちしやすくなります。標本日数がパネルに出るので、
+            極端に少ないときは数字を信用しないでください（日数が足りなければ算出せず理由を表示します）。
           </li>
           <li>
             {" g ≈ μ−σ²/2 "} は2次近似。テールが厚い（尖度が高い）分布ではドラッグを
@@ -944,7 +1281,8 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
 
   // 参照3本
   d.refs.forEach((c) => drawCurve(c.pts, c.color, 1.8, 0.85));
-  // 危機時 ρ の曲線（渡されたときだけ）。平時より必ず内側＝崖が手前に来る。
+  // 危機時 ρ の曲線（渡されたときだけ）。ρ が平時より高ければ内側＝崖が手前に来るが、
+  // 実測では逆に出ることもあるので「必ず内側」とは仮定しない（外側にも描ける）。
   if (d.stress) {
     ctx.setLineDash([6, 4]);
     drawCurve(d.stress.pts, "#b91c1c", 2.4, 0.95);
@@ -1037,7 +1375,15 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  d.dots.forEach((dot, i) => {
+  // 2 ドットは g が近いと（相関差が小さいと）数ピクセルしか離れないので、
+  // ラベルは「上のドットは上へ、下のドットは下へ」と外向きに逃がす。
+  // どちらが上かは実測の向きで変わる（危機時 ρ が平時より低く出ることもある）。
+  const gMax = Math.max(...d.dots.map((t) => t.g));
+  // 相関差が小さいと 2 ドットはほぼ重なる。塗りドット（危機時）を先に描き、白抜きの
+  // 現在地を最後に載せることで、重なっても両方の存在が分かる（白丸＋赤い縁）。
+  [...d.dots]
+    .sort((a, b) => Number(a.hollow) - Number(b.hollow))
+    .forEach((dot) => {
     const dy = yOf(dot.g);
     ctx.beginPath();
     ctx.arc(gx, dy, 7, 0, Math.PI * 2);
@@ -1051,8 +1397,7 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
     const right = gx > padL + plotW * 0.7;
     ctx.textAlign = right ? "right" : "left";
     const ldx = right ? -12 : 12;
-    // 2 ドットが近接したときにラベルが重ならないよう、2 つ目は下側へずらす
-    const ldy = d.dots.length > 1 ? (i === 0 ? -2 : 12) : 4;
+    const ldy = d.dots.length > 1 ? (dot.g >= gMax ? -11 : 19) : 4;
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#fafafa";
     ctx.strokeText(dot.label, gx + ldx, dy + ldy);
