@@ -99,8 +99,8 @@ export interface CellStats {
   n: number;
   // 平均リターン系(発散配色)
   intraday: number; intradayP: number;
-  full: number; fullP: number;
-  gap: number; gapP: number;
+  full: number; fullP: number; nFull: number; volFull: number;
+  gap: number; gapP: number; nGap: number; volGap: number;
   mfe: number;
   mae: number;
   sharpe: number; // 日中平均/日中σ
@@ -120,11 +120,11 @@ export interface CellStats {
   band: number[]; // 各時間ビンの標準偏差(±帯)
 }
 
-function meanP(arr: (number | null)[]): { m: number; p: number; n: number } {
+function meanP(arr: (number | null)[]): { m: number; p: number; n: number; sd: number } {
   const v = arr.filter((x): x is number => x !== null && isFinite(x));
-  if (v.length === 0) return { m: 0, p: 1, n: 0 };
+  if (v.length === 0) return { m: 0, p: 1, n: 0, sd: 0 };
   const t = tTest(v);
-  return { m: mean(v), p: t ? t.p : 1, n: v.length };
+  return { m: mean(v), p: t ? t.p : 1, n: v.length, sd: std(v) };
 }
 
 export function aggregateCell(feats: DayFeatures[], G: number): CellStats | null {
@@ -151,8 +151,8 @@ export function aggregateCell(feats: DayFeatures[], G: number): CellStats | null
   return {
     n,
     intraday: intra.m, intradayP: intra.p,
-    full: full.m, fullP: full.p,
-    gap: gap.m, gapP: gap.p,
+    full: full.m, fullP: full.p, nFull: full.n, volFull: full.sd,
+    gap: gap.m, gapP: gap.p, nGap: gap.n, volGap: gap.sd,
     mfe: mean(feats.map((f) => f.mfe)),
     mae: mean(feats.map((f) => f.mae)),
     sharpe: vol > 0 ? intra.m / vol : 0,
@@ -328,6 +328,170 @@ export function computeCrossRows(
   });
 
   return { rows, consensus, nStocks, timeLabels, grid, selBin };
+}
+
+// ───────────────────────── 行(銘柄)のスカラー化と配分ウェイト ─────────────────────────
+//
+// ヒートマップは(銘柄×曜日)の2次元だが、「どの銘柄に建てるか」を決めるには行を1つの数に
+// 潰す必要がある。潰し方(曜日スコープ)と、そこから相対配分を作る手順をここに集約する。
+
+// 曜日をまたぐ集計の取り方。数値 = CROSS_WD_ORDER の曜日単独。
+export type WdScope = number | "best" | "mean" | "sum";
+// 並び順。"abs" は符号を問わず効果の強い順(絶対値降順)。
+export type SortDir = "desc" | "asc" | "abs";
+// 期待値・分散をどのリターン定義で測るか。
+export type MuBasis = "intraday" | "full" | "gap";
+
+export const WD_SCOPE_LABELS: Record<string, string> = {
+  sum: "週合計", mean: "平均", best: "最良曜日",
+};
+
+export function wdScopeLabel(scope: WdScope): string {
+  return typeof scope === "number" ? CROSS_WD_LABELS[scope] : WD_SCOPE_LABELS[scope] ?? String(scope);
+}
+
+// 1セル(銘柄×曜日)の日内パス振幅 = 平均累積パスの山谷幅(最大−最小)。値動きの形の大きさ。
+export function cellAmplitude(c: CellStats): number {
+  if (!c.path || c.path.length === 0) return 0;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of c.path) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  return hi > lo ? hi - lo : 0;
+}
+
+// 基準別の平均・σ・標本数。full/gap は前日終値が要るぶん n が1日ぶん少なくなりうる。
+export function cellMu(c: CellStats, basis: MuBasis): number {
+  return basis === "full" ? c.full : basis === "gap" ? c.gap : c.intraday;
+}
+export function cellVol(c: CellStats, basis: MuBasis): number {
+  return basis === "full" ? c.volFull : basis === "gap" ? c.volGap : c.vol;
+}
+export function cellCount(c: CellStats, basis: MuBasis): number {
+  return basis === "full" ? c.nFull : basis === "gap" ? c.nGap : c.n;
+}
+
+// スコープに含まれるセル(空セルは除外)。
+function scopeCells(r: CrossRow, scope: WdScope): CellStats[] {
+  if (typeof scope === "number") {
+    const i = CROSS_WD_ORDER.indexOf(scope);
+    const c = i >= 0 ? r.cells[i] : null;
+    return c && c.n >= 1 ? [c] : [];
+  }
+  return r.cells.filter((c): c is CellStats => !!c && c.n >= 1);
+}
+
+// 行を1スカラーへ。該当セルが無ければ NaN(呼び出し側で常に最下部へ落とす)。
+//  additive=false の指標(σ・割合・時刻など)では "sum" は意味を成さないので平均へ落とす。
+export function rowScalar(
+  r: CrossRow,
+  get: (c: CellStats) => number,
+  scope: WdScope,
+  dir: SortDir = "desc",
+  additive = true
+): number {
+  const vals = scopeCells(r, scope).map(get).filter((v) => isFinite(v));
+  if (vals.length === 0) return NaN;
+  if (typeof scope === "number") return vals[0];
+  const sum = vals.reduce((a, b) => a + b, 0);
+  if (scope === "sum") return additive ? sum : sum / vals.length;
+  if (scope === "mean") return sum / vals.length;
+  // "best" = 並び方向にとって最も有利な曜日1つ
+  if (dir === "abs") return vals.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
+  return dir === "asc" ? Math.min(...vals) : Math.max(...vals);
+}
+
+// 配分の材料。μ・分散・標準誤差をスコープ整合的に合成する。
+//  sum : μ=Σμ_d, σ²=Σσ_d², se=√(Σse_d²)  … 週内の5トレードを積み上げた量(日は独立とみなす)
+//  mean: μ,σ²,se をトレード1回あたりに割り戻したもの
+//  単一/best: その曜日のセルそのもの
+export interface RowMuVar {
+  mu: number;
+  var: number; // σ²
+  sd: number; // σ
+  se: number; // 平均の標準誤差
+  n: number; // 標本(立会日)数
+  k: number; // 有効曜日数
+  wd: number | null; // "best"/単一曜日のとき、採用した曜日
+}
+
+export function rowMuVar(r: CrossRow, scope: WdScope, basis: MuBasis, dir: SortDir = "desc"): RowMuVar | null {
+  const idx: number[] = [];
+  const cells: CellStats[] = [];
+  r.cells.forEach((c, i) => {
+    if (!c || cellCount(c, basis) < 1) return;
+    if (typeof scope === "number" && CROSS_WD_ORDER[i] !== scope) return;
+    if (!isFinite(cellMu(c, basis))) return;
+    cells.push(c); idx.push(i);
+  });
+  if (cells.length === 0) return null;
+
+  const one = (c: CellStats, i: number): RowMuVar => {
+    const sd = cellVol(c, basis);
+    const n = cellCount(c, basis);
+    return { mu: cellMu(c, basis), var: sd * sd, sd, se: n > 0 ? sd / Math.sqrt(n) : NaN, n, k: 1, wd: CROSS_WD_ORDER[i] };
+  };
+
+  if (typeof scope === "number") return one(cells[0], idx[0]);
+  if (scope === "best") {
+    let bi = 0;
+    for (let i = 1; i < cells.length; i++) {
+      const a = cellMu(cells[bi], basis), b = cellMu(cells[i], basis);
+      const better = dir === "abs" ? Math.abs(b) > Math.abs(a) : dir === "asc" ? b < a : b > a;
+      if (better) bi = i;
+    }
+    return one(cells[bi], idx[bi]);
+  }
+
+  let mu = 0, varSum = 0, seSq = 0, n = 0;
+  for (const c of cells) {
+    const sd = cellVol(c, basis);
+    const cn = cellCount(c, basis);
+    mu += cellMu(c, basis);
+    varSum += sd * sd;
+    seSq += cn > 0 ? (sd * sd) / cn : 0;
+    n += cn;
+  }
+  const k = cells.length;
+  if (scope === "mean") {
+    return { mu: mu / k, var: varSum / k, sd: Math.sqrt(varSum / k), se: Math.sqrt(seSq) / k, n, k, wd: null };
+  }
+  return { mu, var: varSum, sd: Math.sqrt(varSum), se: Math.sqrt(seSq), n, k, wd: null };
+}
+
+// ── 配分ウェイト(相関を無視したケリー近似) ──
+// 対数効用 max_q E[ln(1+qr)] ≈ qμ − q²σ²/2 を q で解くと q* = μ/σ²。
+// これを銘柄ごとに出し、正の分だけを合計1に正規化して「予算のうち何%を割くか」にする。
+// 相関はここでは一切見ていない(＝分散効果を過大評価する上限値)。
+export interface AllocOpts {
+  haircut: boolean; // μ から1標準誤差を差し引いた保守値を使う
+  minN: number; // これ未満の標本数の銘柄は配分から除外
+}
+export const DEFAULT_ALLOC: AllocOpts = { haircut: true, minN: 5 };
+
+export interface AllocRow extends RowMuVar {
+  ticker: string;
+  muAdj: number; // 保守値 μ̃
+  kelly: number; // max(0, μ̃/σ²)
+  weight: number; // kelly を全銘柄で正規化した相対配分(0..1)
+  excluded: boolean; // n 不足で配分対象外
+}
+
+export function allocWeights(
+  rows: CrossRow[], scope: WdScope, basis: MuBasis, opts: AllocOpts = DEFAULT_ALLOC, dir: SortDir = "desc"
+): Map<string, AllocRow> {
+  const out = new Map<string, AllocRow>();
+  let total = 0;
+  for (const r of rows) {
+    const mv = rowMuVar(r, scope, basis, dir);
+    if (!mv) continue;
+    const excluded = mv.n < opts.minN || !(mv.var > 0);
+    const se = isFinite(mv.se) ? mv.se : 0;
+    const muAdj = opts.haircut ? Math.sign(mv.mu) * Math.max(0, Math.abs(mv.mu) - se) : mv.mu;
+    const kelly = excluded ? 0 : Math.max(0, muAdj / mv.var);
+    total += kelly;
+    out.set(r.ticker, { ...mv, ticker: r.ticker, muAdj, kelly, weight: 0, excluded });
+  }
+  if (total > 0) for (const a of out.values()) a.weight = a.kelly / total;
+  return out;
 }
 
 export { minuteToLabel };
