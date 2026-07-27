@@ -350,6 +350,14 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                     </tr>
                   </tbody>
                 </table>
+                {/* μ の定義（対数平均）を明記する。詳細は docs/portfolio-analysis-open-issues.md */}
+                <p className="text-[10px] text-gray-400 mt-1">
+                  「実現μ」「α」は<strong>対数リターンの平均×252</strong>から計算しています（＝実現した幾何平均に相当）。
+                  単純リターンの算術平均より各銘柄 σᵢ²/2 だけ低いため、
+                  <strong>高ボラ銘柄の α はその分だけ控えめに出ます</strong>（σ=35%で約 6pp、σ=60%で約 19pp の水準差。
+                  α には β で説明される市場分の差が相殺されるので実効はこれより小さい）。
+                  銘柄間の割安/割高の比較でこの効果が効くため、ボラの大きく違う銘柄を並べるときは注意してください。
+                </p>
               </div>
 
               <AnalysisGuide title="証券市場線(SML)・β・Jensenのα の詳細理論">

@@ -37,6 +37,9 @@ export default function OosBacktestChart({ data }: Props) {
   const [logScale, setLogScale] = useState(true);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<OosResult | null>(null);
+  // μ の定義（対数平均＝既定 vs 算術平均）を同じウォークフォワードで走らせた比較。
+  // 接点(最大シャープ)だけが μ に依存し、最小分散/RP/逆ボラ/等加重は Σ だけで決まるので不変。
+  const [muCompare, setMuCompare] = useState<OosResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,19 +64,24 @@ export default function OosBacktestChart({ data }: Props) {
     // 同期計算だが「計算中」を先に描画させるため次フレームへ回す
     setTimeout(() => {
       try {
-        const res = runOosBacktest(aligned, {
+        const base = {
           lookback,
           rebalance,
           rf: rfPct / 100,
           covShrinkage: true,
           muShrinkage: true,
           maxWeight: 1,
-        });
+        };
+        const res = runOosBacktest(aligned, base);
         if (!res) setErr(`履歴が不足しています(必要: 推定${lookback}本+検証区間)。期間の長い銘柄で再試行を。`);
         setResult(res);
+        // μ の定義の優劣は理屈で決められないので、同じ窓・同じ乱数条件で算術μ版も走らせる。
+        // 評価側は元から単純リターンの複利なので、算術μは「最適化と評価の物差しが揃う」側。
+        setMuCompare(res ? runOosBacktest(aligned, { ...base, muMode: "arithmetic" }) : null);
       } catch (e) {
         setErr(String((e as Error)?.message || e));
         setResult(null);
+        setMuCompare(null);
       } finally {
         setRunning(false);
       }
@@ -225,6 +233,9 @@ export default function OosBacktestChart({ data }: Props) {
                 </p>
               </div>
 
+              {/* μ の定義（対数平均 vs 算術平均）の OOS 比較。既定を変える判断はここで測る。 */}
+              {muCompare && <MuModeCompare base={result} alt={muCompare} />}
+
               <AnalysisGuide title="アウトオブサンプル検証(ウォークフォワード)の詳細理論">
                 <p className="font-medium text-gray-700">1. 何を見ているか</p>
                 <p>
@@ -265,6 +276,90 @@ export default function OosBacktestChart({ data }: Props) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * μ の定義（対数平均＝既定 vs 算術平均＝教科書）の OOS 比較。
+ *
+ * 在サンプルでは算術μの方が定義上シャープ比が高くなるが、それは当たり前で意味がない
+ * （最大化している目的関数そのもの）。**将来に効くかはウォークフォワードでしか測れない**。
+ * μ に依存するのは接点(最大シャープ)だけで、最小分散・リスクパリティ・逆ボラ・等加重は
+ * Σ だけで決まるため両者で完全に同一。だから比較すべき行は接点の1行。
+ */
+function MuModeCompare({ base, alt }: { base: OosResult; alt: OosResult }) {
+  const pick = (r: OosResult) => r.strategies.find((s) => s.key === "tangency");
+  const a = pick(base);
+  const b = pick(alt);
+  if (!a || !b) return null;
+  const dSharpe = b.sharpe - a.sharpe;
+  const dCagr = b.cagr - a.cagr;
+  const rows = [
+    { label: "接点：μ=対数平均（既定）", s: a, accent: "#2563eb" },
+    { label: "接点：μ=算術平均（教科書）", s: b, accent: "#7c3aed" },
+  ];
+  return (
+    <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+      <div className="text-xs font-semibold text-violet-800">
+        μ の定義を OOS で比較（接点のみ・他の配分則は Σ だけで決まるので不変）
+      </div>
+      <div className="overflow-x-auto mt-1.5">
+        <table className="w-full text-[11px] tabular-nums">
+          <thead>
+            <tr className="text-gray-400 text-left border-b border-violet-200">
+              <th className="py-1 pr-2 font-medium">推定に使った μ</th>
+              <th className="py-1 px-2 font-medium text-right">実現Sharpe</th>
+              <th className="py-1 px-2 font-medium text-right">CAGR</th>
+              <th className="py-1 px-2 font-medium text-right">年率σ</th>
+              <th className="py-1 px-2 font-medium text-right">最大DD</th>
+              <th className="py-1 pl-2 font-medium text-right">回転(片道)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label} className="border-b border-violet-100">
+                <td className="py-1 pr-2 text-gray-700">
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle"
+                    style={{ background: r.accent }}
+                  />
+                  {r.label}
+                </td>
+                <td className="py-1 px-2 text-right font-semibold text-gray-800">{r.s.sharpe.toFixed(2)}</td>
+                <td className={`py-1 px-2 text-right ${r.s.cagr >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {r.s.cagr >= 0 ? "+" : ""}
+                  {(r.s.cagr * 100).toFixed(1)}%
+                </td>
+                <td className="py-1 px-2 text-right text-gray-600">{(r.s.annVol * 100).toFixed(1)}%</td>
+                <td className="py-1 px-2 text-right text-red-500">{(r.s.maxDrawdown * 100).toFixed(1)}%</td>
+                <td className="py-1 pl-2 text-right text-gray-500">{(r.s.turnover * 100).toFixed(0)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-1.5 text-[11px] text-gray-700 tabular-nums">
+        差（算術 − 対数）: Sharpe{" "}
+        <strong className={dSharpe > 0 ? "text-emerald-700" : dSharpe < 0 ? "text-red-700" : ""}>
+          {dSharpe >= 0 ? "+" : ""}
+          {dSharpe.toFixed(3)}
+        </strong>
+        {" ／ "}CAGR{" "}
+        <strong className={dCagr > 0 ? "text-emerald-700" : dCagr < 0 ? "text-red-700" : ""}>
+          {dCagr >= 0 ? "+" : ""}
+          {(dCagr * 100).toFixed(2)}pp
+        </strong>
+      </p>
+      <p className="mt-1 text-[10px] text-gray-500">
+        <strong>読み方</strong>: 在サンプルでは算術μが定義上有利になるので比較の意味がありません
+        （最大化している目的関数そのもの）。<strong>ここは将来側の1本勝負</strong>です。
+        差が符号も含めて安定しない（推定窓・再配分間隔を変えると入れ替わる）なら、
+        <strong>μ の定義は OOS 成績を動かす要因ではない</strong>＝既定を変える理由がない、という結論になります。
+        逆に算術μが安定して勝つなら既定を反転すべきで、そのとき効率的フロンティアの
+        等高線・g・倍化年数も自動的に厳密化されます。推定窓と再配分間隔を数通り変えて
+        <strong>符号の安定性</strong>を確認してください（1つの設定だけで決めないこと）。
+      </p>
     </div>
   );
 }

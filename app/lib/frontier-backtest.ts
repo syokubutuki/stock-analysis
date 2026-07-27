@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { AlignedReturns } from "./portfolio-risk";
-import { estimateWeights, StrategyWeights } from "./efficient-frontier";
+import { estimateWeights, StrategyWeights, type MuMode } from "./efficient-frontier";
 
 const TRADING_DAYS = 252;
 
@@ -22,6 +22,13 @@ export interface OosParams {
   covShrinkage?: boolean;
   muShrinkage?: boolean;
   maxWeight?: number;
+  /**
+   * μ の定義（既定 "log" = 従来）。接点(最大シャープ)にのみ影響し、
+   * 最小分散・リスクパリティ・逆ボラ・等加重は Σ だけで決まるので不変。
+   * 評価側（下の expm1 で単純リターンに戻して複利）は元から算術世界なので、
+   * "arithmetic" にすると「最適化と評価の物差しが揃う」ことになる。
+   */
+  muMode?: MuMode;
 }
 
 export interface OosStrategy {
@@ -42,6 +49,7 @@ export interface OosResult {
   lookback: number;
   rebalance: number;
   nAssets: number;
+  muMode: MuMode; // この検証で接点の推定に使った μ の定義
 }
 
 const STRATS: { key: keyof StrategyWeights; label: string }[] = [
@@ -128,5 +136,13 @@ export function runOosBacktest(aligned: AlignedReturns, params: OosParams): OosR
     return { key: s.key, label: s.label, equity, cagr, annVol, sharpe, maxDrawdown: mdd, turnover };
   });
 
-  return { dates: oosDates, strategies, nRebalances: rebalCount, lookback, rebalance, nAssets: k };
+  return {
+    dates: oosDates,
+    strategies,
+    nRebalances: rebalCount,
+    lookback,
+    rebalance,
+    nAssets: k,
+    muMode: params.muMode ?? "log",
+  };
 }

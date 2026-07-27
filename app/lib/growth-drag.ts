@@ -106,6 +106,31 @@ export interface AnnualStats {
   periods: number; // 標本数 T
 }
 
+/**
+ * 対数リターン列から**算術平均リターン（年率）**を出す。
+ *
+ * ここがこのプロジェクトで最も取り違えやすい一点。`alignReturns` が返すのは対数リターン
+ * なので、その平均×252 は「各銘柄の幾何平均（≒実現した成長率）」であって
+ * 期待リターン μ ではない。両者の差は実測でぴったり σ²/2（σ=34% で 5.9pp、
+ * σ=61% で 18.6pp）あり、**銘柄間でばらつく**ので取り違えると最適化まで歪む。
+ *
+ * 幾何成長率の分解 g ≈ μ_arith − σ_p²/2 に入れるべきなのは必ずこちら。
+ * 対数平均を入れると σ²/2 を二重に引くことになる（実測で 9pp 過小評価）。
+ * 平均は expm1 の標本平均から直接取るので、対数正規の仮定は要らない。
+ */
+export function arithmeticAnnualMeans(
+  returns: number[][],
+  periodsPerYear: number = TRADING_DAYS
+): number[] {
+  return returns.map((r) => {
+    const T = r.length;
+    if (T === 0) return 0;
+    let s = 0;
+    for (let t = 0; t < T; t++) s += Math.expm1(r[t]);
+    return (s / T) * periodsPerYear;
+  });
+}
+
 export function annualStats(
   aligned: AlignedReturns,
   periodsPerYear: number = TRADING_DAYS
@@ -120,16 +145,13 @@ export function annualStats(
   const vol = new Array(n).fill(0);
   if (n === 0 || T < 2) return { tickers, mu, cov, corr, vol, logMean, periods: T };
 
+  // 算術平均は単純リターンから（対数平均を使うと g と μ を取り違える）
+  const muArith = arithmeticAnnualMeans(returns, periodsPerYear);
   const logMeans: number[] = [];
   for (let i = 0; i < n; i++) {
-    // 算術平均は単純リターンから（対数平均を使うと g と μ を取り違える）
-    let sSimple = 0;
     let sLog = 0;
-    for (let t = 0; t < T; t++) {
-      sSimple += Math.expm1(returns[i][t]);
-      sLog += returns[i][t];
-    }
-    mu[i] = (sSimple / T) * periodsPerYear;
+    for (let t = 0; t < T; t++) sLog += returns[i][t];
+    mu[i] = muArith[i];
     logMean[i] = (sLog / T) * periodsPerYear;
     logMeans.push(sLog / T);
   }

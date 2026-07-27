@@ -12,8 +12,23 @@
 // ============================================================================
 
 import { AlignedReturns } from "./portfolio-risk";
+import { arithmeticAnnualMeans } from "./growth-drag";
 
 const TRADING_DAYS = 252;
+
+/**
+ * 期待リターン μ の定義。
+ *
+ *  - "log"        : 対数リターンの平均×252（**これまでの既定**）。各銘柄の幾何平均に相当し、
+ *                   算術平均より σᵢ²/2 低い。高ボラ銘柄が二重に罰せられる（μ でも σ_p でも）ため
+ *                   接点は低ボラ側へ寄る。教科書の平均分散最適化が想定する μ ではない。
+ *  - "arithmetic" : 単純リターン exp(r)−1 の平均×252。教科書の μ。幾何成長率の分解
+ *                   g = wᵀμ − σ_p²/2 に入れて正しい値が出るのはこちら（実測誤差 0.01pp）。
+ *
+ * 既定を "log" のままにしているのは、既存の接点・CML・α・Michaud・OOS の数値と
+ * 過去の判断記録との比較可能性を壊さないため。優劣は OOS 検証（"μ定義を比較"）で測る。
+ */
+export type MuMode = "log" | "arithmetic";
 
 export interface FrontierPoint {
   sigma: number; // 年率ボラ
@@ -36,6 +51,14 @@ export interface EfficientFrontierResult {
   shrinkage: number; // 共分散に加えたリッジ収縮係数 λ (0 なら無し)
   lwShrinkage: number; // Ledoit-Wolf 収縮強度 δ (0〜1, 0なら未適用)
   muShrinkFactor: number; // μ の Bayes-Stein 収縮強度 φ (0〜1, GMVへの引き寄せ度)
+  /** 最適化に使った μ の定義。 */
+  muMode: MuMode;
+  /**
+   * 年率の**算術平均**リターン(生・収縮前)。muMode に依らず常に算術平均が入る。
+   * 真の幾何成長率 g = wᵀmuArith − σ_p²/2 を計算するために公開している
+   * （プロット軸の μ が対数平均のときは軸から g を読めないため）。
+   */
+  muArith: number[];
 
   // A: 閉形式(空売り可)
   curve: { sigma: number; mu: number; efficient: boolean }[]; // efficient=GMVより上(効率的枝)
@@ -371,6 +394,7 @@ export interface FrontierOptions {
   covShrinkage?: boolean; // Ledoit-Wolf 共分散収縮を使う (既定 true)
   muShrinkage?: boolean; // μ の Bayes-Stein 収縮を使う (既定 true)
   maxWeight?: number; // ロングオンリー最適化の1銘柄上限 (0〜1, 既定 1=制約なし)
+  muMode?: MuMode; // μ の定義 (既定 "log" = 従来どおり)
   seed?: number;
 }
 
@@ -393,9 +417,13 @@ export function efficientFrontier(
   const muShrink = opts.muShrinkage ?? true;
   const maxWeight = Math.max(0, Math.min(1, opts.maxWeight ?? 1));
 
-  // 日次平均と年率の生・期待リターン(個別銘柄の散布は生μで表示)
+  // 日次平均。共分散は常に対数リターンから取る（加法性があるのは対数側）。
   const means = returns.map((r) => mean(r));
-  const muRaw = means.map((m) => m * TRADING_DAYS);
+  // μ は定義を選べる。"log" は対数平均×252（従来）、"arithmetic" は expm1 の平均×252。
+  const muMode: MuMode = opts.muMode ?? "log";
+  const muArith = arithmeticAnnualMeans(returns, TRADING_DAYS);
+  const muLog = means.map((m) => m * TRADING_DAYS);
+  const muRaw = muMode === "arithmetic" ? muArith : muLog;
 
   // 年率共分散行列 Σ。既定は Ledoit-Wolf 収縮(恒等ターゲット)で常時安定化する。
   let lwDelta = 0;
@@ -604,6 +632,8 @@ export function efficientFrontier(
     shrinkage: lambda,
     lwShrinkage: lwDelta,
     muShrinkFactor,
+    muMode,
+    muArith,
     curve,
     gmv,
     tangency,
@@ -641,21 +671,26 @@ export interface EstimatedModel {
   S: number[][]; // 年率共分散(収縮後)
   mu: number[]; // 年率期待リターン(Bayes-Stein収縮後)
   muRaw: number[]; // 年率期待リターン(生)
+  /** 年率の算術平均リターン(生)。muMode に依らず常に算術平均。実現 g の採点用。 */
+  muArith: number[];
+  muMode: MuMode;
 }
 
 // 共分散(Ledoit-Wolf)・μ(Bayes-Stein)を推定してモデルを返す。特異なら null。
 export function buildModel(
   returns: number[][],
-  opts: { covShrinkage?: boolean; muShrinkage?: boolean } = {}
+  opts: { covShrinkage?: boolean; muShrinkage?: boolean; muMode?: MuMode } = {}
 ): EstimatedModel | null {
   const k = returns.length;
   const T = returns[0]?.length ?? 0;
   if (k < 2 || T < 12) return null;
   const covShrink = opts.covShrinkage ?? true;
   const muShrink = opts.muShrinkage ?? true;
+  const muMode: MuMode = opts.muMode ?? "log";
 
   const means = returns.map((r) => mean(r));
-  const muRaw = means.map((m) => m * TRADING_DAYS);
+  const muArith = arithmeticAnnualMeans(returns, TRADING_DAYS);
+  const muRaw = muMode === "arithmetic" ? muArith : means.map((m) => m * TRADING_DAYS);
 
   let SigmaDaily: number[][];
   if (covShrink) {
@@ -699,7 +734,7 @@ export function buildModel(
     const phi = qDaily > 0 ? Math.max(0, Math.min(1, (k + 2) / (k + 2 + T * qDaily))) : 0;
     mu = muRaw.map((m) => (1 - phi) * m + phi * muGmv0);
   }
-  return { k, T, S, mu, muRaw };
+  return { k, T, S, mu, muRaw, muArith, muMode };
 }
 
 // モデルから各配分則のウェイトを解く。
@@ -740,7 +775,7 @@ export function weightsFromModel(
 export function estimateWeights(
   returns: number[][],
   rf: number,
-  opts: { covShrinkage?: boolean; muShrinkage?: boolean; maxWeight?: number } = {},
+  opts: { covShrinkage?: boolean; muShrinkage?: boolean; maxWeight?: number; muMode?: MuMode } = {},
   warm?: { tangency?: number[]; minVar?: number[] }
 ): StrategyWeights | null {
   const model = buildModel(returns, opts);

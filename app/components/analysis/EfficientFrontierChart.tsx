@@ -8,6 +8,7 @@ import {
   efficientFrontier,
   EfficientFrontierResult,
   PortfolioPoint,
+  type MuMode,
 } from "../../lib/efficient-frontier";
 import {
   geometricGrowth,
@@ -133,6 +134,21 @@ const ISO_COLOR = "#a5b4fc";
 const ISO_LABEL = "#6366f1";
 const GROWTH_COLOR = "#7c3aed";
 
+/**
+ * 真の幾何成長率 g = wᵀμ_arith − σ_p²/2。
+ *
+ * プロット軸の μ が対数平均（muMode="log"）のとき、軸から g を読むと σ²/2 を
+ * 二重に引くことになる。実測での過小評価は 9.07pp（等加重の実現成長率 31.14% に対し、
+ * 正しい式 31.15% / 対数μ版 22.07%）。倍化年数に翻訳するとこの差は年数で効くので、
+ * 表と要約は必ず算術μから計算したこちらを出す。
+ * muMode="arithmetic" のときは軸の μ と一致するので両者は同じ値になる。
+ */
+function trueGrowth(point: { weights: number[]; sigma: number }, muArith: number[]): number {
+  let m = 0;
+  for (let i = 0; i < point.weights.length; i++) m += point.weights[i] * (muArith[i] ?? 0);
+  return m - (point.sigma * point.sigma) / 2;
+}
+
 // ラベルの白フチ縁取り。雲の点や等高線に重なっても読めるようにする。
 function outlinedText(
   ctx: CanvasRenderingContext2D,
@@ -158,6 +174,9 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
   const [maxWeightPct, setMaxWeightPct] = useState(100); // 1銘柄上限(%)。100=制約なし
   const [showBaselines, setShowBaselines] = useState(true); // 比較ベースラインの表示
   const [showIso, setShowIso] = useState(true); // G6: iso-growth 等高線と最大成長点
+  // μ の定義。既定は "log"（従来の数値を変えない）。"arithmetic" は教科書の μ で、
+  // 等高線・g・倍化年数が軸と厳密に整合する。優劣は OOS 検証で測る。
+  const [muMode, setMuMode] = useState<MuMode>("log");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number; vol: number; ret: number } | null>(null);
 
@@ -180,8 +199,9 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       covShrinkage: useLW,
       muShrinkage: useMuShrink,
       maxWeight: maxWeightPct / 100,
+      muMode,
     });
-  }, [data, win, rfPct, useLW, useMuShrink, maxWeightPct]);
+  }, [data, win, rfPct, useLW, useMuShrink, maxWeightPct, muMode]);
 
   // ベンチマーク指数の単独リスク/リターン点(σ-μ平面への参照重ね)。
   // 最適化には混ぜず、指数自身の直近 win 本から年率化する。
@@ -282,7 +302,15 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     ctx.save();
     ctx.translate(12, PAD.top + plotH / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("年率期待リターン μ", 0, 0);
+    // 軸の μ が「対数平均（各銘柄の幾何平均に相当）」なのか「算術平均（教科書の μ）」なのかを
+    // 軸に明記する。ここを「期待リターン」と一言で書くと 9pp のズレが誤読される。
+    ctx.fillText(
+      result.muMode === "arithmetic"
+        ? "年率期待リターン μ（算術平均）"
+        : "年率リターン μ（対数平均＝各銘柄の幾何平均）",
+      0,
+      0
+    );
     ctx.restore();
 
     // ラベルの占有矩形。以降のラベルはこれと衝突しない位置を選ぶ（重なりの根絶）。
@@ -746,6 +774,20 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   <input type="checkbox" checked={showIso} onChange={(e) => setShowIso(e.target.checked)} />
                   <span>成長率の等高線 g=μ−σ²/2 と最大成長点</span>
                 </label>
+                <label
+                  className="flex items-center gap-1.5 cursor-pointer select-none"
+                  title="μ を対数平均(従来)から算術平均(教科書の定義)へ切り替える。接点・CML・α・雲がすべて動く実験的トグル。"
+                >
+                  <input
+                    type="checkbox"
+                    checked={muMode === "arithmetic"}
+                    onChange={(e) => setMuMode(e.target.checked ? "arithmetic" : "log")}
+                  />
+                  <span>
+                    μ を<strong>算術平均</strong>で最適化
+                    <span className="text-gray-400">（実験・既定オフ）</span>
+                  </span>
+                </label>
                 <span className="flex items-center gap-1.5">
                   <span className="font-medium">1銘柄上限</span>
                   <input
@@ -819,28 +861,52 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                     この等高線群を<strong>下向きに横切る</strong>——つまり右上へ行くほど g は下がります。
                     濃い紫の破線が実現可能領域に<strong>接する</strong>点（▲）が、実際に資産が最も速く増える配分です。
                   </p>
-                  <p className="mt-1.5 tabular-nums">
-                    ★接点(最大シャープ)：μ {(result.tangencyLongOnly.mu * 100).toFixed(1)}% / σ{" "}
-                    {(result.tangencyLongOnly.sigma * 100).toFixed(1)}% /{" "}
-                    <strong>g {(geometricGrowth(result.tangencyLongOnly.mu, result.tangencyLongOnly.sigma) * 100).toFixed(1)}%</strong>{" "}
-                    （2倍まで{" "}
-                    {yearsLabel(doublingYears(geometricGrowth(result.tangencyLongOnly.mu, result.tangencyLongOnly.sigma)))}）
-                    <br />▲最大成長点：μ {(result.maxGrowthLongOnly.mu * 100).toFixed(1)}% / σ{" "}
-                    {(result.maxGrowthLongOnly.sigma * 100).toFixed(1)}% /{" "}
-                    <strong className="text-violet-800">
-                      g {(geometricGrowth(result.maxGrowthLongOnly.mu, result.maxGrowthLongOnly.sigma) * 100).toFixed(1)}%
-                    </strong>{" "}
-                    （2倍まで{" "}
-                    {yearsLabel(doublingYears(geometricGrowth(result.maxGrowthLongOnly.mu, result.maxGrowthLongOnly.sigma)))}）
-                  </p>
-                  <p className="mt-1.5 text-[10px] text-gray-500">
-                    ★と▲が離れているほど「シャープ比の最良」と「増える速さの最良」が食い違っています。
-                    2つが一致するのは Rf=0 かつレバレッジ自由のときだけで、
-                    <strong>シャープ比は成長率の代理指標にすぎません</strong>。
-                    なお ▲ は<strong>フル投資(Σw=1・現金なし)</strong>の中での最速点です。現金を混ぜられるなら
-                    最大成長は「接点 × ケリー比率 λ*=(μ−Rf)/σ²」で達成され、そちらの方が上に来ます
-                    （その扱いは「相関だけを動かす：三本の崖」パネル）。
-                  </p>
+                  {(() => {
+                    const tan = result.tangencyLongOnly;
+                    const grw = result.maxGrowthLongOnly;
+                    const gAxisTan = geometricGrowth(tan.mu, tan.sigma);
+                    const gAxisGrw = geometricGrowth(grw.mu, grw.sigma);
+                    const gTrueTan = trueGrowth(tan, result.muArith);
+                    const gTrueGrw = trueGrowth(grw, result.muArith);
+                    const logMode = result.muMode === "log";
+                    return (
+                      <>
+                        <p className="mt-1.5 tabular-nums">
+                          ★接点(最大シャープ)：μ {(tan.mu * 100).toFixed(1)}% / σ{" "}
+                          {(tan.sigma * 100).toFixed(1)}% /{" "}
+                          <strong>真の g {(gTrueTan * 100).toFixed(1)}%</strong>（2倍まで{" "}
+                          {yearsLabel(doublingYears(gTrueTan))}）
+                          <br />▲最大成長点：μ {(grw.mu * 100).toFixed(1)}% / σ{" "}
+                          {(grw.sigma * 100).toFixed(1)}% /{" "}
+                          <strong className="text-violet-800">
+                            真の g {(gTrueGrw * 100).toFixed(1)}%
+                          </strong>
+                          （2倍まで {yearsLabel(doublingYears(gTrueGrw))}）
+                        </p>
+                        {logMode && (
+                          <p className="mt-1 text-[10px] text-amber-700 tabular-nums">
+                            ※ 上の g は<strong>算術平均 μ から計算した真の成長率</strong>です。
+                            いまの軸（対数平均 μ）から等高線を読むと ★{(gAxisTan * 100).toFixed(1)}% /
+                            ▲{(gAxisGrw * 100).toFixed(1)}% と{" "}
+                            <strong>
+                              {((gTrueGrw - gAxisGrw) * 100).toFixed(1)}pp ほど低く
+                            </strong>
+                            出ます（σ²/2 を二重に引くため）。
+                            <strong>等高線から読める g は下限</strong>だと思ってください。
+                            上の「μ を算術平均で最適化」を入れると軸と g が厳密に一致します。
+                          </p>
+                        )}
+                        <p className="mt-1.5 text-[10px] text-gray-500">
+                          ★と▲が離れているほど「シャープ比の最良」と「増える速さの最良」が食い違っています。
+                          2つが一致するのは Rf=0 かつレバレッジ自由のときだけで、
+                          <strong>シャープ比は成長率の代理指標にすぎません</strong>。
+                          なお ▲ は<strong>フル投資(Σw=1・現金なし)</strong>の中での最速点です。現金を混ぜられるなら
+                          最大成長は「接点 × ケリー比率 λ*=(μ−Rf)/σ²」で達成され、そちらの方が上に来ます
+                          （その扱いは「相関だけを動かす：三本の崖」パネル）。
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -859,6 +925,8 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
               {/* ベースラインとの比較(在サンプル位置) */}
               {showBaselines && (
                 <BaselineTable
+                  muArith={result.muArith}
+                  muMode={result.muMode}
                   rows={[
                     result.tangencyLongOnly
                       ? { label: "接点(空売り無し)", point: result.tangencyLongOnly, accent: "#dc2626" }
@@ -979,16 +1047,65 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                     （▲はあくまで<strong>現金なし</strong>の制約下の最速点）。
                   </li>
                   <li>
-                    <strong>μ の定義について（重要な注記）</strong>: このパネルの μ は対数リターンの平均を
-                    年率化したもので、厳密な算術平均より {" σ²/2 "} 程度小さい保守側の量です。
-                    したがって等高線から読む g は<strong>実際の幾何成長率より控えめ</strong>になります。
-                    実データの厳密な3項分解（算術 μ と対数 Σ を使い分けたもの）は
-                    「相関が食べた分：期待リターンと『実際に増える速さ』のズレ」パネルを参照してください。
-                    等高線の<strong>形と、★≠▲という結論はこの定義差に依存しません</strong>。
+                    <strong>μ の定義（このパネルで最も注意が要る点）</strong>: 既定の軸の μ は
+                    <strong>対数リターンの平均×252</strong>で、これは各銘柄の
+                    <strong>幾何平均</strong>に相当します（教科書の平均分散最適化が想定する算術平均 μ
+                    ではありません）。両者の差は実測でぴったり {" σᵢ²/2 "}。詳細は次項。
                   </li>
                 </ul>
 
-                <p className="font-medium text-gray-700 mt-3">8. 注意点</p>
+                <p className="font-medium text-gray-700 mt-3">
+                  8. 対数平均 μ と算術平均 μ（実測値つき）
+                </p>
+                <p>
+                  {" alignReturns "} が返すのは<strong>対数リターン</strong>なので、その平均×252 は
+                  「実現した成長率」であって期待リターンではありません。日本株4銘柄・732営業日で
+                  実測すると:
+                </p>
+                <p className="font-mono text-[11px] bg-white rounded px-2 py-1 whitespace-pre-wrap">
+                  {`銘柄     σ      μ_log   μ_arith   差
+7203.T  34.4%   11.4%   17.3%   +5.9pp
+6758.T  34.2%   11.1%   17.0%   +5.9pp
+9984.T  60.9%   38.4%   57.0%  +18.6pp
+8306.T  34.5%   46.8%   52.7%   +5.9pp`}
+                </p>
+                <p>
+                  差は {" σᵢ²/2 "} にぴったり一致します。効くのは水準ではなく
+                  <strong>銘柄間のばらつき（ここでは 12.7pp）</strong>で、高ボラ銘柄が
+                  「μ でも σ_p でも」二重に罰せられるため接点が低ボラ側へ寄ります。
+                </p>
+                <p>
+                  <strong>どちらの式が現実を当てるか</strong>——等加重(日次リバランス)の
+                  実現年率成長率を直接複利計算して照合しました:
+                </p>
+                <p className="font-mono text-[11px] bg-white rounded px-2 py-1 whitespace-pre-wrap">
+                  {`実現値（実際に複利した結果）      31.14%  ← 正解
+wᵀμ_arith − σ_p²/2（正しい式）    31.15%  誤差 +0.01pp
+wᵀμ_log  − σ_p²/2（対数μで計算）  22.07%  誤差 −9.07pp
+wᵀμ_log （引き算なし）            26.90%  誤差 −4.24pp`}
+                </p>
+                <p>
+                  正しい式は<strong>0.01pp で当てます</strong>。対数 μ に {" −σ_p²/2 "} を
+                  かけるのは σ²/2 の<strong>二重引き</strong>で 9pp 過小、逆に引き算を省くと
+                  ポートフォリオ水準のイェンセン差で 4pp 過大。だから
+                  <strong>表と要約の g は必ず算術 μ から計算</strong>しています。
+                </p>
+                <p>
+                  <strong>ではなぜ既定を対数 μ のままにしているのか</strong>。接点への影響を
+                  同じ実データで測ると、ウェイトは {" L1/2 = 36.6% "} も動くのに、
+                  同一物差し（算術シャープ）での損失は <strong>0.024</strong>
+                  （1.609 → 1.634、相対1.5%）しかありませんでした。平均分散最適化の
+                  <strong>「最適解が平坦」</strong>という性質です。
+                  ウェイトが大きく動いて目的関数がほとんど改善しないのは<strong>推定ノイズの兆候</strong>で、
+                  算術 μ の方が標本分散も大きい。しかも Bayes-Stein 収縮（既定オン・実測 φ≈0.83）が
+                  μ のばらつきを 17% に潰すので、実際の差はさらに小さくなります。
+                  したがって<strong>理屈で決めず、下の「OOSウォークフォワード検証」の
+                  「μ定義を比較」で実測してから既定を変える</strong>方針です。
+                  「μ を算術平均で最適化」を入れれば、等高線・g・倍化年数が軸と厳密に整合した状態を
+                  すぐ確認できます（接点・CML・α・雲もすべて動きます）。
+                </p>
+
+                <p className="font-medium text-gray-700 mt-3">9. 注意点</p>
                 <ul className="list-disc pl-4 space-y-1">
                   <li><strong>期待リターン μ の推定は極めて不安定</strong>。過去平均をそのまま使うフロンティア(特に接点)は将来に外れやすく、過学習しやすい。実務では GMV やリスクパリティの方が頑健なことが多い。</li>
                   <li>銘柄数が標本数に近い・高相関だと Σ が特異に近づき逆行列が暴れる。本実装は必要時に対角へ収縮(リッジ λ)を加えて安定化する(ヘッダに λ 表示)。</li>
@@ -1007,7 +1124,15 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
 }
 
 // 各配分則の在サンプル位置(σ/μ/Sharpe と有効銘柄数)を並べて比較する表。
-function BaselineTable({ rows }: { rows: { label: string; point: PortfolioPoint; accent: string }[] }) {
+function BaselineTable({
+  rows,
+  muArith,
+  muMode,
+}: {
+  rows: { label: string; point: PortfolioPoint; accent: string }[];
+  muArith: number[];
+  muMode: MuMode;
+}) {
   // 有効銘柄数 = 逆ハーフィンダール指数(集中度の逆数)。分散の効き具合の目安。
   const effN = (w: number[]) => {
     const s = w.reduce((a, b) => a + Math.abs(b), 0) || 1;
@@ -1024,15 +1149,16 @@ function BaselineTable({ rows }: { rows: { label: string; point: PortfolioPoint;
             <th className="py-1 px-2 font-medium text-right">μ</th>
             <th className="py-1 px-2 font-medium text-right">σ</th>
             <th className="py-1 px-2 font-medium text-right">Sharpe</th>
-            {/* G6: シャープ比の隣に「実際に増える速さ」を必ず並べる(docs §S3) */}
-            <th className="py-1 px-2 font-medium text-right">g=μ−σ²/2</th>
+            {/* G6: シャープ比の隣に「実際に増える速さ」を必ず並べる(docs §S3)。
+                g は必ず算術μから計算した真の値（対数μで計算すると 9pp 過小になる）。 */}
+            <th className="py-1 px-2 font-medium text-right">真の g</th>
             <th className="py-1 px-2 font-medium text-right">2倍まで</th>
             <th className="py-1 pl-2 font-medium text-right">有効銘柄数</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => {
-            const g = geometricGrowth(r.point.mu, r.point.sigma);
+            const g = trueGrowth(r.point, muArith);
             return (
               <tr key={r.label} className="border-b border-gray-100">
                 <td className="py-1 pr-2 text-gray-700">
@@ -1055,6 +1181,15 @@ function BaselineTable({ rows }: { rows: { label: string; point: PortfolioPoint;
       <p className="text-[10px] text-gray-400 mt-1">
         在サンプル(過去)での位置。<strong>1/N は理論最適を実運用でしばしば上回る</strong>ため、真の優劣は下のアウトオブサンプル検証で確認を。有効銘柄数=分散が実質何銘柄に効いているか。
         <strong>Sharpe が最良の行と g が最良の行は一致しません</strong>——長期の資産の伸びを決めるのは g のほう(倍化年数 ln2/g)。
+        <br />
+        「真の g」＝ {" wᵀμ_arith − σ_p²/2 "}（<strong>算術平均 μ から計算</strong>）。
+        {muMode === "log" && (
+          <>
+            {" "}
+            μ 列は<strong>対数平均</strong>なので、μ 列から {" μ−σ²/2 "} を暗算すると
+            σ²/2 を二重に引いて g を過小評価します（実データで約 9pp）。
+          </>
+        )}
       </p>
     </div>
   );
