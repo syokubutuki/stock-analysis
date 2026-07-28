@@ -8,9 +8,17 @@
 //   U3 エルゴード性デモ    Peters のコイン投げ。100人が1回 vs 1人が100回。
 //   T2 ±x% 往復表         振れ幅の二乗で減ることを表で確認する。
 //
-// このパネルだけは**実データを一切使わない**（仕様書 §10.2「データ不要・常時表示可」）。
-// 相関も銘柄数も出てこない。ここで扱うのは「算術平均と幾何平均は別物」という 1 点だけで、
+// ここで扱うのは「算術平均と幾何平均は別物」という 1 点だけで、
 // pf-corr-drag（相関だけを動かす）／pf-growth-drag（実データの3項分解）の土台になる。
+//
+// **合成の体感層と実データをつなぐ橋**（data を渡したときだけ出る）:
+//   合成データだけで手を動かさせても「自分の話」にならない、という指摘への対応。
+//   ウォッチリストの実測 σ_p を ①の振れ幅に流し込むボタンを 2 つ置く。
+//     「実際のあなた」   ＝ 実測の相関込みの σ_p
+//     「相関ゼロなら」   ＝ 同じ銘柄・同じ σ で相関だけ 0 にした σ_p（＝√(2·単独ドラッグ)）
+//   1回＝1年と読ませる。±σ を交互に押したときの1回あたりの目減り √(1−σ²)−1 ≈ −σ²/2 が、
+//   そのまま年率のボラティリティ税になるので、ゲームの目減り＝実際に払っている税になる。
+//   data が無ければ従来どおり合成のみで完結する（仕様書 §10.2「データ不要・常時表示可」）。
 //
 // 描画方式（仕様書 §10.3 / CLAUDE.md の規約）:
 //   U2 の資産曲線     横軸は「クリック回数」で日付ではない → Canvas2D
@@ -21,7 +29,16 @@
 // 乱数は growth-drag.ts の mulberry32 を import して使う（同じ手続きを二重定義しない）。
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { doublingYearsLabel, doublingYears, mulberry32 } from "../../lib/growth-drag";
+import { PortfolioData } from "../../hooks/usePortfolioData";
+import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
+import { alignReturns } from "../../lib/portfolio-risk";
+import {
+  annualStats,
+  decomposeDrag,
+  doublingYearsLabel,
+  doublingYears,
+  mulberry32,
+} from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -36,9 +53,26 @@ const PEOPLE = 100;
 const TOSSES = 100;
 /** T2 の既定行（仕様書 §T2）。 */
 const T2_SWINGS = [10, 20, 30, 50];
+/** 振れ幅スライダーの範囲。下限が 1 なのは、よく分散したポートフォリオの σ_p を丸めずに置くため。 */
+const SWING_MIN = 1;
+const SWING_MAX = 50;
 
 const manYen = (v: number) => `${(v / 10000).toFixed(1)}万円`;
 const signPct = (v: number, d = 1) => `${v >= 0 ? "+" : "−"}${(Math.abs(v) * 100).toFixed(d)}%`;
+/** 年率ボラ(小数) → ゲームの振れ幅(%・整数)。1回＝1年として読ませる。 */
+const swingFromSigma = (sigma: number) =>
+  Math.max(SWING_MIN, Math.min(SWING_MAX, Math.round(sigma * 100)));
+/** ±x% を1往復したときの1回あたりの目減り（厳密値 √(1−x²)−1）。 */
+const dragPerStep = (swingPct: number) => Math.sqrt(1 - (swingPct / 100) ** 2) - 1;
+
+interface Props {
+  /** 渡すと①のゲームを実測 σ_p で回せるようになる。無ければ従来どおり合成のみ。 */
+  data?: PortfolioData;
+  horizon?: Horizon;
+}
+
+/** ①のゲームの振れ幅をどこから取っているか。 */
+type SwingSource = "manual" | "actual" | "nocorr";
 
 // Canvas 初期化（CLAUDE.md のパターン / DPR スケール）
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
@@ -91,13 +125,60 @@ function binomUpperTail(n: number, h: number): number {
   return Math.min(1, Math.max(0, acc));
 }
 
-export default function GrowthIntuitionPanel() {
+export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props = {}) {
+  // ══════════════════════════════════════════════════════════════════════════
+  // 実測（data を渡されたときだけ）── ①のゲームを「自分のポートフォリオ」で回すための橋
+  // ══════════════════════════════════════════════════════════════════════════
+  // 等ウェイトで揃えるのは、ここで見せたいのが「相関だけの効き」だからで、
+  // 建玉ウェイトでの分解は pf-growth-drag（YourPortfolioDragPanel）の担当。
+  const measured = useMemo(() => {
+    if (!data) return null;
+    const series = Object.entries(data)
+      .filter(([, v]) => v.prices.length > 2)
+      .map(([ticker, v]) => ({ ticker, prices: v.prices }));
+    if (series.length < 2) return null;
+    const aligned = alignReturns(series, HORIZON_CONFIG[horizon].window);
+    if (aligned.tickers.length < 2) return null;
+
+    const st = annualStats(aligned);
+    const n = aligned.tickers.length;
+    const d = decomposeDrag(st.mu, st.cov, new Array(n).fill(1 / n));
+    if (!d.ok) return null;
+
+    // 単独ドラッグ Σw²σ²/2 は「相関がゼロだったときの σ_p²/2」そのものなので、
+    // √(2·単独ドラッグ) が相関ゼロの σ_p になる（相関ドラッグを差し引いた姿）。
+    const sigmaNoCorr = Math.sqrt(Math.max(2 * d.soloDrag, 0));
+    const swingActual = swingFromSigma(d.sigmaP);
+    const swingNoCorr = swingFromSigma(sigmaNoCorr);
+    return {
+      n,
+      periods: st.periods,
+      rho: d.avgCorr,
+      nEff: d.nEff,
+      sigmaActual: d.sigmaP,
+      sigmaNoCorr,
+      swingActual,
+      swingNoCorr,
+      // ゲームの目減り比＝(振れ幅の比)²。表示は丸めた振れ幅どうしで揃える（表と食い違わせない）。
+      dragActual: dragPerStep(swingActual),
+      dragNoCorr: dragPerStep(swingNoCorr),
+    };
+  }, [data, horizon]);
+
   // ══════════════════════════════════════════════════════════════════════════
   // U2 ±10%ゲーム
   // ══════════════════════════════════════════════════════════════════════════
-  const [swingPct, setSwingPct] = useState(10); // 振れ幅スライダー（5%〜50%・仕様書 §U2）
+  const [swingPct, setSwingPct] = useState(10); // 振れ幅スライダー（仕様書 §U2）
+  const [swingSource, setSwingSource] = useState<SwingSource>("manual");
   const [moves, setMoves] = useState<number[]>([]); // +1 = 上げ / −1 = 下げ
   const x = swingPct / 100;
+
+  /** 実測値をゲームに流し込む。押した履歴は残す（同じ押し方のまま振れ幅だけ入れ替わる）。 */
+  const applyMeasured = (src: "actual" | "nocorr") => {
+    if (!measured) return;
+    setSwingPct(src === "actual" ? measured.swingActual : measured.swingNoCorr);
+    setSwingSource(src);
+  };
 
   const game = useMemo(() => {
     const path = [CAPITAL];
@@ -185,8 +266,14 @@ export default function GrowthIntuitionPanel() {
   // T2 ±x% 往復表
   // ══════════════════════════════════════════════════════════════════════════
   const t2Rows = useMemo(() => {
-    const list = [...T2_SWINGS];
-    if (!list.includes(swingPct)) list.push(swingPct);
+    // 実測が使えるときは「実際のあなた」と「相関ゼロなら」を同じ表に並べる。
+    // ①で体感した振れ幅が、表の中でそのまま金額になって出てくるのが要点。
+    const notes = new Map<number, string>();
+    if (measured) {
+      notes.set(measured.swingNoCorr, "相関ゼロなら");
+      notes.set(measured.swingActual, "実際のあなた");
+    }
+    const list = [...new Set([...T2_SWINGS, ...notes.keys(), swingPct])];
     list.sort((a, b) => a - b);
     return list.map((p) => {
       const s = p / 100;
@@ -201,9 +288,10 @@ export default function GrowthIntuitionPanel() {
         perStep: Math.sqrt(two) - 1, // 1回あたりの実質（幾何）
         approx: -(s * s) / 2, // 近似 −x²/2
         isCurrent: p === swingPct,
+        note: notes.get(p) ?? "",
       };
     });
-  }, [swingPct]);
+  }, [swingPct, measured]);
 
   return (
     <div className="space-y-6">
@@ -218,6 +306,73 @@ export default function GrowthIntuitionPanel() {
           ボタンを交互に押してください。上に出ている「あなたの平均リターン」は 0.0% を指し続けます。
           それでも資産は元本を割っていきます。<strong>これが算術平均と幾何平均の違いの全部です。</strong>
         </p>
+
+        {/* ── 実測 σ_p をゲームに流し込む橋（data があるときだけ） ─────────── */}
+        {measured && (
+          <div className="mt-2 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+            <div className="text-xs font-semibold text-gray-800">
+              このゲームを、あなたのウォッチリスト {measured.n} 銘柄で回す
+            </div>
+            <p className="mt-0.5 text-[11px] text-gray-600">
+              <strong>1回押す＝1年</strong>。振れ幅を実測値に入れ替えます（等ウェイト・直近
+              {measured.periods}日・年率）。押した履歴はそのまま残るので、
+              <strong>同じ押し方のまま線がどれだけ下に沈むか</strong>を見てください。
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => applyMeasured("actual")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                  swingSource === "actual"
+                    ? "bg-red-600 text-white border-red-600"
+                    : "bg-white text-red-700 border-red-300 hover:bg-red-50"
+                }`}
+              >
+                実際のあなた ±{measured.swingActual}%
+              </button>
+              <button
+                onClick={() => applyMeasured("nocorr")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                  swingSource === "nocorr"
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                }`}
+              >
+                もし相関がゼロだったら ±{measured.swingNoCorr}%
+              </button>
+              {swingSource !== "manual" && (
+                <button
+                  onClick={() => {
+                    setSwingPct(10);
+                    setSwingSource("manual");
+                  }}
+                  className="px-2 py-1 rounded-lg border border-gray-300 bg-white text-gray-600 text-[11px] hover:bg-gray-50"
+                >
+                  ±10% に戻す
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-gray-700">
+              <strong>銘柄は同じ {measured.n} 本、1銘柄ずつの荒さも同じ</strong>です。違うのは相関だけ
+              （実測 ρ = <strong className="tabular-nums">{measured.rho.toFixed(2)}</strong>）。
+              それだけで1年の振れ幅が ±{measured.swingNoCorr}% → ±{measured.swingActual}% になり、
+              1年あたりの目減りは{" "}
+              <strong className="tabular-nums">{signPct(measured.dragNoCorr, 2)}</strong> →{" "}
+              <strong className="text-red-700 tabular-nums">
+                {signPct(measured.dragActual, 2)}
+              </strong>
+              {measured.dragNoCorr < -1e-9 && (
+                <>
+                  {" "}（
+                  <strong className="text-red-700">
+                    {(measured.dragActual / measured.dragNoCorr).toFixed(1)} 倍
+                  </strong>
+                  ）
+                </>
+              )}
+              。<strong>この差が、相関に払っている分です。</strong>
+            </p>
+          </div>
+        )}
 
         <div className="mt-2 rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
           {/* 常時表示する「平均リターン」と資産 */}
@@ -298,11 +453,14 @@ export default function GrowthIntuitionPanel() {
               <span className="text-gray-500">振れ幅</span>
               <input
                 type="range"
-                min={5}
-                max={50}
+                min={SWING_MIN}
+                max={SWING_MAX}
                 step={1}
                 value={swingPct}
-                onChange={(e) => setSwingPct(Number(e.target.value))}
+                onChange={(e) => {
+                  setSwingPct(Number(e.target.value));
+                  setSwingSource("manual");
+                }}
                 className="w-32 accent-blue-600"
               />
               <span className="w-9 text-right tabular-nums font-semibold">{swingPct}%</span>
@@ -316,8 +474,17 @@ export default function GrowthIntuitionPanel() {
         <p className="mt-1 text-[11px] text-gray-500">
           灰色の破線＝「平均リターンどおりに複利で増えたつもりの線」。交互に押していると平均は 0% なので
           この線は元本の高さで水平のままです。<strong>青い実線（実際の資産）はその下へ沈み続けます。</strong>
-          振れ幅を大きくすると沈み方が急に速くなります——減り方は振れ幅の
-          <strong>二乗</strong>で効くからです（{`x²/2`}）。
+          振れ幅を大きくすると、沈み方は急に速くなります——
+          <strong>振れ幅が3倍になると、目減りは9倍</strong>です。
+          {swingSource !== "manual" && measured && (
+            <>
+              {" "}いま押しているのは
+              <strong className={swingSource === "actual" ? "text-red-700" : "text-emerald-700"}>
+                {swingSource === "actual" ? "あなたの実測の振れ幅" : "相関がゼロだった場合の振れ幅"}
+              </strong>
+              （±{swingPct}%・1回＝1年）。10回押せば、それがあなたの10年です。
+            </>
+          )}
         </p>
       </div>
 
@@ -403,6 +570,15 @@ export default function GrowthIntuitionPanel() {
         <p className="mt-0.5 text-[11px] text-gray-500">
           上がって、同じ率だけ下がる。算術平均は全部ゼロです。それでも資産は必ず減り、
           <strong>減り方は振れ幅の二乗で効きます</strong>。元本 {manYen(CAPITAL)}。
+          {measured && (
+            <>
+              {" "}
+              <strong className="text-emerald-700">相関ゼロなら</strong>の行と
+              <strong className="text-red-700">実際のあなた</strong>の行が、
+              あなたのウォッチリストの実測値です。
+              <strong>この2行の「10回後」の金額差が、相関に払っている10年分</strong>。
+            </>
+          )}
         </p>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-xs border-collapse">
@@ -430,6 +606,15 @@ export default function GrowthIntuitionPanel() {
                     <span className="text-green-700">+{r.swing}%</span>
                     <span className="text-gray-400"> / </span>
                     <span className="text-red-700">−{r.swing}%</span>
+                    {r.note && (
+                      <span
+                        className={`ml-1.5 text-[10px] font-semibold ${
+                          r.note === "実際のあなた" ? "text-red-700" : "text-emerald-700"
+                        }`}
+                      >
+                        {r.note}
+                      </span>
+                    )}
                     {r.isCurrent && (
                       <span className="ml-1.5 text-[10px] text-blue-600 font-normal">← 上のゲーム</span>
                     )}
@@ -467,8 +652,10 @@ export default function GrowthIntuitionPanel() {
       <AnalysisGuide title="算術平均と幾何平均・ボラティリティ税・エルゴード性の詳細理論">
         <p className="font-medium text-gray-700">1. 手法の概要</p>
         <p>
-          このパネルは<strong>実データを使いません</strong>。扱うのは
-          「<strong>平均という言葉が2種類ある</strong>」という 1 点だけです。
+          このパネルの中身は<strong>合成データ</strong>です。扱うのは
+          「<strong>平均という言葉が2種類ある</strong>」という 1 点だけ。
+          ただし①のゲームだけは、<strong>あなたのウォッチリストの実測ボラを振れ幅に流し込めます</strong>
+          （緑の枠のボタン）。合成の体感と自分のポートフォリオを、同じ1つの操作でつなぐためです。
         </p>
         <p>
           「期待リターン」は<strong>足し算の世界</strong>の言葉です。100人が1回ずつ賭けたときの、
@@ -645,9 +832,25 @@ export default function GrowthIntuitionPanel() {
         <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
-            <strong>ここは合成データ・思考実験です</strong>。振れ幅もコインの倍率もあなたが選んだ前提で、
-            実測値ではありません。実データでの分解は
+            <strong>②③とコインの倍率は合成データ・思考実験です</strong>。あなたが選んだ前提であり、
+            実測値ではありません。実データでの完全な分解は
             「相関が食べた分：期待リターンと『実際に増える速さ』のズレ」パネルを見てください。
+          </li>
+          <li>
+            <strong>①の実測ボタンは「1回＝1年」という読み替えの上に立っています</strong>。
+            ±σ_p を交互に押すと1回あたり {" √(1−σ_p²)−1 ≈ −σ_p²/2 "} 減り、これが年率の
+            ボラティリティ税に一致するので成り立つ対応です。<strong>実際の1年は ±σ_p ちょうどには
+            動きません</strong>——上下同率・等確率という単純化であり、実現パスの再現ではありません。
+          </li>
+          <li>
+            <strong>「相関ゼロなら」は達成可能な目標ではありません</strong>。同じ銘柄・同じ1銘柄あたりの
+            荒さのまま相関だけを 0 に置いた<strong>反実仮想</strong>で、
+            2つのボタンの差を「相関の値段」として見るための基準線です。
+            実際に相関を下げるには銘柄の組み合わせ自体を変える必要があります。
+          </li>
+          <li>
+            振れ幅は整数%に丸めています（σ_p=24.6% なら ±25%）。③の表と数字を揃えるためで、
+            表示上の端数はこの丸めのぶんずれます。
           </li>
           <li>
             <strong>{" g ≈ μ − σ²/2 "} は2次近似</strong>です。

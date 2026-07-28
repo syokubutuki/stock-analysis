@@ -22,14 +22,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
-import { alignReturns, correlationMatrix } from "../../lib/portfolio-risk";
-import { stressCorrelation } from "../../lib/dcc";
+import { AlignedReturns, alignReturns, correlationMatrix } from "../../lib/portfolio-risk";
+import { StressCorrCI, stressCorrelation, stressCorrelationCI } from "../../lib/dcc";
 import {
   TRADING_DAYS,
   annualStats,
   doublingYears,
   doublingYearsLabel as yearsLabel,
   effectiveN,
+  effectiveNFromWeights,
   generateShocks,
   growthCurve,
   hiddenLeverage,
@@ -167,6 +168,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 /** 危機レジームの定義（dcc.ts の stressCorrelation に渡す）。PortfolioRiskPanel と同一。 */
 const STRESS_OPTS = { quantile: 0.25, lookback: 60 };
 
+/** Δρ の CI に使うブロック長の選択肢（営業日）。 */
+const BLOCK_LENS = [10, 20, 40];
+
 export interface MeasuredInputs {
   n: number;
   tickers: string[];
@@ -183,6 +187,15 @@ export interface MeasuredInputs {
   nStressDays: number;
   nCalmDays: number;
   periods: number;
+  /**
+   * 実測の相関行列 R をそのまま使った実効銘柄数 (Σw)²/(wᵀRw)（等ウェイト）。
+   * 崖の式が使う等相関近似 N/(1+(N−1)ρ̄) との差が「等相関という単純化のコスト」。
+   */
+  nEffEmpirical: number;
+  /** 等相関近似での N_eff（ρ̄ ＝ 全期間の平均相関）。 */
+  nEffEqualCorr: number;
+  /** 危機時の相関行列での実測 N_eff（危機標本が取れたときだけ）。 */
+  nEffStress: number | null;
 }
 
 export default function CorrelationDragChart({
@@ -200,31 +213,53 @@ export default function CorrelationDragChart({
   // 危機レジームは「直近60日のバスケット実現ボラが上位25%の日」。同時点のリターンで
   // 切ると条件付けバイアスで相関が機械的に**下がる**ため、事前に分かるボラで切る
   // （dcc.ts の解説を参照。危機を軽く見せる＝安全に見える間違いになる）。
-  const measured: MeasuredInputs | null = useMemo(() => {
+  const aligned: AlignedReturns | null = useMemo(() => {
     if (!data) return null;
     const series = Object.entries(data)
       .filter(([, v]) => v.prices.length > 2)
       .map(([ticker, v]) => ({ ticker, prices: v.prices }));
     if (series.length < 2) return null;
-    const aligned = alignReturns(series, HORIZON_CONFIG[horizon].window);
-    if (aligned.tickers.length < 2) return null;
+    const a = alignReturns(series, HORIZON_CONFIG[horizon].window);
+    return a.tickers.length >= 2 ? a : null;
+  }, [data, horizon]);
+
+  const measured: MeasuredInputs | null = useMemo(() => {
+    if (!aligned) return null;
 
     const st = annualStats(aligned);
     const avgVol = st.vol.reduce((s, v) => s + v, 0) / st.vol.length;
     const stress = stressCorrelation(aligned, STRESS_OPTS);
+    const cm = correlationMatrix(aligned);
+    const n = aligned.tickers.length;
+    // 等ウェイトでの実測 N_eff。崖の式（等相関近似）と並べて出すことで、
+    // 「全ペアの相関が等しい」という単純化がどれだけ効いていないかが数字で見える。
+    const wEq = new Array(n).fill(1 / n);
     return {
-      n: aligned.tickers.length,
+      n,
       tickers: aligned.tickers,
       avgVolPct: avgVol * 100,
-      rhoAll: correlationMatrix(aligned).avgCorr,
+      rhoAll: cm.avgCorr,
       rhoCalm: stress.ok ? stress.avgCalm : null,
       rhoStress: stress.ok ? stress.avg : null,
       reason: stress.reason,
       nStressDays: stress.nDays,
       nCalmDays: stress.nCalm,
       periods: st.periods,
+      nEffEmpirical: effectiveNFromWeights(wEq, cm.matrix),
+      nEffEqualCorr: effectiveN(n, cm.avgCorr),
+      nEffStress: stress.ok ? effectiveNFromWeights(wEq, stress.matrix) : null,
     };
-  }, [data, horizon]);
+  }, [aligned]);
+
+  // ── 危機時 ρ と平時 ρ の差の不確かさ（課題2） ───────────────────────────
+  // 点推定だけでは「危機時のほうが低い」がノイズか本物かを判定できないので、
+  // ボラのクラスタリングを壊さないブロック単位で再抽出して Δρ の CI を出す。
+  // 計算は開いたときだけ走る（このパネルは折りたたみの中でマウントされる）。
+  const [blockLen, setBlockLen] = useState(20);
+  const rhoCI: StressCorrCI | null = useMemo(() => {
+    if (!aligned) return null;
+    return stressCorrelationCI(aligned, { ...STRESS_OPTS, blockLen, b: 400, level: 0.9 });
+  }, [aligned, blockLen]);
 
   // ── コントロール ──────────────────────────────────────────────────────
   // ρ・N・σ は「ユーザーが触るまでは実測値（無ければ既定値）に追従する」。
@@ -492,6 +527,12 @@ export default function CorrelationDragChart({
               <span>
                 平時 ρ ={" "}
                 <strong className="text-gray-900">{measured.rhoCalm.toFixed(2)}</strong>
+                {rhoCI?.ok && (
+                  <span className="text-gray-400">
+                    {" "}
+                    [{rhoCI.calmLo.toFixed(2)}, {rhoCI.calmHi.toFixed(2)}]
+                  </span>
+                )}
                 <span className="text-gray-400"> （{measured.nCalmDays}日）</span>
               </span>
             )}
@@ -502,6 +543,12 @@ export default function CorrelationDragChart({
               <span>
                 危機時 ρ ={" "}
                 <strong className="text-red-700">{rhoStressMeasured.toFixed(2)}</strong>
+                {rhoCI?.ok && (
+                  <span className="text-gray-400">
+                    {" "}
+                    [{rhoCI.stressLo.toFixed(2)}, {rhoCI.stressHi.toFixed(2)}]
+                  </span>
+                )}
                 <span className="text-gray-400"> （{measured.nStressDays}日）</span>
               </span>
             )}
@@ -509,6 +556,149 @@ export default function CorrelationDragChart({
               1銘柄の平均ボラ σ = {measured.avgVolPct.toFixed(0)}%
             </span>
           </div>
+
+          {/* ── 課題2: Δρ の不確かさ。CI が 0 を跨ぐなら「差は検出できない」と言い切る ── */}
+          {rhoCI?.ok && measured.rhoCalm != null && rhoStressMeasured != null && (
+            <div
+              className={`mt-2 rounded border px-2 py-1.5 ${
+                rhoCI.crossesZero
+                  ? "border-gray-200 bg-white"
+                  : rhoCI.delta > 0
+                    ? "border-red-200 bg-red-50"
+                    : "border-blue-200 bg-blue-50"
+              }`}
+            >
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs tabular-nums">
+                <span className="text-gray-600">危機時 − 平時 の差 Δρ =</span>
+                <strong
+                  className={
+                    rhoCI.crossesZero
+                      ? "text-gray-700"
+                      : rhoCI.delta > 0
+                        ? "text-red-700"
+                        : "text-blue-700"
+                  }
+                >
+                  {rhoCI.delta >= 0 ? "+" : "−"}
+                  {Math.abs(rhoCI.delta).toFixed(3)}
+                </strong>
+                <span className="text-gray-500">
+                  {(rhoCI.level * 100).toFixed(0)}% CI [{rhoCI.deltaLo.toFixed(3)},{" "}
+                  {rhoCI.deltaHi.toFixed(3)}]
+                </span>
+                <span className="text-gray-500">p = {rhoCI.pTwoSided.toFixed(3)}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    rhoCI.crossesZero
+                      ? "bg-gray-200 text-gray-600"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {rhoCI.crossesZero ? "差は検出できない" : "0 を跨がない"}
+                </span>
+                <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-400">
+                  ブロック長
+                  {BLOCK_LENS.map((L) => (
+                    <button
+                      key={L}
+                      onClick={() => setBlockLen(L)}
+                      className={`px-1.5 py-0.5 rounded border ${
+                        blockLen === L
+                          ? "bg-gray-700 text-white border-gray-700"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                      title="再抽出する連続ブロックの長さ（営業日）。ボラのクラスタリングを壊さないための単位。"
+                    >
+                      {L}日
+                    </button>
+                  ))}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">
+                {rhoCI.crossesZero ? (
+                  <>
+                    ブロック・ブートストラップ（{blockLen}営業日ブロック・{rhoCI.b}回）で
+                    Δρ の CI が <strong>0 を跨いでいます</strong>。つまり
+                    <strong>この標本では平時と危機時の相関差を検出できません</strong>——
+                    上に出ている符号は<strong>ノイズと区別がつかない</strong>ので、
+                    向きを結論として読まないでください。
+                  </>
+                ) : rhoCI.delta > 0 ? (
+                  <>
+                    CI が 0 を跨がないので、この標本では
+                    <strong>危機時に相関が上がる差は本物</strong>です
+                    （ブロック {blockLen}日・{rhoCI.b}回）。ただし
+                    <strong>次の危機で同じ大きさになる保証ではありません</strong>。
+                  </>
+                ) : (
+                  <>
+                    CI が 0 を跨がないので、この標本では
+                    <strong>危機時のほうが相関が低いのは本物</strong>です
+                    （ブロック {blockLen}日・{rhoCI.b}回）。一般論の
+                    「荒れると相関が上がる」があなたの組み合わせでは成り立っていない、
+                    という実測結果です。
+                  </>
+                )}
+                {" "}標準誤差 {rhoCI.deltaSe.toFixed(3)}。ブロック長を変えても符号と結論が
+                変わらないかを確認してください（変わるなら、その差は頑健ではありません）。
+              </p>
+            </div>
+          )}
+          {rhoCI != null && !rhoCI.ok && rhoStressMeasured != null && (
+            <p className="mt-1 text-[11px] text-gray-400">
+              Δρ の信頼区間は算出できませんでした（{rhoCI.reason}）。
+            </p>
+          )}
+
+          {/* ── 課題3: N_eff の等相関近似 vs 実測 R ── */}
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-gray-600 tabular-nums">
+            <span className="text-gray-500">実効銘柄数 N_eff（等ウェイト）:</span>
+            <span>
+              実測 R ={" "}
+              <strong className="text-gray-900">{measured.nEffEmpirical.toFixed(2)}</strong>
+            </span>
+            <span>
+              等相関近似（ρ̄={measured.rhoAll.toFixed(2)}）={" "}
+              <strong className="text-gray-900">{measured.nEffEqualCorr.toFixed(2)}</strong>
+            </span>
+            <span
+              className={
+                Math.abs(measured.nEffEmpirical - measured.nEffEqualCorr) >
+                0.15 * Math.max(measured.nEffEqualCorr, 1e-9)
+                  ? "text-amber-700"
+                  : "text-gray-400"
+              }
+            >
+              差 {measured.nEffEmpirical >= measured.nEffEqualCorr ? "+" : "−"}
+              {Math.abs(measured.nEffEmpirical - measured.nEffEqualCorr).toFixed(2)}
+              （
+              {(
+                (100 * (measured.nEffEmpirical - measured.nEffEqualCorr)) /
+                Math.max(measured.nEffEqualCorr, 1e-9)
+              ).toFixed(0)}
+              %）
+            </span>
+            {measured.nEffStress != null && (
+              <span className="text-red-700">
+                危機時 R = <strong>{measured.nEffStress.toFixed(2)}</strong>
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[11px] text-gray-500">
+            下の崖は<strong>全ペアの相関が等しい（等相関）</strong>という単純化の上に立っていて、
+            N_eff = N/(1+(N−1)ρ̄) で計算しています。左の「実測 R」は
+            <strong>{" (Σw)²/(wᵀRw) "}</strong>——ペアごとの相関の違いをそのまま織り込んだ値です。
+            {Math.abs(measured.nEffEmpirical - measured.nEffEqualCorr) >
+            0.15 * Math.max(measured.nEffEqualCorr, 1e-9) ? (
+              <strong className="text-amber-700">
+                {" "}2つが{measured.nEffEmpirical > measured.nEffEqualCorr ? "実測のほうが大きく" : "実測のほうが小さく"}
+                15%以上ずれています＝等相関の近似が効いていません。崖の位置は目安として読み、
+                実データの分解は「相関が食べた分」パネルを見てください。
+              </strong>
+            ) : (
+              <> 2つがほぼ一致しているので、この銘柄構成では等相関の単純化が実害なく効いています。</>
+            )}
+          </p>
           {rhoStressMeasured == null && (
             <p className="mt-1 text-[11px] text-amber-700">
               危機時の相関は算出できませんでした（{measured.reason || "期間不足"}）。
@@ -535,9 +725,18 @@ export default function CorrelationDragChart({
                   （{rhoStressMeasured.toFixed(2)} ≤ {measured.rhoCalm.toFixed(2)}）。
                   「荒れた相場では必ず相関が上がる」は一般的な傾向にすぎず、
                   <strong>あなたの組み合わせでは成り立っていない</strong>という実測結果です。
-                  ただし危機時は全体の25%（{measured.nStressDays}日）だけの部分標本で標準誤差が大きく、
-                  <strong>次の危機で同じとは限りません</strong>。銘柄を入れ替えたり窓を長くすると
-                  向きが変わることもあります。
+                  ただし危機時は全体の25%（{measured.nStressDays}日）だけの部分標本なので、
+                  この向きが本物かどうかは上の <strong>Δρ の信頼区間</strong>で判定してください
+                  {rhoCI?.ok && (
+                    <>
+                      （現在は<strong>
+                        {rhoCI.crossesZero
+                          ? "0 を跨いでいる＝差を検出できていません"
+                          : "0 を跨いでいない＝標本内では本物の差です"}
+                      </strong>）
+                    </>
+                  )}
+                  。銘柄を入れ替えたり窓を長くすると向きが変わることもあります。
                 </p>
               )}
             </>
@@ -745,6 +944,45 @@ export default function CorrelationDragChart({
             </>
           )}
         </p>
+
+        {/* 2ドットの意味を、数式でも統計でもなく「社会がすでに制度として出した答え」で言う。
+            保険数理では相関の破れが除外条項として明文化されている（地震保険が別建てなのはそのため）。
+            記号ゼロで音読でき、読者が生活の中で検算できる唯一の説明なので本文側に置く。 */}
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-gray-700">
+          <div className="text-xs font-semibold text-gray-800">
+            なぜ「一斉に下がる」ことだけが致命傷なのか — 火災保険が地震を引き受けない理由と同じです
+          </div>
+          <p className="mt-1">
+            通常の火災保険は、<strong>地震による火災を補償しません</strong>。火事が別々に起きているうちは、
+            契約を集めるほど平均に近づいて分散できます。ところが地震は、
+            <strong>すべての契約を同時に燃やします</strong>。同時に来るリスクは、何件集めても分散されない
+            ——だから保険会社はそれを<strong>除外条項</strong>として契約から切り離し、
+            地震保険という別建て（政府の再保険つき）にしています。
+            <strong>「分散できないリスクは引き受けない」というプロの判断が、条文になっている</strong>わけです。
+          </p>
+          <p className="mt-1.5">
+            上の図の
+            {rhoStress != null ? (
+              <>
+                <strong className="text-red-700">赤い丸</strong>が、あなたにとっての「地震による火災」です。
+              </>
+            ) : (
+              <>
+                <strong>ρ を右へ動かしたときの崖</strong>が、あなたにとっての「地震による火災」です。
+              </>
+            )}
+            銘柄はバラバラに見えても、暴落は全部を同時に燃やしにきます。違うのは一点だけ——
+            <strong className="text-red-700">あなたの口座には除外条項がありません</strong>。
+            保険会社と違って「この部分は引き受けません」と言えない。
+            切り離せない以上、打てる手は<strong>建玉（丸の横位置）を自分で下げておくこと</strong>だけです。
+          </p>
+          <p className="mt-1.5 text-gray-500">
+            確率論の言葉で言えば、保険が成り立つのは大数の法則が効く＝各契約が<strong>独立</strong>だからで、
+            地震はその独立性を壊します。ポートフォリオで同じ役をするのが相関 ρ で、
+            ρ が上がるほど実効銘柄数 N_eff は 1 に近づく——
+            <strong>「10銘柄」が「1銘柄を10倍」に変わる</strong>のがその瞬間です。
+          </p>
+        </div>
       </div>
 
       {/* 崖の要約表（仕様書 §G1 の表） */}
@@ -1031,6 +1269,15 @@ export default function CorrelationDragChart({
             <strong>崖の位置</strong>: 3本の坂は入口の傾きが同じ。違うのは「どこで落ちるか」だけ。
             相関が高いほど崖は<strong>手前</strong>にある。同じ歩幅で歩いても、落ちる人と落ちない人が出る。
           </li>
+          <li>
+            <strong>地震と火災保険</strong>: 通常の火災保険が地震による火災を補償しないのは、
+            地震が<strong>全契約を同時に燃やす</strong>＝独立性（大数の法則の前提）を壊すから。
+            保険数理はこの「相関の破れ」を<strong>除外条項</strong>という形で明文化していて、
+            地震だけ別建ての保険＋政府の再保険に切り出している。
+            暴落時に ρ→1 になるポートフォリオはこれと同じ構造だが、
+            <strong>投資家には除外条項が無い</strong>。プロが「引き受けない」と判断したリスクを、
+            分散できているつもりで抱えている状態がありうる。打てる手は建玉を下げることだけ。
+          </li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">5. 結果の読み方</p>
@@ -1129,7 +1376,44 @@ export default function CorrelationDragChart({
           μ は自分の想定を手で入れて、頂点の位置がどれだけ動くかを確かめる欄として使ってください。
         </p>
 
-        <p className="font-medium text-gray-700 mt-3">8. 注意点・限界</p>
+        <p className="font-medium text-gray-700 mt-3">
+          8. その差はノイズか本物か（Δρ のブロック・ブートストラップ）
+        </p>
+        <p>
+          危機時 ρ は<strong>全体の25%しかない部分標本</strong>からの推定です。だから
+          「危機時のほうが低い」と出ても、それが<strong>本物の非定常性</strong>なのか
+          <strong>小標本のノイズ</strong>なのかは、点推定を見ているだけでは決して分かりません
+          （実際、窓を 252日 → 756日 に変えると符号が入れ替わることがあります）。
+          そこで {" Δρ = ρ_危機 − ρ_平時 "} の標本分布を作り、
+          <strong>信頼区間が 0 を跨ぐかどうか</strong>で判定します。
+        </p>
+        <p>
+          <strong>なぜ「ブロック」で再抽出するのか</strong>: 日次リターンには
+          <strong>ボラのクラスタリング</strong>（荒れた日は固まって来る）があり、そもそも危機レジームを
+          「直近60日のボラ」で定義しています。1日ずつバラバラに引き直すとこの塊が壊れ、
+          <strong>危機レジームそのものが標本から消えてしまう</strong>ため、Δρ の振れ幅を過小評価します。
+          そこで長さ L（既定20営業日）の<strong>連続ブロック</strong>を復元抽出して元の長さまで並べ、
+          <strong>全銘柄で同じ日付ブロック</strong>を取ります（＝その日の横断的な同時性は壊さない）。
+          再抽出した系列に対して<strong>レジーム分割からやり直す</strong>のが要点で、
+          「どの日が危機か」の不確かさまで CI に含まれます。
+        </p>
+        <p className="font-mono text-[11px] bg-white rounded px-2 py-1">
+          Δρ* の分布 → CI = [ q(α/2), q(1−α/2) ] , p = 2·min( P(Δρ*≤0), P(Δρ*≥0) )
+        </p>
+        <p>
+          ρ 単体の CI は Fisher の z 変換 {" z = ½·ln((1+ρ)/(1−ρ)) "} 上で取ってから戻します
+          （ρ は ±1 で頭打ちなので、そのままだと区間が範囲外にはみ出すため）。差 Δρ はそのまま取ります。
+        </p>
+        <p>
+          <strong>読み方</strong>: CI が 0 を跨いだら「<strong>差は検出できない</strong>」と言い切ってよく、
+          表示されている符号を結論として読んではいけません。跨がなければ標本内では本物の差ですが、
+          それでも<strong>次の危機で同じ大きさになる約束ではありません</strong>。
+          ブロック長ボタン（10 / 20 / 40日）で<strong>結論が変わらないか</strong>を必ず確かめてください。
+          ブロックを長くすると系列構造をより保存する代わりに実効的な標本数が減って CI が広がるので、
+          <strong>長いブロックでも 0 を跨がない差だけが頑健</strong>です。
+        </p>
+
+        <p className="font-medium text-gray-700 mt-3">9. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
             <strong>ρ・N・σ が実測でも、崖そのものは合成モデルです</strong>。
@@ -1140,7 +1424,12 @@ export default function CorrelationDragChart({
           </li>
           <li>
             <strong>全ペアの相関が等しい（等相関）という単純化</strong>を置いています。現実には相関はペアごとに
-            異なり、N_eff はウォッチリスト実測の {" (Σw)²/(wᵀRw) "} で測るほうが正確です。
+            異なるので、上のバナーに<strong>2つの N_eff を並べて出しています</strong>——
+            崖が使う等相関近似 {" N/(1+(N−1)ρ̄) "} と、実測の相関行列をそのまま使う
+            {" (Σw)²/(wᵀRw) "}。<strong>この2つが大きく違うときは等相関の近似が効いていません</strong>
+            （目安として 15% 以上の乖離で警告を出します）。乖離の向きにも意味があり、実測のほうが
+            <strong>小さい</strong>なら「一部のペアが極端に高い相関で束になっている」——
+            平均 ρ̄ を見ているだけでは気づけない集中です。
           </li>
           <li>
             <strong>μ の推定誤差は σ の推定誤差よりはるかに大きい</strong>。頂点 W* は μ に比例するため、
@@ -1156,6 +1445,10 @@ export default function CorrelationDragChart({
             <strong>危機時 ρ は部分標本（全体の25%）からの推定</strong>なので、平時 ρ より標準誤差が大きく、
             銘柄数が多いと相関行列がランク落ちしやすくなります。標本日数がパネルに出るので、
             極端に少ないときは数字を信用しないでください（日数が足りなければ算出せず理由を表示します）。
+            <strong>
+              振れ幅そのものは Δρ = ρ_危機 − ρ_平時 のブートストラップ CI として数値で出しています
+            </strong>
+            （上の 8. 参照）。
           </li>
           <li>
             {" g ≈ μ−σ²/2 "} は2次近似。テールが厚い（尖度が高い）分布ではドラッグを

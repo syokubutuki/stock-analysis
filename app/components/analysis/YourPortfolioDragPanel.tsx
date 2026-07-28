@@ -205,6 +205,13 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
       ? decomp.corrDrag / (decomp.soloDrag + decomp.corrDrag)
       : 0;
 
+  // 「相関のせいで2倍になるのが何年遅れるか」。両方が有限のときだけ年数で言える
+  // （g≤0 側は Infinity になるので、そのときは年数ではなく「永遠に来ない」と言う）。
+  const delayYears =
+    isFinite(decomp.doublingYearsNoCorr) && isFinite(decomp.doublingYears)
+      ? decomp.doublingYears - decomp.doublingYearsNoCorr
+      : null;
+
   return (
     <div className="space-y-5">
       {/* コントロール */}
@@ -271,28 +278,63 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
       </div>
 
       {/* ── U5 隠れレバレッジカード ─────────────────────────────────────── */}
+      {/* 見出しは日常の言葉で言い切り、記号（N_eff・√(N/N_eff)・ρ）は各数字の真下に
+          小さく併記する。専門語を消すのではなく、**入口に置かない**のが方針。 */}
       <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4">
-        <div className="text-xs text-gray-600">
-          {decomp.nAssets} 銘柄に分散したつもり
+        <div className="text-sm font-bold text-gray-800">
+          {decomp.nAssets} 銘柄に分けたつもりが、実際は{" "}
+          <span className="text-red-700 tabular-nums text-lg">{decomp.nEff.toFixed(1)} 銘柄</span>{" "}
+          ぶんにしか分かれていません
         </div>
-        <div className="mt-1 flex flex-wrap items-end gap-x-8 gap-y-2">
+        <div className="mt-2.5 flex flex-wrap items-end gap-x-8 gap-y-3">
           <div>
-            <div className="text-[10px] text-gray-500">実質</div>
+            <div className="text-[10px] text-gray-500">
+              {decomp.nAssets}銘柄が、本当に分かれている数
+            </div>
             <div className="text-3xl font-bold text-red-700 tabular-nums">
-              {decomp.nEff.toFixed(1)} <span className="text-lg">銘柄</span>
+              {decomp.nEff.toFixed(1)} <span className="text-lg">銘柄ぶん</span>
+            </div>
+            <div className="text-[10px] text-gray-400">実効銘柄数 N_eff</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-500">
+              値動きの荒さで取られる目減りの倍率
+            </div>
+            <div className="text-3xl font-bold text-red-700 tabular-nums">
+              {decomp.taxMultiple.toFixed(1)} <span className="text-lg">倍</span>
+            </div>
+            <div className="text-[10px] text-gray-400">ボラティリティ税の倍率 N / N_eff</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-500">2倍になるのが遅れる年数</div>
+            <div className="text-3xl font-bold text-red-700 tabular-nums">
+              {delayYears != null ? (
+                <>
+                  +{delayYears.toFixed(1)} <span className="text-lg">年</span>
+                </>
+              ) : isFinite(decomp.doublingYearsNoCorr) ? (
+                <span className="text-xl">永遠に来ない</span>
+              ) : (
+                <span className="text-xl text-gray-400">—</span>
+              )}
+            </div>
+            <div className="text-[10px] text-gray-400">
+              倍化年数 ln2/g の差（相関ゼロとの比較）
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">隠れレバレッジ</div>
-            <div className="text-3xl font-bold text-red-700 tabular-nums">
-              {decomp.hiddenLev.toFixed(2)} <span className="text-lg">倍</span>
+            <div className="text-[10px] text-gray-500">思っていたリスクの何倍を負っているか</div>
+            <div className="text-2xl font-bold text-gray-700 tabular-nums">
+              {decomp.hiddenLev.toFixed(2)} <span className="text-base">倍</span>
             </div>
+            <div className="text-[10px] text-gray-400">隠れレバレッジ √(N/N_eff)</div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">平均相関</div>
+            <div className="text-[10px] text-gray-500">銘柄どうしの「似かた」の平均</div>
             <div className="text-2xl font-bold text-gray-700 tabular-nums">
               {decomp.avgCorr.toFixed(2)}
             </div>
+            <div className="text-[10px] text-gray-400">平均相関 ρ</div>
           </div>
         </div>
 
@@ -315,12 +357,25 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
           })}
         </div>
         <p className="mt-2 text-xs text-gray-700">
-          払っている<strong>ボラティリティ税</strong>は、本当に分散できていた場合の{" "}
+          四角は {decomp.nAssets} 銘柄。<strong>赤く塗られているぶんだけが本当に分かれています</strong>。
+          灰色は「分散しているつもりだったのに、消えている」ぶんです。
+          値動きの荒さだけで毎年取られる目減りが、ちゃんと分かれていた場合の{" "}
           <strong className="text-red-700 text-base tabular-nums">
             {decomp.taxMultiple.toFixed(1)} 倍
-          </strong>
-          （N / N_eff = {decomp.nAssets} / {decomp.nEff.toFixed(1)}）。
-          灰色の部分が「分散しているつもりだったのに消えている」ぶんです。
+          </strong>{" "}
+          になっている、ということです。
+          <span className="text-gray-500">
+            （専門用語では<strong>ボラティリティ税</strong>が N / N_eff = {decomp.nAssets} /{" "}
+            {decomp.nEff.toFixed(1)} 倍）
+          </span>
+          {delayYears != null && (
+            <>
+              {" "}同じ期待リターンのまま、資産が2倍になるのが{" "}
+              <strong>{yearsLabel(decomp.doublingYearsNoCorr)}</strong> から{" "}
+              <strong className="text-red-700">{yearsLabel(decomp.doublingYears)}</strong>{" "}
+              へ延びています。
+            </>
+          )}
         </p>
       </div>
 
