@@ -10,11 +10,26 @@
 // カタログ数で IC 閾値を膨らませる(Deflated Sharpe と同発想の縮小)を用いる。
 //
 // 予測器は computeWeeklyAnalog(lean=true) を prices.slice(0, t+1) に適用して共有する。
+//
+// ── 改善A: 経路レベルの採点 ──
+// 上の IC / 方向的中率は「H日後の終値」1点だけの採点である。しかしアナログ予測が
+// 出力しているのは経路(中央値パス・25–75%帯・高安到達 MFE/MAE)であり、
+// 「途中で−4%まで沈んでから+1%で終わった週」と「一直線に+1%の週」を終点採点は
+// 区別できない。ストップ幅・利確目標・建玉の持ち堪えは終点でなく経路で決まるので、
+// 経路そのものを次の3軸で採点する(computeOosPathScore):
+//   ① 帯の較正: 実測終値が予測 P25–P75 に入った割合(名目50%)。帯幅も併記——
+//      帯を広げれば被覆率は簡単に上がるので、幅とセットでしか意味を持たない。
+//   ② 高安の当否: 予測 MFE/MAE と実測の Spearman、到達率(較正されていれば≒50%)、
+//      バイアス(実測−予測の中央値)。利確/損切り水準として使えるかを直接測る。
+//   ③ 形の一致: 日次増分の相関と、z化パス間の DTW 距離。いずれも
+//      「予測を別の週の実測に付け替える」巡回シフト・ヌルと比較する。中央値パスは
+//      平滑化された対象なので生の相関値は小さくなりがちで、絶対値でなくヌルとの差で判断する。
 
 import { PricePoint } from "./types";
 import { UsReturn, BinScheme } from "./us-spillover-core";
 import {
   computeWeeklyAnalog, AnalogMode, DistMetric, WindowAlign, WeightMode,
+  buildForward, zShape, dtw,
 } from "./weekly-analog";
 import { quantileSorted, median as medianOf } from "./stats-significance";
 
@@ -94,7 +109,41 @@ export interface OosSetting {
   volNorm: boolean;
 }
 
-export interface OosPredPoint { date: string; yhat: number; yact: number; }
+export interface OosPredPoint {
+  date: string;
+  yhat: number; yact: number;
+  // 改善A: 経路採点用。長さ H+1（[0]=0 を含む）。設定によっては欠けうるので optional。
+  pathHat?: number[];  // 予測: 選抜のフォワード終値中央値パス
+  p25?: number[]; p75?: number[]; // 予測: 25–75% 帯
+  hiHat?: number; loHat?: number; // 予測: H日以内の高値到達中央(MFE)/安値到達中央(MAE)
+  pathAct?: number[];  // 実測: 実際に辿った終値累積パス
+  hiAct?: number; loAct?: number; // 実測: H日以内の高値到達/安値到達
+}
+
+// 改善A: 経路そのものの採点。終点1点でなく「その後どういう経路を辿ったか」を照合する。
+export interface OosPathScore {
+  n: number;          // 経路を採点できた週数
+  H: number;
+  // ① 帯の較正
+  coverage: number;   // 実測終値が予測 P25–P75 に入った (週×日) の割合
+  coverageLo: number; coverageHi: number; // 週ブロック・ブートストラップ95%CI
+  coverageNominal: number; // 名目 0.5
+  bandWidth: number;  // 平均バンド幅(リターン単位)。被覆率の「安さ」を判定する分母
+  coverageByDay: number[]; // 先行き m 日目ごとの被覆率(長さ H+1, [0]は未使用で NaN)
+  bandWidthByDay: number[]; // 同じく m 日目の平均バンド幅
+  // ② 高安(MFE/MAE)の当否
+  mfeIC: number; maeIC: number;       // 予測と実測の Spearman
+  mfeTouch: number; maeTouch: number; // 実測が予測水準に到達した割合(較正なら≒0.5)
+  mfeBias: number; maeBias: number;   // 実測−予測 の中央値(MFE正=予測が控えめ)
+  // ③ 形の一致(ヌル比較)
+  shapeCorr: number;     // 日次増分 Pearson の Fisher-z 平均
+  shapeCorrNull: number; // 巡回シフト・ヌルの平均
+  shapeCorrP: number;
+  dtwDist: number;       // z化パス間 DTW 距離の平均(小さいほど形が近い)
+  dtwNull: number;
+  dtwP: number;
+  shapeOk: boolean;      // H>=3 で形の指標が計算できたか
+}
 
 export interface OosQuintile { yhatMean: number; yactMean: number; n: number; }
 
@@ -109,6 +158,7 @@ export interface OosResult {
   quintiles: OosQuintile[]; // ŷ 五分位ごとの実測平均
   monotone: number;  // 分位index と実測平均の Spearman(単調性, 1に近いほど良)
   H: number;
+  path: OosPathScore | null; // 改善A: 経路レベルの採点(経路が揃わなければ null)
 }
 
 export interface OosCatalogRow { setting: OosSetting; label: string; ic: number; n: number; }
@@ -149,9 +199,157 @@ function predictSeries(
     const baseC = prices[t].close, futC = prices[t + H].close;
     if (!(baseC > 0) || !(futC > 0)) continue;
     const yact = futC / baseC - 1;
-    pts.push({ date: prices[t].time, yhat, yact });
+    // 改善A: 実測経路。候補窓と同じ規約(buildForward)で作るので予測と直接比較できる。
+    const act = buildForward(prices, t, H);
+    pts.push({
+      date: prices[t].time, yhat, yact,
+      pathHat: res.fwdMedian, p25: res.fwdP25, p75: res.fwdP75,
+      hiHat: res.medianMfe, loHat: res.medianMae,
+      pathAct: act ? act.forward : undefined,
+      hiAct: act ? act.fwdHigh[H] : undefined,
+      loAct: act ? act.fwdLow[H] : undefined,
+    });
   }
   return pts;
+}
+
+// ───────────────────────── 改善A: 経路レベルの採点 ─────────────────────────
+
+// パスを日次増分に直す(長さ H)。水準でなく「日々どちらへ動いたか」の形を比べる。
+function increments(path: number[]): number[] {
+  const out: number[] = [];
+  for (let m = 1; m < path.length; m++) out.push(path[m] - path[m - 1]);
+  return out;
+}
+
+// Fisher z 変換の平均(相関の平均は単純平均だと歪むため)。
+function meanFisher(rs: number[]): number {
+  const zs = rs.filter((r) => isFinite(r)).map((r) => Math.atanh(Math.max(-0.999, Math.min(0.999, r))));
+  if (zs.length === 0) return NaN;
+  return Math.tanh(zs.reduce((s, v) => s + v, 0) / zs.length);
+}
+
+// 巡回シフト・ヌルの片側 p 値。予測パスを s 週ぶんずらして別の週の実測に付け替え、
+// 各系列の内部構造(自己相関・フォワード重複)は保ったまま「予測と実測の対応」だけを壊す。
+// greater=true なら「観測が大きいほど良い」指標(相関)、false なら小さいほど良い指標(DTW距離)。
+function shiftPValue(
+  n: number, B: number, seed: number, stat: (shift: number) => number, greater: boolean
+): { obs: number; nullMean: number; p: number } {
+  const obs = stat(0);
+  if (!isFinite(obs) || n < 5) return { obs, nullMean: NaN, p: 1 };
+  const rng = mulberry32(seed);
+  const vals: number[] = [];
+  for (let b = 0; b < B; b++) {
+    const s = 1 + Math.floor(rng() * (n - 1));
+    const v = stat(s);
+    if (isFinite(v)) vals.push(v);
+  }
+  if (vals.length < 10) return { obs, nullMean: NaN, p: 1 };
+  const nullMean = vals.reduce((s, v) => s + v, 0) / vals.length;
+  const ge = vals.filter((v) => (greater ? v >= obs - 1e-15 : v <= obs + 1e-15)).length;
+  return { obs, nullMean, p: (ge + 1) / (vals.length + 1) };
+}
+
+export function computeOosPathScore(points: OosPredPoint[], H: number, seed = 0x9a7401): OosPathScore | null {
+  // 経路が揃っている週だけを採点対象にする
+  const ps = points.filter((p) =>
+    p.pathHat && p.p25 && p.p75 && p.pathAct &&
+    p.pathHat.length === H + 1 && p.pathAct.length === H + 1 &&
+    p.p25.length === H + 1 && p.p75.length === H + 1
+  );
+  const n = ps.length;
+  if (n < 8 || H < 1) return null;
+
+  // ── ① 帯の較正: 実測終値が予測 P25–P75 に入ったか(m=1..H, m=0 は定義上必ず0で自明) ──
+  const weekCov: number[] = [];
+  let widthSum = 0, widthCnt = 0;
+  const dayHit = new Array<number>(H + 1).fill(0);
+  const dayTot = new Array<number>(H + 1).fill(0);
+  const dayWidth = new Array<number>(H + 1).fill(0);
+  for (const p of ps) {
+    let hit = 0, tot = 0;
+    for (let m = 1; m <= H; m++) {
+      const lo = p.p25![m], hi = p.p75![m], a = p.pathAct![m];
+      if (!isFinite(lo) || !isFinite(hi) || !isFinite(a)) continue;
+      const inside = a >= Math.min(lo, hi) && a <= Math.max(lo, hi);
+      if (inside) { hit++; dayHit[m]++; }
+      tot++; dayTot[m]++;
+      const w = Math.abs(hi - lo);
+      widthSum += w; widthCnt++; dayWidth[m] += w;
+    }
+    if (tot > 0) weekCov.push(hit / tot);
+  }
+  const coverage = weekCov.length ? weekCov.reduce((s, v) => s + v, 0) / weekCov.length : NaN;
+  const bandWidth = widthCnt ? widthSum / widthCnt : NaN;
+  const coverageByDay = dayTot.map((t, m) => (m === 0 || t === 0 ? NaN : dayHit[m] / t));
+  const bandWidthByDay = dayTot.map((t, m) => (m === 0 || t === 0 ? NaN : dayWidth[m] / t));
+
+  // 週ブロック・ブートストラップ(ブロック長 ≈ フォワードが重複する週数)
+  let coverageLo = coverage, coverageHi = coverage;
+  if (weekCov.length >= 10) {
+    const bl = Math.max(1, Math.ceil(Math.max(1, H) / 5));
+    const nb = Math.ceil(weekCov.length / bl);
+    const rng = mulberry32(seed ^ 0x11);
+    const samp: number[] = [];
+    for (let b = 0; b < 600; b++) {
+      const acc: number[] = [];
+      for (let k = 0; k < nb && acc.length < weekCov.length; k++) {
+        const start = Math.floor(rng() * weekCov.length);
+        for (let j = 0; j < bl && acc.length < weekCov.length; j++) acc.push(weekCov[(start + j) % weekCov.length]);
+      }
+      samp.push(acc.reduce((s, v) => s + v, 0) / acc.length);
+    }
+    samp.sort((a, b) => a - b);
+    coverageLo = quantileSorted(samp, 0.025); coverageHi = quantileSorted(samp, 0.975);
+  }
+
+  // ── ② 高安(MFE/MAE)の当否 ──
+  const hiPairs = ps.filter((p) => isFinite(p.hiHat!) && isFinite(p.hiAct!));
+  const loPairs = ps.filter((p) => isFinite(p.loHat!) && isFinite(p.loAct!));
+  const mfeIC = hiPairs.length >= 5 ? spearman(hiPairs.map((p) => p.hiHat!), hiPairs.map((p) => p.hiAct!)) : NaN;
+  const maeIC = loPairs.length >= 5 ? spearman(loPairs.map((p) => p.loHat!), loPairs.map((p) => p.loAct!)) : NaN;
+  // 到達率: 実測が予測水準に届いたか。中央値予測が較正されていれば ≒0.5。
+  const mfeTouch = hiPairs.length ? hiPairs.filter((p) => p.hiAct! >= p.hiHat!).length / hiPairs.length : NaN;
+  const maeTouch = loPairs.length ? loPairs.filter((p) => p.loAct! <= p.loHat!).length / loPairs.length : NaN;
+  const mfeBias = hiPairs.length ? medianOf(hiPairs.map((p) => p.hiAct! - p.hiHat!)) : NaN;
+  const maeBias = loPairs.length ? medianOf(loPairs.map((p) => p.loAct! - p.loHat!)) : NaN;
+
+  // ── ③ 形の一致(巡回シフト・ヌルと比較) ──
+  const shapeOk = H >= 3;
+  let shapeCorr = NaN, shapeCorrNull = NaN, shapeCorrP = 1;
+  let dtwDist = NaN, dtwNull = NaN, dtwP = 1;
+  if (shapeOk) {
+    const incHat = ps.map((p) => increments(p.pathHat!));
+    const incAct = ps.map((p) => increments(p.pathAct!));
+    const zHat = ps.map((p) => zShape(p.pathHat!));
+    const zAct = ps.map((p) => zShape(p.pathAct!));
+
+    const corrStat = (shift: number): number => {
+      const rs: number[] = [];
+      for (let i = 0; i < n; i++) rs.push(pearson(incHat[(i + shift) % n], incAct[i]));
+      return meanFisher(rs);
+    };
+    const dtwStat = (shift: number): number => {
+      let s = 0, c = 0;
+      for (let i = 0; i < n; i++) {
+        const d = dtw(zHat[(i + shift) % n], zAct[i], H + 1);
+        if (isFinite(d)) { s += d; c++; }
+      }
+      return c ? s / c : NaN;
+    };
+    const rc = shiftPValue(n, 400, seed ^ 0x22, corrStat, true);   // 相関は大きいほど良い
+    shapeCorr = rc.obs; shapeCorrNull = rc.nullMean; shapeCorrP = rc.p;
+    const rd = shiftPValue(n, 200, seed ^ 0x33, dtwStat, false);   // DTW 距離は小さいほど良い
+    dtwDist = rd.obs; dtwNull = rd.nullMean; dtwP = rd.p;
+  }
+
+  return {
+    n, H,
+    coverage, coverageLo, coverageHi, coverageNominal: 0.5, bandWidth,
+    coverageByDay, bandWidthByDay,
+    mfeIC, maeIC, mfeTouch, maeTouch, mfeBias, maeBias,
+    shapeCorr, shapeCorrNull, shapeCorrP, dtwDist, dtwNull, dtwP, shapeOk,
+  };
 }
 
 function metricsFromPoints(points: OosPredPoint[], H: number): OosResult {
@@ -203,7 +401,9 @@ function metricsFromPoints(points: OosPredPoint[], H: number): OosResult {
     icLo = quantileSorted(samp, 0.025); icHi = quantileSorted(samp, 0.975);
   }
 
-  return { points, ic, icLo, icHi, n, nEff, hit, baseHit, quintiles, monotone, H };
+  const path = computeOosPathScore(points, H);
+
+  return { points, ic, icLo, icHi, n, nEff, hit, baseHit, quintiles, monotone, H, path };
 }
 
 // 単一設定の OOS 検証。
@@ -252,6 +452,17 @@ export interface RunCatalogParams {
   maxWeeks?: number;
 }
 
+// 試行数補正後の IC 有意閾値。nTrials 個の標準正規の期待最大値 × IC の標準誤差。
+// 「設定を総当たりして最良を選ぶ」でも「N銘柄を並べて最良を選ぶ」でも、多重比較の構造は同じなので
+// 設定カタログ(runWeeklyAnalogOosCatalog)と横断表(ウォッチリストN銘柄)で共有する。
+export function deflatedIcThreshold(nTrials: number, nObs: number): number {
+  if (nTrials < 2) return 0;
+  const seIc = 1 / Math.sqrt(Math.max(2, nObs - 1));
+  const EULER = 0.5772156649;
+  const expMaxZ = (1 - EULER) * invNormalCdf(1 - 1 / nTrials) + EULER * invNormalCdf(1 - 1 / (nTrials * Math.E));
+  return expMaxZ * seIc;
+}
+
 export function runWeeklyAnalogOosCatalog(p: RunCatalogParams): OosCatalog | null {
   const catalog = defaultCatalog(p.K);
   const maxWeeks = p.maxWeeks ?? 130;
@@ -276,11 +487,7 @@ export function runWeeklyAnalogOosCatalog(p: RunCatalogParams): OosCatalog | nul
   const nTrials = rows.length;
   const bestIc = rows[0].ic;
   const nObs = Math.max(8, Math.round((rows[0].n) / Math.ceil(Math.max(1, p.H) / 5)));
-  const seIc = 1 / Math.sqrt(Math.max(2, nObs - 1)); // IC の標準誤差近似
-  // 試行数補正: nTrials 個の標準正規の期待最大 × SE
-  const EULER = 0.5772156649;
-  const expMaxZ = (1 - EULER) * invNormalCdf(1 - 1 / nTrials) + EULER * invNormalCdf(1 - 1 / (nTrials * Math.E));
-  const deflatedThreshold = expMaxZ * seIc;
+  const deflatedThreshold = deflatedIcThreshold(nTrials, nObs);
   const bestPasses = bestIc > deflatedThreshold;
 
   // PBO(簡易): 前半で最良の設定が後半で中央値を下回る割合を、前半トップ→後半順位から推定。

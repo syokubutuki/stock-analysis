@@ -15,6 +15,8 @@ import {
   computeWeeklyAnalog, WeeklyAnalogResult, AnalogMode, UsMode, DistMetric, WindowAlign, WeightMode,
 } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
+import { AnalogFreezeButton } from "./AnalogLedgerPanel";
+import type { AnalogLedgerSettings } from "../../lib/analog-ledger";
 import AnalysisGuide from "./AnalysisGuide";
 
 // C1: 信頼度バッジ。実効n・ベースライン差p・novelty棄却の3条件から緑/黄/赤。
@@ -325,6 +327,15 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   // US 切替でビン選択をリセット(今週の起点ビン既定に戻す)
   const resetBin = () => setSelBinOverride(null);
 
+  // 改善C: 前向き検証台帳に凍結する設定一式。採点と一覧は /portfolio の台帳に集約する。
+  const ledgerSettings: AnalogLedgerSettings = useMemo(() => ({
+    mode, metric, align, weight, volNorm, pool: false, L: effL, H, K,
+    usTicker, usMode, scheme,
+    selBin: result?.selBin ?? 0,
+    binLabel: result?.binMetaObj.labels[result.selBin] ?? "",
+    dtwBandFrac, hlWeight,
+  }), [mode, metric, align, weight, volNorm, effL, H, K, usTicker, usMode, scheme, result, dtwBandFrac, hlWeight]);
+
   if (prices.length < 120) {
     return <div className="text-sm text-gray-500">アナログ比較には約120営業日以上の履歴が必要です。</div>;
   }
@@ -499,6 +510,8 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
             );
           })()}
 
+          <AnalogFreezeButton ticker={ticker ?? ""} res={result} settings={ledgerSettings} />
+
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-400">
@@ -622,6 +635,18 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
           <li><strong>右側(t&gt;0, フォワード)</strong>: その後の分布。<span className="text-blue-700 font-medium">青の太線=終値の中央値</span>、帯=終値25–75%、薄線=各事例。右肩上がり＆帯が上偏＝似た局面のあと上がりやすい。</li>
           <li><strong>高安到達(HL/MFE・MAE)</strong>: 終値だけでなく日中の高安も使う。<span className="text-green-700 font-medium">緑点線=高値到達の中央値(MFE)</span>＝その後どこまで上げたか(利確目安)、<span className="text-red-700 font-medium">赤点線=安値到達の中央値(MAE)</span>＝どこまで下げたか(損切り/含み損目安)。各時点までの running max/min を集計。緑赤に挟まれたコーンが「典型的な値幅」。今週の経路には縦バーで日中レンジ(高安)を重ねる。</li>
           <li>上部バナーの終値中央値・勝率に加え、到達の中央値(高値/安値)で利確幅・ストップ幅の当たりを付ける。</li>
+        </ul>
+
+        <p className="font-medium text-gray-700 mt-3">3c. 前向き検証台帳への凍結</p>
+        <p>
+          {"チャート上の「この予測を台帳に凍結」で、今表示している予測(中央値パス・25–75%帯・高安到達 MFE/MAE)を"}
+          <strong>基準日と設定ごと固定</strong>{"して記録する。以後は"}<strong>{"凍結時点でまだ存在しなかったデータだけ"}</strong>{"で採点されるため、後から条件を変えて『当たっていた』と言うことができない(臨床試験の事前登録と同じ発想)。"}
+          {"同じ 銘柄×基準日×設定 は二重に記録できない。"}
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li><strong>一覧と採点はポートフォリオ画面に集約</strong>: 採点には基準日から H 営業日後の実際の値動きが要り、全銘柄の価格系列を持つ横断ビュー（/portfolio の「今週の軌跡アナログ：ウォッチリスト横断」直下の台帳）でしか全記録を照合できない。この画面は記録の投入口だけを担う。</li>
+          <li><strong>OOS検証との違い</strong>: 「予測力OOS検証」は毎回その場で計算し直すバックテストなので、設定を触れば結果も動く。台帳は記録後に触れないぶん証拠として強い。両者が食い違うなら台帳を優先する。</li>
+          <li><strong>凍結してから張る</strong>のが使い方。台帳に無い予測で建てた玉は、後からいくらでも「当たっていた」と言えてしまう。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">4. 投資判断への活用</p>

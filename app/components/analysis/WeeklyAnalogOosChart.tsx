@@ -4,13 +4,17 @@
 // 各週末で t 以前のデータだけからアナログ予測 ŷ を作り、実測 y と突き合わせて
 // IC(情報係数)・方向的中率・分位単調性で予測力を測る。設定総当たりスキャンでは
 // 試行数補正(Deflated 閾値)と PBO で多重比較の過学習を露出させる。
+//
+// 改善A: 上記はすべて「H日後の終値1点」の採点。予測している対象は経路なので、
+// 実際に辿った経路との照合を別立てで行う——①25–75%帯の被覆率(名目50%)と帯幅、
+// ②高安到達 MFE/MAE の IC・到達率・バイアス、③日次増分相関と DTW 距離の巡回シフト・ヌル比較。
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeUsReturns, BinScheme } from "../../lib/us-spillover-core";
 import { useUsDaily } from "../../hooks/useUsDaily";
 import { useAnalogWorker } from "../../hooks/useAnalogWorker";
-import { OosResult, OosCatalog, OosSetting } from "../../lib/weekly-analog-oos";
+import { OosResult, OosCatalog, OosSetting, OosPathScore } from "../../lib/weekly-analog-oos";
 import { AnalogMode, DistMetric, WindowAlign, WeightMode } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
@@ -106,11 +110,93 @@ function drawQuintiles(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.fillText("予測ŷの分位 → 実測yの平均（右肩上がり＝単調＝予測力あり）", ml, 11);
 }
 
+// 改善A: 先行き m 日目ごとの帯被覆率。名目50%線からの乖離で「帯が締まりすぎ/緩すぎ」を見る。
+// 棒＝被覆率、折れ線＝平均バンド幅(右軸)。被覆率は帯を広げれば簡単に上がるので幅と併読する。
+function drawCoverage(ctx: CanvasRenderingContext2D, width: number, height: number, ps: OosPathScore) {
+  const ml = 40, mr = 46, mt = 18, mb = 26;
+  const plotW = width - ml - mr, plotH = height - mt - mb;
+  const H = ps.H;
+  const yOf = (v: number) => mt + plotH - v * plotH; // 0..1
+  // 名目50%
+  ctx.strokeStyle = "#94a3b8"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ml, yOf(0.5)); ctx.lineTo(ml + plotW, yOf(0.5)); ctx.stroke(); ctx.setLineDash([]);
+  const bw = plotW / H;
+  for (let m = 1; m <= H; m++) {
+    const c = ps.coverageByDay[m];
+    if (!isFinite(c)) continue;
+    const x = ml + (m - 1) * bw + bw * 0.22, w = bw * 0.56;
+    // 名目に近いほど青、離れるほど赤
+    const dev = Math.abs(c - 0.5);
+    ctx.fillStyle = dev < 0.08 ? "rgba(37,99,235,0.6)" : dev < 0.15 ? "rgba(245,158,11,0.65)" : "rgba(220,38,38,0.6)";
+    ctx.fillRect(x, yOf(c), w, plotH - (yOf(c) - mt));
+    ctx.fillStyle = "#374151"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(`${(c * 100).toFixed(0)}%`, x + w / 2, yOf(c) - 3);
+    ctx.fillStyle = "#6b7280";
+    ctx.fillText(`${m}日`, x + w / 2, mt + plotH + 12);
+  }
+  // 帯幅(右軸)
+  const wMax = Math.max(0.005, ...ps.bandWidthByDay.filter((v) => isFinite(v)));
+  ctx.strokeStyle = "#0f766e"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  let started = false;
+  for (let m = 1; m <= H; m++) {
+    const w = ps.bandWidthByDay[m];
+    if (!isFinite(w)) continue;
+    const x = ml + (m - 0.5) * bw, y = mt + plotH - (w / wMax) * plotH * 0.9;
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = "#0f766e"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText(`帯幅 最大${(wMax * 100).toFixed(1)}%`, ml + plotW + 4, mt + 8);
+  ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
+  ctx.fillText("100%", ml - 4, mt + 8);
+  ctx.fillText("50%", ml - 4, yOf(0.5) + 3);
+  ctx.fillText("0%", ml - 4, mt + plotH);
+  ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("予測25–75%帯が実測を包んだ割合（点線=名目50%）／ 緑線=帯幅", ml, 11);
+}
+
+// 改善A: 予測 MFE/MAE と実測の散布。45°線に乗れば「利確/損切り水準」として使える。
+function drawExtremes(ctx: CanvasRenderingContext2D, width: number, height: number, r: OosResult) {
+  const ml = 46, mr = 14, mt = 18, mb = 30;
+  const plotW = width - ml - mr, plotH = height - mt - mb;
+  const pts = r.points.filter((p) => isFinite(p.hiHat ?? NaN) && isFinite(p.hiAct ?? NaN) && isFinite(p.loHat ?? NaN) && isFinite(p.loAct ?? NaN));
+  if (pts.length === 0) return;
+  const all = [
+    ...pts.map((p) => p.hiHat!), ...pts.map((p) => p.hiAct!),
+    ...pts.map((p) => p.loHat!), ...pts.map((p) => p.loAct!),
+  ];
+  const mx = Math.max(0.01, ...all.map(Math.abs));
+  const xOf = (v: number) => ml + ((v + mx) / (2 * mx)) * plotW;
+  const yOf = (v: number) => mt + plotH - ((v + mx) / (2 * mx)) * plotH;
+  // 45°線(完全較正)
+  ctx.strokeStyle = "#94a3b8"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xOf(-mx), yOf(-mx)); ctx.lineTo(xOf(mx), yOf(mx)); ctx.stroke(); ctx.setLineDash([]);
+  // 軸
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.beginPath(); ctx.moveTo(xOf(0), mt); ctx.lineTo(xOf(0), mt + plotH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
+  for (const p of pts) {
+    ctx.fillStyle = "rgba(22,163,74,0.5)";
+    ctx.beginPath(); ctx.arc(xOf(p.hiHat!), yOf(p.hiAct!), 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(220,38,38,0.45)";
+    ctx.beginPath(); ctx.arc(xOf(p.loHat!), yOf(p.loAct!), 2.2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("予測（アナログの高安到達中央値）→", ml + plotW / 2, mt + plotH + 22);
+  ctx.save(); ctx.translate(12, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText("実測の高安到達 →", 0, 0); ctx.restore();
+  ctx.textAlign = "left"; ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif";
+  ctx.fillText("緑=高値到達(MFE, 利確目安) / 赤=安値到達(MAE, 損切り目安)｜点線=45°(完全較正)", ml, 11);
+}
+
 const LS_KEY = "weeklyAnalogOos.settings.v1";
 
 export default function WeeklyAnalogOosChart({ prices }: Props) {
   const scatterRef = useRef<HTMLCanvasElement>(null);
   const quintRef = useRef<HTMLCanvasElement>(null);
+  const covRef = useRef<HTMLCanvasElement>(null);
+  const extRef = useRef<HTMLCanvasElement>(null);
   const [usTicker, setUsTicker] = useState("^IXIC");
   const [scheme, setScheme] = useState<BinScheme>("tercile");
   const [mode, setMode] = useState<AnalogMode>("similar");
@@ -173,6 +259,16 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
     if (!quintRef.current || !result) return;
     const init = initCanvas(quintRef.current, 160);
     if (init) drawQuintiles(init.ctx, init.width, init.height, result);
+  }, [result]);
+  useEffect(() => {
+    if (!covRef.current || !result?.path) return;
+    const init = initCanvas(covRef.current, 180);
+    if (init) drawCoverage(init.ctx, init.width, init.height, result.path);
+  }, [result]);
+  useEffect(() => {
+    if (!extRef.current || !result?.path) return;
+    const init = initCanvas(extRef.current, 240);
+    if (init) drawExtremes(init.ctx, init.width, init.height, result);
   }, [result]);
 
   if (prices.length < 260) {
@@ -269,6 +365,95 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
           </div>
           <div className="relative"><canvas ref={scatterRef} /></div>
           <div className="relative"><canvas ref={quintRef} /></div>
+
+          {/* 改善A: 経路レベルの採点。上の IC/方向は終点1点だけの採点なので、経路そのものを別に採点する。 */}
+          <div className="pt-2 border-t border-gray-200 space-y-3">
+            <p className="text-xs text-gray-500">
+              ここまでは<span className="font-medium text-gray-700">H日後の終値1点</span>の採点。
+              しかし予測している対象は<span className="font-medium text-gray-700">経路</span>（中央値パス・25–75%帯・高安到達）で、
+              「途中で沈んでから戻った週」と「一直線に上げた週」を終点採点は区別できない。以下は
+              <span className="font-medium text-gray-700">実際に辿った経路</span>との照合。
+            </p>
+            {result.path ? (() => {
+              const ps = result.path;
+              const covDev = Math.abs(ps.coverage - 0.5);
+              const covOk = ps.coverageLo <= 0.5 && ps.coverageHi >= 0.5; // CIが名目を含む＝較正されている
+              const shapeOk = ps.shapeOk && ps.shapeCorrP < 0.05;
+              const pct = (v: number, d = 0) => (isFinite(v) ? `${(v * 100).toFixed(d)}%` : "—");
+              const num = (v: number, d = 3) => (isFinite(v) ? v.toFixed(d) : "—");
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                    {/* ① 帯の較正 */}
+                    <div className={`rounded-md border px-3 py-2 ${covOk ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
+                      <div className="font-medium text-gray-700">① 帯の較正</div>
+                      <div className="mt-1">
+                        被覆率 <span className="font-bold">{pct(ps.coverage)}</span>
+                        <span className="text-gray-500">（名目50% / CI [{pct(ps.coverageLo)}, {pct(ps.coverageHi)}]）</span>
+                      </div>
+                      <div className="text-[11px] text-gray-600">平均バンド幅 {pct(ps.bandWidth, 1)}</div>
+                      <div className="text-[11px] mt-0.5">
+                        {covOk
+                          ? <span className="text-green-700">CIが名目50%を含む＝帯は較正されている</span>
+                          : ps.coverage > 0.5
+                          ? <span className="text-amber-700">名目より広く当たる＝帯が緩い（幅を割り引いて読む）</span>
+                          : <span className="text-red-700">名目より外れる＝帯が締まりすぎ・過信の元</span>}
+                      </div>
+                    </div>
+                    {/* ② 高安の当否 */}
+                    <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2">
+                      <div className="font-medium text-gray-700">② 高安(MFE/MAE)の当否</div>
+                      <div className="mt-1">
+                        IC <span className="text-green-700 font-bold">高値 {num(ps.mfeIC)}</span>
+                        <span className="mx-1 text-gray-400">/</span>
+                        <span className="text-red-700 font-bold">安値 {num(ps.maeIC)}</span>
+                      </div>
+                      <div className="text-[11px] text-gray-600">
+                        到達率 高値 {pct(ps.mfeTouch)} / 安値 {pct(ps.maeTouch)}（較正なら≒50%）
+                      </div>
+                      <div className="text-[11px] text-gray-600">
+                        バイアス(実測−予測) 高値 {isFinite(ps.mfeBias) ? fmtPct(ps.mfeBias) : "—"} / 安値 {isFinite(ps.maeBias) ? fmtPct(ps.maeBias) : "—"}
+                      </div>
+                    </div>
+                    {/* ③ 形の一致 */}
+                    <div className={`rounded-md border px-3 py-2 ${shapeOk ? "border-green-300 bg-green-50" : "border-gray-300 bg-gray-50"}`}>
+                      <div className="font-medium text-gray-700">③ 形の一致（ヌル比較）</div>
+                      {ps.shapeOk ? (
+                        <>
+                          <div className="mt-1">
+                            増分相関 <span className="font-bold">{num(ps.shapeCorr)}</span>
+                            <span className="text-gray-500">（ヌル {num(ps.shapeCorrNull)} / p={ps.shapeCorrP < 0.001 ? "<.001" : ps.shapeCorrP.toFixed(3)}）</span>
+                          </div>
+                          <div className="text-[11px] text-gray-600">
+                            DTW距離 {num(ps.dtwDist, 2)}（ヌル {num(ps.dtwNull, 2)} / p={ps.dtwP < 0.001 ? "<.001" : ps.dtwP.toFixed(3)}）
+                          </div>
+                          <div className="text-[11px] mt-0.5">
+                            {shapeOk
+                              ? <span className="text-green-700">別の週の予測を当てるより形が合う＝経路の形に情報がある</span>
+                              : <span className="text-gray-500">ヌルと区別できない＝形の先読み力はない（終点だけを見る）</span>}
+                          </div>
+                        </>
+                      ) : <div className="text-[11px] text-gray-500 mt-1">H≧3 でのみ算出（現在 H={ps.H}）</div>}
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    経路採点の対象 n={ps.n}週｜終点採点(IC {result.ic.toFixed(3)})との食い違いに注意——
+                    <span className="font-medium text-gray-700">終点が当たらなくても帯と高安が較正されていれば、ストップ幅・利確目標の設定には使える</span>。
+                    逆も然り（終点だけ当たっても経路が荒ければ途中で振り落とされる）。
+                  </div>
+                  <div className="relative"><canvas ref={covRef} /></div>
+                  <div className="relative"><canvas ref={extRef} /></div>
+                  {covDev > 0.2 && (
+                    <div className="text-[11px] text-red-600">
+                      被覆率が名目から {(covDev * 100).toFixed(0)}pt 乖離。25–75%帯を「5割の確率で収まる範囲」として読むのは誤りになる。
+                    </div>
+                  )}
+                </>
+              );
+            })() : (
+              <div className="text-xs text-gray-400">経路の採点に必要な週数（8週以上）が揃いませんでした。</div>
+            )}
+          </div>
         </>
       )}
 
@@ -323,6 +508,35 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
           <li><strong>分位単調性</strong>: ŷ を5分位に分け、各バケットの実測平均が Q1→Q5 で右肩上がりか。予測が強いほど単調。バケット順位と実測平均の Spearman で数値化(1に近いほど単調)。</li>
           <li><strong>実効週数 n_eff</strong>: フォワードが重なる週は独立でない。n_eff ≈ n / ⌈H/5⌉。</li>
         </ul>
+        <p className="font-medium text-gray-700 mt-3">2b. 経路レベルの採点（終点1点では足りない理由）</p>
+        <p>
+          {"上の IC・方向的中率・分位単調性は、すべて "}<strong>y = P(t+H)/P(t) − 1</strong>{" というH日後の終値1点だけの採点である。しかしアナログ予測が出力しているのは経路——中央値パス、25–75%帯、高値到達(MFE)/安値到達(MAE)——であって、「途中で−4%まで沈んでから+1%で終わった週」と「一直線に+1%まで上げた週」は終点採点では同点になる。だが実務では両者は全く違う: 前者ならストップに刈られて+1%を取り逃す。"}
+          <strong>{"ストップ幅・利確目標・建玉を持ち堪えられるかは終点でなく経路が決める"}</strong>{"ので、経路そのものを次の3軸で採点する。"}
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>
+            <strong>① 帯の較正（被覆率）</strong>: 各検証週の実測終値パスが、予測の25–75%帯に入っていた割合。
+            {"名目は 50%（25%点と75%点の間だから）。定義は "}<strong>{"coverage = (1/N)Σ_i (1/H)Σ_{m=1..H} 1[ P25_i(m) ≤ act_i(m) ≤ P75_i(m) ]"}</strong>{"。"}
+            95%CI は<strong>週ブロック・ブートストラップ</strong>（ブロック長 ≈ ⌈H/5⌉ 週＝フォワードが重なる週数）で、フォワード重複による見かけの標本増を打ち消す。
+            <span className="text-red-700">帯を広げれば被覆率はいくらでも上がる</span>ので、必ず<strong>平均バンド幅</strong>と併せて読む——「被覆50%・幅3%」と「被覆50%・幅12%」では前者だけが有用。
+          </li>
+          <li>
+            <strong>② 高安(MFE/MAE)の当否</strong>: MFE=Maximum Favorable Excursion(H日以内に到達した最大の含み益)、MAE=Maximum Adverse Excursion(同・最大の含み損)。予測値（選抜局面の高安到達中央値）と実測の
+            <strong>Spearman IC</strong>、<strong>到達率</strong>（実測が予測水準に届いた割合。中央値予測が較正されていれば≒50%）、
+            <strong>バイアス</strong>（実測−予測の中央値。高値側が正＝予測が控えめ、安値側が負＝予測より深く沈む）。
+            <span className="font-medium">安値側のバイアスが負に大きいなら、アナログのMAEを損切り幅に使うと想定より頻繁に刈られる</span>——これは終点採点では絶対に見えない欠陥。
+          </li>
+          <li>
+            <strong>③ 形の一致（ヌル比較）</strong>: 予測パスと実測パスをそれぞれ日次増分に直した Pearson 相関を週ごとに計算し、Fisher z 変換して平均。加えて両パスを z 化して <strong>DTW 距離</strong>（時間のズレを吸収した形の距離）。
+            どちらも絶対値には意味がない——中央値パスは多数の局面を平均した平滑な対象なので、生の相関は構造的に小さくなる。そこで
+            <strong>巡回シフト・ヌル</strong>と比較する: 予測パスを s 週ぶんずらして<em>別の週の実測</em>に付け替え、各系列の自己相関・重複構造は保ったまま「予測と実測の対応」だけを壊した分布を作り、実測の統計量がその外側にあるかを片側 p 値で測る。
+            <strong>p&lt;0.05 なら「その週の予測はその週の実測に、他の週の実測より合っている」</strong>＝形に情報がある。
+          </li>
+        </ul>
+        <p>
+          {"3つは独立した性質で、食い違いこそが情報になる。"}<strong>{"終点IC≈0 でも帯と高安が較正されていれば、方向を張る材料にはならないがリスク管理（ストップ幅・利確目標・想定変動幅）には使える"}</strong>{"。逆に終点ICだけ高くても被覆率が名目から大きく外れていれば、25–75%帯を「5割の確率で収まる範囲」として読むのは誤りで、サイズを張る根拠にしてはいけない。"}
+        </p>
+
         <p className="font-medium text-gray-700 mt-3">3. 多重比較の補正(全設定スキャン)</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>設定(モード/距離/窓/…)を総当たりして IC 最良を選ぶのは<strong>過学習</strong>。乱数でも試行数が多ければ、どれか一つは高い IC を示す。</li>

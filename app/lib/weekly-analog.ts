@@ -200,7 +200,7 @@ function buildLead(prices: PricePoint[], end: number, L: number):
 }
 
 // z化(形状のみ比較。水準・スケール差を吸収)。
-function zShape(lead: number[]): number[] {
+export function zShape(lead: number[]): number[] {
   const m = lead.reduce((s, v) => s + v, 0) / lead.length;
   const sd = Math.sqrt(lead.reduce((s, v) => s + (v - m) ** 2, 0) / lead.length) || 1;
   return lead.map((v) => (v - m) / sd);
@@ -216,7 +216,7 @@ function euclid(a: number[], b: number[]): number {
 // 吸収して「形」を突き合わせる。Sakoe-Chiba バンドで warping 幅を制限し、退化と計算量を抑える。
 //   D[i][j] = (a_i - b_j)^2 + min(D[i-1][j], D[i][j-1], D[i-1][j-1])
 // 経路長で正規化した平方根 √(D(n,m)/Λ(n,m)) を返す(経路長の異なる候補間でも可換に近づける, B3)。
-function dtw(a: number[], b: number[], band: number): number {
+export function dtw(a: number[], b: number[], band: number): number {
   const n = a.length, m = b.length;
   const w = Math.max(band, Math.abs(n - m));
   let prevD = new Array<number>(m + 1).fill(Infinity);
@@ -281,7 +281,7 @@ function groupWeeks(prices: PricePoint[]): Map<string, number[]> {
 }
 
 // 窓末(end)を 0% とするフォワード終値パス＋高値/安値の到達(running max/min = MFE/MAE)。
-function buildForward(prices: PricePoint[], end: number, H: number):
+export function buildForward(prices: PricePoint[], end: number, H: number):
   { forward: number[]; fwdHigh: number[]; fwdLow: number[] } | null {
   const baseC = prices[end].close;
   if (!(baseC > 0)) return null;
