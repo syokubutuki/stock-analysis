@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { useBenchmarkPrices, BENCHMARK_PRESETS } from "../../hooks/useBenchmarkPrices";
-import { computeCapm, CapmResult } from "../../lib/capm-sml";
+import { computeCapm, CapmResult, type MuMode } from "../../lib/capm-sml";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -35,6 +35,9 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
   const [open, setOpen] = useState(true);
   const [benchTicker, setBenchTicker] = useState("^N225");
   const [rfPct, setRfPct] = useState(0.5);
+  // μ の定義。既定は "log"（従来どおり・数値不変）。効率的フロンティアの同名トグルと
+  // 同じ意味で、こちらをオンにすると 2 つのパネルの物差しが揃う。
+  const [muMode, setMuMode] = useState<MuMode>("log");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoverTicker, setHoverTicker] = useState<string | null>(null);
 
@@ -54,8 +57,8 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
       .filter(([, v]) => v.prices.length > 2)
       .map(([ticker, v]) => ({ ticker, prices: v.prices }));
     if (series.length < 1) return null;
-    return computeCapm(series, benchTicker, bench.name, bench.prices, rfPct / 100, win);
-  }, [data, bench.prices, bench.name, benchTicker, rfPct, win]);
+    return computeCapm(series, benchTicker, bench.name, bench.prices, rfPct / 100, win, muMode);
+  }, [data, bench.prices, bench.name, benchTicker, rfPct, win, muMode]);
 
   const bounds = useMemo(() => {
     if (!result) return null;
@@ -249,6 +252,20 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
               className="w-32"
             />
             <span className="tabular-nums w-10">{rfPct.toFixed(1)}%</span>
+            <label
+              className="flex items-center gap-1.5 cursor-pointer select-none ml-2"
+              title="μ・α を対数平均(従来)から算術平均(教科書の定義)へ切り替える。β・σ・相関は対数リターンのまま。効率的フロンティアの同名トグルと同じ意味なので、両方オンにすると 2 つのパネルの物差しが揃う。"
+            >
+              <input
+                type="checkbox"
+                checked={muMode === "arithmetic"}
+                onChange={(e) => setMuMode(e.target.checked ? "arithmetic" : "log")}
+              />
+              <span>
+                μ・α を<strong>算術平均</strong>で計算
+                <span className="text-gray-400">（実験・既定オフ）</span>
+              </span>
+            </label>
             {bench.loading && <span className="text-gray-400">指数取得中…</span>}
           </div>
 
@@ -350,14 +367,25 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                     </tr>
                   </tbody>
                 </table>
-                {/* μ の定義（対数平均）を明記する。詳細は docs/portfolio-analysis-open-issues.md */}
-                <p className="text-[10px] text-gray-400 mt-1">
-                  「実現μ」「α」は<strong>対数リターンの平均×252</strong>から計算しています（＝実現した幾何平均に相当）。
-                  単純リターンの算術平均より各銘柄 σᵢ²/2 だけ低いため、
-                  <strong>高ボラ銘柄の α はその分だけ控えめに出ます</strong>（σ=35%で約 6pp、σ=60%で約 19pp の水準差。
-                  α には β で説明される市場分の差が相殺されるので実効はこれより小さい）。
-                  銘柄間の割安/割高の比較でこの効果が効くため、ボラの大きく違う銘柄を並べるときは注意してください。
-                </p>
+                {/* μ の定義を明記する。詳細は docs/portfolio-analysis-open-issues.md §1.7 */}
+                {result.muMode === "log" ? (
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    「実現μ」「α」は<strong>対数リターンの平均×252</strong>から計算しています（＝実現した幾何平均に相当）。
+                    単純リターンの算術平均より各銘柄 σᵢ²/2 だけ低いため、
+                    <strong>高ボラ銘柄の α はその分だけ控えめに出ます</strong>（σ=35%で約 6pp、σ=60%で約 19pp の水準差。
+                    α には β で説明される市場分の差が相殺されるので実効はこれより小さい）。
+                    銘柄間の割安/割高の比較でこの効果が効くため、ボラの大きく違う銘柄を並べるときは注意してください。
+                    上の<strong>「μ・α を算術平均で計算」</strong>を押すと、この歪みを取り除いた値に切り替わります。
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-amber-600 mt-1">
+                    <strong>算術平均モード</strong>：「実現μ」「α」は<strong>単純リターン exp(r)−1 の平均×252</strong>
+                    （教科書の期待リターンの定義）で計算しています。対数平均モードより各銘柄
+                    σᵢ²/2 だけ高く出て、<strong>高ボラ銘柄の α が systematically 低く出る歪みが消えます</strong>。
+                    β・σ・相関は対数リターンのままなので、動くのは μ と α だけです。
+                    効率的フロンティアの同名トグルと同じ物差しなので、比較するなら<strong>両方を同じ設定に</strong>してください。
+                  </p>
+                )}
               </div>
 
               <AnalysisGuide title="証券市場線(SML)・β・Jensenのα の詳細理論">
@@ -404,6 +432,13 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                   <li>指数は「真の市場ポートフォリオ」ではなくその代理。指数の選び方でα・βは変わる。</li>
                   <li>米国指数×日本株は通貨(ドル建て)と時差(非同期)でβが下方バイアス。上部の注意を参照。</li>
                   <li>CAPMは単一ファクター。規模・バリュー等の効果は説明できず、αにそれらが混入する。</li>
+                  <li>
+                    <strong>μ の定義でαの並びが動く</strong>。既定の対数平均は各銘柄の実現幾何平均で、
+                    算術平均より σᵢ²/2 だけ低い。この差は<strong>銘柄ごとに違う</strong>（σ=35%で6pp、σ=60%で19pp）ので、
+                    ボラの大きく異なる銘柄を並べると<strong>高ボラ銘柄のαが構造的に低く出る</strong>。
+                    上部のトグルで算術平均に切り替えるとこの歪みは消える（β・σ・相関は不変）。
+                    効率的フロンティア側の同名トグルと必ず設定を揃えること。
+                  </li>
                 </ul>
               </AnalysisGuide>
             </>

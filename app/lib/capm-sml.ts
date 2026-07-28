@@ -13,8 +13,22 @@
 
 import { PricePoint } from "./types";
 import { alignReturns } from "./portfolio-risk";
+import { type MuMode } from "./efficient-frontier";
 
 const TRADING_DAYS = 252;
+
+// ---- μ の定義（対数平均 / 算術平均）----------------------------------------
+//
+// alignReturns が返すのは**対数**リターンなので、その平均×252 は「実現した幾何平均」で
+// あって教科書の期待リターン μ ではない。両者の差はぴったり σᵢ²/2 で、σ=35% なら 6pp、
+// σ=60% なら 19pp。**銘柄間でばらつく**のがここでの問題で、対数平均のまま α を出すと
+// 高ボラ銘柄の α が systematically 過小評価される（β で説明されない部分に σᵢ²/2 の差が混ざる）。
+//
+// 既定は "log"（従来どおり・数値不変）。"arithmetic" にすると μ と α だけが算術平均ベースに
+// 変わる。β・σ・相関は**対数リターンの共分散のまま**にしてあり、これは効率的フロンティア
+// (efficient-frontier.ts) の muMode が μ だけを差し替え Σ を触らないのと同じ約束
+// ——2つのパネルで同じ物差しを使うための整合。詳細は docs/portfolio-analysis-open-issues.md §1。
+export type { MuMode };
 
 export interface CapmAsset {
   ticker: string;
@@ -33,6 +47,8 @@ export interface CapmResult {
   benchName: string;
   riskFree: number;
   nObs: number;
+  /** μ・α の定義（"log" ＝ 従来どおりの対数平均）。 */
+  muMode: MuMode;
   muMarket: number; // 市場の年率リターン
   sigMarket: number; // 市場の年率ボラ
   assets: CapmAsset[];
@@ -71,7 +87,8 @@ export function computeCapm(
   benchName: string,
   benchPrices: PricePoint[],
   riskFreeRate: number, // 年率
-  window: number
+  window: number,
+  muMode: MuMode = "log"
 ): CapmResult | null {
   if (benchPrices.length < 3) return null;
   const valid = series.filter((s) => s.prices.length > 2);
@@ -86,10 +103,16 @@ export function computeCapm(
   if (T < 12) return null;
 
   const rm = aligned.returns[0];
-  const rfDaily = riskFreeRate / TRADING_DAYS;
   const meanRm = mean(rm);
   const varRm = variance(rm, meanRm);
-  const muMarket = meanRm * TRADING_DAYS;
+  // β・σ・相関は常に対数リターンから（muMode は μ の定義だけを差し替える）。
+  // 年率平均だけ muMode に従う: 算術平均は単純リターン expm1(r) の標本平均から直接取る
+  // （対数正規の仮定を置かずに済む。growth-drag.ts の arithmeticAnnualMeans と同じ手続き）。
+  const annualMean = (r: number[]) =>
+    muMode === "arithmetic"
+      ? mean(r.map((v) => Math.expm1(v))) * TRADING_DAYS
+      : mean(r) * TRADING_DAYS;
+  const muMarket = annualMean(rm);
   const sigMarket = Math.sqrt(Math.max(varRm, 0) * TRADING_DAYS);
   const sdRm = Math.sqrt(Math.max(varRm, 0));
 
@@ -100,12 +123,14 @@ export function computeCapm(
     const varRi = variance(ri, meanRi);
     const cov = covariance(ri, rm, meanRi, meanRm);
     const beta = varRm > 0 ? cov / varRm : 0;
-    const mu = meanRi * TRADING_DAYS;
+    const mu = annualMean(ri);
     const sigma = Math.sqrt(Math.max(varRi, 0) * TRADING_DAYS);
     const sdRi = Math.sqrt(Math.max(varRi, 0));
     const corr = sdRi > 0 && sdRm > 0 ? cov / (sdRi * sdRm) : 0;
-    const alphaAnnual = (meanRi - (rfDaily + beta * (meanRm - rfDaily))) * TRADING_DAYS;
     const capmExpected = riskFreeRate + beta * (muMarket - riskFreeRate);
+    // α ＝ 実現 μ − SML 上の理論値。日次で引いて×252 しても同じ式になるので、
+    // mispricing と同一の値を1か所で作る（2通りの計算を残さない）。
+    const alphaAnnual = mu - capmExpected;
     const treynor = Math.abs(beta) > 1e-9 ? (mu - riskFreeRate) / beta : NaN;
     assets.push({
       ticker: aligned.tickers[i],
@@ -134,6 +159,7 @@ export function computeCapm(
     benchName,
     riskFree: riskFreeRate,
     nObs: T,
+    muMode,
     muMarket,
     sigMarket,
     assets,

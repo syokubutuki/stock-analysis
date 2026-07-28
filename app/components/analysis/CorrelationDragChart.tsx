@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
 import { AlignedReturns, alignReturns, correlationMatrix } from "../../lib/portfolio-risk";
+import { WatchlistItem, effectiveKind } from "../../lib/watchlist";
 import { StressCorrCI, stressCorrelation, stressCorrelationCI } from "../../lib/dcc";
 import {
   TRADING_DAYS,
@@ -143,6 +144,11 @@ export interface CorrelationDragChartProps {
    * 省略すると合成データのみ（従来の挙動）。
    */
   data?: PortfolioData;
+  /**
+   * ウォッチリスト。渡すと「実際の建玉ウェイトでの N_eff」を等ウェイト版と並べて出せる
+   * （等ウェイトのままだと実測 R と等相関近似は恒等的に一致してしまい情報がないため）。
+   */
+  watchlist?: WatchlistItem[];
   /** リターン窓の指定。data を渡すときだけ意味を持つ（既定 "swing"）。 */
   horizon?: Horizon;
   /** ρ スライダーの初期値。指定すると実測値より優先（既定は実測 → 無ければ 0.5）。 */
@@ -189,17 +195,31 @@ export interface MeasuredInputs {
   periods: number;
   /**
    * 実測の相関行列 R をそのまま使った実効銘柄数 (Σw)²/(wᵀRw)（等ウェイト）。
-   * 崖の式が使う等相関近似 N/(1+(N−1)ρ̄) との差が「等相関という単純化のコスト」。
+   *
+   * 【重要】等ウェイトのとき、これは崖の式が使う等相関近似 N/(1+(N−1)ρ̄) と
+   * **恒等的に一致する**（下の nEffEqualCorr と必ず同じ値になる）。証明:
+   *   Σᵢⱼ Rᵢⱼ = N + 2·Σ_{i<j} Rᵢⱼ = N + N(N−1)ρ̄  ⇒  N²/Σᵢⱼ Rᵢⱼ = N/(1+(N−1)ρ̄)
+   * したがって「実測 R を使えば等相関の近似誤差が見える」というのは**誤り**で、
+   * 等ウェイトのままではこの2つを並べても情報がない。近似が本当に効くのは
+   * ①ウェイトの偏り（nEffHeld）と ②ペア相関のばらつき（rhoMin/rhoMax）の2つ。
    */
   nEffEmpirical: number;
-  /** 等相関近似での N_eff（ρ̄ ＝ 全期間の平均相関）。 */
+  /** 等相関近似での N_eff（ρ̄ ＝ 全期間の平均相関）。上と恒等的に一致する。 */
   nEffEqualCorr: number;
   /** 危機時の相関行列での実測 N_eff（危機標本が取れたときだけ）。 */
   nEffStress: number | null;
+  /** 実際の建玉ウェイト（時価構成比）での N_eff。建玉が2銘柄未満なら null。 */
+  nEffHeld: number | null;
+  /** 建玉として数えた銘柄数。 */
+  nHeld: number;
+  /** ペア相関の最小・最大（1本の ρ では代表できない幅）。 */
+  rhoMin: number;
+  rhoMax: number;
 }
 
 export default function CorrelationDragChart({
   data,
+  watchlist,
   horizon = "swing",
   initialRho,
   initialExposure = 1,
@@ -231,10 +251,35 @@ export default function CorrelationDragChart({
     const stress = stressCorrelation(aligned, STRESS_OPTS);
     const cm = correlationMatrix(aligned);
     const n = aligned.tickers.length;
-    // 等ウェイトでの実測 N_eff。崖の式（等相関近似）と並べて出すことで、
-    // 「全ペアの相関が等しい」という単純化がどれだけ効いていないかが数字で見える。
     const wEq = new Array(n).fill(1 / n);
+
+    // 実際の建玉ウェイト（時価構成比）。等ウェイトとの差＝ウェイトの偏りが N_eff を削る分。
+    // 抽出ロジックは YourPortfolioDragPanel / PortfolioRiskPanel と同一。
+    const mv: Record<string, number> = {};
+    for (const item of watchlist ?? []) {
+      if (effectiveKind(item) !== "held") continue;
+      const pos = item.position;
+      const last = data?.[item.ticker]?.prices.at(-1)?.close;
+      if (pos && pos.shares > 0 && last) mv[item.ticker] = pos.shares * last;
+    }
+    const totalMV = aligned.tickers.reduce((s, t) => s + (mv[t] ?? 0), 0);
+    const nHeld = aligned.tickers.filter((t) => (mv[t] ?? 0) > 0).length;
+    const wHeld = totalMV > 0 ? aligned.tickers.map((t) => (mv[t] ?? 0) / totalMV) : null;
+
+    // ペア相関の幅（崖が1本の ρ で代表しているものの実体）
+    let rhoMin = Infinity;
+    let rhoMax = -Infinity;
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        rhoMin = Math.min(rhoMin, cm.matrix[i][j]);
+        rhoMax = Math.max(rhoMax, cm.matrix[i][j]);
+      }
+
     return {
+      nEffHeld: wHeld && nHeld >= 2 ? effectiveNFromWeights(wHeld, cm.matrix) : null,
+      nHeld,
+      rhoMin: isFinite(rhoMin) ? rhoMin : 0,
+      rhoMax: isFinite(rhoMax) ? rhoMax : 0,
       n,
       tickers: aligned.tickers,
       avgVolPct: avgVol * 100,
@@ -249,7 +294,7 @@ export default function CorrelationDragChart({
       nEffEqualCorr: effectiveN(n, cm.avgCorr),
       nEffStress: stress.ok ? effectiveNFromWeights(wEq, stress.matrix) : null,
     };
-  }, [aligned]);
+  }, [aligned, data, watchlist]);
 
   // ── 危機時 ρ と平時 ρ の差の不確かさ（課題2） ───────────────────────────
   // 点推定だけでは「危機時のほうが低い」がノイズか本物かを判定できないので、
@@ -591,10 +636,16 @@ export default function CorrelationDragChart({
                   className={`text-[10px] px-1.5 py-0.5 rounded ${
                     rhoCI.crossesZero
                       ? "bg-gray-200 text-gray-600"
-                      : "bg-amber-100 text-amber-800"
+                      : rhoCI.pTwoSided < 0.05
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-yellow-50 text-yellow-800 border border-yellow-200"
                   }`}
                 >
-                  {rhoCI.crossesZero ? "差は検出できない" : "0 を跨がない"}
+                  {rhoCI.crossesZero
+                    ? "差は検出できない"
+                    : rhoCI.pTwoSided < 0.05
+                      ? "0 を跨がない（5%水準でも有意）"
+                      : "0 を跨がないが弱い（5%水準では非有意）"}
                 </span>
                 <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-400">
                   ブロック長
@@ -623,20 +674,36 @@ export default function CorrelationDragChart({
                     上に出ている符号は<strong>ノイズと区別がつかない</strong>ので、
                     向きを結論として読まないでください。
                   </>
-                ) : rhoCI.delta > 0 ? (
-                  <>
-                    CI が 0 を跨がないので、この標本では
-                    <strong>危機時に相関が上がる差は本物</strong>です
-                    （ブロック {blockLen}日・{rhoCI.b}回）。ただし
-                    <strong>次の危機で同じ大きさになる保証ではありません</strong>。
-                  </>
                 ) : (
                   <>
-                    CI が 0 を跨がないので、この標本では
-                    <strong>危機時のほうが相関が低いのは本物</strong>です
-                    （ブロック {blockLen}日・{rhoCI.b}回）。一般論の
-                    「荒れると相関が上がる」があなたの組み合わせでは成り立っていない、
-                    という実測結果です。
+                    {(rhoCI.level * 100).toFixed(0)}% CI が 0 を跨がないので、この標本では
+                    {rhoCI.delta > 0 ? (
+                      <strong>危機時に相関が上がっている</strong>
+                    ) : (
+                      <strong>危機時のほうが相関が低い</strong>
+                    )}
+                    と読めます（ブロック {blockLen}日・{rhoCI.b}回）。
+                    {rhoCI.pTwoSided < 0.05 ? (
+                      <>
+                        {" "}p = {rhoCI.pTwoSided.toFixed(3)} なので
+                        <strong>慣例の5%水準でも有意</strong>です。
+                      </>
+                    ) : (
+                      <>
+                        {" "}ただし p = {rhoCI.pTwoSided.toFixed(3)} で
+                        <strong>5%水準では有意になりません</strong>——
+                        {(rhoCI.level * 100).toFixed(0)}% CI で 0 を外すのは
+                        p &lt; {((1 - rhoCI.level)).toFixed(2)} と同義なので、
+                        <strong>「弱い証拠」どまり</strong>と読んでください。
+                      </>
+                    )}
+                    {rhoCI.delta < 0 && (
+                      <>
+                        {" "}一般論の「荒れると相関が上がる」が、少なくともこの標本では
+                        成り立っていません。
+                      </>
+                    )}
+                    {" "}いずれにせよ<strong>次の危機で同じ向き・同じ大きさになる保証ではありません</strong>。
                   </>
                 )}
                 {" "}標準誤差 {rhoCI.deltaSe.toFixed(3)}。ブロック長を変えても符号と結論が
@@ -650,54 +717,74 @@ export default function CorrelationDragChart({
             </p>
           )}
 
-          {/* ── 課題3: N_eff の等相関近似 vs 実測 R ── */}
+          {/* ── 課題3: 等相関という単純化は、どこで効いてどこで効かないか ──
+              等ウェイトなら「実測 R の N_eff」と「等相関近似」は代数的に同じ値になる。
+              並べても情報がないので、実際に効く2つ（ウェイトの偏り・ペア相関の幅）を出す。 */}
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-gray-600 tabular-nums">
-            <span className="text-gray-500">実効銘柄数 N_eff（等ウェイト）:</span>
+            <span className="text-gray-500">実効銘柄数 N_eff:</span>
             <span>
-              実測 R ={" "}
+              等ウェイト ={" "}
               <strong className="text-gray-900">{measured.nEffEmpirical.toFixed(2)}</strong>
+              <span className="text-gray-400">
+                {" "}（実測 R も等相関近似 N/(1+(N−1)ρ̄) も同値）
+              </span>
             </span>
-            <span>
-              等相関近似（ρ̄={measured.rhoAll.toFixed(2)}）={" "}
-              <strong className="text-gray-900">{measured.nEffEqualCorr.toFixed(2)}</strong>
-            </span>
-            <span
-              className={
-                Math.abs(measured.nEffEmpirical - measured.nEffEqualCorr) >
-                0.15 * Math.max(measured.nEffEqualCorr, 1e-9)
-                  ? "text-amber-700"
-                  : "text-gray-400"
-              }
-            >
-              差 {measured.nEffEmpirical >= measured.nEffEqualCorr ? "+" : "−"}
-              {Math.abs(measured.nEffEmpirical - measured.nEffEqualCorr).toFixed(2)}
-              （
-              {(
-                (100 * (measured.nEffEmpirical - measured.nEffEqualCorr)) /
-                Math.max(measured.nEffEqualCorr, 1e-9)
-              ).toFixed(0)}
-              %）
-            </span>
+            {measured.nEffHeld != null ? (
+              <span
+                className={
+                  measured.nEffHeld < measured.nEffEmpirical * 0.85
+                    ? "text-amber-700"
+                    : "text-gray-600"
+                }
+              >
+                あなたの建玉ウェイト ={" "}
+                <strong>{measured.nEffHeld.toFixed(2)}</strong>
+                <span className="text-gray-400"> （{measured.nHeld}銘柄の時価構成比）</span>
+              </span>
+            ) : (
+              <span className="text-gray-400">
+                建玉ウェイト版は保有2銘柄以上（株数入力あり）で表示
+              </span>
+            )}
             {measured.nEffStress != null && (
               <span className="text-red-700">
                 危機時 R = <strong>{measured.nEffStress.toFixed(2)}</strong>
               </span>
             )}
+            <span className="text-gray-500">
+              ペア相関の幅 {measured.rhoMin.toFixed(2)} 〜 {measured.rhoMax.toFixed(2)}
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-gray-500">
-            下の崖は<strong>全ペアの相関が等しい（等相関）</strong>という単純化の上に立っていて、
-            N_eff = N/(1+(N−1)ρ̄) で計算しています。左の「実測 R」は
-            <strong>{" (Σw)²/(wᵀRw) "}</strong>——ペアごとの相関の違いをそのまま織り込んだ値です。
-            {Math.abs(measured.nEffEmpirical - measured.nEffEqualCorr) >
-            0.15 * Math.max(measured.nEffEqualCorr, 1e-9) ? (
-              <strong className="text-amber-700">
-                {" "}2つが{measured.nEffEmpirical > measured.nEffEqualCorr ? "実測のほうが大きく" : "実測のほうが小さく"}
-                15%以上ずれています＝等相関の近似が効いていません。崖の位置は目安として読み、
-                実データの分解は「相関が食べた分」パネルを見てください。
-              </strong>
+            崖は<strong>全ペアの相関が等しい（等相関）</strong>という単純化の上に立っています。
+            ただし<strong>等ウェイトのままでは、実測 R をそのまま使う {" (Σw)²/(wᵀRw) "} と
+            等相関近似 N/(1+(N−1)ρ̄) は必ず同じ値になります</strong>
+            （{" Σᵢⱼ Rᵢⱼ = N + N(N−1)ρ̄ "} なので代数的に一致。ρ̄ は非対角の平均）。
+            つまり<strong>この2つを並べても近似の粗さは測れません</strong>。実際に効くのは次の2つです。
+            {measured.nEffHeld == null ? (
+              <>
+                {" "}①<strong>ウェイトの偏り</strong>：等ウェイトを外れると N_eff は必ず落ちます。
+                ウォッチリストに<strong>保有（株数入力あり）を2銘柄以上</strong>登録すると、
+                あなたの実際の建玉構成比での N_eff をここに出します。
+              </>
             ) : (
-              <> 2つがほぼ一致しているので、この銘柄構成では等相関の単純化が実害なく効いています。</>
+              <>
+                {" "}①<strong>ウェイトの偏り</strong>：あなたの建玉構成比だと N_eff は{" "}
+                <strong>{measured.nEffHeld.toFixed(2)}</strong>（等ウェイトの{" "}
+                {((100 * measured.nEffHeld) / Math.max(measured.nEffEmpirical, 1e-9)).toFixed(0)}%）。
+                {measured.nEffHeld < measured.nEffEmpirical * 0.85 && (
+                  <strong className="text-amber-700">
+                    {" "}偏りだけで実質的な分散が
+                    {(100 - (100 * measured.nEffHeld) / Math.max(measured.nEffEmpirical, 1e-9)).toFixed(0)}%
+                    失われています。
+                  </strong>
+                )}
+              </>
             )}
+            {" "}②<strong>ペア相関のばらつき</strong>：実測は {measured.rhoMin.toFixed(2)} 〜{" "}
+            {measured.rhoMax.toFixed(2)} に散らばっていて、崖はこれを ρ 1本で代表しています。
+            N_eff は一致しても、<strong>どのペアで束になっているかは表現できません</strong>——
+            そこは「相関が食べた分」パネルの主成分（実質いくつの賭けか）で確認してください。
           </p>
           {rhoStressMeasured == null && (
             <p className="mt-1 text-[11px] text-amber-700">
@@ -732,7 +819,9 @@ export default function CorrelationDragChart({
                       （現在は<strong>
                         {rhoCI.crossesZero
                           ? "0 を跨いでいる＝差を検出できていません"
-                          : "0 を跨いでいない＝標本内では本物の差です"}
+                          : rhoCI.pTwoSided < 0.05
+                            ? "0 を跨いでおらず p<0.05＝標本内では有意な差です"
+                            : "0 を跨がないが p≥0.05＝弱い証拠どまりです"}
                       </strong>）
                     </>
                   )}
@@ -1398,11 +1487,22 @@ export default function CorrelationDragChart({
           「どの日が危機か」の不確かさまで CI に含まれます。
         </p>
         <p className="font-mono text-[11px] bg-white rounded px-2 py-1">
-          Δρ* の分布 → CI = [ q(α/2), q(1−α/2) ] , p = 2·min( P(Δρ*≤0), P(Δρ*≥0) )
+          SE = sd(Δρ*) , CI = Δρ̂ ± z·SE , p = 2(1 − Φ(|Δρ̂| / SE))
         </p>
         <p>
-          ρ 単体の CI は Fisher の z 変換 {" z = ½·ln((1+ρ)/(1−ρ)) "} 上で取ってから戻します
-          （ρ は ±1 で頭打ちなので、そのままだと区間が範囲外にはみ出すため）。差 Δρ はそのまま取ります。
+          <strong>位置はブートストラップに任せていません</strong>（ここが設計上の判断）。
+          ブロックを貼り合わせた系列では、数週間まとまって来るはずの危機が細切れになり、
+          レジーム分割が甘くなります。その結果 <strong>Δρ* は実測より系統的に 0 へ寄る</strong>——
+          真に ρ が 0.35→0.80 と上がる合成データで確かめると、実測 Δρ̂=+0.220 に対して
+          ブート分布は [0.011, 0.209] に居座り、<strong>素のパーセンタイル区間だと実測値が
+          自分の信頼区間の外に出てしまいました</strong>。これは推定量のバイアスではなく
+          <strong>再標本化の副作用</strong>なので、区間の<strong>中心は実測値に固定</strong>し、
+          ブートストラップは<strong>ばらつき（標準誤差）の推定にだけ</strong>使います。
+          こうすると実測値は必ず区間の中心に来て、<strong>「区間が 0 を外す」と「p が小さい」が
+          常に一致</strong>します。代償として Δρ̂ の正規近似を仮定しますが、
+          Δρ̂ は多数のペア相関の平均の差なので妥当です。
+          ρ 単体の CI は Fisher の z 変換 {" z = ½·ln((1+ρ)/(1−ρ)) "} 上で作ってから戻します
+          （ρ は ±1 で頭打ちなので、そのままだと区間が範囲外にはみ出すため）。
         </p>
         <p>
           <strong>読み方</strong>: CI が 0 を跨いだら「<strong>差は検出できない</strong>」と言い切ってよく、
@@ -1423,13 +1523,14 @@ export default function CorrelationDragChart({
             ウォッチリストを渡していない場合は、ρ・N・σ も含めて全て仮定です。
           </li>
           <li>
-            <strong>全ペアの相関が等しい（等相関）という単純化</strong>を置いています。現実には相関はペアごとに
-            異なるので、上のバナーに<strong>2つの N_eff を並べて出しています</strong>——
-            崖が使う等相関近似 {" N/(1+(N−1)ρ̄) "} と、実測の相関行列をそのまま使う
-            {" (Σw)²/(wᵀRw) "}。<strong>この2つが大きく違うときは等相関の近似が効いていません</strong>
-            （目安として 15% 以上の乖離で警告を出します）。乖離の向きにも意味があり、実測のほうが
-            <strong>小さい</strong>なら「一部のペアが極端に高い相関で束になっている」——
-            平均 ρ̄ を見ているだけでは気づけない集中です。
+            <strong>全ペアの相関が等しい（等相関）という単純化</strong>を置いています。ただし
+            <strong>「実測の相関行列を使えば近似の粗さが見える」というのは誤り</strong>です——
+            等ウェイトのとき {" (Σw)²/(wᵀRw) "} と {" N/(1+(N−1)ρ̄) "} は
+            <strong>恒等的に同じ値</strong>になります（{" Σᵢⱼ Rᵢⱼ = N + 2Σ_{i<j}Rᵢⱼ = N + N(N−1)ρ̄ "}
+            より）。実際に単純化が効くのは
+            <strong>①ウェイトの偏り</strong>（等ウェイトを外れると N_eff は必ず落ちる）と
+            <strong>②ペア相関のばらつき</strong>（同じ ρ̄ でも「一部のペアだけ極端に高い」構造は
+            ρ 1本では表現できない）の2つで、バナーにはその2つを出しています。
           </li>
           <li>
             <strong>μ の推定誤差は σ の推定誤差よりはるかに大きい</strong>。頂点 W* は μ に比例するため、

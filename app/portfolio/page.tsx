@@ -51,6 +51,10 @@ const CorrelationDragChart = dynamic(
   () => import("../components/analysis/CorrelationDragChart"),
   { ssr: false }
 );
+const ExceedanceCorrelationChart = dynamic(
+  () => import("../components/analysis/ExceedanceCorrelationChart"),
+  { ssr: false }
+);
 const YourPortfolioDragPanel = dynamic(
   () => import("../components/analysis/YourPortfolioDragPanel"),
   { ssr: false }
@@ -554,8 +558,18 @@ export default function PortfolioPage() {
             items.push({
               id: "pf-corr-drag",
               title: "相関だけを動かす：三本の崖と、同期していく値動き",
-              subtitle: "ρスライダー1本でN本の値動きが同じ形に揃っていく同期アニメ／g(建玉%)の放物線をρ=0・0.5・0.8で重ね、現在地ドットは動かないのに崖だけが手前にずり寄る／実質銘柄数N_effと隠れレバレッジのリアルタイム表示／平時ρと危機時ρを実測し「平時のあなた」「暴落時のあなた」を2ドットで対比",
-              node: <CorrelationDragChart data={data} horizon={horizon} />,
+              subtitle: "ρスライダー1本でN本の値動きが同じ形に揃っていく同期アニメ／g(建玉%)の放物線をρ=0・0.5・0.8で重ね、現在地ドットは動かないのに崖だけが手前にずり寄る／実質銘柄数N_effは等ウェイト版に加えて実際の建玉ウェイト版とペア相関の幅を併記（等ウェイトでは実測Rと等相関近似が恒等的に一致するため）／平時ρと危機時ρを実測し「平時のあなた」「暴落時のあなた」を2ドットで対比、その差Δρはブロック・ブートストラップCIでノイズかどうかを判定",
+              node: <CorrelationDragChart data={data} watchlist={watchlist} horizon={horizon} />,
+            });
+            // 危機時ρ（上下対称な定義）では測れない「下落時 “だけ” 相関が上がる」を、
+            // 2変量正規のヌルと比べて検定する。条件付けバイアスはヌル側にも同じだけ効くので差で相殺される。
+            if (dn >= 2) items.push({
+              id: "pf-exceedance-corr",
+              title: "下落時“だけ”相関が上がるか：exceedance correlation と正規ヌル",
+              subtitle: "ともに−θσ以下の日の相関ρ⁻とともに+θσ以上の日のρ⁺を θ=0/0.5/1.0/1.5 で測り、同じ無条件相関・同じ標本数の2変量正規モンテカルロと比較／条件付けバイアス(Boyer-Gibson-Loretan)はヌルにも同じだけ効くので差で相殺／非対称性A=ρ⁻−ρ⁺とAng-Chen型H統計量の検定・ペア別内訳",
+              // 期間は渡さない: テールの標本を確保するため、この分析だけは既定を
+              // 最長窓（ポジション=756日）に固定し、パネル内のボタンで切り替えさせる。
+              node: <ExceedanceCorrelationChart data={data} />,
             });
             // 期待リターンは増えているのに長期成長率は下がる、を実データのウォーターフォールで示す。
             if (dn >= 2) items.push({
