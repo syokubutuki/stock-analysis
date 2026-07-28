@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
-import { WatchlistItem, effectiveKind } from "../../lib/watchlist";
+import { WatchlistItem, heldMarketValues } from "../../lib/watchlist";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
 import {
   alignReturns,
@@ -38,16 +38,8 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
     const aligned = alignReturns(series, HORIZON_CONFIG[horizon].window);
     const corr = correlationMatrix(aligned);
 
-    // 建玉(保有 & 株数>0)の時価でウェイト
-    const rawWeights: Record<string, number> = {};
-    for (const item of watchlist) {
-      if (effectiveKind(item) !== "held") continue;
-      const pos = item.position;
-      const last = data[item.ticker]?.prices.at(-1)?.close;
-      if (pos && pos.shares > 0 && last) {
-        rawWeights[item.ticker] = pos.shares * last;
-      }
-    }
+    // 建玉(保有 & 株数>0)の時価でウェイト（抽出は watchlist.ts の共通関数）
+    const rawWeights = heldMarketValues(data, watchlist);
     const risk = portfolioRisk(aligned, rawWeights);
     return { corr, risk, names, aligned, rawWeights };
   }, [data, watchlist, horizon]);

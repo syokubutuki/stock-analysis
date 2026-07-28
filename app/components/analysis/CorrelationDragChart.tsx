@@ -23,8 +23,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
 import { AlignedReturns, alignReturns, correlationMatrix } from "../../lib/portfolio-risk";
-import { WatchlistItem, effectiveKind } from "../../lib/watchlist";
-import { StressCorrCI, stressCorrelation, stressCorrelationCI } from "../../lib/dcc";
+import { WatchlistItem, heldMarketValues, heldWeightsFor } from "../../lib/watchlist";
+import {
+  DOWNSIDE_RHO_EVENT,
+  DownsideRho,
+  loadDownsideRho,
+  sameUniverse,
+} from "../../lib/downside-rho";
+import { stressCorrelation } from "../../lib/dcc";
+import {
+  useStressCorrCI,
+  useStressCorrCIProfile,
+  type StressProfilePoint,
+} from "../../hooks/usePortfolioTail";
 import {
   TRADING_DAYS,
   annualStats,
@@ -177,6 +188,13 @@ const STRESS_OPTS = { quantile: 0.25, lookback: 60 };
 /** Δρ の CI に使うブロック長の選択肢（営業日）。 */
 const BLOCK_LENS = [10, 20, 40];
 
+/**
+ * 窓依存プロファイルで測る窓（営業日）。データが足りない窓は実データ長に丸められる。
+ * 126（半年）〜 2520（10年）まで。標本が増えるほど CI が縮むはずで、そうならなければ
+ * 「相関構造そのものが期間で違う」ことを意味する。
+ */
+const PROFILE_WINDOWS = [126, 252, 504, 756, 1260, 2520];
+
 export interface MeasuredInputs {
   n: number;
   tickers: string[];
@@ -254,17 +272,11 @@ export default function CorrelationDragChart({
     const wEq = new Array(n).fill(1 / n);
 
     // 実際の建玉ウェイト（時価構成比）。等ウェイトとの差＝ウェイトの偏りが N_eff を削る分。
-    // 抽出ロジックは YourPortfolioDragPanel / PortfolioRiskPanel と同一。
-    const mv: Record<string, number> = {};
-    for (const item of watchlist ?? []) {
-      if (effectiveKind(item) !== "held") continue;
-      const pos = item.position;
-      const last = data?.[item.ticker]?.prices.at(-1)?.close;
-      if (pos && pos.shares > 0 && last) mv[item.ticker] = pos.shares * last;
-    }
-    const totalMV = aligned.tickers.reduce((s, t) => s + (mv[t] ?? 0), 0);
-    const nHeld = aligned.tickers.filter((t) => (mv[t] ?? 0) > 0).length;
-    const wHeld = totalMV > 0 ? aligned.tickers.map((t) => (mv[t] ?? 0) / totalMV) : null;
+    // 抽出は watchlist.ts の共通関数（YourPortfolioDragPanel / PortfolioRiskPanel と同一）。
+    const { weights: wHeld, count: nHeld } = heldWeightsFor(
+      aligned.tickers,
+      heldMarketValues(data ?? {}, watchlist ?? [])
+    );
 
     // ペア相関の幅（崖が1本の ρ で代表しているものの実体）
     let rhoMin = Infinity;
@@ -300,11 +312,46 @@ export default function CorrelationDragChart({
   // 点推定だけでは「危機時のほうが低い」がノイズか本物かを判定できないので、
   // ボラのクラスタリングを壊さないブロック単位で再抽出して Δρ の CI を出す。
   // 計算は開いたときだけ走る（このパネルは折りたたみの中でマウントされる）。
+  // 400回の再標本化 × 全ペア × 全日はメインスレッドを止めるので Worker へ逃がす。
   const [blockLen, setBlockLen] = useState(20);
-  const rhoCI: StressCorrCI | null = useMemo(() => {
-    if (!aligned) return null;
-    return stressCorrelationCI(aligned, { ...STRESS_OPTS, blockLen, b: 400, level: 0.9 });
-  }, [aligned, blockLen]);
+  const ciOpts = useMemo(
+    () => ({ ...STRESS_OPTS, blockLen, b: 400, level: 0.9 }),
+    [blockLen]
+  );
+  const { value: rhoCI, loading: ciLoading } = useStressCorrCI(aligned, ciOpts);
+
+  // ── 窓依存プロファイル（課題: 窓で結論が変わるのを1枚で見せる） ──────────
+  // 252日で「弱い証拠」、756日で「検出不能」のように**窓で結論が入れ替わる**ことがあるので、
+  // 窓を横軸に Δρ±CI を並べる。ここだけは常に全期間データから測る（パネル上部の窓設定に
+  // 引きずられると「窓を変えた比較」にならないため）。
+  const profileAligned: AlignedReturns | null = useMemo(() => {
+    if (!data) return null;
+    const series = Object.entries(data)
+      .filter(([, v]) => v.prices.length > 2)
+      .map(([ticker, v]) => ({ ticker, prices: v.prices }));
+    if (series.length < 2) return null;
+    const a = alignReturns(series, 100000); // 共通営業日の全履歴
+    return a.tickers.length >= 2 ? a : null;
+  }, [data]);
+  const [showProfile, setShowProfile] = useState(false);
+  const { value: profile, loading: profileLoading } = useStressCorrCIProfile(
+    showProfile ? profileAligned : null,
+    PROFILE_WINDOWS,
+    ciOpts
+  );
+
+  // ── exceedance パネルから送られてきた下側相関 ρ⁻ ─────────────────────────
+  // 「測る」パネルと「建玉を決める」パネルを跨ぐので、localStorage + イベントで受け取る
+  // （panel-nav.ts と同じ最小構成）。初期値は遅延初期化で読む＝このパネルは SSR されない。
+  const [downside, setDownside] = useState<DownsideRho | null>(() => loadDownsideRho());
+  useEffect(() => {
+    const onRho = (e: Event) => setDownside((e as CustomEvent<DownsideRho | null>).detail ?? null);
+    window.addEventListener(DOWNSIDE_RHO_EVENT, onRho as EventListener);
+    return () => window.removeEventListener(DOWNSIDE_RHO_EVENT, onRho as EventListener);
+  }, []);
+  /** 送られてきた ρ⁻ が今のウォッチリストと同じ銘柄構成で測られたか。 */
+  const downsideSameUniverse =
+    downside != null && measured != null && sameUniverse(downside.tickers, measured.tickers);
 
   // ── コントロール ──────────────────────────────────────────────────────
   // ρ・N・σ は「ユーザーが触るまでは実測値（無ければ既定値）に追従する」。
@@ -438,6 +485,17 @@ export default function CorrelationDragChart({
       ),
     [nAssets, rho, mu, sigma, exposure, shocks]
   );
+
+  // ── 窓依存プロファイルの描画 ────────────────────────────────────────────
+  const profileCanvas = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = profileCanvas.current;
+    if (!canvas || !profile || profile.length === 0) return;
+    const draw = () => drawProfile(canvas, profile);
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
+  }, [profile]);
 
   // ── 崖の描画（静止画なので state 変化時と resize 時だけ） ──────────────────
   const cliffCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -711,10 +769,135 @@ export default function CorrelationDragChart({
               </p>
             </div>
           )}
+          {ciLoading && rhoStressMeasured != null && (
+            <p className="mt-1 text-[11px] text-gray-400">
+              Δρ の信頼区間を計算中…（ブロック・ブートストラップ400回。別スレッドで走ります）
+            </p>
+          )}
           {rhoCI != null && !rhoCI.ok && rhoStressMeasured != null && (
             <p className="mt-1 text-[11px] text-gray-400">
               Δρ の信頼区間は算出できませんでした（{rhoCI.reason}）。
             </p>
+          )}
+
+          {/* ── 窓依存プロファイル：窓で結論が変わるのを1枚で ─────────────── */}
+          {rhoStressMeasured != null && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowProfile((v) => !v)}
+                className="text-[11px] px-2 py-0.5 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
+                title="推定に使う期間を変えながら Δρ とその信頼区間を並べる。どの窓でも同じ向きなら本物、窓ごとに入れ替わるならノイズ。"
+              >
+                {showProfile ? "▼ 窓依存プロファイルを閉じる" : "▶ 窓を変えても同じ結論か（窓依存プロファイル）"}
+              </button>
+              {showProfile && (
+                <div className="mt-2">
+                  {profileLoading || !profile ? (
+                    <p className="text-[11px] text-gray-400">
+                      {PROFILE_WINDOWS.length}通りの窓でブートストラップ中…（別スレッドで走ります）
+                    </p>
+                  ) : (
+                    <>
+                      <canvas ref={profileCanvas} className="w-full" />
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        横軸＝推定に使う期間（営業日）、縦軸＝Δρ とその
+                        {(rhoCI?.level ?? 0.9) * 100}% CI。
+                        <strong>灰色のゼロ線を跨いでいる窓は「差を検出できない」</strong>。
+                        期間を伸ばすほど CI は縮むはずで、
+                        <strong>縮んでもゼロを跨ぎ続けるなら「本当に差がない」</strong>、
+                        逆に<strong>窓によって符号が入れ替わるなら相関構造そのものが期間で違う</strong>
+                        （どちらか一方の期間の値を将来に当てはめてはいけない）。
+                        {(() => {
+                          const ok = profile.filter((p) => p.ci.ok);
+                          if (ok.length < 2) return null;
+                          const signs = new Set(ok.map((p) => Math.sign(p.ci.delta)));
+                          const anySig = ok.filter((p) => !p.ci.crossesZero);
+                          return (
+                            <>
+                              {" "}この標本では{ok.length}通りの窓のうち{anySig.length}通りで
+                              CI がゼロを外し、符号は
+                              {signs.size > 1 ? (
+                                <strong className="text-amber-700">窓によって入れ替わっています</strong>
+                              ) : (
+                                <strong>すべて同じ向きです</strong>
+                              )}
+                              。
+                            </>
+                          );
+                        })()}
+                      </p>
+                      <div className="mt-1 overflow-x-auto">
+                        <table className="w-full text-[11px] tabular-nums border-collapse">
+                          <thead>
+                            <tr className="text-gray-400 text-left border-b border-gray-200">
+                              <th className="py-1 pr-2 font-medium">期間</th>
+                              <th className="py-1 px-2 font-medium text-right">平時 ρ</th>
+                              <th className="py-1 px-2 font-medium text-right">危機時 ρ</th>
+                              <th className="py-1 px-2 font-medium text-right">Δρ</th>
+                              <th className="py-1 px-2 font-medium text-right">CI</th>
+                              <th className="py-1 px-2 font-medium text-right">p</th>
+                              <th className="py-1 pl-2 font-medium">判定</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {profile.map((p) => (
+                              <tr key={p.requested} className="border-b border-gray-100">
+                                <td className="py-1 pr-2 text-gray-700">
+                                  {p.periods}日
+                                  {p.periods < p.requested && (
+                                    <span className="text-gray-400">（{p.requested}日要求）</span>
+                                  )}
+                                </td>
+                                <td className="py-1 px-2 text-right text-gray-500">
+                                  {p.ci.ok
+                                    ? ((p.ci.calmLo + p.ci.calmHi) / 2).toFixed(2)
+                                    : "—"}
+                                </td>
+                                <td className="py-1 px-2 text-right text-gray-500">
+                                  {p.ci.ok
+                                    ? ((p.ci.stressLo + p.ci.stressHi) / 2).toFixed(2)
+                                    : "—"}
+                                </td>
+                                <td
+                                  className={`py-1 px-2 text-right font-medium ${
+                                    !p.ci.ok
+                                      ? "text-gray-300"
+                                      : p.ci.delta > 0
+                                        ? "text-red-700"
+                                        : "text-blue-700"
+                                  }`}
+                                >
+                                  {p.ci.ok
+                                    ? `${p.ci.delta >= 0 ? "+" : "−"}${Math.abs(p.ci.delta).toFixed(3)}`
+                                    : "—"}
+                                </td>
+                                <td className="py-1 px-2 text-right text-gray-400">
+                                  {p.ci.ok
+                                    ? `[${p.ci.deltaLo.toFixed(2)}, ${p.ci.deltaHi.toFixed(2)}]`
+                                    : "—"}
+                                </td>
+                                <td className="py-1 px-2 text-right text-gray-500">
+                                  {p.ci.ok ? p.ci.pTwoSided.toFixed(3) : "—"}
+                                </td>
+                                <td className="py-1 pl-2 text-gray-500">
+                                  {!p.ci.ok
+                                    ? p.ci.reason
+                                    : p.ci.crossesZero
+                                      ? "検出できない"
+                                      : p.ci.pTwoSided < 0.05
+                                        ? "有意"
+                                        : "弱い証拠"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* ── 課題3: 等相関という単純化は、どこで効いてどこで効かないか ──
@@ -924,7 +1107,42 @@ export default function CorrelationDragChart({
                 危機時 {rhoStressMeasured.toFixed(2)}
               </button>
             )}
+            {downside != null && (
+              <button
+                onClick={() => {
+                  setSweeping(false);
+                  setRhoUser(Math.min(0.95, Math.max(0, downside.rho)));
+                }}
+                className={`px-2 py-0.5 text-xs rounded border ${
+                  rhoUser != null && Math.abs(rhoUser - Math.min(0.95, Math.max(0, downside.rho))) < 1e-9
+                    ? "bg-orange-700 text-white border-orange-700"
+                    : "bg-white text-orange-700 border-orange-300 hover:bg-orange-50"
+                }`}
+                title={`exceedance パネルで測った下側相関（θ=±${downside.theta.toFixed(1)}σ・${downside.periods}日・ヌル: ${downside.nullLabel}）。下げているときのあなたの崖を見るための値。`}
+              >
+                下側 ρ⁻ {downside.rho.toFixed(2)}
+              </button>
+            )}
           </div>
+        )}
+        {downside != null && (
+          <p className="mt-1 text-[11px] text-gray-500">
+            「下側 ρ⁻」は<strong>下落時“だけ”相関が上がるか</strong>パネルで測った値
+            （θ=±{downside.theta.toFixed(1)}σ・{downside.periods}日・ヌル {downside.nullLabel}）。
+            <strong>平時の ρ で建玉を決めていると、下げている最中のあなたは別の崖に立っています</strong>——
+            このボタンで ρ を差し替え、頂点（最速の建玉）がどこまで手前に来るかを確認してください。
+            {!downsideSameUniverse && (
+              <strong className="text-amber-700">
+                {" "}※ 測定時の銘柄構成（{downside.tickers.length}銘柄）が今と違うので参考値です。
+              </strong>
+            )}
+            {Number.isFinite(downside.asymP) && downside.asymP >= 0.05 && (
+              <strong className="text-amber-700">
+                {" "}※ 非対称性は検出されていません（p={downside.asymP.toFixed(3)}）。
+                ρ⁻ が高く見えても条件付けと標本ノイズで説明がつく範囲かもしれません。
+              </strong>
+            )}
+          </p>
         )}
         <p className="mt-1.5 text-xs text-gray-700">
           {nAssets} 銘柄に分散したつもりでも、実質は{" "}
@@ -1109,6 +1327,17 @@ export default function CorrelationDragChart({
                       rho: rhoStress,
                       color: "#b91c1c",
                       note: `${stressLabel}（${stressRho != null ? "指定値" : "危機時の実測相関"}）`,
+                      cur: true,
+                    },
+                  ]
+                : []),
+              // exceedance パネルから受け取った下側相関（下げている最中の崖）
+              ...(downside != null
+                ? [
+                    {
+                      rho: Math.min(0.95, Math.max(0, downside.rho)),
+                      color: "#c2410c",
+                      note: `下落時テール ρ⁻（θ=±${downside.theta.toFixed(1)}σ）`,
                       cur: true,
                     },
                   ]
@@ -1564,6 +1793,121 @@ export default function CorrelationDragChart({
       </AnalysisGuide>
     </div>
   );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 窓依存プロファイル（Canvas2D）
+// 横軸は「推定に使う期間の長さ」で時間軸ではない（＝期間をズームする意味がない）ので、
+// CLAUDE.md の規約どおり Canvas2D。窓ごとに Δρ の点と CI の縦棒を打ち、ゼロ線を引く。
+// 見たいのは「点がゼロ線のどちら側か」と「棒がゼロ線を跨ぐか」の2つだけ。
+// ────────────────────────────────────────────────────────────────────────────
+function drawProfile(canvas: HTMLCanvasElement, points: StressProfilePoint[]) {
+  const H = 200;
+  const fit = fitCanvas(canvas, H);
+  if (!fit) return;
+  const { ctx, width, height } = fit;
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, width, height);
+
+  const padL = 46;
+  const padR = 12;
+  const padT = 12;
+  const padB = 30;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+  if (plotW < 60 || plotH < 50) return;
+
+  const ok = points.filter((p) => p.ci.ok);
+  if (ok.length === 0) {
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("どの窓でも算出できませんでした", padL + plotW / 2, padT + plotH / 2);
+    return;
+  }
+
+  let lo = 0;
+  let hi = 0;
+  for (const p of ok) {
+    lo = Math.min(lo, p.ci.deltaLo, p.ci.delta);
+    hi = Math.max(hi, p.ci.deltaHi, p.ci.delta);
+  }
+  const span = hi - lo || 0.1;
+  lo -= span * 0.15;
+  hi += span * 0.15;
+  const range = hi - lo || 1;
+
+  // 横位置は「窓の順番」で等間隔に置く（日数に比例させると短い窓が潰れて読めない）
+  const xOf = (i: number) =>
+    padL + (points.length === 1 ? plotW / 2 : (plotW * (i + 0.5)) / points.length);
+  const yOf = (v: number) => padT + ((hi - v) / range) * plotH;
+
+  // ゼロ線より下（Δρ<0＝危機時のほうが低い）を薄青、上を薄赤で塗り分ける
+  const y0 = yOf(0);
+  ctx.fillStyle = "#fef4f4";
+  ctx.fillRect(padL, padT, plotW, Math.max(0, y0 - padT));
+  ctx.fillStyle = "#f3f7fe";
+  ctx.fillRect(padL, y0, plotW, Math.max(0, padT + plotH - y0));
+
+  // y グリッド
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  const step = niceStep(range / 4);
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    const y = yOf(v);
+    ctx.strokeStyle = "#eceff1";
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText(v.toFixed(2), padL - 6, y);
+  }
+
+  // ゼロ線（判定の境目なので濃く）
+  ctx.strokeStyle = "#6b7280";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(padL, y0);
+  ctx.lineTo(padL + plotW, y0);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  points.forEach((p, i) => {
+    const x = xOf(i);
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText(`${p.periods}日`, x, padT + plotH + 6);
+    if (!p.ci.ok) return;
+    const crosses = p.ci.crossesZero;
+    const color = crosses ? "#9ca3af" : p.ci.delta > 0 ? "#b91c1c" : "#1d4ed8";
+    // CI の縦棒（跨いでいるものは灰色＝「判定なし」が一目で分かる）
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, yOf(p.ci.deltaLo));
+    ctx.lineTo(x, yOf(p.ci.deltaHi));
+    ctx.stroke();
+    // 上下のヒゲ
+    ctx.lineWidth = 1.5;
+    for (const v of [p.ci.deltaLo, p.ci.deltaHi]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 4, yOf(v));
+      ctx.lineTo(x + 4, yOf(v));
+      ctx.stroke();
+    }
+    // 点推定
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, yOf(p.ci.delta), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = "#6b7280";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("Δρ = 危機時 − 平時", padL + 2, padT + 2);
 }
 
 // ────────────────────────────────────────────────────────────────────────────

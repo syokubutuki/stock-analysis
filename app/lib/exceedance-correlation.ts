@@ -39,9 +39,34 @@
 // すべて純関数・依存は portfolio-risk の型のみ。Worker 不要（S は計算量から自動調整）。
 
 import { AlignedReturns } from "./portfolio-risk";
+import { benjaminiHochberg } from "./stats-significance";
 
 /** 閾値（標準偏差単位）。0 は「ともに平均以下 / 以上」。 */
 export const DEFAULT_THETAS = [0, 0.5, 1.0, 1.5];
+
+/**
+ * ヌルの作り方。**何を「当たり前」として差し引くか**の選択そのものなので、結論が変わる。
+ *
+ *  - "normal"   : 2変量正規。テール依存性ゼロ・裾も薄い。ここからの乖離は
+ *                 「非対称性」だけでなく**裾の厚さやボラのクラスタリングでも**生じる。
+ *                 条件付けバイアスの大きさを見せる教材としては最良。
+ *  - "t"        : 対称な多変量 t（共通の混合変数）。**裾が厚くテール依存もあるが上下対称**。
+ *                 自由度 ν は実測の超過尖度から ν = 4 + 6/κ で推定する。
+ *                 これを超えた分は「裾の厚さでは説明できない」＝より強い主張になる。
+ *  - "signflip" : 各日のリターンベクトル全体を確率1/2で符号反転するランダマイゼーション。
+ *                 **分布を一切仮定しない**。日ごとの横断パターン・ボラの時系列・
+ *                 各銘柄の絶対値分布をすべて保存したまま、上下の非対称性だけを壊す
+ *                 （s_t²=1 なので相関は保たれる）。非対称性の検定としては最も厳密で、
+ *                 その代わり ρ⁻ と ρ⁺ のヌル平均は構造上ほぼ一致するので
+ *                 「テール依存が強いか」は測れない（測れるのは上下差だけ）。
+ */
+export type NullMode = "normal" | "t" | "signflip";
+
+export const NULL_MODE_LABEL: Record<NullMode, string> = {
+  normal: "2変量正規",
+  t: "対称 t（裾が厚い）",
+  signflip: "符号反転（仮定なし）",
+};
 
 /** 条件付き標本がこの日数を下回るペアはその水準で捨てる（相関が意味を持たないため）。 */
 const MIN_OBS = 10;
@@ -85,8 +110,14 @@ export interface ExceedancePair {
   down: number;
   up: number;
   asym: number;
-  /** 非対称性の両側 p 値（このペア単独）。 */
+  /** 非対称性の両側 p 値（このペア単独・未補正）。 */
   p: number;
+  /**
+   * Benjamini-Hochberg で多重比較を補正した q 値（＝この値以下を有意とすると
+   * 偽陽性の期待割合がその水準に収まる）。ペア数だけ検定を繰り返しているので、
+   * **拾い読みするならこちらを見る**。p が計算できないペアは NaN。
+   */
+  q: number;
 }
 
 export interface ExceedanceResult {
@@ -116,12 +147,19 @@ export interface ExceedanceResult {
   /** 実際に走ったモンテカルロ本数。 */
   sims: number;
   minObs: number;
+  /** 使ったヌル。 */
+  nullMode: NullMode;
+  /** "t" のときの自由度 ν（実測尖度から推定）。他モードでは NaN。 */
+  nu: number;
+  /** 各銘柄の超過尖度の平均（ν の推定根拠・裾の厚さの目安）。 */
+  excessKurtosis: number;
 }
 
-const EMPTY = (reason: string): ExceedanceResult => ({
+const EMPTY = (reason: string, nullMode: NullMode = "t"): ExceedanceResult => ({
   ok: false, reason, tickers: [], T: 0, nPairs: 0, rhoAll: 0, levels: [],
   refTheta: 1, h: 0, hP: 1, downExcess: 0, downExcessP: 1, upExcess: 0, upExcessP: 1,
   asymMean: 0, asymMeanP: 1, pairs: [], sims: 0, minObs: MIN_OBS,
+  nullMode, nu: NaN, excessKurtosis: NaN,
 });
 
 // ───────────────────────── 数値ユーティリティ ─────────────────────────
@@ -165,6 +203,62 @@ function cholesky(R: number[][]): number[][] | null {
     if (ok) return L;
   }
   return null;
+}
+
+/**
+ * 多変量 t の自由度 ν を実測の超過尖度から推定する。
+ * 共通の混合変数を持つ多変量 t の周辺超過尖度は 6/(ν−4)（ν>4）なので、逆に解いて
+ *   ν = 4 + 6/κ
+ * κ が 0 以下（正規並み）なら実質正規として ν=50 を返す（t と正規の差が消える領域）。
+ * 上限50・下限4.5 でクランプ（ν≤4 だと尖度が発散して標本と対応しなくなる）。
+ */
+function estimateNu(z: number[][]): { nu: number; kurtosis: number } {
+  let sum = 0;
+  let cnt = 0;
+  for (const r of z) {
+    const T = r.length;
+    if (T < 20) continue;
+    let m2 = 0;
+    let m4 = 0;
+    for (let t = 0; t < T; t++) {
+      const v2 = r[t] * r[t];
+      m2 += v2;
+      m4 += v2 * v2;
+    }
+    m2 /= T;
+    m4 /= T;
+    if (m2 > 1e-18) {
+      sum += m4 / (m2 * m2) - 3;
+      cnt++;
+    }
+  }
+  if (cnt === 0) return { nu: 50, kurtosis: NaN };
+  const k = sum / cnt;
+  if (!(k > 0.05)) return { nu: 50, kurtosis: k };
+  return { nu: Math.min(50, Math.max(4.5, 4 + 6 / k)), kurtosis: k };
+}
+
+/**
+ * ガンマ乱数（Marsaglia-Tsang 2000）。χ²_ν = Gamma(ν/2, scale=2) を作るために使う。
+ * a<1 は昇格して補正（Gamma(a) = Gamma(a+1)·U^(1/a)）。
+ */
+function gammaSample(a: number, rand: () => number, gauss: () => number): number {
+  if (a < 1) return gammaSample(a + 1, rand, gauss) * Math.pow(Math.max(rand(), 1e-12), 1 / a);
+  const d = a - 1 / 3;
+  const c = 1 / Math.sqrt(9 * d);
+  for (let guard = 0; guard < 1000; guard++) {
+    let xg = 0;
+    let v = 0;
+    do {
+      xg = gauss();
+      v = 1 + c * xg;
+    } while (v <= 0);
+    v = v * v * v;
+    const u = Math.max(rand(), 1e-12);
+    if (u < 1 - 0.0331 * xg * xg * xg * xg) return d * v;
+    if (Math.log(u) < 0.5 * xg * xg + d * (1 - v + Math.log(v))) return d * v;
+  }
+  return d; // 実質到達しない（保険）
 }
 
 function quantileOf(sorted: number[], q: number): number {
@@ -282,6 +376,10 @@ export interface ExceedanceOpts {
   minObs?: number;
   /** ペア表と見出しに使う参照水準（既定 1.0）。 */
   refTheta?: number;
+  /** ヌルの作り方（既定 "t" ＝ 裾の厚さを許した対称ヌル）。 */
+  nullMode?: NullMode;
+  /** "t" の自由度を手で与える（省略時は実測尖度から推定）。 */
+  nu?: number;
 }
 
 export function exceedanceCorrelation(
@@ -291,13 +389,14 @@ export function exceedanceCorrelation(
   const thetas = opts.thetas ?? DEFAULT_THETAS;
   const minObs = opts.minObs ?? MIN_OBS;
   const seed = opts.seed ?? 20260727;
+  const nullMode: NullMode = opts.nullMode ?? "t";
   const L = thetas.length;
 
   const { tickers, returns } = aligned;
   const n = tickers.length;
   const T = n > 0 ? returns[0].length : 0;
-  if (n < 2) return EMPTY("銘柄数不足（2銘柄以上必要）");
-  if (T < 120) return EMPTY(`期間不足（リターン${T}日 / 最低120日）`);
+  if (n < 2) return EMPTY("銘柄数不足（2銘柄以上必要）", nullMode);
+  if (T < 120) return EMPTY(`期間不足（リターン${T}日 / 最低120日）`, nullMode);
 
   const nPairs = (n * (n - 1)) / 2;
   const z = standardize(returns);
@@ -318,8 +417,13 @@ export function exceedanceCorrelation(
   }
   const rhoAll = rhoSum / nPairs;
 
-  const Lmat = cholesky(R);
-  if (!Lmat) return EMPTY("相関行列が正定値でない（銘柄が重複している可能性）");
+  // 符号反転ヌルは分布を作らないので Cholesky を必要としない（相関行列が半正定値でも動く）。
+  const Lmat = nullMode === "signflip" ? null : cholesky(R);
+  if (nullMode !== "signflip" && !Lmat)
+    return EMPTY("相関行列が正定値でない（銘柄が重複している可能性）", nullMode);
+
+  const { nu: nuEst, kurtosis } = estimateNu(z);
+  const nu = nullMode === "t" ? (opts.nu ?? nuEst) : NaN;
 
   // 実測
   const alloc = () => ({
@@ -363,6 +467,44 @@ export function exceedanceCorrelation(
   const sim = alloc();
   const e: number[][] = Array.from({ length: n }, () => new Array(T).fill(0));
   const x: number[][] = Array.from({ length: n }, () => new Array(T).fill(0));
+  const sgn = new Float64Array(T);
+
+  /**
+   * ヌル標本を1本作って x に書く。3モードの違いはここだけに閉じ込める
+   * （このあとの標準化 → 条件付け → 相関は実測とまったく同じ手続きを通す）。
+   */
+  const drawNull = () => {
+    if (nullMode === "signflip") {
+      // 各日のリターンベクトル全体を確率1/2で反転する。全銘柄で同じ符号なので
+      // 横断的な相関は保たれ（s_t²=1）、ボラの時系列も絶対値の分布もそのまま。
+      // 壊れるのは「上か下か」だけ ＝ 非対称性のヌルとして厳密。
+      for (let t = 0; t < T; t++) sgn[t] = rand() < 0.5 ? -1 : 1;
+      for (let i = 0; i < n; i++) {
+        const xi = x[i];
+        const zi = z[i];
+        for (let t = 0; t < T; t++) xi[t] = sgn[t] * zi[t];
+      }
+      return;
+    }
+    // 正規 / t は共通の Cholesky 変換。t は「日ごとに共通の混合変数」を掛けるだけ
+    // （全銘柄で同じ w_t を掛けるのでテール依存が生まれ、かつ上下対称のまま）。
+    for (let i = 0; i < n; i++) for (let t = 0; t < T; t++) e[i][t] = gauss();
+    const Lm = Lmat as number[][];
+    for (let i = 0; i < n; i++) {
+      const xi = x[i];
+      for (let t = 0; t < T; t++) {
+        let v = 0;
+        for (let k = 0; k <= i; k++) v += Lm[i][k] * e[k][t];
+        xi[t] = v;
+      }
+    }
+    if (nullMode === "t") {
+      for (let t = 0; t < T; t++) {
+        const w = Math.sqrt(nu / Math.max(2 * gammaSample(nu / 2, rand, gauss), 1e-12));
+        for (let i = 0; i < n; i++) x[i][t] *= w;
+      }
+    }
+  };
 
   // ヌル分布の蓄積
   const nullDown: number[][] = Array.from({ length: L }, () => []);
@@ -382,16 +524,7 @@ export function exceedanceCorrelation(
   const pairValid = new Int32Array(nPairs);
 
   for (let s = 0; s < sims; s++) {
-    for (let i = 0; i < n; i++) for (let t = 0; t < T; t++) e[i][t] = gauss();
-    // x = L·e（同じ無条件相関を持つ2変量正規・テール依存性ゼロ・完全対称）
-    for (let i = 0; i < n; i++) {
-      const xi = x[i];
-      for (let t = 0; t < T; t++) {
-        let v = 0;
-        for (let k = 0; k <= i; k++) v += Lmat[i][k] * e[k][t];
-        xi[t] = v;
-      }
-    }
+    drawNull();
     const zs = standardize(x);
     exceedanceRaw(zs, thetas, minObs, sim);
     const sd = levelMeans(sim.down, nPairs, L);
@@ -535,9 +668,20 @@ export function exceedanceCorrelation(
         up: emp.up[p * L + refIdx],
         asym: pairAsymEmp[p],
         p: pairValid[p] > 0 ? (pairExceed[p] + 1) / (pairValid[p] + 1) : NaN,
+        q: NaN,
       });
       p++;
     }
+  }
+  // 多重比較の補正（BH-FDR）。ペア数だけ検定を繰り返しているので、補正なしの p を
+  // 拾い読みすると偽陽性を必ず拾う（既存の benjaminiHochberg を再利用）。
+  // p が計算できなかったペア（条件付き標本不足）は補正の対象から外す。
+  const okIdx = pairs.map((v, i) => (Number.isFinite(v.p) ? i : -1)).filter((i) => i >= 0);
+  if (okIdx.length > 0) {
+    const q = benjaminiHochberg(okIdx.map((i) => pairs[i].p));
+    okIdx.forEach((i, k) => {
+      pairs[i].q = q[k];
+    });
   }
   pairs.sort((a, b) => (Number.isFinite(b.asym) ? b.asym : -Infinity) - (Number.isFinite(a.asym) ? a.asym : -Infinity));
 
@@ -561,5 +705,8 @@ export function exceedanceCorrelation(
     pairs,
     sims,
     minObs,
+    nullMode,
+    nu,
+    excessKurtosis: kurtosis,
   };
 }

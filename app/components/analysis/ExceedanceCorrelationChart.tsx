@@ -12,11 +12,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
-import { alignReturns } from "../../lib/portfolio-risk";
+import { AlignedReturns, alignReturns } from "../../lib/portfolio-risk";
 import {
   ExceedanceResult,
-  exceedanceCorrelation,
+  NULL_MODE_LABEL,
+  NullMode,
 } from "../../lib/exceedance-correlation";
+import { useExceedanceAll } from "../../hooks/usePortfolioTail";
+import { publishDownsideRho } from "../../lib/downside-rho";
+import { openAnalysisPanel } from "../../lib/panel-nav";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -26,6 +30,16 @@ interface Props {
 
 /** テールを測るには標本が要るので、60日窓（デイトレ）は使わせない。 */
 const TAIL_HORIZONS: Horizon[] = ["swing", "position"];
+
+/**
+ * 表示するヌルの順。既定は "signflip"——分布を一切仮定せず非対称性だけを壊すので、
+ * 「裾が厚いだけ」を「非対称」と誤認しない。正規ヌルは実データで実際に誤検出した
+ * （7203他4銘柄・756日で正規なら p=0.015 だが、裾を許すと p=0.147/0.233）ので既定にしない。
+ */
+const NULL_MODES: NullMode[] = ["signflip", "t", "normal"];
+
+/** Worker への入力を安定させるため、既定オプションはモジュール定数にする（毎回新しい object を作らない）。 */
+const EXCEEDANCE_OPTS = {};
 
 const HEIGHT = 340;
 const DOWN_COLOR = "#b91c1c";
@@ -66,15 +80,27 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
     return m;
   }, [data]);
 
-  const result: ExceedanceResult | null = useMemo(() => {
+  const [nullMode, setNullMode] = useState<NullMode>("signflip");
+
+  const aligned: AlignedReturns | null = useMemo(() => {
     const series = Object.entries(data)
       .filter(([, v]) => v.prices.length > 2)
       .map(([ticker, v]) => ({ ticker, prices: v.prices }));
     if (series.length < 2) return null;
-    const aligned = alignReturns(series, HORIZON_CONFIG[win].window);
-    if (aligned.tickers.length < 2) return null;
-    return exceedanceCorrelation(aligned);
+    const a = alignReturns(series, HORIZON_CONFIG[win].window);
+    return a.tickers.length >= 2 ? a : null;
   }, [data, win]);
+
+  // 3種のヌルをすべて走らせる。**結論がヌルの選び方で変わる**のがこの分析の核心なので、
+  // 選択中の1つだけを見せて済ませない（下の頑健性の表で3つ並べる）。
+  // 3本ぶんのモンテカルロは銘柄数次第で数秒かかるので Web Worker へ逃がす。
+  const {
+    value: rawResults,
+    loading,
+    error,
+  } = useExceedanceAll(aligned, NULL_MODES, EXCEEDANCE_OPTS);
+  const results = rawResults as Record<NullMode, ExceedanceResult> | null;
+  const result: ExceedanceResult | null = results ? results[nullMode] : null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -85,16 +111,33 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
     return () => window.removeEventListener("resize", draw);
   }, [result]);
 
-  if (!result) {
+  if (!aligned) {
     return (
       <div className="text-xs text-gray-400">
         2銘柄以上の共通営業日が必要です。ウォッチリストに銘柄を追加してください。
       </div>
     );
   }
+  if (error) {
+    return <div className="text-xs text-red-600">計算に失敗しました（{error}）。</div>;
+  }
+  if (!result) {
+    return (
+      <div className="text-xs text-gray-400">
+        {loading
+          ? "3種のヌルでモンテカルロを実行中…（銘柄数が多いと数秒かかります。別スレッドで走るので操作は止まりません）"
+          : "計算待ち…"}
+      </div>
+    );
+  }
 
   const asymSig = Number.isFinite(result.asymMeanP) && result.asymMeanP < 0.05;
   const downSig = Number.isFinite(result.downExcessP) && result.downExcessP < 0.05;
+  // 3ヌルで判定が割れているか（割れていたら「ヌル依存」＝結論として弱い）
+  const sigCount = results
+    ? NULL_MODES.filter((m) => results[m].ok && results[m].asymMeanP < 0.05).length
+    : 0;
+  const splitVerdict = results != null && sigCount > 0 && sigCount < NULL_MODES.length;
   const verdict = !result.ok
     ? "判定不能"
     : asymSig && result.asymMean > 0
@@ -136,6 +179,35 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
         </span>
       </div>
 
+      {/* ── ヌルの選択（結論そのものを左右する） ───────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+        <span className="font-medium">ヌル（何を「当たり前」として差し引くか）</span>
+        {NULL_MODES.map((m) => (
+          <button
+            key={m}
+            onClick={() => setNullMode(m)}
+            className={`px-2 py-0.5 rounded ${
+              nullMode === m ? "bg-gray-800 text-white" : "bg-gray-100 hover:bg-gray-200"
+            }`}
+            title={
+              m === "signflip"
+                ? "各日のリターンベクトル全体を確率1/2で符号反転する。分布を一切仮定せず、上下の非対称性だけを壊す。"
+                : m === "t"
+                  ? "対称な多変量 t。裾が厚くテール依存もあるが上下対称。自由度は実測尖度から推定。"
+                  : "2変量正規。裾が薄くテール依存ゼロ。条件付けバイアスの大きさを見る教材向け。"
+            }
+          >
+            {NULL_MODE_LABEL[m]}
+          </button>
+        ))}
+        {result.ok && Number.isFinite(result.excessKurtosis) && (
+          <span className="text-gray-400 tabular-nums">
+            超過尖度 {result.excessKurtosis.toFixed(1)}
+            {nullMode === "t" && Number.isFinite(result.nu) && ` → ν=${result.nu.toFixed(1)}`}
+          </span>
+        )}
+      </div>
+
       {!result.ok ? (
         <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
           この構成では判定できませんでした（{result.reason}）。期間の長い窓を選ぶか、銘柄を増やしてください。
@@ -161,8 +233,8 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
             <p className="mt-1 text-[11px] leading-relaxed">
               {asymSig && result.asymMean > 0 ? (
                 <>
-                  無条件相関が同じ<strong>2変量正規（完全対称・テール依存性ゼロ）</strong>を
-                  {result.sims}本まわしたヌル分布と比べて、下側の相関が上側より
+                  <strong>{NULL_MODE_LABEL[result.nullMode]}</strong>のヌル（上下対称）を
+                  {result.sims}本まわした分布と比べて、下側の相関が上側より
                   <strong>統計的に有意に高い</strong>。つまりあなたの組み合わせは
                   <strong>下げるときだけ一緒に動く</strong>——分散が最も必要な場面で最も効かない、
                   という最悪の性質を持っています。建玉上限は平時の相関ではなく
@@ -185,7 +257,8 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                 </>
               ) : (
                 <>
-                  下側の相関は<strong>2変量正規のヌルで説明できる範囲</strong>に収まっています。
+                  下側の相関は<strong>{NULL_MODE_LABEL[result.nullMode]}のヌルで説明できる範囲</strong>
+                  に収まっています。
                   下のグラフで<strong>実測（赤/青）がヌル帯（灰）の中に入っている</strong>のがそれです。
                   「テールでは相関が上がる」とよく言われますが、
                   <strong>この銘柄構成・この期間では検出できません</strong>。
@@ -202,6 +275,91 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
               )}
             </p>
           </div>
+
+          {/* ── ヌル別の頑健性（この分析で最も重要な表） ─────────────────── */}
+          {results && (
+            <div
+              className={`rounded-lg border px-3 py-2 ${
+                splitVerdict ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-gray-50"
+              }`}
+            >
+              <div className="text-xs font-semibold text-gray-700 mb-1">
+                ヌルを変えると結論は変わるか（ここを見ずに上のバナーだけ読まないでください）
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] tabular-nums border-collapse">
+                  <thead>
+                    <tr className="text-gray-400 text-left border-b border-gray-200">
+                      <th className="py-1 pr-2 font-medium">ヌル</th>
+                      <th className="py-1 px-2 font-medium text-right">Ā = ρ⁻−ρ⁺</th>
+                      <th className="py-1 px-2 font-medium text-right">両側 p</th>
+                      <th className="py-1 px-2 font-medium text-right">下側超過</th>
+                      <th className="py-1 px-2 font-medium text-right">p</th>
+                      <th className="py-1 pl-2 font-medium">この標本での読み</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {NULL_MODES.map((m) => {
+                      const r = results[m];
+                      const sig = r.ok && Number.isFinite(r.asymMeanP) && r.asymMeanP < 0.05;
+                      return (
+                        <tr
+                          key={m}
+                          className={`border-b border-gray-100 ${
+                            m === nullMode ? "bg-white font-medium" : ""
+                          }`}
+                        >
+                          <td className="py-1 pr-2 text-gray-700">
+                            {NULL_MODE_LABEL[m]}
+                            {m === "t" && Number.isFinite(r.nu) && (
+                              <span className="text-gray-400"> ν={r.nu.toFixed(1)}</span>
+                            )}
+                          </td>
+                          <td className="py-1 px-2 text-right">{sv(r.asymMean)}</td>
+                          <td
+                            className={`py-1 px-2 text-right ${
+                              sig ? "text-amber-700 font-semibold" : "text-gray-500"
+                            }`}
+                          >
+                            {pv(r.asymMeanP)}
+                          </td>
+                          <td className="py-1 px-2 text-right text-gray-600">{sv(r.downExcess)}</td>
+                          <td className="py-1 px-2 text-right text-gray-500">{pv(r.downExcessP)}</td>
+                          <td className="py-1 pl-2 text-gray-500">
+                            {sig ? "非対称あり" : "非対称は検出できない"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-1 text-[11px] text-gray-600">
+                Ā の値は3行とも同じ（実測だから）で、変わるのは<strong>「それが珍しいかどうか」の基準</strong>だけです。
+                {splitVerdict ? (
+                  <strong className="text-amber-800">
+                    {" "}この標本では判定がヌルによって割れています——
+                    <strong>裾の厚さを許すヌル（対称t・符号反転）で有意でないなら、
+                    非対称性の証拠としては採用しないでください</strong>。
+                    正規ヌルだけで有意になるのは「上下が非対称だから」ではなく
+                    「そもそも正規より裾が厚いから」で説明がつきます。
+                  </strong>
+                ) : sigCount === NULL_MODES.length ? (
+                  <>
+                    {" "}<strong>3つすべてで有意</strong>——裾の厚さでは説明できない非対称性です。
+                    ここまで揃えば建玉の判断材料として使えます。
+                  </>
+                ) : (
+                  <>
+                    {" "}<strong>3つすべてで非有意</strong>——どの基準で見ても非対称性は検出できません。
+                  </>
+                )}
+                {" "}なお<strong>符号反転ヌルでは ρ⁻ と ρ⁺ のヌル平均がほぼ一致する</strong>
+                （上下を混ぜてしまうため）ので、「下側超過」の列は意味を持ちません。
+                水準の高さを見たいときは対称t を選んでください。
+              </p>
+            </div>
+          )}
 
           {/* ── スマイル図 ─────────────────────────────────────────── */}
           <div>
@@ -222,7 +380,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
               </span>
               <span className="flex items-center gap-1">
                 <span className="inline-block w-4 h-2 bg-gray-300 opacity-60" />
-                ヌルの90%帯（2変量正規・同じ無条件相関・同じ標本数）
+                ヌルの90%帯（{NULL_MODE_LABEL[result.nullMode]}・同じ無条件相関・同じ標本数）
               </span>
               <span className="flex items-center gap-1">
                 <span className="inline-block w-4 border-t border-dashed border-gray-500" />
@@ -323,6 +481,61 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
             </p>
           </div>
 
+          {/* ── 崖へ渡す（測定を建玉判断に接続する1クリック） ─────────────── */}
+          {(() => {
+            const ref = result.levels.find((l) => l.theta === result.refTheta);
+            if (!ref || !Number.isFinite(ref.down.corr)) return null;
+            return (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="text-xs text-gray-700">
+                    測った下側相関 ρ⁻（θ=±{result.refTheta.toFixed(1)}σ）={" "}
+                    <strong className="text-base tabular-nums" style={{ color: DOWN_COLOR }}>
+                      {ref.down.corr.toFixed(2)}
+                    </strong>
+                    <span className="text-gray-400 tabular-nums">
+                      {" "}／ 上側 ρ⁺ = {cv(ref.up.corr)} ／ 平時の無条件 ρ̄ = {cv(result.rhoAll)}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      publishDownsideRho({
+                        rho: ref.down.corr,
+                        rhoUp: ref.up.corr,
+                        theta: result.refTheta,
+                        periods: result.T,
+                        tickers: result.tickers,
+                        asymP: result.asymMeanP,
+                        nullLabel: NULL_MODE_LABEL[result.nullMode],
+                        savedAt: Date.now(),
+                      });
+                      openAnalysisPanel("pf-corr-drag");
+                    }}
+                    className="ml-auto px-2.5 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                    title="この ρ⁻ を「相関だけを動かす」パネルの崖に送り、建玉上限を引き直す"
+                  >
+                    この ρ⁻ を崖に送る →
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  平時の ρ̄ で建玉を決めていると、<strong>下げているときの自分は別の崖の上に立っています</strong>。
+                  ボタンを押すと「相関だけを動かす」パネルが開き、ρ に この ρ⁻ を入れるボタンが出ます——
+                  そこで<strong>頂点（最速の建玉）がどこまで手前に来るか</strong>を確認してください。
+                  {!asymSig && (
+                    <>
+                      {" "}
+                      <strong className="text-amber-700">
+                        ただしこの標本では非対称性が検出できていません（p = {pv(result.asymMeanP)}）。
+                        ρ⁻ が ρ̄ より高く見えても、その差は条件付けと標本ノイズで説明がつく範囲かもしれない、
+                        という前提で使ってください。
+                      </strong>
+                    </>
+                  )}
+                </p>
+              </div>
+            );
+          })()}
+
           {/* ── ペア別内訳 ─────────────────────────────────────────── */}
           {result.pairs.length > 0 && (
             <div className="overflow-x-auto">
@@ -337,7 +550,8 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                     <th className="py-1 px-2 font-medium text-right">下側 ρ⁻</th>
                     <th className="py-1 px-2 font-medium text-right">上側 ρ⁺</th>
                     <th className="py-1 px-2 font-medium text-right">A = ρ⁻−ρ⁺</th>
-                    <th className="py-1 pl-2 font-medium text-right">p</th>
+                    <th className="py-1 px-2 font-medium text-right">p（未補正）</th>
+                    <th className="py-1 pl-2 font-medium text-right">q（FDR補正）</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -359,22 +573,28 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                         {cv(p.up)}
                       </td>
                       <td className="py-1 px-2 text-right font-medium">{sv(p.asym)}</td>
+                      <td className="py-1 px-2 text-right text-gray-400">{pv(p.p)}</td>
                       <td
                         className={`py-1 pl-2 text-right ${
-                          Number.isFinite(p.p) && p.p < 0.05 ? "text-amber-700 font-medium" : "text-gray-400"
+                          Number.isFinite(p.q) && p.q < 0.1
+                            ? "text-amber-700 font-medium"
+                            : "text-gray-400"
                         }`}
                       >
-                        {pv(p.p)}
+                        {pv(p.q)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <p className="text-[10px] text-gray-400 mt-1">
-                ペア単位の p は<strong>多重比較の補正をしていません</strong>。
-                {result.nPairs} ペアあれば偶然 5% を切るペアが {(result.nPairs * 0.05).toFixed(1)} 個は出ます。
-                <strong>個別ペアの p を拾い読みしないでください</strong>——判定は上のバナー（全ペア平均）で行い、
-                この表は「どのペアが効いているか」を見るためだけに使います。
+                {result.nPairs} ペアぶん検定を繰り返しているので、未補正の p を拾い読みすると
+                偶然 5% を切るペアが {(result.nPairs * 0.05).toFixed(1)} 個は出ます。そこで
+                <strong>Benjamini-Hochberg で補正した q 値</strong>を併記しました
+                （q &lt; 0.1 を橙で強調＝そこを有意とすると偽陽性の期待割合が1割に収まる）。
+                <strong>拾い読みするなら q のほうを見てください</strong>。
+                なお全体の判定は今も上のバナー（全ペア平均）と頑健性の表で行います——
+                この表は「どのペアが効いているか」の内訳です。
               </p>
             </div>
           )}
@@ -422,12 +642,45 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
 
         <p className="font-medium text-gray-700 mt-3">3. 解法：同じ切り方をヌルにも適用する</p>
         <p>
-          正しい比較対象は「無条件相関だけが同じで、<strong>テール依存性がゼロ・完全対称</strong>な世界」です。
-          具体的には、実測の相関行列 R を Cholesky 分解して {" x = L·e "}（e は独立な標準正規）で
-          <strong>同じ長さ T の多変量正規標本</strong>を作り、
-          <strong>実測とまったく同じ手続き</strong>（標準化 → 閾値で条件付け → 相関）を通します。
-          これを {" S "} 本繰り返せば、
-          <strong>「正規だったら ρ⁻(θ) はどこにどれだけ散らばるか」</strong>という分布が得られます。
+          比較対象は「あなたのデータと同じ無条件相関・同じ標本数を持つが、
+          <strong>上下対称であることだけは保証されている</strong>世界」です。そこから
+          <strong>実測とまったく同じ手続き</strong>（標準化 → 閾値で条件付け → 相関）を通した分布を作れば、
+          条件付けバイアスも小標本バイアスも<strong>ヌル側に同じだけ入る</strong>ので、
+          差を取れば相殺されます。これが Longin-Solnik (2001) / Ang-Chen (2002) の枠組みです。
+        </p>
+        <p>
+          <strong>ただし「対称な世界」の作り方は1つではなく、選び方で結論が変わります</strong>。
+          本パネルは3種類を用意して<strong>全部を同時に表示</strong>します（上の頑健性の表）。
+        </p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>
+            <strong>2変量正規</strong>: R を Cholesky 分解して {" x = L·e "}（e は独立な標準正規）。
+            テール依存性ゼロ・裾も薄い。<strong>条件付けバイアスの大きさを見せる教材としては最良</strong>ですが、
+            検定に使うと<strong>危険</strong>です——実データの裾は正規よりずっと厚いので、
+            <strong>裾が厚いだけで「非対称」と誤検出します</strong>。
+            合成データで確認済み: 完全対称な t₅ 分布（非対称性ゼロ）に対して、
+            正規ヌルは <strong>Ā の p = 0.023 と誤って有意</strong>を出しました。
+          </li>
+          <li>
+            <strong>対称 t</strong>: {" x = L·e · √(ν/W) "}、W ~ χ²_ν を<strong>日ごとに全銘柄で共有</strong>。
+            裾が厚くテール依存もあるのに<strong>上下は完全対称</strong>という世界です。
+            自由度は実測の超過尖度 κ から {" ν = 4 + 6/κ "} で推定します（多変量 t の周辺超過尖度が
+            {" 6/(ν−4) "} であることの逆解き）。上の t₅ の例では ν=5.2 と正しく復元し、
+            誤検出は消えました（p = 0.150）。
+          </li>
+          <li>
+            <strong>符号反転（ランダマイゼーション）</strong>: 各日のリターンベクトル
+            <strong>全体</strong>を確率1/2で {" −1 "} 倍します。全銘柄で同じ符号なので
+            {" s_t² = 1 "} より<strong>相関は保たれ</strong>、ボラの時系列も各銘柄の絶対値の分布も
+            <strong>一切変わりません</strong>。壊れるのは「上か下か」だけ。
+            <strong>分布を何も仮定しない</strong>ぶんこれが最も厳密な非対称性の検定で、既定にしています。
+            上の t₅ の例では p = 0.462。
+          </li>
+        </ul>
+        <p>
+          <strong>符号反転ヌルの代償</strong>: 上下を混ぜてしまうので ρ⁻ と ρ⁺ のヌル平均が
+          ほぼ一致します。つまり<strong>「テール依存が強いか（水準）」は測れず、測れるのは上下差だけ</strong>。
+          水準も見たいときは対称 t を選んでください。
         </p>
         <p>
           条件付けバイアスも小標本バイアスも<strong>ヌル側に同じだけ入る</strong>ので、
@@ -489,8 +742,9 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
             <strong>θ=1.5 で有意でなくても「非対称でない」証拠にはなりません</strong>——単に標本が足りないだけかもしれない。
           </li>
           <li>
-            ペア表は「どのペアが効いているか」の内訳です。多重比較の補正をしていないので、
-            <strong>個別 p を拾い読みしない</strong>こと。
+            ペア表は「どのペアが効いているか」の内訳です。ペア数だけ検定を繰り返しているので、
+            拾い読みするときは<strong>未補正の p ではなく BH-FDR の q</strong> を見てください
+            （q &lt; 0.1 なら「そこを有意とすると偽陽性の期待割合が1割」）。
           </li>
         </ul>
 
@@ -521,11 +775,20 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
         <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
-            <strong>ヌルは「正規かどうか」も同時に検定してしまう</strong>。ヌルからの乖離は
-            テール依存性だけでなく、<strong>裾の厚さ（尖度）やボラのクラスタリング</strong>でも生じます。
-            厳密に「コピュラの非対称性だけ」を取り出したいなら、ヌル側も同じ GARCH で標準化した残差から
-            作る必要があります（本実装はそこまでやっていません）。
-            したがって<strong>有意＝非対称性の確定ではなく、「正規では説明できない何かがある」</strong>と読むのが正確です。
+            <strong>正規ヌルの「有意」は非対称性の証拠にならない</strong>（実装で対処済みですが、
+            読み方として最重要）。正規からの乖離は非対称性だけでなく
+            <strong>裾の厚さやボラのクラスタリング</strong>でも生じます。だから本パネルは
+            対称 t と符号反転を併記し、<strong>3つが割れたら「証拠として採用しない」</strong>と
+            明示する設計にしています。実データでも実際に割れました——
+            7203他4銘柄・756日では正規ヌルで p=0.015（有意）でも、
+            <strong>裾を許すと p=0.147（対称t）/ 0.233（符号反転）で非有意</strong>。
+            この銘柄構成の超過尖度は 6.6（ν≈4.9 相当）で、正規とはかけ離れています。
+          </li>
+          <li>
+            <strong>符号反転ヌルも万能ではない</strong>。日ごとに独立して符号を振るので、
+            「下げた翌日にボラが上がる（レバレッジ効果）」のような<strong>時間方向の非対称</strong>は
+            ヌル側でも壊れます。ここで検定しているのは
+            <strong>同時点の横断的な非対称性だけ</strong>です。
           </li>
           <li>
             <strong>条件は「両方が同時に超えた日」</strong>です。片方だけで条件付ける定義（Ang-Chen の一部の版）とは

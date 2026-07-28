@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
 import { useBenchmarkPrices, BENCHMARK_PRESETS } from "../../hooks/useBenchmarkPrices";
-import { computeCapm, CapmResult, type MuMode } from "../../lib/capm-sml";
+import { computeCapm, CapmResult } from "../../lib/capm-sml";
+import { useSharedMuMode } from "../../lib/mu-mode-store";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props {
@@ -35,9 +36,10 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
   const [open, setOpen] = useState(true);
   const [benchTicker, setBenchTicker] = useState("^N225");
   const [rfPct, setRfPct] = useState(0.5);
-  // μ の定義。既定は "log"（従来どおり・数値不変）。効率的フロンティアの同名トグルと
-  // 同じ意味で、こちらをオンにすると 2 つのパネルの物差しが揃う。
-  const [muMode, setMuMode] = useState<MuMode>("log");
+  // μ の定義。既定は "log"（従来どおり・数値不変）。効率的フロンティアと**同じ state を共有**
+  // するので、どちらで切り替えても両方のパネルの物差しが同時に変わる（片方だけ算術μ、
+  // という食い違いが起きない）。
+  const [muMode, setMuMode] = useSharedMuMode();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoverTicker, setHoverTicker] = useState<string | null>(null);
 
@@ -254,7 +256,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
             <span className="tabular-nums w-10">{rfPct.toFixed(1)}%</span>
             <label
               className="flex items-center gap-1.5 cursor-pointer select-none ml-2"
-              title="μ・α を対数平均(従来)から算術平均(教科書の定義)へ切り替える。β・σ・相関は対数リターンのまま。効率的フロンティアの同名トグルと同じ意味なので、両方オンにすると 2 つのパネルの物差しが揃う。"
+              title="μ・α を対数平均(従来)から算術平均(教科書の定義)へ切り替える。β・σ・相関は対数リターンのまま。効率的フロンティアの同名トグルと設定を共有するので、どちらで切り替えても両方のパネルが同じ物差しになる。"
             >
               <input
                 type="checkbox"
@@ -263,7 +265,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
               />
               <span>
                 μ・α を<strong>算術平均</strong>で計算
-                <span className="text-gray-400">（実験・既定オフ）</span>
+                <span className="text-gray-400">（実験・既定オフ・フロンティアと共有）</span>
               </span>
             </label>
             {bench.loading && <span className="text-gray-400">指数取得中…</span>}
@@ -383,7 +385,8 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                     （教科書の期待リターンの定義）で計算しています。対数平均モードより各銘柄
                     σᵢ²/2 だけ高く出て、<strong>高ボラ銘柄の α が systematically 低く出る歪みが消えます</strong>。
                     β・σ・相関は対数リターンのままなので、動くのは μ と α だけです。
-                    効率的フロンティアの同名トグルと同じ物差しなので、比較するなら<strong>両方を同じ設定に</strong>してください。
+                    この設定は<strong>効率的フロンティアと共有</strong>されているので、
+                    あちらの接点・CML・雲も同時に算術μへ切り替わっています（物差しは常に一致します）。
                   </p>
                 )}
               </div>

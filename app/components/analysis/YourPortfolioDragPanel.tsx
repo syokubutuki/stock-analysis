@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
-import { WatchlistItem, effectiveKind } from "../../lib/watchlist";
+import { WatchlistItem, heldMarketValues, heldWeightsFor } from "../../lib/watchlist";
 import { Horizon, HORIZON_CONFIG } from "../../lib/signal-digest";
 import { alignReturns, portfolioRisk, type RiskComponent } from "../../lib/portfolio-risk";
 import {
@@ -70,16 +70,11 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
 
     const aligned = alignReturns(series, HORIZON_CONFIG[horizon].window);
 
-    // 建玉（保有・株数>0）の時価。PortfolioRiskPanel と同一の抽出ロジック。
-    const rawWeights: Record<string, number> = {};
-    for (const item of watchlist) {
-      if (effectiveKind(item) !== "held") continue;
-      const pos = item.position;
-      const last = data[item.ticker]?.prices.at(-1)?.close;
-      if (pos && pos.shares > 0 && last) rawWeights[item.ticker] = pos.shares * last;
-    }
+    // 建玉（保有・株数>0）の時価。抽出は watchlist.ts の共通関数
+    // （PortfolioRiskPanel / CorrelationDragChart と同一）。
+    const rawWeights = heldMarketValues(data, watchlist);
     const heldTickers = aligned.tickers.filter((t) => (rawWeights[t] ?? 0) > 0);
-    const totalMV = heldTickers.reduce((s, t) => s + rawWeights[t], 0);
+    const { total: totalMV } = heldWeightsFor(aligned.tickers, rawWeights);
 
     return { aligned, names, rawWeights, heldTickers, totalMV };
   }, [data, watchlist, horizon]);

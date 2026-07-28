@@ -10,6 +10,7 @@ import {
   PortfolioPoint,
   type MuMode,
 } from "../../lib/efficient-frontier";
+import { useSharedMuMode } from "../../lib/mu-mode-store";
 import {
   geometricGrowth,
   doublingYears,
@@ -176,7 +177,8 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
   const [showIso, setShowIso] = useState(true); // G6: iso-growth 等高線と最大成長点
   // μ の定義。既定は "log"（従来の数値を変えない）。"arithmetic" は教科書の μ で、
   // 等高線・g・倍化年数が軸と厳密に整合する。優劣は OOS 検証で測る。
-  const [muMode, setMuMode] = useState<MuMode>("log");
+  // μ の定義は CAPM・SML パネルと**共有**する（片方だけ切り替えて物差しが食い違う事故を防ぐ）。
+  const [muMode, setMuMode] = useSharedMuMode();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number; vol: number; ret: number } | null>(null);
 
@@ -776,7 +778,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                 </label>
                 <label
                   className="flex items-center gap-1.5 cursor-pointer select-none"
-                  title="μ を対数平均(従来)から算術平均(教科書の定義)へ切り替える。接点・CML・α・雲がすべて動く実験的トグル。"
+                  title="μ を対数平均(従来)から算術平均(教科書の定義)へ切り替える。接点・CML・α・雲がすべて動く実験的トグル。CAPM・SML パネルと設定を共有するので、2つのパネルの物差しは常に一致する。"
                 >
                   <input
                     type="checkbox"
@@ -785,7 +787,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   />
                   <span>
                     μ を<strong>算術平均</strong>で最適化
-                    <span className="text-gray-400">（実験・既定オフ）</span>
+                    <span className="text-gray-400">（実験・既定オフ・CAPMパネルと共有）</span>
                   </span>
                 </label>
                 <span className="flex items-center gap-1.5">
