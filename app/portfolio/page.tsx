@@ -123,6 +123,10 @@ const ParticipationCrossChart = dynamic(
   () => import("../components/analysis/ParticipationCrossChart"),
   { ssr: false }
 );
+const DriftIdentifiabilityChart = dynamic(
+  () => import("../components/analysis/DriftIdentifiabilityChart"),
+  { ssr: false }
+);
 const SelectionTiltChart = dynamic(
   () => import("../components/analysis/SelectionTiltChart"),
   { ssr: false }
@@ -534,6 +538,14 @@ export default function PortfolioPage() {
               title: "床の銘柄横断比較：各銘柄の実現プレミアム（株式原論 C24）",
               subtitle: "全銘柄に参加の価値を実測しソート比較。プレミアム±SE・t値・g・最大DD・床<0窓率／市場の床を基準線に重ね生存者バイアスに注意しつつ横断で床の不確かさを体感",
               node: <ParticipationCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            // 系C26: 「ドリフトの高い個別銘柄を選べばよいのでは？」に識別限界から答える不可能性層。
+            // C25（束にせよ）の根拠そのものなので、pf-selection-tilt の直前に置く。
+            items.push({
+              id: "pf-drift-id",
+              title: "個別銘柄のドリフトは同定できるか：μ の識別限界（株式原論 C26）",
+              subtitle: "μ̂±SE(=σ/√T)・95%CI・必要年数T*=(κσ/Δμ)²／勝者の呪い(真のμ同一というヌルでもトップはSE·√(2lnN)上振れ)をブート実測／Merton非対称性(頻度を上げてもμの精度は不変・σは√nで改善)／James-Stein収縮と順位95%CI／「過去ドリフト上位」の前向き検証。既定の結論は同定不能",
+              node: <DriftIdentifiabilityChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // 系C25: 床（C24）の一段先＝特性チルトで床を底上げできるかの前向き検証。
             items.push({
