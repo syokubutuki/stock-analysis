@@ -5,17 +5,18 @@
 // 前夜米国を符号2値ではなく 3分位/5分位のビンに細分し、「どのビンの翌日か」を切り替えて
 // 曜日別の日内パスを見比べ、曜日効果が地合い(米国の強弱)で反転しないか(交互作用)を確認する。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { computeWeekdayPaths, WeekdayPathResult } from "../../lib/weekday-intraday-path";
 import { DayData } from "../../lib/intraday-core";
 import {
-  assignBins, binEdges, binMeta, binOfValue, BinScheme, AlignedDay, UsReturn,
+  assignBins, binEdges, binMeta, binOfValue, dayCumPath, BinScheme, AlignedDay, UsReturn,
 } from "../../lib/us-spillover-core";
+import { lastBarBin } from "../../lib/today-vs-expected";
 import { useAlignedDays, UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import { US_DRIVERS } from "../../hooks/useUsDaily";
-import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
+import { IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import {
-  drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  PathCanvas, PathOverlay, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
   usePathEvolution, PathEvolutionControls, PathDriftTable,
   PathDriftGuideSection,
 } from "./intradayPathShared";
@@ -36,6 +37,9 @@ function fmtBinRange(lo: number | null, hi: number | null): string {
   if (hi === null) return `≥ ${fmtSignedPct(lo, 2)}`;
   return `${fmtSignedPct(lo, 2)} 〜 ${fmtSignedPct(hi, 2)}`;
 }
+
+// 曜日別パスの対象曜日(月〜金)。当日が表示中の群に含まれるかの判定に使う。
+const WD_IN_RANGE = [1, 2, 3, 4, 5];
 
 interface BinInfo {
   bin: number;
@@ -60,9 +64,9 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
   const setSchemeAndReset = useCallback((s: BinScheme) => { setScheme(s); setSelBinRaw(null); }, []);
   const [showBand, setShowBand] = useState(true);
   const [showMedian, setShowMedian] = useState(false);
+  const [showToday, setShowToday] = useState(true);
   const [showDist, setShowDist] = useState(false);
   const { data, loading, error } = useAlignedDays(ticker, interval, usTicker);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // 前夜米国リターンをビン化し、各ビンのメタ情報・今日の所属ビンを求める(選択ビンには依らない)。
   const binning = useMemo(() => {
@@ -106,14 +110,33 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
 
   const evo = usePathEvolution(result?.bins);
 
-  useEffect(() => {
-    if (!result || !canvasRef.current) return;
-    const init = initCanvas(canvasRef.current, 260);
-    if (init) drawPathStats(init.ctx, init.width, init.height, result.bins, result.timeLabels, result.maxAbs, {
-      showBand, showMedian,
-      showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
-    });
-  }, [result, showBand, showMedian, evo.showSpaghetti, evo.showEras, evo.groupFilter]);
+  // 直近の立会日(=今日、場中なら途中まで)の実測パス。台本(平均パス)の上に重ねて現在地を読む。
+  const overlay: PathOverlay | null = useMemo(() => {
+    if (!showToday || !data?.grid || !binning || binning.rows.length === 0) return null;
+    const last = binning.rows[binning.rows.length - 1];
+    const li = lastBarBin(last.jp, data.grid, data.gmtoffset);
+    if (li < 0) return null;
+    return {
+      values: dayCumPath(last.jp, data.grid, data.gmtoffset),
+      lastIdx: li,
+      label: `${last.jp.date}（当日実測）`,
+    };
+  }, [showToday, data, binning]);
+
+  // 黒線の日が属する条件セル。表示中のビンと一致しないことは普通に起こる:
+  // バナーの「直近の前夜米国」は“まだ寄っていない今夜のNY”（=明日の条件）で、
+  // 黒線の日（=最後に立会が済んだ日）の前夜は その1つ前のNY だから。
+  const overlayCell = useMemo(() => {
+    if (!overlay || !binning) return null;
+    const i = binning.rows.length - 1;
+    const bin = binning.binIdx[i];
+    const wd = binning.rows[i].jp.weekday;
+    return {
+      bin,
+      binLabel: binning.binInfos.find((b) => b.bin === bin)?.label ?? "-",
+      inCell: bin === selBin && WD_IN_RANGE.includes(wd),
+    };
+  }, [overlay, binning, selBin]);
 
   const timelineDays: TimelineDay[] = useMemo(
     () => (result ? result.days.map((d) => ({ date: d.date, close: d.close, key: String(d.weekday) })) : []),
@@ -211,6 +234,10 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
           <input type="checkbox" checked={showMedian} onChange={(e) => setShowMedian(e.target.checked)} />
           中央値パス（破線）
         </label>
+        <label className="flex items-center gap-1 text-xs text-gray-600">
+          <input type="checkbox" checked={showToday} onChange={(e) => setShowToday(e.target.checked)} />
+          当日の実測を重ねる（黒）
+        </label>
       </div>
 
       <LoadingError loading={loading} error={error} />
@@ -228,7 +255,32 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
           </div>
           <PathLegend stats={result.bins} />
           <PathEvolutionControls stats={result.bins} evo={evo} />
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <PathCanvas
+            stats={result.bins}
+            timeLabels={result.timeLabels}
+            maxAbs={result.maxAbs}
+            opts={{
+              showBand, showMedian,
+              showSpaghetti: evo.showSpaghetti, showEras: evo.showEras, groupFilter: evo.groupFilter,
+              overlay,
+            }}
+          />
+          {overlay && overlayCell && (
+            <p className="text-[11px] text-gray-500">
+              黒線 = {overlay.label}。
+              {overlayCell.inCell ? (
+                "この日の前夜米国は表示中のビンと同じ＝同条件の平均パスと直接比べられる（この日自身も標本に含まれる）。"
+              ) : (
+                <>
+                  この日の前夜米国は「{overlayCell.binLabel}」ビン（表示中は「{selInfo.label}」）。同条件で比べるには
+                  <button onClick={() => setSelBinRaw(overlayCell.bin)} className="mx-1 underline text-blue-700 hover:text-blue-900">
+                    {overlayCell.binLabel}に切り替える
+                  </button>
+                  。上のバナーの「直近の前夜米国」はまだ寄っていない今夜のNY（＝明日の条件）なので、黒線の日の条件とは1日ずれる。
+                </>
+              )}
+            </p>
+          )}
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="曜日" />
           <p className="text-[11px] text-gray-400">
@@ -236,6 +288,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
             例: 金曜は米大幅高なら継続・米大幅安ならフェード、など地合いの強さ依存の曜日癖を切り分ける。
             {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
             {evo.showSpaghetti && "個別日は最新ほど濃く太い。枠外に出た日はクリップされる（縦軸は平均基準のため）。"}
+            {" チャート上にカーソルを置くと、その時刻の各曜日の平均値が読める。個別日を表示中はカーソル直下の1本を特定して日付と引け値も表示する。"}
           </p>
 
           <PairDiffMatrix stats={result.bins} pairDiffs={result.pairDiffs} />

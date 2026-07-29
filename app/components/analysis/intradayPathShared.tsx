@@ -4,13 +4,13 @@
 // intraday-path-core の PathStat/PairDiff を受けて、Canvas2Dの重ね描き・凡例・
 // 寄り→引けサマリー表・群間差マトリクス・原系列タイムラインを提供する。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   createChart, LineSeries, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesMarker, type Time,
 } from "lightweight-charts";
 import { PathStat, PairDiff } from "../../lib/intraday-path-core";
-import { fmtSignedPct, drawTimeAxisLabels } from "./intradayShared";
+import { fmtSignedPct, drawTimeAxisLabels, initCanvas } from "./intradayShared";
 import StatBadge from "./StatBadge";
 
 // 0..1 の不透明度を #rrggbb に付ける2桁16進に変換。
@@ -23,6 +23,54 @@ export interface PathDrawOpts {
   showSpaghetti?: boolean; // 個別日パスを新旧グラデーションで重ねる
   showEras?: boolean; // 時代分割(古→直近)の平均パスを描き、全期間平均は隠す
   groupFilter?: string | null; // PathStat.key。指定群だけ描画(null=全群)
+  // 当日(または任意の対象日)の実測パスを黒で重ねる。lastIdx までしか描かない(場中の偽の平坦線を防ぐ)。
+  overlay?: PathOverlay | null;
+  // 個別日の濃淡を「日付の新旧」ではなく任意のスコア(date→0..1, 1=最も強調)で決める。
+  // 例: 今日との類似度。指定した日付だけが濃く描かれ、それ以外は最小濃度になる。
+  dayAccent?: Map<string, number> | null;
+}
+
+// 対象日の実測パス。値は群と同じ寄り基準の累積対数リターン。
+export interface PathOverlay {
+  values: number[];
+  lastIdx: number; // 実測が到達している最終ビン(-1=なし)
+  label: string;
+  color?: string;
+}
+
+const OVERLAY_COLOR = "#111827";
+
+// 描画とヒットテストで共有する縦軸スケール。個別日パスは外れ値が桁違いなのでスケールに含めず、
+// プロット枠でクリップする。時代分割の平均は全期間平均より振れるので、はみ出さないよう広げる。
+export function pathYMax(stats: PathStat[], maxAbs: number, opts: PathDrawOpts): number {
+  const visible = stats.filter(
+    (b) => b.n > 0 && (opts.groupFilter == null || b.key === opts.groupFilter)
+  );
+  let yMax = maxAbs;
+  if (opts.showEras) {
+    for (const b of visible) for (const e of b.eras) for (const v of e.mean) {
+      if (Math.abs(v) > yMax) yMax = Math.abs(v);
+    }
+  }
+  if (opts.overlay) {
+    for (let g = 0; g <= opts.overlay.lastIdx && g < opts.overlay.values.length; g++) {
+      if (Math.abs(opts.overlay.values[g]) > yMax) yMax = Math.abs(opts.overlay.values[g]);
+    }
+  }
+  return yMax * 1.05;
+}
+
+// プロット領域の余白と座標変換。描画とホバーのヒットテストが必ず同じ幾何を使うよう一元化する。
+export function pathGeom(W: number, H: number, G: number, yMax: number) {
+  const ml = 44, mr = 10, mt = 10, mb = 22;
+  const plotW = W - ml - mr, plotH = H - mt - mb;
+  return {
+    ml, mr, mt, mb, plotW, plotH,
+    X: (g: number) => ml + (g / Math.max(1, G - 1)) * plotW,
+    Y: (v: number) => mt + (1 - (v + yMax) / (2 * yMax)) * plotH,
+    // 画面x座標 → 最も近い時間ビン
+    binOfX: (x: number) => Math.max(0, Math.min(G - 1, Math.round(((x - ml) / plotW) * (G - 1)))),
+  };
 }
 
 // 群別の平均パス(+任意で中央値・95%帯・個別日・時代分割)とピーク/ボトム点をCanvasに重ね描く。
@@ -31,8 +79,6 @@ export function drawPathStats(
   stats: PathStat[], timeLabels: string[], maxAbs: number,
   opts: PathDrawOpts
 ) {
-  const ml = 44, mr = 10, mt = 10, mb = 22;
-  const plotW = W - ml - mr, plotH = H - mt - mb;
   const G = timeLabels.length;
   if (G < 2) return;
 
@@ -40,17 +86,8 @@ export function drawPathStats(
     (b) => b.n > 0 && (opts.groupFilter == null || b.key === opts.groupFilter)
   );
 
-  // 時代分割の平均は全期間平均より標本が少なく振れるため、はみ出さないよう縦軸を広げる。
-  // 個別日パスは外れ値が桁違いなのでスケールには含めず、プロット枠でクリップする。
-  let yMax = maxAbs;
-  if (opts.showEras) {
-    for (const b of visible) for (const e of b.eras) for (const v of e.mean) {
-      if (Math.abs(v) > yMax) yMax = Math.abs(v);
-    }
-  }
-  yMax *= 1.05;
-  const X = (g: number) => ml + (g / (G - 1)) * plotW;
-  const Y = (v: number) => mt + (1 - (v + yMax) / (2 * yMax)) * plotH;
+  const yMax = pathYMax(stats, maxAbs, opts);
+  const { ml, mt, plotW, plotH, X, Y } = pathGeom(W, H, G, yMax);
 
   // グリッド + ゼロ線
   ctx.strokeStyle = "#f0f0f0"; ctx.lineWidth = 1;
@@ -74,13 +111,16 @@ export function drawPathStats(
   ctx.save();
   ctx.beginPath(); ctx.rect(ml, mt, plotW, plotH); ctx.clip();
 
-  // 個別日パス(新旧グラデーション): 古い日ほど薄く細く、最新日ほど濃く太い。
+  // 個別日パス: 既定は新旧グラデーション(古い日ほど薄く細く、最新日ほど濃く太い)。
+  // dayAccent を与えた場合は濃淡の意味が「日付の新旧」から「そのスコア(例: 今日との類似度)」に変わる。
   if (opts.showSpaghetti) {
     for (const b of visible) {
       const D = b.days.length;
       if (D === 0) continue;
       b.days.forEach((d, i) => {
-        const t = D > 1 ? i / (D - 1) : 1; // 0=最古 1=最新
+        const t = opts.dayAccent
+          ? opts.dayAccent.get(d.date) ?? 0
+          : D > 1 ? i / (D - 1) : 1; // 0=最古 1=最新
         stroke(d.values, b.color + alphaHex(0.05 + 0.3 * t), 0.5 + 1.0 * t);
       });
     }
@@ -118,6 +158,23 @@ export function drawPathStats(
     for (const b of visible) stroke(b.mean, b.color, 2);
   }
 
+  // 対象日の実測(黒・太線)。到達済みのビンまでしか描かない。
+  if (opts.overlay && opts.overlay.lastIdx >= 0) {
+    const ov = opts.overlay;
+    const col = ov.color ?? OVERLAY_COLOR;
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let g = 0; g <= ov.lastIdx && g < G; g++) {
+      const x = X(g), y = Y(ov.values[g]);
+      if (g === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // 現在地(最終到達点)を白抜き丸で強調
+    const li = Math.min(ov.lastIdx, G - 1);
+    ctx.fillStyle = "#ffffff"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(X(li), Y(ov.values[li]), 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+
   ctx.restore();
 
   // ピーク(▲塗り)・ボトム(▽白抜き)マーカー。
@@ -134,6 +191,122 @@ export function drawPathStats(
   }
 
   drawTimeAxisLabels(ctx, timeLabels, ml, plotW / G, H - 6);
+}
+
+// ───────────────────── ホバー付きパスCanvas ─────────────────────
+
+interface HoverInfo {
+  left: number; top: number; // ツールチップの表示位置(枠内にクランプ済み)
+  g: number; // 時間ビン
+  day: { date: string; label: string; color: string; value: number; end: number } | null;
+}
+
+// drawPathStats を描画するCanvas + マウスホバーの読み取り。
+//   ・十字線: その時刻の各群の平均(と対象日の実測)を数値で読む
+//   ・個別日: 「個別日」表示中はカーソルに最も近い1本を特定し、日付と終端を表示する
+// 個別日を重ねると線が数十本になり、目で追えても「どの日か」が分からなくなるのを解消する。
+export function PathCanvas({
+  stats, timeLabels, maxAbs, opts, height = 260,
+}: {
+  stats: PathStat[];
+  timeLabels: string[];
+  maxAbs: number;
+  opts: PathDrawOpts;
+  height?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hover, setHover] = useState<HoverInfo | null>(null);
+
+  const G = timeLabels.length;
+  const ov = opts.overlay;
+  const optsKey = [
+    opts.showBand, opts.showMedian, opts.showSpaghetti, opts.showEras, opts.groupFilter,
+    opts.dayAccent?.size ?? 0, ov?.label ?? "", ov?.lastIdx ?? -1,
+    ov && ov.lastIdx >= 0 ? ov.values[ov.lastIdx] : 0,
+  ].join("|");
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const render = () => {
+      const init = initCanvas(canvas, height);
+      if (init) drawPathStats(init.ctx, init.width, init.height, stats, timeLabels, maxAbs, opts);
+    };
+    render();
+    window.addEventListener("resize", render);
+    return () => window.removeEventListener("resize", render);
+    // opts はオブジェクトなので毎描画で参照が変わる。中身のプリミティブを連結した optsKey で
+    // 同一性を判定する(依存に opts 自体を入れるとホバーの度に再描画されてちらつく)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats, timeLabels, maxAbs, optsKey, height]);
+
+  const onMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || G < 2) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const yMax = pathYMax(stats, maxAbs, opts);
+    const geom = pathGeom(rect.width, height, G, yMax);
+    if (mx < geom.ml || mx > geom.ml + geom.plotW) { setHover(null); return; }
+    const g = geom.binOfX(mx);
+
+    // 個別日表示中はカーソル直近の1本を特定(縦8px以内)。
+    let day: HoverInfo["day"] = null;
+    if (opts.showSpaghetti) {
+      let best = 8;
+      for (const s of stats) {
+        if (s.n === 0 || (opts.groupFilter != null && s.key !== opts.groupFilter)) continue;
+        for (const d of s.days) {
+          const dy = Math.abs(geom.Y(d.values[g]) - my);
+          if (dy < best) {
+            best = dy;
+            day = { date: d.date, label: s.label, color: s.color, value: d.values[g], end: d.end };
+          }
+        }
+      }
+    }
+    setHover({
+      left: Math.min(mx + 10, Math.max(0, rect.width - 170)),
+      top: Math.max(0, my - 10),
+      g, day,
+    });
+  };
+
+  const visible = stats.filter((s) => s.n > 0 && (opts.groupFilter == null || s.key === opts.groupFilter));
+
+  return (
+    <div className="relative">
+      <canvas ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)} />
+      {hover && (
+        <div
+          className="pointer-events-none absolute z-10 rounded border border-gray-200 bg-white/95 px-2 py-1 text-[10px] shadow-sm"
+          style={{ left: hover.left, top: hover.top }}
+        >
+          <div className="font-medium text-gray-700">{timeLabels[hover.g]}</div>
+          {hover.day && (
+            <div className="mt-0.5 border-b border-gray-100 pb-0.5">
+              <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ backgroundColor: hover.day.color }} />
+              <span className="font-bold text-gray-800">{hover.day.date}</span>
+              <span className="text-gray-400">（{hover.day.label}）</span>
+              <span className="ml-1 tabular-nums text-gray-600">{fmtSignedPct(hover.day.value)}</span>
+              <span className="ml-1 text-gray-400">引け {fmtSignedPct(hover.day.end)}</span>
+            </div>
+          )}
+          {visible.map((s) => (
+            <div key={s.key} className="tabular-nums text-gray-600">
+              <span className="inline-block w-2 h-2 rounded-sm mr-1 align-middle" style={{ backgroundColor: s.color }} />
+              {s.label} 平均 {fmtSignedPct(s.mean[hover.g])}
+            </div>
+          ))}
+          {ov && hover.g <= ov.lastIdx && (
+            <div className="tabular-nums font-medium text-gray-900">
+              {ov.label} {fmtSignedPct(ov.values[hover.g])}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ───────────────────── 経時ドリフト(新旧グラデーション/時代分割) ─────────────────────

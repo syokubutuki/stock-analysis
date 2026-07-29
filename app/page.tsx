@@ -712,6 +712,18 @@ const TodayVsExpectedPathChart = dynamic(
   () => import("./components/analysis/TodayVsExpectedPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const IntradayAnalogPathChart = dynamic(
+  () => import("./components/analysis/IntradayAnalogPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsJpLinkedPathChart = dynamic(
+  () => import("./components/analysis/UsJpLinkedPathChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
+const UsBinEventStudyChart = dynamic(
+  () => import("./components/analysis/UsBinEventStudyChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const RegimeUsPathChart = dynamic(
   () => import("./components/analysis/RegimeUsPathChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -1888,6 +1900,7 @@ export default function AnalysisPage() {
                       { id: "cal-week-embed", title: "週内Embedding（週の関数PCA・固有週アトラス／形→翌週リターンの予測力を大域検定）", node: <WeekEmbeddingChart prices={allPrices} /> },
                       { id: "cal-weekday-cond", title: "曜日 × 値動きビン 条件付き分析（インタラクティブ）", node: <WeekdayConditionalChart prices={filteredPrices} /> },
                       { id: "cal-monday-gap", title: "月曜ギャップ解剖（週初めの「下げて始まる」を層別）", node: <MondayGapChart prices={allPrices} /> },
+                      { id: "cal-us-bin-event", title: "曜日 × 前夜米国ビン のイベントスタディ（−5日〜+5日の日足経路・効果は持続するか巻き戻るか）", node: <UsBinEventStudyChart prices={allPrices} /> },
                     ],
                   },
                   {
@@ -1897,6 +1910,8 @@ export default function AnalysisPage() {
                       { id: "cal-tom-path", title: "月内位置（月初/中旬/月末）× 当日日内 平均累積パス", node: <TurnOfMonthPathChart ticker={data.ticker} /> },
                       { id: "cal-weekday-us-path", title: "曜日 × 前夜米国ビン 交互作用：日内平均累積パス", node: <WeekdayUsPathChart ticker={data.ticker} /> },
                       { id: "cal-today-vs-expected", title: "当日の実測 vs 条件付き期待パス（台本どおりか／乖離は続くか）", node: <TodayVsExpectedPathChart ticker={data.ticker} /> },
+                      { id: "cal-intraday-analog", title: "寄り前情報アナログ（似た経路をたどった過去日の日内パスを重ねる／OOS検証つき）", node: <IntradayAnalogPathChart ticker={data.ticker} /> },
+                      { id: "cal-us-jp-linked", title: "前夜米国の日中経路 → 当日日本の連続パス（終値1点でなく“形”で条件付け）", node: <UsJpLinkedPathChart ticker={data.ticker} /> },
                       { id: "cal-regime-us-path", title: "相場基調 × 前夜米国 交互作用：日内平均累積パス", node: <RegimeUsPathChart ticker={data.ticker} /> },
                       { id: "cal-weekday-intra-edge", title: "曜日 × 日内タイミング エッジスキャン", node: <WeekdayIntradayEdgeChart ticker={data.ticker} /> },
                       { id: "cal-sector-basket", title: "業種バスケット 曜日×日内（標本プール）", node: <SectorBasketWeekdayChart ticker={data.ticker} /> },

@@ -17,7 +17,7 @@ import { PricePoint } from "./types";
 import {
   DayData, BinGrid, binIndexOfMinute, localMinute,
 } from "./intraday-core";
-import { mean, quantileSorted } from "./stats-significance";
+import { mean, quantileSorted, studentTwoSidedP } from "./stats-significance";
 
 // ───────────────────────── 米国リターン系列 ─────────────────────────
 
@@ -222,45 +222,11 @@ export function ols(x: number[], y: number[]): Regression | null {
   return { n, alpha, beta, r2, corr, seBeta, tBeta, pBeta, meanX: mx, meanY: my };
 }
 
-// ───────────────────────── t分布の両側p値(自己完結) ─────────────────────────
-// stats-significance.ts は1標本t検定しか公開していないため、回帰係数用に独立実装する。
-
-function lnGamma(z: number): number {
-  const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
-  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lnGamma(1 - z);
-  z -= 1;
-  let x = c[0];
-  for (let i = 1; i < 9; i++) x += c[i] / (z + i);
-  const t = z + 7.5;
-  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
-}
-
-function incompleteBeta(a: number, b: number, x: number): number {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  const lnB = lnGamma(a) + lnGamma(b) - lnGamma(a + b);
-  const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lnB) / a;
-  let f = 1, c = 1, d = 1 - ((a + b) * x) / (a + 1);
-  if (Math.abs(d) < 1e-30) d = 1e-30;
-  d = 1 / d; f = d;
-  for (let i = 1; i <= 200; i++) {
-    let num = (i * (b - i) * x) / ((a + 2 * i - 1) * (a + 2 * i));
-    d = 1 + num * d; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d;
-    c = 1 + num / c; if (Math.abs(c) < 1e-30) c = 1e-30; f *= d * c;
-    num = (-(a + i) * (a + b + i) * x) / ((a + 2 * i) * (a + 2 * i + 1));
-    d = 1 + num * d; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d;
-    c = 1 + num / c; if (Math.abs(c) < 1e-30) c = 1e-30;
-    const delta = d * c; f *= delta;
-    if (Math.abs(delta - 1) < 1e-10) break;
-  }
-  return front * f;
-}
-
-export function studentTwoSidedP(t: number, df: number): number {
-  if (!isFinite(t) || df <= 0) return 1;
-  const x = df / (df + t * t);
-  return Math.min(1, incompleteBeta(df / 2, 0.5, x));
-}
+// ───────────────────────── t分布の両側p値 ─────────────────────────
+// 実装は stats-significance に一元化されている(不完全ベータ関数の収束側の切替を含む)。
+// 従来ここに私的コピーを置いていたが、x→1 で壊れる欠陥版だったため委譲に統一した。
+// 多数のモジュールがこの名前で import しているため、再輸出でインターフェースは維持する。
+export { studentTwoSidedP };
 
 // ───────────────────────── 乱数・ブートストラップ ─────────────────────────
 

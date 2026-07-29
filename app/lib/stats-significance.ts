@@ -35,16 +35,13 @@ function lnGamma(z: number): number {
   return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
 }
 
-// 正則化不完全ベータ関数 I_x(a,b)。t分布の両側p値に使う。
-function incompleteBeta(a: number, b: number, x: number): number {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  const lnB = lnGamma(a) + lnGamma(b) - lnGamma(a + b);
-  const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lnB) / a;
+// 連分数(修正Lentz法)による不完全ベータ関数の中核。x が小さい側でしか収束しないため、
+// 呼び出し側(incompleteBeta)で対称関係を使って必ず収束する側に写してから使う。
+function betaCF(a: number, b: number, x: number): number {
   let f = 1, c = 1, d = 1 - ((a + b) * x) / (a + 1);
   if (Math.abs(d) < 1e-30) d = 1e-30;
   d = 1 / d; f = d;
-  for (let i = 1; i <= 200; i++) {
+  for (let i = 1; i <= 300; i++) {
     let num = (i * (b - i) * x) / ((a + 2 * i - 1) * (a + 2 * i));
     d = 1 + num * d; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d;
     c = 1 + num / c; if (Math.abs(c) < 1e-30) c = 1e-30; f *= d * c;
@@ -52,9 +49,37 @@ function incompleteBeta(a: number, b: number, x: number): number {
     d = 1 + num * d; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d;
     c = 1 + num / c; if (Math.abs(c) < 1e-30) c = 1e-30;
     const delta = d * c; f *= delta;
-    if (Math.abs(delta - 1) < 1e-10) break;
+    if (Math.abs(delta - 1) < 1e-12) break;
   }
-  return front * f;
+  return f;
+}
+
+// 正則化不完全ベータ関数 I_x(a,b)。t分布・F分布の両側p値に使う。
+//
+// 【重要】連分数は x < (a+1)/(a+b+2) の側でしか実用的な速度で収束しない。x がそれより大きい
+// ときは対称関係 I_x(a,b) = 1 − I_{1−x}(b,a) で写す。この分岐が無いと、x→1 で値が静かに壊れる
+// （t検定では |t| が小さいとき x=df/(df+t²)→1 になるため、「差がほぼ無い」ケースのp値が
+// 不当に小さく出る。例: t=0.03, df=702 で p=0.59 と表示されてしまう。正しくは 0.976）。
+export function incompleteBeta(a: number, b: number, x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const lnB = lnGamma(a) + lnGamma(b) - lnGamma(a + b);
+  const bt = Math.exp(a * Math.log(x) + b * Math.log(1 - x) - lnB);
+  return x < (a + 1) / (a + b + 2)
+    ? (bt * betaCF(a, b, x)) / a
+    : 1 - (bt * betaCF(b, a, 1 - x)) / b;
+}
+
+// 自由度 df のt分布の両側p値。P(|T| > |t|)。
+export function studentTwoSidedP(t: number, df: number): number {
+  if (!isFinite(t) || df <= 0) return 1;
+  return Math.min(1, incompleteBeta(df / 2, 0.5, df / (df + t * t)));
+}
+
+// F(d1,d2) の上側確率 P(F > f) = I_{d2/(d2+d1·f)}(d2/2, d1/2)。
+export function fSurvival(f: number, d1: number, d2: number): number {
+  if (!isFinite(f) || f <= 0 || d1 <= 0 || d2 <= 0) return 1;
+  return Math.min(1, incompleteBeta(d2 / 2, d1 / 2, d2 / (d2 + d1 * f)));
 }
 
 // 平均=0 という帰無仮説に対する1標本t検定の両側p値。
@@ -64,10 +89,7 @@ export function tTest(arr: number[]): { t: number; p: number } | null {
   const se = std(arr) / Math.sqrt(n);
   if (se === 0) return null;
   const t = mean(arr) / se;
-  const df = n - 1;
-  const x = df / (df + t * t);
-  const p = Math.min(incompleteBeta(df / 2, 0.5, x), 1);
-  return { t, p };
+  return { t, p: studentTwoSidedP(t, n - 1) };
 }
 
 // Benjamini-Hochberg法によるFDR(偽発見率)補正。生p値配列 → 補正済みp値配列(同順)。
