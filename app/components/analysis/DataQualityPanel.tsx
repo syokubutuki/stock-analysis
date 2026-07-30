@@ -238,21 +238,26 @@ function GlitchDetail({ glitch, prices }: { glitch: PriceGlitch; prices: PricePo
       width: containerRef.current.clientWidth,
       height: CHART_HEIGHT,
       crosshair: { mode: 0 },
-      rightPriceScale: { visible: true },
+      // 破損値(1/10)と正常値が同じ軸に乗るので、既定の余白では軸下端が負値まで伸びて
+      // 価格軸として無意味になる。余白を詰めて実データの範囲に寄せる。
+      rightPriceScale: { visible: true, scaleMargins: { top: 0.08, bottom: 0.04 } },
       timeScale: { timeVisible: false },
     });
     chartRef.current = chart;
 
+    // 2本の最終値ラベル・水平線は同じ値なので右端で重なって読めない。凡例は title に任せる。
+    const seriesOpts = { lineWidth: 2 as const, lastValueVisible: false, priceLineVisible: false };
+
     const beforeSeries = chart.addSeries(LineSeries, {
+      ...seriesOpts,
       color: "#dc2626",
-      lineWidth: 2,
       title: "配信値(修復前)",
     });
     beforeSeries.setData(view.before);
 
     const afterSeries = chart.addSeries(LineSeries, {
+      ...seriesOpts,
       color: "#16a34a",
-      lineWidth: 2,
       title: "修復後",
     });
     afterSeries.setData(view.after);
