@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { repairPriceGlitches, PriceSanityReport } from "@/app/lib/price-sanity";
+import { PricePoint } from "@/app/lib/types";
 
 const isFundCode = (ticker: string) => /^\d{7,8}$/.test(ticker);
 
@@ -86,6 +88,22 @@ async function fetchFundData(ticker: string, range: string) {
   return { ticker, name: fundName, currency: "JPY", prices };
 }
 
+// 修復・疑いはサーバログにも残す。配信元の破損は時間が経つと直る（＝再現しなくなる）ため、
+// 「あの日の分析結果は破損データだったのか」を後から突き合わせられるようにしておく。
+function logSanity(ticker: string, report: PriceSanityReport) {
+  for (const g of report.repaired) {
+    console.warn(
+      `[price-sanity] ${ticker}: repaired ${g.from}..${g.to} (${g.days}d) factor=${g.factor}`
+    );
+  }
+  if (report.suspects.length > 0) {
+    console.warn(
+      `[price-sanity] ${ticker}: ${report.suspects.length} unrepaired jump(s) >35%: ` +
+        report.suspects.map((s) => `${s.time}:${s.logReturn.toFixed(2)}`).join(",")
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker");
   if (!ticker) {
@@ -100,7 +118,9 @@ export async function GET(request: NextRequest) {
     // 7〜8桁数字は投資信託 → Yahoo!ファイナンス日本版から取得
     if (isFundCode(ticker)) {
       const data = await fetchFundData(ticker, safeRange);
-      return NextResponse.json(data);
+      const fixed = repairPriceGlitches(data.prices as PricePoint[]);
+      logSanity(ticker, fixed.report);
+      return NextResponse.json({ ...data, prices: fixed.prices, dataQuality: fixed.report });
     }
 
     // 東証コード（4桁数字 or 285A等の英数字混在）なら .T を付与
@@ -159,13 +179,19 @@ export async function GET(request: NextRequest) {
           volume: quote.volume[i] || 0,
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as PricePoint[];
+
+    // 配信元のスケール破損（数日だけ 1/10 等）をここで一括修復する。呼び出し側は20箇所以上
+    // あり、個別に対処すると必ず漏れるため、取得の関門を唯一の修復地点とする。
+    const fixed = repairPriceGlitches(prices);
+    logSanity(symbol, fixed.report);
 
     return NextResponse.json({
       ticker: symbol,
       name: meta.shortName || meta.symbol || symbol,
       currency: meta.currency || "JPY",
-      prices,
+      prices: fixed.prices,
+      dataQuality: fixed.report,
     });
   } catch (e) {
     console.error("Stock API error:", e);

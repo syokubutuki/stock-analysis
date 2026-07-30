@@ -46,7 +46,7 @@ export interface DesignBoard {
   hitProbExact: number; // P(TPに先に到達) = (1−e^{2BS})/(e^{−2AS}−e^{2BS})
   hitProbZeroMu: number; // μ=0 の極限 B/(A+B)
   skew: number; // (A−B)/√(AB)
-  eTauH: number; // 期待滞在 E[τ] = AB·H（Hの倍数で AB）
+  eTauH: number; // 期待滞在 E[τ]。μ=0 では ab/σ²=AB·H、μ≠0 では Wald から厳密に (a·p−b(1−p))/μ
   tradeSd: number; // 1トレードの標準偏差 √(AB)·σ√H
   nTrades: number; // 暦期間T に入るトレード数 T/(AB·H)
   expTotal: number; // 総期待値 μT（A,Bに不変）
@@ -72,7 +72,16 @@ export function designBoard(p: {
     const den = Math.exp(-2 * A * S) - Math.exp(2 * B * S);
     if (Math.abs(den) > 1e-15) hit = num / den;
   }
-  const eTau = AB * H;
+  // 期待滞在 E[τ]。μ=0 なら ab/σ² = AB·H。μ≠0 では Wald の第1式 E[X_τ]=μ·E[τ] から厳密に
+  //   E[τ] = (a·p − b·(1−p)) / μ        （a=Aσ√H, b=Bσ√H, p=到達確率の厳密解）
+  // が出る。μ→0 で 0/0 なので極限 AB·H に落とす（S→0 で分子→AB·μ·H なので連続に繋がる）。
+  // 回転数 → 総コスト → コスト後シャープに伝播するので、ここは近似で済ませない。
+  let eTau = AB * H;
+  if (Math.abs(S) > 1e-6 && mu !== 0) {
+    const eX = A * sigma * Math.sqrt(H) * hit - B * sigma * Math.sqrt(H) * (1 - hit);
+    const t = eX / mu;
+    if (Number.isFinite(t) && t > 0) eTau = t;
+  }
   const nTrades = eTau > 0 ? T / eTau : 0;
   const expTotal = mu * T;
   const varTotal = sigma * sigma * T;

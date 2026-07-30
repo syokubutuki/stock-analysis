@@ -131,6 +131,10 @@ const SelectionTiltChart = dynamic(
   () => import("../components/analysis/SelectionTiltChart"),
   { ssr: false }
 );
+const SectorFactorSelectChart = dynamic(
+  () => import("../components/analysis/SectorFactorSelectChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -515,6 +519,27 @@ export default function PortfolioPage() {
           ) : null}
         </div>
 
+        {/* 横断分析は数十〜百銘柄を扱うので、銘柄ごとにバナーを出すと画面が埋まる。
+            修復のあった銘柄だけを1行に集約して開示する。 */}
+        {(() => {
+          const repaired = Object.entries(data).filter(
+            ([, v]) => (v.dataQuality?.repaired.length ?? 0) > 0
+          );
+          if (repaired.length === 0) return null;
+          return (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-xs">
+              <span className="font-medium">データ品質: </span>
+              {`${repaired.length}銘柄で配信元の価格スケール破損を検出し、水準を復元しました（`}
+              {repaired
+                .map(([t, v]) =>
+                  `${t}: ${v.dataQuality!.repaired.map((g) => `${g.from}${g.days > 1 ? `〜${g.to}` : ""}`).join("・")}`
+                )
+                .join(", ")}
+              {`）。放置すると σ・β・相関・最適化がすべて壊れます。`}
+            </div>
+          );
+        })()}
+
         {watchlist.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
             ウォッチリストが空です。上の入力欄か、個別分析画面の ★ で銘柄を追加してください。
@@ -553,6 +578,16 @@ export default function PortfolioPage() {
               title: "対象選択による床の底上げ：横断ドリフト・チルト（株式原論 C25）",
               subtitle: "特性(モメンタム/低ボラ/短期反転/トレンド)で対象をチルトし市場等加重(床)への超過ドリフトΔμを前向き検証。t値ハードル(C16)＋BH-FDR＋N_eff(C20)＋生存者バイアス診断。大半は床未達が誠実な既定",
               node: <SelectionTiltChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            // 系C29: C26（μでは選べない）→C25（束でチルト）の次に来る「束の中をどう選ぶか」。
+            // 特定セクターに意図的に集中している場合、期待リターンの銘柄間差はファクター感応度 b に
+            // しか宿らず、b は μ と違い測れる（SE(b̂)=σ_ε/(σ_F√T) は観測頻度で縮む）。
+            // P0 はその手前の前提診断だけ: 「そのセクターは本当に自分が思う因子で動いているか」。
+            items.push({
+              id: "pf-sector-select",
+              title: "セクター内選別：ファクター感応度による発掘（株式原論 C29）",
+              subtitle: "【P0 前提診断】銀行等のセクター集中を前提に「どの銘柄を買うか」を測れる量だけで決める層の第一段。セクター因子(市場直交化)を金利プロキシに回帰したR²・符号・NW t で「そのセクターは本当に金利の賭けか」を検証／μは測れないがbは測れる非対称性(C26との並置)／分散を市場・セクター・固有に3分解し生の相関ρ̄と残差相関ρ̄_εを対比＝高相関の正体は欲しい共通因子か／露出を削らず5本に分けたときのσ低減と成長率利得。P1以降でb̂ランキング(S=b/σ_ε)と推奨ウェイト(w∝b/σ_ε²)を積む",
+              node: <SectorFactorSelectChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // リスク分析(pf-risk)を読む前に「なぜリスクを見る必要があるのか」を体で分からせる層。
             // 数式ゼロの直感（データ不要）→ 合成データ（相関だけを動かす）→ 実データ（自分の分解）の順。

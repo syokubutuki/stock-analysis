@@ -210,6 +210,34 @@ const SEC_FIN: { ticker: string; name: string }[] = [
   { ticker: "8795.T", name: "T&D HD" },
 ];
 
+// 銀行のみ(純)。
+// SEC_FIN は証券・保険を含むため「セクター因子」を作ると金融一般に薄まる。金利感応度で
+// セクター内を選別する分析(sector-factor-select.ts / C27)は、因子が「銀行」でないと
+// 意味が壊れるので、貸出・預金を本業とする銀行だけの純ユニバースを別に持つ。
+const SEC_BANK: { ticker: string; name: string }[] = [
+  // メガ・信託・特殊業態
+  { ticker: "8306.T", name: "三菱UFJ FG" },
+  { ticker: "8316.T", name: "三井住友FG" },
+  { ticker: "8411.T", name: "みずほFG" },
+  { ticker: "8308.T", name: "りそなHD" },
+  { ticker: "8309.T", name: "三井住友トラストG" },
+  { ticker: "7182.T", name: "ゆうちょ銀行" },
+  { ticker: "8304.T", name: "あおぞら銀行" },
+  { ticker: "8410.T", name: "セブン銀行" }, // 手数料収益型＝低b側の対照として意図的に含む
+  // 主要地銀・広域再編行
+  // 注: 2022年以降に持株会社化した行は 58xx の新コードに移っている(旧 83xx では取得できない)。
+  //     静岡FG(5831)/いよぎんHD(5830) は 2022-10 上場のため履歴が約3年しかなく、
+  //     長い窓を選ぶとパネルから自動的に落ちる(buildPanel の履歴フィルタ)。
+  { ticker: "8331.T", name: "千葉銀行" },
+  { ticker: "5831.T", name: "静岡フィナンシャルG" },
+  { ticker: "8354.T", name: "ふくおかFG" },
+  { ticker: "7186.T", name: "コンコルディアFG" },
+  { ticker: "5844.T", name: "京都フィナンシャルG" },
+  { ticker: "5830.T", name: "いよぎんHD" },
+  { ticker: "8377.T", name: "ほくほくFG" },
+  { ticker: "8524.T", name: "北洋銀行" },
+];
+
 // 電機・精密・半導体
 const SEC_TECH: { ticker: string; name: string }[] = [
   { ticker: "6758.T", name: "ソニーグループ" },
@@ -343,6 +371,14 @@ export const UNIVERSES: UniverseDef[] = [
     label: "業種:銀行・証券・保険",
     note: "金融セクター内の横断。金利・市況の共通要因を相殺し、銘柄固有の強弱だけを抽出。",
     tickers: dedupe(SEC_FIN),
+  },
+  {
+    id: "sec-bank",
+    label: "業種:銀行（純）",
+    note:
+      "銀行のみ。セクター因子を「金融」でなく「銀行」で定義するための純ユニバース（金利感応度による選別＝C27 用）。" +
+      "注意: 地銀は統合・再編で消えた行が多く、この現存リストは過去の勝者に偏る（生存者バイアス）。",
+    tickers: dedupe(SEC_BANK),
   },
   {
     id: "sec-tech",

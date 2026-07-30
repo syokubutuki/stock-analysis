@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PricePoint, StockData } from "../lib/types";
 import { getCached, putCached, DEFAULT_TTL_MS } from "../lib/price-cache";
+import type { PriceSanityReport } from "../lib/price-sanity";
 
 export interface FetchedStock {
   prices: PricePoint[];
   name: string;
   error?: string;
+  /**
+   * 取得時に修復した価格スケール破損（app/lib/price-sanity.ts）。
+   * キャッシュ命中時は付かない（＝修復済みデータであることは版で保証され、報告だけが落ちる）。
+   */
+  dataQuality?: PriceSanityReport;
 }
 
 export type PortfolioData = Record<string, FetchedStock>;
@@ -35,7 +41,11 @@ async function fetchOne(ticker: string): Promise<FetchedStock> {
     if (!res.ok) {
       return { prices: [], name: ticker, error: json.error || "取得失敗" };
     }
-    const result: FetchedStock = { prices: json.prices ?? [], name: json.name ?? ticker };
+    const result: FetchedStock = {
+      prices: json.prices ?? [],
+      name: json.name ?? ticker,
+      dataQuality: json.dataQuality,
+    };
     memCache.set(ticker, result);
     if (result.prices.length > 0) void putCached(ticker, result.name, result.prices);
     return result;

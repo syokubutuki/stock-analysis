@@ -9,6 +9,7 @@ import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
 import WatchlistPanel from "./components/WatchlistPanel";
 import TickerSearchInput from "./components/TickerSearchInput";
 import AccordionSection from "./components/analysis/AccordionSection";
+import DataQualityNotice from "./components/analysis/DataQualityNotice";
 import { SeriesMode } from "./lib/series-mode";
 import { recordTicker } from "./lib/test-ledger";
 
@@ -1326,6 +1327,8 @@ export default function AnalysisPage() {
             {error}
           </div>
         )}
+
+        <DataQualityNotice report={data?.dataQuality} />
 
         {data && filteredPrices.length > 0 && (
           <>

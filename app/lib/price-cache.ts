@@ -7,6 +7,7 @@
 // なぜ IndexedDB か: localStorage は同期・5〜10MB上限で 100銘柄×10年(≈15MB)が溢れる。
 // IndexedDB は非同期・大容量でブラウザ再読込を跨いで残る。個人用途なのでサーバ不要。
 import { PricePoint } from "./types";
+import { SANITIZER_VERSION } from "./price-sanity";
 
 const DB_NAME = "stock-analysis-cache";
 const STORE = "prices";
@@ -17,6 +18,20 @@ export interface CachedPrices {
   name: string;
   prices: PricePoint[];
   fetchedAt: number; // epoch ms
+  /**
+   * 保存時の価格サニタイザの版（app/lib/price-sanity.ts）。
+   * 版が現行と違うエントリは TTL 内でも捨てて再取得する。破損データを掴んだまま
+   * キャッシュが生き続けると、取得層を直しても利用者の画面が直らないため。
+   * undefined = サニタイズ導入前に保存されたもの（＝無条件に無効）。
+   */
+  sanitizerVersion?: number;
+}
+
+/** TTL とサニタイザ版の両方を満たすエントリだけを有効とみなす。 */
+function isFresh(v: CachedPrices | undefined, maxAgeMs: number, now: number): boolean {
+  if (!v || !(v.prices?.length > 0)) return false;
+  if (v.sanitizerVersion !== SANITIZER_VERSION) return false;
+  return now - v.fetchedAt <= maxAgeMs;
 }
 
 // 既定TTL: 8時間(日足は1日1回更新。場中に何度開いても最大数回の再取得で収まる)。
@@ -51,8 +66,7 @@ export async function getCached(ticker: string, maxAgeMs = DEFAULT_TTL_MS): Prom
       const req = tx.objectStore(STORE).get(ticker);
       req.onsuccess = () => {
         const v = req.result as CachedPrices | undefined;
-        if (v && v.prices?.length > 0 && Date.now() - v.fetchedAt <= maxAgeMs) resolve(v);
-        else resolve(null);
+        resolve(isFresh(v, maxAgeMs, Date.now()) ? (v as CachedPrices) : null);
       };
       req.onerror = () => resolve(null);
     } catch {
@@ -82,7 +96,7 @@ export async function getManyCached(
         const req = store.get(t);
         req.onsuccess = () => {
           const v = req.result as CachedPrices | undefined;
-          if (v && v.prices?.length > 0 && now - v.fetchedAt <= maxAgeMs) out[t] = v;
+          if (isFresh(v, maxAgeMs, now)) out[t] = v as CachedPrices;
           if (--pending === 0) { resolve(out); db.close(); }
         };
         req.onerror = () => { if (--pending === 0) { resolve(out); db.close(); } };
@@ -102,7 +116,9 @@ export async function putCached(ticker: string, name: string, prices: PricePoint
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put({ ticker, name, prices, fetchedAt: Date.now() } as CachedPrices);
+      tx.objectStore(STORE).put({
+        ticker, name, prices, fetchedAt: Date.now(), sanitizerVersion: SANITIZER_VERSION,
+      } as CachedPrices);
       tx.oncomplete = () => { resolve(); db.close(); };
       tx.onerror = () => { resolve(); db.close(); };
       tx.onabort = () => { resolve(); db.close(); };
