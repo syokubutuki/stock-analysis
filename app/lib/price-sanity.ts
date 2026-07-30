@@ -64,7 +64,7 @@ import type { PricePoint } from "./types";
  * 古い版で保存された破損データがキャッシュに残っていると、利用者の画面は直らない。
  * キャッシュ側でこの版を突き合わせ、版が違うエントリは TTL 内でも無効として捨てる。
  */
-export const SANITIZER_VERSION = 1;
+export const SANITIZER_VERSION = 2;
 
 /** データ破損とみなす1日あたり対数リターンの下限（|log r| > これ）。±35%。 */
 const JUMP_THRESHOLD = 0.3;
@@ -115,6 +115,19 @@ const PLAUSIBLE_FACTORS: number[] = (() => {
   return [...out].filter((k) => Math.abs(Math.log(k)) >= MIN_LOG_FACTOR);
 })();
 
+/** 修復した1日の修復前/修復後の実値。画面で「何をどう直したか」を示すために持つ。 */
+export interface GlitchPoint {
+  time: string;
+  /** 配信元の値（修復前の終値）。 */
+  closeBefore: number;
+  /** 修復後の終値。 */
+  closeAfter: number;
+  /** 配信元の出来高。 */
+  volumeBefore: number;
+  /** 修復後の出来高。 */
+  volumeAfter: number;
+}
+
 /** 修復した破損区間。 */
 export interface PriceGlitch {
   /** 破損区間の最初の営業日（YYYY-MM-DD）。 */
@@ -125,6 +138,12 @@ export interface PriceGlitch {
   days: number;
   /** 破損中の価格に掛かっていた倍率（1306.T なら 0.1）。修復は price / factor。 */
   factor: number;
+  /** 修復した各日の実値。表・チャートで修復前後を並べて見せるために持つ。 */
+  points: GlitchPoint[];
+  /** 破損区間の直前の営業日の終値（＝正常な水準の基準）。 */
+  anchorBefore: string;
+  /** 水準が戻った営業日（＝破損区間の直後）。 */
+  anchorAfter: string;
 }
 
 /** 修復条件を満たさなかった極端なジャンプ（本物の暴落・未調整の分割の可能性）。 */
@@ -140,6 +159,13 @@ export interface PriceSanityReport {
   repaired: PriceGlitch[];
   /** 修復しなかった極端なジャンプ（要人間判断）。 */
   suspects: PriceJumpSuspect[];
+  /**
+   * 修復前/修復後の年率ボラティリティ（修復があったときだけ意味を持つ）。
+   * 「放置するとどれだけ壊れていたか」を数値で示す。この比が 1 に近い修復は
+   * そもそも壊れていなかった疑いがある（^TNX の教訓）。
+   */
+  sigmaBefore?: number;
+  sigmaAfter?: number;
 }
 
 /**
@@ -236,11 +262,24 @@ export function repairPriceGlitches(prices: PricePoint[]): {
     }
 
     for (let i = t; i < bestS; i++) factors[i] = factor;
+    const points: GlitchPoint[] = [];
+    for (let i = t; i < bestS; i++) {
+      points.push({
+        time: prices[i].time,
+        closeBefore: prices[i].close,
+        closeAfter: prices[i].close / factor,
+        volumeBefore: prices[i].volume,
+        volumeAfter: Math.round(prices[i].volume * factor),
+      });
+    }
     repaired.push({
       from: prices[t].time,
       to: prices[bestS - 1].time,
       days: bestS - t,
       factor,
+      points,
+      anchorBefore: prices[t - 1].time,
+      anchorAfter: prices[bestS].time,
     });
     // 復帰日 s は正常値なので、その次の日から探索を続ける。
     t = bestS;
@@ -261,7 +300,27 @@ export function repairPriceGlitches(prices: PricePoint[]): {
       volume: Math.round(p.volume * k),
     };
   });
-  return { prices: out, report: { repaired, suspects } };
+  return {
+    prices: out,
+    report: {
+      repaired,
+      suspects,
+      sigmaBefore: annualizedSigma(close),
+      sigmaAfter: annualizedSigma(out.map((p) => p.close)),
+    },
+  };
+}
+
+/** 年率ボラティリティ（対数リターンの標準偏差 × √252）。修復の効き目を示すために使う。 */
+function annualizedSigma(close: number[]): number {
+  const r: number[] = [];
+  for (let i = 1; i < close.length; i++) {
+    if (close[i] > 0 && close[i - 1] > 0) r.push(Math.log(close[i] / close[i - 1]));
+  }
+  if (r.length < 2) return 0;
+  const m = r.reduce((a, b) => a + b, 0) / r.length;
+  const v = r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1);
+  return Math.sqrt(v) * Math.sqrt(252);
 }
 
 /** 警告バナー等に出す1行の説明。修復も疑いも無ければ null。 */

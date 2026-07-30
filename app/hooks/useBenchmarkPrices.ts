@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PricePoint, StockData } from "../lib/types";
+import type { PriceSanityReport } from "../lib/price-sanity";
 
 // 指数(ベンチマーク)価格の取得フック。/api/stock から10年分を取得する。
 // 複数コンポーネントが同一指数を使うため、モジュール内キャッシュで再取得を避ける。
@@ -11,11 +12,20 @@ export interface BenchmarkPrices {
   name: string;
   loading: boolean;
   error: string | null;
+  /**
+   * 取得時に修復した価格スケール破損。
+   *
+   * **これを落としてはいけない。** 破損していた 1306.T はベンチマークであって検索対象の
+   * 銘柄ではないため、個別分析ページのバナー（＝検索した銘柄の報告）には出てこない。
+   * β を見ている画面に開示が無いと、利用者は自分が見ている数値の出自を知れない。
+   */
+  dataQuality?: PriceSanityReport;
 }
 
 interface CacheEntry {
   prices: PricePoint[];
   name: string;
+  dataQuality?: PriceSanityReport;
 }
 
 const cache = new Map<string, CacheEntry>();
@@ -30,7 +40,9 @@ async function fetchBench(ticker: string): Promise<CacheEntry> {
     const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`);
     const json = (await res.json()) as StockData & { error?: string };
     if (!res.ok) throw new Error(json.error || "取得失敗");
-    const entry: CacheEntry = { prices: json.prices ?? [], name: json.name ?? ticker };
+    const entry: CacheEntry = {
+      prices: json.prices ?? [], name: json.name ?? ticker, dataQuality: json.dataQuality,
+    };
     cache.set(ticker, entry);
     return entry;
   })();
@@ -47,6 +59,7 @@ interface ResolvedEntry {
   prices: PricePoint[] | null;
   name: string;
   error: string | null;
+  dataQuality?: PriceSanityReport;
 }
 
 export function useBenchmarkPrices(ticker: string): BenchmarkPrices {
@@ -60,7 +73,8 @@ export function useBenchmarkPrices(ticker: string): BenchmarkPrices {
     let cancelled = false;
     fetchBench(ticker)
       .then((e) => {
-        if (!cancelled) setEntry({ ticker, prices: e.prices, name: e.name, error: null });
+        if (!cancelled)
+          setEntry({ ticker, prices: e.prices, name: e.name, error: null, dataQuality: e.dataQuality });
       })
       .catch((err) => {
         if (!cancelled) setEntry({ ticker, prices: null, name: ticker, error: String(err?.message || err) });
@@ -76,8 +90,9 @@ export function useBenchmarkPrices(ticker: string): BenchmarkPrices {
   const prices = resolved ? entry.prices : cached?.prices ?? null;
   const name = resolved ? entry.name : cached?.name ?? ticker;
   const error = resolved ? entry.error : null;
+  const dataQuality = resolved ? entry.dataQuality : cached?.dataQuality;
   const loading = prices === null && error === null;
-  return { prices, name, loading, error };
+  return { prices, name, loading, error, dataQuality };
 }
 
 // 主要ベンチマーク指数のプリセット。/api/stock(Yahoo Finance)で取得可能なシンボル。

@@ -10,6 +10,7 @@ import WatchlistPanel from "./components/WatchlistPanel";
 import TickerSearchInput from "./components/TickerSearchInput";
 import AccordionSection from "./components/analysis/AccordionSection";
 import DataQualityNotice from "./components/analysis/DataQualityNotice";
+import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
 import { SeriesMode } from "./lib/series-mode";
 import { recordTicker } from "./lib/test-ledger";
 
@@ -40,6 +41,10 @@ const VolumeAnalysis = dynamic(
 const UnifiedChart = dynamic(
   () => import("./components/analysis/UnifiedChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={500} /> }
+);
+const DataQualityPanel = dynamic(
+  () => import("./components/analysis/DataQualityPanel"),
+  { ssr: false, loading: () => <ChartPlaceholder height={200} /> }
 );
 const GapAnalysisChart = dynamic(
   () => import("./components/analysis/GapAnalysisChart"),
@@ -1335,6 +1340,25 @@ export default function AnalysisPage() {
             <div className="text-xs text-gray-400">
               {SECTIONS.find(s => s.key === activeSection)?.description}
             </div>
+
+            {/* 破損点検は「どこをどう直したか」の詳細（表＋修復前後チャート）。
+                報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
+                破損していた 1306.T はベンチマーク側なので、パネル内でベンチマークも点検できる。 */}
+            <CollapsibleAnalysis
+              id="data-quality"
+              title="価格データの破損点検"
+              subtitle="配信元のスケール破損を検出・修復した記録。修復した日の配信値と修復値・年率σの膨張・修復前後を重ねたチャート・ベンチマーク指数の点検"
+              defaultOpen={
+                (data.dataQuality?.repaired.length ?? 0) > 0 ||
+                (data.dataQuality?.suspects.length ?? 0) > 0
+              }
+            >
+              <DataQualityPanel
+                ticker={data.ticker}
+                prices={allPrices}
+                report={data.dataQuality}
+              />
+            </CollapsibleAnalysis>
 
             {/* サマリー */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

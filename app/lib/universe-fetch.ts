@@ -50,7 +50,7 @@ async function fetchOne(
     const stock: UniStock = { prices: json.prices ?? [], name: json.name ?? ticker };
     cache.set(ticker, stock);
     // write-through(await しない: 描画をブロックしない)
-    if (stock.prices.length > 0) void putCached(ticker, stock.name, stock.prices);
+    if (stock.prices.length > 0) void putCached(ticker, stock.name, stock.prices, json.dataQuality);
     return { stock, cached: false };
   } catch {
     if (signal?.aborted) return { stock: { prices: [], name: ticker, error: "中断" }, cached: false };

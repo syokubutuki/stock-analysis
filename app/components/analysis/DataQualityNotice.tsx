@@ -23,6 +23,9 @@ export default function DataQualityNotice({ report }: { report?: PriceSanityRepo
     >
       <span className="font-medium">データ品質: </span>
       {message}
+      <span className="ml-1 opacity-80">
+        （修復した日の配信値・修復値と修復前後のチャートは「価格データの破損点検」パネルで確認できます）
+      </span>
     </div>
   );
 }

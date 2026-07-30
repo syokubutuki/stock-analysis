@@ -30,7 +30,9 @@ async function fetchOne(ticker: string): Promise<FetchedStock> {
   // L2: IndexedDB(ページ再読込を跨ぐ永続キャッシュ・TTL内なら Yahoo を叩かない)
   const idb = await getCached(ticker, DEFAULT_TTL_MS);
   if (idb) {
-    const result: FetchedStock = { prices: idb.prices, name: idb.name };
+    const result: FetchedStock = {
+      prices: idb.prices, name: idb.name, dataQuality: idb.dataQuality,
+    };
     memCache.set(ticker, result);
     return result;
   }
@@ -47,7 +49,7 @@ async function fetchOne(ticker: string): Promise<FetchedStock> {
       dataQuality: json.dataQuality,
     };
     memCache.set(ticker, result);
-    if (result.prices.length > 0) void putCached(ticker, result.name, result.prices);
+    if (result.prices.length > 0) void putCached(ticker, result.name, result.prices, result.dataQuality);
     return result;
   } catch {
     return { prices: [], name: ticker, error: "通信エラー" };

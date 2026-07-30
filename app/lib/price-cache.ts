@@ -7,7 +7,7 @@
 // なぜ IndexedDB か: localStorage は同期・5〜10MB上限で 100銘柄×10年(≈15MB)が溢れる。
 // IndexedDB は非同期・大容量でブラウザ再読込を跨いで残る。個人用途なのでサーバ不要。
 import { PricePoint } from "./types";
-import { SANITIZER_VERSION } from "./price-sanity";
+import { SANITIZER_VERSION, type PriceSanityReport } from "./price-sanity";
 
 const DB_NAME = "stock-analysis-cache";
 const STORE = "prices";
@@ -25,6 +25,12 @@ export interface CachedPrices {
    * undefined = サニタイズ導入前に保存されたもの（＝無条件に無効）。
    */
   sanitizerVersion?: number;
+  /**
+   * 取得時の修復記録。**キャッシュにも必ず持たせる**。
+   * これが無いと、キャッシュ命中したページでは修復の開示バナーだけが消え、
+   * 「リロードしたら警告が消えた＝直ったのか？」という誤解を生む。
+   */
+  dataQuality?: PriceSanityReport;
 }
 
 /** TTL とサニタイザ版の両方を満たすエントリだけを有効とみなす。 */
@@ -109,7 +115,12 @@ export async function getManyCached(
 }
 
 // 書き込み(write-through)。失敗は黙って無視(キャッシュは補助)。
-export async function putCached(ticker: string, name: string, prices: PricePoint[]): Promise<void> {
+export async function putCached(
+  ticker: string,
+  name: string,
+  prices: PricePoint[],
+  dataQuality?: PriceSanityReport
+): Promise<void> {
   if (!prices || prices.length === 0) return;
   const db = await openDb();
   if (!db) return;
@@ -117,7 +128,8 @@ export async function putCached(ticker: string, name: string, prices: PricePoint
     try {
       const tx = db.transaction(STORE, "readwrite");
       tx.objectStore(STORE).put({
-        ticker, name, prices, fetchedAt: Date.now(), sanitizerVersion: SANITIZER_VERSION,
+        ticker, name, prices, fetchedAt: Date.now(),
+        sanitizerVersion: SANITIZER_VERSION, dataQuality,
       } as CachedPrices);
       tx.oncomplete = () => { resolve(); db.close(); };
       tx.onerror = () => { resolve(); db.close(); };
