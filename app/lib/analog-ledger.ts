@@ -61,7 +61,9 @@ export interface AnalogLedgerEntry {
   winRate: number;
 }
 
-export function loadAnalogLedger(): AnalogLedgerEntry[] {
+// 以下2つは localStorage 直の入出力。保存先はサーバ(ledger-store.ts)に移ったので、
+// これらはサーバ未設定・到達不能時のフォールバックと、旧記録の移行元としてだけ使う。
+export function loadLocalAnalogLedger(): AnalogLedgerEntry[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -73,7 +75,7 @@ export function loadAnalogLedger(): AnalogLedgerEntry[] {
   }
 }
 
-function saveAnalogLedger(entries: AnalogLedgerEntry[]) {
+export function saveLocalAnalogLedger(entries: AnalogLedgerEntry[]) {
   if (typeof window === "undefined") return;
   try {
     // 古い順に切り詰め(台帳は補助機能なので容量超過で壊れないことを優先)
@@ -112,23 +114,25 @@ export interface FreezeInput {
   res: WeeklyAnalogResult;
 }
 
-// 現在表示中の予測をまとめて凍結する。戻り値は {追加, 重複でスキップ}。
-export function freezeAnalogPredictions(
-  inputs: FreezeInput[], settings: AnalogLedgerSettings
-): { added: number; skipped: number; entries: AnalogLedgerEntry[] } {
-  const entries = loadAnalogLedger();
-  const existing = new Set(entries.map((e) => entryKey(e.ticker, e.asOf, e.settings)));
+// 現在表示中の予測から、凍結する記録を組み立てる（保存はしない）。
+// 既存の記録と同じ 銘柄×基準日×設定 は除く。frozenAt はサーバ側で当日日付に上書きされる
+// ——クライアント時計を戻して遡って凍結できると、前向き検証の前提そのものが崩れるため。
+export function buildAnalogEntries(
+  inputs: FreezeInput[], settings: AnalogLedgerSettings, existingKeys: Iterable<string>
+): { toAdd: AnalogLedgerEntry[]; skipped: number } {
+  const existing = new Set(existingKeys);
   const label = settingsLabel(settings);
   const frozenAt = todayIso();
-  let added = 0, skipped = 0;
+  const toAdd: AnalogLedgerEntry[] = [];
+  let skipped = 0;
   for (const inp of inputs) {
     const r = inp.res;
     const asOf = r.query.endTime;
     const key = entryKey(inp.ticker, asOf, settings);
     if (existing.has(key)) { skipped++; continue; }
     const denom = r.upCount + r.downCount || 1;
-    entries.push({
-      id: `${inp.ticker}-${asOf}-${Date.now()}-${added}`,
+    toAdd.push({
+      id: `${inp.ticker}-${asOf}-${Date.now()}-${toAdd.length}`,
       ticker: inp.ticker,
       name: inp.name,
       frozenAt, asOf, settings, label,
@@ -146,49 +150,37 @@ export function freezeAnalogPredictions(
       winRate: r.upCount / denom,
     });
     existing.add(key);
-    added++;
   }
-  saveAnalogLedger(entries);
-  return { added, skipped, entries: loadAnalogLedger() };
+  return { toAdd, skipped };
 }
 
-export function removeAnalogEntry(id: string): AnalogLedgerEntry[] {
-  const entries = loadAnalogLedger().filter((e) => e.id !== id);
-  saveAnalogLedger(entries);
-  return entries;
+/** 手動バックアップ用。サーバ保存後も、退避コピーを手元に持てるようにしておく。 */
+export function exportAnalogLedger(entries: AnalogLedgerEntry[]): string {
+  return JSON.stringify(entries, null, 2);
 }
 
-export function clearAnalogLedger(): AnalogLedgerEntry[] {
-  saveAnalogLedger([]);
-  return [];
-}
-
-// 手動バックアップ用。localStorage はブラウザを変えると消えるため、
-// 前向き検証を年単位で続けるならエクスポートして保管する。
-export function exportAnalogLedger(): string {
-  return JSON.stringify(loadAnalogLedger(), null, 2);
-}
-
-export function importAnalogLedger(json: string): { added: number; skipped: number; entries: AnalogLedgerEntry[] } {
+/** JSON テキストから取り込める記録だけを取り出す（重複・不正は落とす）。保存は呼び出し側。 */
+export function parseImportedAnalogLedger(
+  json: string, existingKeys: Iterable<string>
+): { toAdd: AnalogLedgerEntry[]; skipped: number } {
   let incoming: AnalogLedgerEntry[];
   try {
     const parsed = JSON.parse(json);
-    if (!Array.isArray(parsed)) return { added: 0, skipped: 0, entries: loadAnalogLedger() };
+    if (!Array.isArray(parsed)) return { toAdd: [], skipped: 0 };
     incoming = parsed as AnalogLedgerEntry[];
   } catch {
-    return { added: 0, skipped: 0, entries: loadAnalogLedger() };
+    return { toAdd: [], skipped: 0 };
   }
-  const entries = loadAnalogLedger();
-  const existing = new Set(entries.map((e) => entryKey(e.ticker, e.asOf, e.settings)));
-  let added = 0, skipped = 0;
+  const existing = new Set(existingKeys);
+  const toAdd: AnalogLedgerEntry[] = [];
+  let skipped = 0;
   for (const e of incoming) {
     if (!e || !e.ticker || !e.asOf || !e.settings || !Array.isArray(e.predPath)) { skipped++; continue; }
     const key = entryKey(e.ticker, e.asOf, e.settings);
     if (existing.has(key)) { skipped++; continue; }
-    entries.push(e); existing.add(key); added++;
+    toAdd.push(e); existing.add(key);
   }
-  saveAnalogLedger(entries);
-  return { added, skipped, entries: loadAnalogLedger() };
+  return { toAdd, skipped };
 }
 
 // ───────────────────────── 採点 ─────────────────────────

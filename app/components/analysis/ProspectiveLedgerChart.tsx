@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   LineSeries,
@@ -13,14 +13,19 @@ import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
 import { buildEdgeCatalog } from "../../lib/edge-trades";
 import {
-  loadLedger,
-  freezeEdge,
-  removeEntry,
+  buildFrozenEntry,
   evaluateEntry,
   type LedgerEntry,
   type LedgerEval,
   type LedgerVerdict,
 } from "../../lib/prospective-ledger";
+import {
+  loadProspectiveLedger,
+  saveProspectiveEntry,
+  removeProspectiveEntry,
+  type LedgerSource,
+} from "../../lib/ledger-store";
+import LedgerSyncBar from "./LedgerSyncBar";
 
 interface Props {
   prices: PricePoint[];
@@ -40,11 +45,40 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const [source, setSource] = useState<LedgerSource>("server");
+  const [reason, setReason] = useState<string | undefined>(undefined);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true); // 初回はサーバから読み込み中
   const [freezeEdgeId, setFreezeEdgeId] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string>("");
   const [message, setMessage] = useState<string>("");
 
-  useEffect(() => { setEntries(loadLedger()); }, []);
+  // 台帳の保存先はサーバ。到達できない場合だけ、このブラウザの localStorage に退避する
+  // （state.source が "local" になり、LedgerSyncBar がその旨を開示する）。
+  const applyState = useCallback((s: { entries: LedgerEntry[]; source: LedgerSource; ownerId: string | null; reason?: string }) => {
+    setEntries(s.entries);
+    setSource(s.source);
+    setOwnerId(s.ownerId);
+    setReason(s.reason);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    loadProspectiveLedger().then((s) => {
+      if (!alive) return;
+      applyState(s);
+      setBusy(false);
+    });
+    return () => { alive = false; };
+  }, [applyState]);
+
+  // 「サーバーに再接続」「引き継ぎ」からの再読み込み(イベント経由)
+  const reload = useCallback(() => {
+    setBusy(true);
+    loadProspectiveLedger()
+      .then(applyState)
+      .finally(() => setBusy(false));
+  }, [applyState]);
 
   const catalog = useMemo(() => buildEdgeCatalog(prices), [prices]);
   const effectiveFreezeId = freezeEdgeId || (catalog[0]?.id ?? "");
@@ -97,25 +131,37 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
     chartRef.current?.timeScale().fitContent();
   }, [selectedEval]);
 
-  const onFreeze = () => {
+  const onFreeze = async () => {
     const edge = catalog.find((e) => e.id === effectiveFreezeId);
-    if (!edge) return;
+    if (!edge || busy) return;
     const dup = entries.find((e) => e.ticker === ticker && e.edgeId === edge.id);
     if (dup) {
       setMessage(`${edge.label} は ${dup.frozenAt} に凍結済みです(重複凍結は境界が動くだけで意味がありません)。`);
       return;
     }
-    const entry = freezeEdge(ticker, edge);
-    if (entry) {
-      setEntries(loadLedger());
+    const entry = buildFrozenEntry(ticker, edge);
+    if (!entry) return;
+    setBusy(true);
+    try {
+      const next = await saveProspectiveEntry(entry);
+      applyState(next);
       setSelectedId(entry.id);
-      setMessage(`凍結しました: ${edge.label}(境界 ${entry.freezeDataEnd})。明日以降の新データだけで採点されます。`);
+      setMessage(
+        `凍結しました: ${edge.label}(境界 ${entry.freezeDataEnd})。明日以降の新データだけで採点されます。` +
+          (next.source === "server" ? "" : "（サーバー未接続のため、この端末にのみ保存）")
+      );
+    } finally {
+      setBusy(false);
     }
   };
 
-  const onRemove = (id: string) => {
-    removeEntry(id);
-    setEntries(loadLedger());
+  const onRemove = async (id: string) => {
+    setBusy(true);
+    try {
+      applyState(await removeProspectiveEntry(id));
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (prices.length < 300) {
@@ -132,6 +178,8 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
         </p>
       </div>
 
+      <LedgerSyncBar source={source} reason={reason} ownerId={ownerId} onReload={reload} busy={busy} />
+
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <label className="flex items-center gap-1">
           凍結するエッジ
@@ -139,7 +187,8 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
             {catalog.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
         </label>
-        <button onClick={onFreeze} className="px-3 py-1 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">
+        <button onClick={onFreeze} disabled={busy}
+          className="px-3 py-1 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-40">
           {ticker} で凍結
         </button>
         {message && <span className="text-gray-500">{message}</span>}
@@ -234,7 +283,7 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
 
         <p className="font-medium text-gray-700 mt-3">2. 仕組み</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>「凍結」ボタンで、エッジの定義・方向・IS統計量(μ_IS, σ_IS)と<span className="font-medium">凍結時点の最終取引日(境界)</span>をブラウザに保存します。</li>
+          <li>「凍結」ボタンで、エッジの定義・方向・IS統計量(μ_IS, σ_IS)と<span className="font-medium">凍結時点の最終取引日(境界)</span>をサーバに保存します。凍結日は<span className="font-medium">サーバ側の日付</span>で記録されるため、端末の時計を戻して遡って凍結することはできません。</li>
           <li>以後この画面を開くたび、境界より後に成立した取引だけでOOS成績を再計算します。境界以前のデータは金輪際、成績に算入されません。</li>
           <li>判定には凍結時のμ_IS・σ_ISを使ったSPRT(逐次確率比検定)を用います。毎日覗いても誤り率が壊れない(anytime-valid)ため、日々の監視に耐えます。数式はエッジ減衰・死亡検知の解説を参照。</li>
         </ul>
@@ -256,7 +305,7 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
 
         <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>台帳はこのブラウザのlocalStorageに保存されます。ブラウザを変える・履歴を消すと台帳も消えます。</li>
+          <li>台帳はサーバに保存され、ログイン不要の匿名キー(cookie)で紐づきます。ブラウザのデータを消すとキーを失って自分からは見えなくなるため、別端末で続けるなら「端末の引き継ぎ」からキーを控えておいてください。サーバに接続できない環境では、この端末のlocalStorageに退避して動きます(その旨が上部に表示されます)。</li>
           <li>正準エッジ(寄/引執行の代表型)のみ凍結できます。任意のカスタム戦略の凍結は対象外です。</li>
           <li>成績は約定できた前提のグロス値です。実効値はエッジ割引(スプレッド・マーク乖離)と容量推定を併読してください。</li>
           <li>凍結が誠実でも、「凍結する候補を過去データで選んだ」事実は消えません。前向き検証は最後の関門であって、免罪符ではありません。</li>

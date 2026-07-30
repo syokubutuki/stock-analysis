@@ -5,9 +5,13 @@
 // まだ存在しなかった未来のデータでのみ評価する——である。臨床試験の事前登録
 // (pre-registration)の投資版。
 //
-// 凍結時にIS統計量(μ_IS, σ_IS)をlocalStorageへ保存し、以後の再訪時には
+// 凍結時にIS統計量(μ_IS, σ_IS)を保存し、以後の再訪時には
 // 「凍結時点より後の取引」だけでOOS成績とSPRT判定(edge-decay.tsと同じ逐次検定)を更新する。
 // 凍結後にパラメータを差し替えられないことが、この検証の価値の源泉。
+//
+// 保存先はサーバ(Postgres)。このファイルは「凍結する記録の組み立て」と「採点」だけを担い、
+// 永続化は ledger-store.ts が扱う。以下の localStorage 関数は、
+// サーバが未設定・到達不能なとき(ローカル開発など)のフォールバックと、旧記録の移行元として残す。
 
 import { mean, std } from "./stats-significance";
 import { Side } from "./weekday-trade";
@@ -30,7 +34,7 @@ export interface LedgerEntry {
   tradesPerYear: number;
 }
 
-export function loadLedger(): LedgerEntry[] {
+export function loadLocalLedger(): LedgerEntry[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -42,7 +46,7 @@ export function loadLedger(): LedgerEntry[] {
   }
 }
 
-function saveLedger(entries: LedgerEntry[]) {
+export function saveLocalLedger(entries: LedgerEntry[]) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
@@ -51,7 +55,10 @@ function saveLedger(entries: LedgerEntry[]) {
   }
 }
 
-export function freezeEdge(ticker: string, edge: EdgeSeries): LedgerEntry | null {
+// 凍結する記録を組み立てる（保存はしない）。
+// frozenAt はサーバ側で当日日付に上書きされる——クライアント時計を戻して遡って凍結できると、
+// 前向き検証の前提そのものが崩れるため。ここで入れる値はフォールバック保存時の暫定値。
+export function buildFrozenEntry(ticker: string, edge: EdgeSeries): LedgerEntry | null {
   if (edge.trades.length < 30) return null;
   const rawMean = mean(edge.trades.map((t) => t.ret));
   const direction: Side = rawMean >= 0 ? "long" : "short";
@@ -61,7 +68,7 @@ export function freezeEdge(ticker: string, edge: EdgeSeries): LedgerEntry | null
   if (sd <= 0) return null;
   const today = new Date();
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const entry: LedgerEntry = {
+  return {
     id: `${ticker}-${edge.id}-${Date.now()}`,
     ticker,
     edgeId: edge.id,
@@ -75,14 +82,6 @@ export function freezeEdge(ticker: string, edge: EdgeSeries): LedgerEntry | null
     sharpeIS: (mu / sd) * Math.sqrt(edge.tradesPerYear),
     tradesPerYear: edge.tradesPerYear,
   };
-  const entries = loadLedger();
-  entries.push(entry);
-  saveLedger(entries);
-  return entry;
-}
-
-export function removeEntry(id: string) {
-  saveLedger(loadLedger().filter((e) => e.id !== id));
 }
 
 export type LedgerVerdict = "alive" | "dead" | "undecided" | "waiting";

@@ -5,16 +5,20 @@
 // 重ねて採点する。OOS 検証(再計算バックテスト)と違い、記録した後から設定を変えられないため、
 // 最も改竄されにくい証拠になる。
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { WeeklyAnalogResult } from "../../lib/weekly-analog";
 import {
   AnalogLedgerEntry, AnalogLedgerEval, AnalogLedgerSettings, FreezeInput,
-  loadAnalogLedger, freezeAnalogPredictions, removeAnalogEntry, clearAnalogLedger,
-  evaluateAnalogEntry, summarizeAnalogLedger, settingsLabel,
-  exportAnalogLedger, importAnalogLedger,
+  buildAnalogEntries, entryKey, evaluateAnalogEntry, summarizeAnalogLedger, settingsLabel,
+  exportAnalogLedger, parseImportedAnalogLedger,
 } from "../../lib/analog-ledger";
+import {
+  loadAnalogLedgerStore, saveAnalogEntries, removeAnalogEntryStore, clearAnalogLedgerStore,
+  type LedgerSource,
+} from "../../lib/ledger-store";
 import AnalysisGuide from "./AnalysisGuide";
+import LedgerSyncBar from "./LedgerSyncBar";
 
 interface Props {
   rows: { ticker: string; res: WeeklyAnalogResult | null }[];
@@ -64,13 +68,23 @@ function PathCompare({ ev, scale }: { ev: AnalogLedgerEval; scale: number }) {
 // 個別チャートは自分1銘柄しか持たないため、そこに一覧を置くと大半が「照合不可」になる。
 export function AnalogFreezeButton({ ticker, res, settings }: { ticker: string; res: WeeklyAnalogResult | null; settings: AnalogLedgerSettings }) {
   const [msg, setMsg] = useState<string | null>(null);
-  const disabled = !res || !ticker;
-  const onClick = () => {
-    if (!res || !ticker) return;
-    const { added, skipped } = freezeAnalogPredictions([{ ticker, res }], settings);
-    setMsg(added > 0
-      ? `${res.query.endTime} 基準の予測を凍結しました。${settings.H}営業日後に確定します（一覧と採点はポートフォリオの台帳）。`
-      : `この銘柄×基準日×設定は既に記録済みです（${skipped}件）。条件を変えて記録し直せないのが前向き検証の要件です。`);
+  const [busy, setBusy] = useState(false);
+  const disabled = !res || !ticker || busy;
+  // 重複判定はサーバの UNIQUE 制約に任せる（この画面は台帳を読み込んでいないため、
+  // 手元の既存キー集合を持っていない）。受理された件数が added で返る。
+  const onClick = async () => {
+    if (!res || !ticker || busy) return;
+    setBusy(true);
+    try {
+      const { toAdd } = buildAnalogEntries([{ ticker, res }], settings, []);
+      const r = await saveAnalogEntries(toAdd);
+      setMsg(r.added > 0
+        ? `${res.query.endTime} 基準の予測を凍結しました。${settings.H}営業日後に確定します（一覧と採点はポートフォリオの台帳）。`
+          + (r.source === "server" ? "" : "（サーバー未接続のため、この端末にのみ保存）")
+        : `この銘柄×基準日×設定は既に記録済みです。条件を変えて記録し直せないのが前向き検証の要件です。`);
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -87,27 +101,66 @@ export function AnalogFreezeButton({ ticker, res, settings }: { ticker: string; 
 }
 
 export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, names }: Props) {
-  // 親(WeeklyAnalogCrossChart)は ssr:false の動的インポートなのでサーバ描画が無く、
-  // 初期値で localStorage を読んでもハイドレーション不整合は起きない(副作用での再設定が不要)。
-  const [entries, setEntries] = useState<AnalogLedgerEntry[]>(() => loadAnalogLedger());
+  const [entries, setEntries] = useState<AnalogLedgerEntry[]>([]);
+  const [source, setSource] = useState<LedgerSource>("server");
+  const [reason, setReason] = useState<string | undefined>(undefined);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true); // 初回はサーバから読み込み中
   const [msg, setMsg] = useState<string | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 保存先はサーバ。到達できない場合だけ localStorage に退避し、LedgerSyncBar がその旨を開示する。
+  const applyState = useCallback((s: { entries: AnalogLedgerEntry[]; source: LedgerSource; ownerId: string | null; reason?: string }) => {
+    setEntries(s.entries);
+    setSource(s.source);
+    setOwnerId(s.ownerId);
+    setReason(s.reason);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    loadAnalogLedgerStore().then((s) => {
+      if (!alive) return;
+      applyState(s);
+      setBusy(false);
+    });
+    return () => { alive = false; };
+  }, [applyState]);
+
+  // 「サーバーに再接続」「引き継ぎ」からの再読み込み(イベント経由)
+  const reload = useCallback(() => {
+    setBusy(true);
+    loadAnalogLedgerStore().then(applyState).finally(() => setBusy(false));
+  }, [applyState]);
+
+  const existingKeys = useMemo(
+    () => entries.map((e) => entryKey(e.ticker, e.asOf, e.settings)),
+    [entries]
+  );
 
   const freezable = useMemo<FreezeInput[]>(
     () => rows.filter((r) => r.res).map((r) => ({ ticker: r.ticker, name: names?.[r.ticker], res: r.res! })),
     [rows, names]
   );
 
-  const doFreeze = useCallback(() => {
-    if (freezable.length === 0) return;
-    const { added, skipped, entries: next } = freezeAnalogPredictions(freezable, settings);
-    setEntries(next);
-    setMsg(added > 0
-      ? `${added}件を凍結しました${skipped > 0 ? `（同一の予測 ${skipped}件はスキップ）` : ""}。結果は基準日から${settings.H}営業日後に確定します。`
-      : `新規はありません（同一の銘柄×基準日×設定が既に ${skipped}件 記録済み）。`);
-  }, [freezable, settings]);
+  const doFreeze = useCallback(async () => {
+    if (freezable.length === 0 || busy) return;
+    setBusy(true);
+    try {
+      const { toAdd, skipped } = buildAnalogEntries(freezable, settings, existingKeys);
+      const r = await saveAnalogEntries(toAdd);
+      applyState(r);
+      const rejected = skipped + (toAdd.length - r.added);
+      setMsg(r.added > 0
+        ? `${r.added}件を凍結しました${rejected > 0 ? `（同一の予測 ${rejected}件はスキップ）` : ""}。結果は基準日から${settings.H}営業日後に確定します。`
+          + (r.source === "server" ? "" : "（サーバー未接続のため、この端末にのみ保存）")
+        : `新規はありません（同一の銘柄×基準日×設定が既に ${rejected}件 記録済み）。`);
+    } finally {
+      setBusy(false);
+    }
+  }, [freezable, settings, existingKeys, busy, applyState]);
 
   const evals = useMemo(() => {
     const out: AnalogLedgerEval[] = [];
@@ -135,21 +188,42 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
   }, [shown]);
 
   const doExport = () => {
-    const blob = new Blob([exportAnalogLedger()], { type: "application/json" });
+    const blob = new Blob([exportAnalogLedger(entries)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `analog-ledger-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
+  // 取り込みは元の凍結日を保つ(origin='local-import')。他所で凍結した記録の日付を
+  // 今日に書き換えてしまうと、前向き検証の境界が動いて記録の意味が変わるため。
   const doImport = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const { added, skipped, entries: next } = importAnalogLedger(String(reader.result ?? ""));
-      setEntries(next);
-      setMsg(`取り込み: 追加${added}件 / 重複・不正スキップ${skipped}件`);
+    reader.onload = async () => {
+      setBusy(true);
+      try {
+        const { toAdd, skipped } = parseImportedAnalogLedger(String(reader.result ?? ""), existingKeys);
+        const r = await saveAnalogEntries(toAdd, "local-import");
+        applyState(r);
+        setMsg(`取り込み: 追加${r.added}件 / 重複・不正スキップ${skipped + (toAdd.length - r.added)}件`);
+      } finally {
+        setBusy(false);
+      }
     };
     reader.readAsText(file);
+  };
+
+  const doRemove = async (id: string) => {
+    setBusy(true);
+    try { applyState(await removeAnalogEntryStore(id)); } finally { setBusy(false); }
+  };
+  const doClear = async () => {
+    setBusy(true);
+    try {
+      applyState(await clearAnalogLedgerStore());
+      setConfirmClear(false);
+      setMsg("台帳を空にしました。");
+    } finally { setBusy(false); }
   };
 
   const curLabel = settingsLabel(settings);
@@ -163,8 +237,10 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
         後から条件を変えられないことが、この検証の価値の源泉（臨床試験の事前登録と同じ発想）。
       </p>
 
+      <LedgerSyncBar source={source} reason={reason} ownerId={ownerId} onReload={reload} busy={busy} />
+
       <div className="flex items-center gap-2 flex-wrap text-xs">
-        <button onClick={doFreeze} disabled={freezable.length === 0}
+        <button onClick={doFreeze} disabled={freezable.length === 0 || busy}
           className="px-3 py-1.5 rounded font-medium bg-emerald-600 text-white disabled:opacity-40 hover:bg-emerald-700">
           今の予測を台帳に凍結（{freezable.length}銘柄）
         </button>
@@ -222,15 +298,14 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
             <span className="text-gray-300">|</span>
             {confirmClear ? (
               <>
-                <span className="text-red-600">全{entries.length}件を削除しますか？</span>
-                <button onClick={() => { setEntries(clearAnalogLedger()); setConfirmClear(false); setMsg("台帳を空にしました。"); }}
-                  className="px-2 py-0.5 rounded bg-red-600 text-white hover:bg-red-700">削除する</button>
+                <span className="text-red-600">全{entries.length}件を削除しますか？（サーバーからも消えます・復元不可）</span>
+                <button onClick={doClear} disabled={busy}
+                  className="px-2 py-0.5 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-40">削除する</button>
                 <button onClick={() => setConfirmClear(false)} className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600">やめる</button>
               </>
             ) : (
               <button onClick={() => setConfirmClear(true)} className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-500">全削除</button>
             )}
-            <span className="text-gray-400">｜保存先はこのブラウザ（localStorage）。長期の記録はエクスポートして保管。</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -295,9 +370,9 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                         実効{e.nEff}/p{e.diffP < 0.001 ? "<.001" : e.diffP.toFixed(2)}
                       </td>
                       <td className="px-1 py-1 text-center">
-                        <button onClick={() => { setEntries(removeAnalogEntry(e.id)); }}
+                        <button onClick={() => doRemove(e.id)} disabled={busy}
                           title="この記録を削除（削除は前向き検証の趣旨に反するので、誤記録の訂正だけに使う）"
-                          className="text-gray-300 hover:text-red-500">✕</button>
+                          className="text-gray-300 hover:text-red-500 disabled:opacity-40">✕</button>
                       </td>
                     </tr>
                   );
@@ -326,6 +401,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
           <li><strong>基準日(asOf)</strong>: 凍結時点の最終立会日。経路の起点(0%)。以後の採点はこの日の終値を基準に行う。</li>
           <li><strong>設定</strong>: モード/距離/窓/重み/σ正規化/プール/L・H・K/米国指数・ビン。<strong>銘柄×基準日×設定が同一の記録は二重に作れない</strong>——後から条件を変えて記録し直せると前向き検証の意味が消えるため。</li>
           <li><strong>記録の投入口は2つ</strong>: この画面のボタン（表示中の全銘柄を一括凍結）と、個別銘柄タブの「今週の軌跡アナログ比較」にある「この予測を台帳に凍結」（1銘柄ずつ）。保存先は同じで、一覧と採点はこの台帳に集約される——採点には全銘柄の価格系列が要るため。</li>
+          <li><strong>凍結日はサーバが決める</strong>: 端末の時計を戻して過去の日付で凍結することはできない。同一の予測を二度記録できないことと合わせ、「後から都合よく記録し直す」道を物理的に塞いでいる。</li>
           <li><strong>凍結時の根拠</strong>: 事例数・実効n・ベースライン差と p 値・勝率・novelty。「何を見て張ったか」を残すことで、後から<em>「実効nが薄い記録ばかり外している」</em>のような診断ができる。</li>
         </ul>
         <p className="font-medium text-gray-700 mt-3">3. 採点の定義</p>
@@ -346,7 +422,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
         <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>件数が全て</strong>。確定20件でも的中率の標準誤差は約11pt——50%と60%を区別できない。年単位で貯めて初めて意味を持つ。</li>
-          <li>保存先はこのブラウザの localStorage。<strong>ブラウザやPCを変えると消える</strong>ため、長期の記録はエクスポートしたJSONを保管する。</li>
+          <li>保存先はサーバで、ログイン不要の<strong>匿名キー(cookie)</strong>で紐づく。ブラウザのデータを消すとキーを失って自分からは見えなくなるので、端末を移る予定があれば「端末の引き継ぎ」からキーを控える。サーバに接続できない環境では、この端末の localStorage に退避して動く（上部にその旨が出る）。</li>
           <li>記録を削除できる以上、この台帳は<strong>自分自身への誠実さ</strong>にしか担保されない。外れた記録を消せば数字は簡単に良くなる。削除は誤記録の訂正だけに使う。</li>
           <li>全銘柄を一括凍結すると横断相関で件数が水増しされる。同一週の複数銘柄はほぼ1票と考える（独立な記録は「週数」であって「銘柄数×週数」ではない）。</li>
           <li>配当・分割で価格系列が遡及調整されると、過去に凍結した記録の実測値もわずかに変わる。</li>
