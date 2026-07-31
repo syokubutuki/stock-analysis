@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Disclaimer from "./components/Disclaimer";
+import DomainMigrationNotice from "./components/DomainMigrationNotice";
+import { SITE_ORIGIN } from "./lib/site-url";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  // 当プロジェクトの公開ドメインは stock-analysis-self.vercel.app のみ。
+  // 正規ドメインは kabugenron.com。stock-analysis-self.vercel.app は移行元としてのみ残す。
   // stock-analysis.vercel.app は別アカウントの無関係なサイトなので使用しない。
-  // sitemap.ts の BASE と必ず一致させること（食い違うとサイトマップが対象範囲外で弾かれる）。
-  metadataBase: new URL("https://stock-analysis-self.vercel.app"),
+  // sitemap.ts と site-url.ts の SITE_ORIGIN を必ず一致させる。
+  metadataBase: new URL(SITE_ORIGIN),
+  alternates: { canonical: "/" },
   verification: {
     google: "ofoMx5OtnknPc6zhkrBc9iHZOWR69gj9HdjcPOf0B0o",
   },
@@ -32,6 +35,7 @@ export const metadata: Metadata = {
       "FFT・ウェーブレット・EMD・DFA・エントロピーなど多角的な手法で株価時系列の構造を可視化。",
     type: "website",
     locale: "ja_JP",
+    url: SITE_ORIGIN,
   },
   twitter: {
     card: "summary",
@@ -49,6 +53,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
+        <DomainMigrationNotice />
         {children}
         <Disclaimer />
         <Analytics />

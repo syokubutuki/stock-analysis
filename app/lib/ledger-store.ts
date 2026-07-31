@@ -251,6 +251,16 @@ export async function fetchOwnerId(): Promise<string | null> {
 
 /** 別端末で発行された復元キーに切り替える。成功したら台帳を読み直すこと。 */
 export async function adoptOwnerId(ownerId: string): Promise<{ ok: boolean; error?: string }> {
+  const adopted = await setOwnerId(ownerId);
+  if (!adopted.ok) return adopted;
+  // 通常の端末引き継ぎでは、引き継ぎ先のサーバー台帳だけを表示し、この端末に残る
+  // 別所有者のローカル台帳を誤って混ぜない。
+  setFlag(MIGRATED_PROSPECTIVE);
+  setFlag(MIGRATED_ANALOG);
+  return { ok: true };
+}
+
+async function setOwnerId(ownerId: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch("/api/ledger/owner", {
       method: "POST",
@@ -263,11 +273,28 @@ export async function adoptOwnerId(ownerId: string): Promise<{ ok: boolean; erro
       return { ok: false, error: msg ?? "引き継ぎに失敗しました" };
     }
     cachedOwnerId = ownerId.trim();
-    // 引き継ぎ先の台帳は既にサーバにあるので、この端末の旧記録を再送しない。
-    setFlag(MIGRATED_PROSPECTIVE);
-    setFlag(MIGRATED_ANALOG);
     return { ok: true };
   } catch {
     return { ok: false, error: "台帳サーバに接続できません" };
   }
+}
+
+/**
+ * 旧ドメインからの移行専用。所有者を維持しつつ、同じ利用者のローカル台帳は
+ * load* の既存インポート処理へ渡すため、移行済みフラグを立てない。
+ */
+export async function adoptOwnerIdForDomainMigration(
+  ownerId: string
+): Promise<{ ok: boolean; error?: string }> {
+  return setOwnerId(ownerId);
+}
+
+/** 新ドメインへコピーした未同期台帳を、既存の冪等なAPI経由でサーバーへ取り込む。 */
+export async function importDomainMigratedLedgers(): Promise<void> {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(MIGRATED_PROSPECTIVE);
+    window.localStorage.removeItem(MIGRATED_ANALOG);
+  }
+  await loadProspectiveLedger();
+  await loadAnalogLedgerStore();
 }
