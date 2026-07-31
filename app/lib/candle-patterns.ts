@@ -87,6 +87,18 @@ export interface PatternEdgeResult {
   recentBanner: { label: string; time: string; edge: PatternEdge }[]; // 直近5営業日の検出
 }
 
+// 指定パターンの検出インデックス列。StrategyVsBenchmark に渡す建玉ベクトルの材料。
+// patternEdges と同じ走査範囲・同じ detect を使うので、表の統計と同じ標本に対応する。
+export function patternSignalIndices(prices: PricePoint[], kind: PatternKind, horizon: number): number[] {
+  const out: number[] = [];
+  const n = prices.length;
+  for (let i = 2; i < n - horizon; i++) {
+    if (!(prices[i].close > 0)) continue;
+    if (detect(prices, i, kind)) out.push(i);
+  }
+  return out;
+}
+
 export function patternEdges(prices: PricePoint[], horizon: number): PatternEdgeResult {
   const n = prices.length;
   const perPattern = new Map<PatternKind, { rets: number[]; times: string[] }>();

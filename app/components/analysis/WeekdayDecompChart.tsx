@@ -4,6 +4,9 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { decomposeByWeekday } from "../../lib/overnight-intraday";
 import AnalysisGuide from "./AnalysisGuide";
+import StrategyVsBenchmark from "./StrategyVsBenchmark";
+import { countRoundTrips } from "../../lib/strategy-vs-benchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -24,11 +27,42 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 }
 
 type Mode = "mean" | "cum";
+type Seg = "overnight" | "intraday";
+const WD_LABEL: Record<number, string> = { 1: "月", 2: "火", 3: "水", 4: "木", 5: "金" };
 
 export default function WeekdayDecompChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mode, setMode] = useState<Mode>("mean");
+  const [seg, setSeg] = useState<Seg>("overnight");
+  const [stratDow, setStratDow] = useState<number | 0>(0); // 0=全曜日
   const rows = useMemo(() => decomposeByWeekday(prices), [prices]);
+
+  // 「選んだ曜日の、選んだ区間だけ建てる」戦略。
+  // 区間は日ごとに独立に建てて畳むので、選択日1日＝1往復。単利を対数に直して渡す。
+  const decompStrategy = useMemo(() => {
+    const toLog = (r: number) => (Number.isFinite(r) && r > -1 ? Math.log(1 + r) : 0);
+    const mask: boolean[] = [];
+    const strategyDaily: number[] = [];
+    const buyHoldDaily: number[] = [];
+    for (let i = 1; i < prices.length; i++) {
+      const pc = prices[i - 1].close, o = prices[i].open, c = prices[i].close;
+      if (!(pc > 0) || !(o > 0) || !(c > 0)) continue;
+      const dow = new Date(`${prices[i].time}T00:00:00Z`).getUTCDay();
+      if (dow < 1 || dow > 5) continue;
+      const sel = stratDow === 0 || dow === stratDow;
+      const r = seg === "overnight" ? (o - pc) / pc : (c - o) / o;
+      mask.push(sel);
+      strategyDaily.push(sel ? toLog(r) : 0);
+      buyHoldDaily.push(toLog((c - pc) / pc));
+    }
+    return {
+      strategyDaily,
+      buyHoldDaily,
+      roundTrips: countRoundTrips(mask, false),
+      nSel: mask.filter(Boolean).length,
+    };
+  }, [prices, seg, stratDow]);
+  const spreadRT = useMemo(() => (prices.length === 0 ? 0 : representativeSpread(prices)), [prices]);
 
   useEffect(() => {
     if (!canvasRef.current || rows.length === 0) return;
@@ -86,6 +120,56 @@ export default function WeekdayDecompChart({ prices }: Props) {
 
       <div className="relative"><canvas ref={canvasRef} /></div>
 
+      {/* 曜日×区間の戦略を B&H と比較（選択日1日＝1往復でコストを実額控除） */}
+      {decompStrategy.strategyDaily.length > 0 && (
+        <div className="pt-2 border-t border-gray-100 space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h4 className="text-sm font-medium text-gray-700">
+              曜日×区間の戦略 vs バイ&ホールド（
+              {stratDow === 0 ? "全曜日" : `${WD_LABEL[stratDow]}曜`}の
+              {seg === "overnight" ? "夜間" : "日中"}だけ建てる・n={decompStrategy.nSel}）
+            </h4>
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <div className="flex gap-1">
+                {(["overnight", "intraday"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSeg(s)}
+                    className={`px-2 py-0.5 rounded ${seg === s ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                  >
+                    {s === "overnight" ? "夜間" : "日中"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setStratDow(0)}
+                  className={`px-2 py-0.5 rounded ${stratDow === 0 ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                >
+                  全
+                </button>
+                {[1, 2, 3, 4, 5].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setStratDow(d)}
+                    className={`px-2 py-0.5 rounded ${stratDow === d ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                  >
+                    {WD_LABEL[d]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <StrategyVsBenchmark
+            strategyDaily={decompStrategy.strategyDaily}
+            buyHoldDaily={decompStrategy.buyHoldDaily}
+            roundTrips={decompStrategy.roundTrips}
+            spreadRT={spreadRT}
+            label="曜日×区間"
+          />
+        </div>
+      )}
+
       <AnalysisGuide title="曜日別 夜間/日中分解の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>
         <p>{"1日のリターンを夜間（持ち越し）と日中（ザラ場）に分け、さらに曜日別に集計する。『どの曜日の、どの時間帯でリターンが出やすいか』を見て、執行タイミングの戦略を選ぶ。"}</p>
@@ -101,7 +185,8 @@ export default function WeekdayDecompChart({ prices }: Props) {
         </ul>
         <p className="font-medium text-gray-700 mt-3">4. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>取引コスト未控除。曜日×時間帯の細分化で標本が減る（nを確認）。</li>
+          <li>上の「曜日×区間の戦略 vs B&H」パネルで取引コストを実額控除できる（グラフはコスト前）。区間は日ごとに建てて畳むので選択日1日＝1往復と数えており、回転率が高くコストが強く効く。</li>
+          <li>曜日×時間帯の細分化で標本が減る（nを確認）。1曜日に絞ると年約50往復・標本も1/5になる。</li>
           <li>祝日・連休で曜日の意味がずれる週がある。</li>
         </ul>
       </AnalysisGuide>

@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { computeBreakoutStats } from "../../lib/breakout-stats";
+import { computeBreakoutStats, donchianPositions } from "../../lib/breakout-stats";
 import AnalysisGuide from "./AnalysisGuide";
+import StrategyVsBenchmark from "./StrategyVsBenchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -15,7 +17,16 @@ const fmtRate = (v: number) => `${(v * 100).toFixed(0)}%`;
 
 export default function BreakoutStatsChart({ prices }: Props) {
   const [horizon, setHorizon] = useState(10);
+  const [lookback, setLookback] = useState(20);
+  const [side, setSide] = useState<"up" | "down">("up");
   const res = useMemo(() => (prices.length < 100 ? null : computeBreakoutStats(prices, horizon)), [prices, horizon]);
+
+  // ブレイク後 horizon 日だけ建てる戦略の建玉ベクトル（往復回数が実測できる）
+  const positions = useMemo(
+    () => (prices.length < 100 ? [] : donchianPositions(prices, lookback, horizon, side)),
+    [prices, lookback, horizon, side]
+  );
+  const spreadRT = useMemo(() => (prices.length < 100 ? 0 : representativeSpread(prices)), [prices]);
 
   if (prices.length < 100 || !res) return null;
 
@@ -73,6 +84,51 @@ export default function BreakoutStatsChart({ prices }: Props) {
       </div>
       <p className="text-[11px] text-gray-400">※「方向調整」: 下抜けは下落で当たりのため符号反転。プラス＝ブレイク方向に動いた。引け維持率＝日中ブレイクが引けでも維持された割合（高いほどだましが少ない）。</p>
 
+      {/* ブレイク追随戦略を B&H と比較（往復回数を実測してコストを実額控除） */}
+      <div className="pt-2 border-t border-gray-100 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h4 className="text-sm font-medium text-gray-700">
+            ブレイク追随戦略 vs バイ&ホールド（{lookback}日{side === "up" ? "高値上抜け" : "安値下抜け"}後 {horizon}日保有）
+          </h4>
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <div className="flex items-center gap-1">
+              <span>期間:</span>
+              {[20, 55].map((lb) => (
+                <button
+                  key={lb}
+                  onClick={() => setLookback(lb)}
+                  className={`px-2 py-0.5 rounded ${lookback === lb ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                >
+                  {lb}日
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              <span>方向:</span>
+              <button
+                onClick={() => setSide("up")}
+                className={`px-2 py-0.5 rounded ${side === "up" ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+              >
+                上抜け買い
+              </button>
+              <button
+                onClick={() => setSide("down")}
+                className={`px-2 py-0.5 rounded ${side === "down" ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+              >
+                下抜け売り
+              </button>
+            </div>
+          </div>
+        </div>
+        <StrategyVsBenchmark
+          mode="positions"
+          prices={prices}
+          positions={positions}
+          spreadRT={spreadRT}
+          label="ブレイク追随"
+        />
+      </div>
+
       <AnalysisGuide title="ブレイクアウト統計の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>
         <p>{"高値/安値のブレイクに『追随して順張りすべきか、だましとして逆張りすべきか』を、過去の全ブレイクから検証する。ドンチャン・チャネル（N日高安）と前日高安の2種で見る。"}</p>
@@ -92,7 +148,8 @@ export default function BreakoutStatsChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li>日足ベースのため日中のブレイク→戻りの経路は分からない（時刻分析は別途）。</li>
           <li>トレンド相場ではブレイク順張り、レンジ相場では逆張りが有利になりやすく、環境依存。</li>
-          <li>取引コスト未控除。ブレイク戦略は往復が多い。</li>
+          <li>上の「ブレイク追随戦略 vs B&H」パネルで取引コストを実額控除できる。ブレイク戦略は往復が多いので、回転率とコスト後の超過リターンを必ず確認すること（表の方向調整リターンはコスト前）。</li>
+          <li>戦略パネルの建玉は「ブレイク日の引けで建て、N日保有、重複は保有延長」という単純規則。ストップやトレーリングは入れていないので、実運用の出口規則とは別物。</li>
         </ul>
       </AnalysisGuide>
     </div>

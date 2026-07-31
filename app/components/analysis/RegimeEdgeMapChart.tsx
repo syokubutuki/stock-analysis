@@ -9,6 +9,8 @@ import {
   type RegimeScheme,
   type RegimeEdgeCell,
 } from "../../lib/regime-edge-map";
+import { roundTripCost } from "../../lib/strategy-vs-benchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -41,7 +43,14 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
   const [scheme, setScheme] = useState<RegimeScheme>("vol");
   const [metric, setMetric] = useState<Metric>("sharpe");
 
-  const map = useMemo(() => buildRegimeEdgeMap(prices, scheme), [prices, scheme]);
+  const [deduct, setDeduct] = useState(false);
+  const [feeBps, setFeeBps] = useState(0);
+  const spreadRT = useMemo(() => representativeSpread(prices), [prices]);
+  const costRT = useMemo(
+    () => roundTripCost({ enabled: deduct, spreadRT, feeBps }),
+    [deduct, spreadRT, feeBps]
+  );
+  const map = useMemo(() => buildRegimeEdgeMap(prices, scheme, costRT), [prices, scheme, costRT]);
 
   const maxAbs = useMemo(() => {
     let mx = 1e-9;
@@ -80,6 +89,23 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
             現在の局面: <span className="text-blue-600 font-medium">{map.nowRegime}</span>
           </span>
         )}
+        <label className="flex items-center gap-1.5 cursor-pointer" title="シグナルごとに回転率を実測し、往復コストを建玉日に配分して控除する">
+          <input type="checkbox" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />
+          <span className={deduct ? "font-medium text-gray-800" : "text-gray-600"}>コスト控除</span>
+        </label>
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">片道</span>
+          <input
+            type="number" min={0} max={200} step={1} value={feeBps}
+            onChange={(e) => setFeeBps(Math.max(0, Number(e.target.value) || 0))}
+            className="w-14 px-1 py-0.5 border border-gray-200 rounded font-mono text-right"
+            disabled={!deduct}
+          />
+          <span className="text-gray-500">bps</span>
+        </label>
+        <span className="text-gray-500">
+          往復 <span className="font-mono">{(costRT * 100).toFixed(3)}%</span>
+        </span>
       </div>
 
       <div className="overflow-x-auto">
@@ -87,6 +113,7 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
           <thead>
             <tr className="text-gray-500 border-b border-gray-200">
               <th className="text-left py-1 px-1.5">シグナル</th>
+              <th className="text-right px-1.5 text-gray-400" title="年間往復回数。高いほどコストに弱い">回転/年</th>
               <th className="text-right px-1.5 text-gray-400">全体</th>
               {map.regimeOrder.map((r, j) => (
                 <th
@@ -105,6 +132,12 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
                 <td className="py-1 px-1.5 whitespace-nowrap">
                   <span className="text-gray-700">{row.edge.label}</span>
                   <span className="text-gray-400 ml-1 text-[10px]">{row.edge.category}</span>
+                </td>
+                <td
+                  className={`text-right px-1.5 font-mono ${row.tripsPerYear >= 50 ? "text-amber-700" : "text-gray-400"}`}
+                  title={deduct ? `建玉日1日あたり −${(row.costPerDay * 100).toFixed(4)}% を控除` : undefined}
+                >
+                  {row.tripsPerYear.toFixed(0)}
                 </td>
                 <td className="text-right px-1.5 font-mono text-gray-500">
                   {row.overall ? fmtMetric(row.overall, metric) : "–"}
@@ -180,7 +213,7 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li><span className="font-medium">局面判定の遅延:</span> レジームは事後的に確定しやすく、リアルタイムでは誤判定が起きる。特にHMMは全標本フィットで、実運用より楽観的に見える。</li>
           <li><span className="font-medium">サンプル分割:</span> 局面ごとに日数が減り、暴落など稀な局面はNが小さくノイズが大きい。</li>
-          <li><span className="font-medium">コスト未考慮:</span> セル値は取引コスト控除前。回転の速いシグナルは実際にはさらに割り引かれる。</li>
+          <li><span className="font-medium">コスト:</span> 上の「コスト控除」をONにすると、シグナルごとに回転率 Σ|Δpos|/2 を実測し、総コスト（1往復あたり −ln(1−c)）を建玉日に均等配分してセル値から引く。<strong>回転の速いシグナルほど自動的に重く罰せられる</strong>ので、コスト後のセル比較が公平になる。「回転/年」列が50を超える行は琥珀色で警告している。既定はOFF（コスト前）。</li>
         </ul>
       </AnalysisGuide>
     </div>

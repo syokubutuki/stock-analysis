@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { rMultiples } from "../../lib/execution-stats";
+import { roundTripCost } from "../../lib/strategy-vs-benchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
 
 interface Props { prices: PricePoint[]; }
@@ -23,7 +25,20 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 
 export default function RMultipleChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const res = useMemo(() => (prices.length < 260 ? null : rMultiples(prices, 20)), [prices]);
+  const [deduct, setDeduct] = useState(false);
+  const [feeBps, setFeeBps] = useState(0);
+
+  const spreadRT = useMemo(() => (prices.length < 260 ? 0 : representativeSpread(prices)), [prices]);
+  const costRT = useMemo(
+    () => roundTripCost({ enabled: deduct, spreadRT, feeBps }),
+    [deduct, spreadRT, feeBps]
+  );
+  const res = useMemo(
+    () => (prices.length < 260 ? null : rMultiples(prices, 20, costRT)),
+    [prices, costRT]
+  );
+  // 比較用にコスト前も持つ（控除で期待値の符号が反転したかを判定する）
+  const gross = useMemo(() => (prices.length < 260 ? null : rMultiples(prices, 20, 0)), [prices]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -69,6 +84,49 @@ export default function RMultipleChart({ prices }: Props) {
 
       <div className="relative"><canvas ref={canvasRef} /></div>
 
+      {/* 取引コストを R 単位で実額控除 */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 pt-1 border-t border-gray-100">
+        <label className="flex items-center gap-1.5 cursor-pointer" title="往復スプレッド＋手数料を R 単位に換算して各トレードから控除する">
+          <input type="checkbox" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />
+          <span className={deduct ? "font-medium text-gray-800" : ""}>取引コストを控除</span>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className="text-gray-500">片道手数料</span>
+          <input
+            type="number" min={0} max={200} step={1} value={feeBps}
+            onChange={(e) => setFeeBps(Math.max(0, Number(e.target.value) || 0))}
+            className="w-16 px-1.5 py-0.5 border border-gray-200 rounded font-mono text-right"
+            disabled={!deduct}
+          />
+          <span className="text-gray-500">bps</span>
+        </label>
+        <span className="text-gray-500">
+          推定往復スプレッド <span className="font-mono">{(spreadRT * 100).toFixed(3)}%</span>
+        </span>
+        <span className="text-gray-500">
+          1往復コスト <span className="font-mono">{(costRT * 100).toFixed(3)}%</span>
+          {deduct && res.meanCostR > 0 && (
+            <> ＝ 平均 <span className="font-mono text-red-700">{res.meanCostR.toFixed(3)}R</span></>
+          )}
+        </span>
+        {gross && (
+          <span className="text-gray-500">
+            期待値 コスト前 <span className="font-mono">{gross.expectancyR.toFixed(3)}R</span>
+            {deduct && (
+              <> → 後 <span className={`font-mono font-medium ${res.expectancyR >= 0 ? "text-green-700" : "text-red-700"}`}>{res.expectancyR.toFixed(3)}R</span></>
+            )}
+          </span>
+        )}
+      </div>
+
+      {deduct && gross && gross.expectancyR > 0 && res.expectancyR <= 0 && (
+        <div className="p-2 rounded border border-amber-200 bg-amber-50 text-xs text-amber-900">
+          <span className="font-medium">コストで期待値がマイナスに転じました。</span>
+          コスト前は +{gross.expectancyR.toFixed(3)}R ですが、1往復あたり平均 {res.meanCostR.toFixed(3)}R を払うと
+          期待値が {res.expectancyR.toFixed(3)}R になります。正の期待値は資金管理では作れないので、この設定では実行できません。
+        </div>
+      )}
+
       <AnalysisGuide title="R倍数分布の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>
         <p>{"1トレードの損益を『リスク(1R)の何倍取れたか』で標準化して見る。1R＝最初に決めた損切り幅(=2ATR)。これにより銘柄や時期によらず戦略の優位性を比較できる。"}</p>
@@ -86,7 +144,7 @@ export default function RMultipleChart({ prices }: Props) {
         <p className="font-medium text-gray-700 mt-3">4. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>全日エントリー・固定ストップの簡易シミュレーション。特定シグナルでは分布が変わる。</li>
-          <li>取引コスト未控除。スリッページで期待値は目減りする。</li>
+          <li>取引コストは上のトグルで R 単位に換算して控除できる（既定OFF）。換算は「コスト金額 = 往復コスト×建値」を 1R=2ATR で割ったもので、<strong>低ボラ局面ほど R 換算のコストが重くなる</strong>（リスク幅が狭いぶん同じコストが大きなRを食う）。スリッページ・市場インパクトは含まない。</li>
         </ul>
       </AnalysisGuide>
     </div>

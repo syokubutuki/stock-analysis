@@ -15,6 +15,9 @@ import {
   type Metric,
 } from "../../lib/session-gap";
 import AnalysisGuide from "./AnalysisGuide";
+import StrategyVsBenchmark from "./StrategyVsBenchmark";
+import { countRoundTrips } from "../../lib/strategy-vs-benchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -44,9 +47,28 @@ export default function SessionGapChart({ prices }: Props) {
   const [mode, setMode] = useState<Mode>("weekday");
   const [metric, setMetric] = useState<Metric>("gap");
 
+  const [stratCtx, setStratCtx] = useState<GapContext | "all">("postBreak");
+
   const days = useMemo(() => buildGapDays(prices), [prices]);
   const strip = useMemo(() => weekdayStrip(days, metric), [days, metric]);
   const summary = useMemo(() => gapSummary(days, metric), [days, metric]);
+
+  // 「選んだ休場コンテキストの日だけ、選んだ区間を建てる」戦略。
+  // 区間（夜間/日中/当日）は日ごとに独立に建てて畳むので、選択日1日＝1往復。
+  // metricOf は単利なので対数に直して共通層に渡す（cost は対数空間で厳密に効く）。
+  const gapStrategy = useMemo(() => {
+    const toLog = (r: number) => (Number.isFinite(r) && r > -1 ? Math.log(1 + r) : 0);
+    const mask = days.map((d) => stratCtx === "all" || d.context === stratCtx);
+    const strategyDaily = days.map((d, i) => (mask[i] ? toLog(metricOf(d, metric)) : 0));
+    const buyHoldDaily = days.map((d) => toLog(d.fullday));
+    return {
+      strategyDaily,
+      buyHoldDaily,
+      roundTrips: countRoundTrips(mask, false),
+      nSel: mask.filter(Boolean).length,
+    };
+  }, [days, metric, stratCtx]);
+  const spreadRT = useMemo(() => (prices.length === 0 ? 0 : representativeSpread(prices)), [prices]);
 
   // 決定論的ジッター（点が完全に重ならないよう横方向に散らす）
   const jitter = (i: number) => {
@@ -265,6 +287,38 @@ export default function SessionGapChart({ prices }: Props) {
         </>
       )}
 
+      {/* 文脈別セグメント戦略を B&H と比較（選択日1日＝1往復でコストを実額控除） */}
+      {days.length > 0 && (
+        <div className="pt-2 border-t border-gray-100 space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h4 className="text-sm font-medium text-gray-700">
+              文脈別セグメント戦略 vs バイ&ホールド（
+              {stratCtx === "all" ? "全営業日" : CONTEXT_META[stratCtx].label}の
+              {METRICS.find((m) => m.value === metric)?.label}だけ建てる・n={gapStrategy.nSel}）
+            </h4>
+            <select
+              value={stratCtx}
+              onChange={(e) => setStratCtx(e.target.value as GapContext | "all")}
+              className="text-xs px-2 py-1 border border-gray-200 rounded bg-white"
+            >
+              <option value="all">全営業日</option>
+              {CONTEXT_ORDER.map((c) => (
+                <option key={c} value={c}>
+                  {CONTEXT_META[c].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <StrategyVsBenchmark
+            strategyDaily={gapStrategy.strategyDaily}
+            buyHoldDaily={gapStrategy.buyHoldDaily}
+            roundTrips={gapStrategy.roundTrips}
+            spreadRT={spreadRT}
+            label="文脈別セグメント"
+          />
+        </div>
+      )}
+
       <AnalysisGuide title="休場コンテキスト別 曜日分析の詳細理論">
         <p className="font-medium text-gray-700">1. なぜこの分析が必要か</p>
         <p>{"単純に曜日（月〜金）で値動きを分けると、前後の市場の開閉に動きが歪む。月曜は常に土日の2日分の窓を跨ぐが、月曜が祝日なら火曜が『実質月曜』として大きなギャップを引き受ける。逆に金曜が祝日なら、木曜が『実質金曜』として週末（連休）の持ち越しリスクを避けた手仕舞い売りを浴びやすい。曜日ラベルだけではこれらが通常日に混ざってしまい、本当の曜日効果が見えなくなる。"}</p>
@@ -299,7 +353,8 @@ export default function SessionGapChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li>連休前後の日は数が少なく（年に十数回）、検定力が低い。nと安定度を必ず確認する。</li>
           <li>暦日ギャップから休場を推定するため、データ欠損（取引はあったが価格が無い日）があると誤判定する。半日立会などは区別しない。</li>
-          <li>取引コスト未控除。ギャップは寄付の流動性が薄い時間帯に集中するため、実際の約定は理論値より不利になりやすい。</li>
+          <li>上の「文脈別セグメント戦略 vs B&H」パネルで取引コストを実額控除できる（表・ヒートマップはコスト前）。区間は日ごとに建てて畳むので選択日1日＝1往復と数えており、回転率が高くコストが強く効く。</li>
+          <li>ギャップは寄付の流動性が薄い時間帯に集中するため、実際の約定は推定スプレッドより不利になりやすい。パネルの数値も楽観側と考えること。</li>
         </ul>
       </AnalysisGuide>
     </div>

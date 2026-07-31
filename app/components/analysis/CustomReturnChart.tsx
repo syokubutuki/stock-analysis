@@ -10,6 +10,8 @@ import {
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
 import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStrategyPanel";
+import StrategyVsBenchmark from "./StrategyVsBenchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -160,6 +162,15 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
   const buyHoldReturns = useMemo(
     () => computeCustomReturns(prices, "prevClose", "close", effectiveStart, effectiveEnd),
     [prices, effectiveStart, effectiveEnd]
+  );
+
+  // 取引コスト控除用: 日足高安から推定した往復スプレッド
+  const spreadRT = useMemo(() => representativeSpread(prices), [prices]);
+
+  // 高値/安値での約定を前提にした設定は事後情報を使うため執行不能（理論上限）
+  const isExtremeBased = useMemo(
+    () => entry === "high" || entry === "low" || exit === "high" || exit === "low",
+    [entry, exit]
   );
 
   // 統計
@@ -474,23 +485,17 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
       {/* 統計 */}
       {stats && (
         <>
-          {/* バイ&ホールドとの比較 */}
-          {buyHoldReturns.length > 0 && (() => {
-            const bhTotal = buyHoldReturns[buyHoldReturns.length - 1].cumReturn;
-            const excess = stats.totalReturn - bhTotal;
-            const bhYears = buyHoldReturns.length / 252;
-            const bhAnnual = bhYears > 0 ? bhTotal / bhYears : 0;
-            const excessAnnual = stats.annualReturn - bhAnnual;
-            return (
-              <div className={`flex flex-wrap gap-3 p-3 rounded-lg border text-sm ${excess > 0 ? "bg-green-50 border-green-200" : excess < 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}>
-                <span className="font-medium">{excess > 0 ? "戦略がB&Hに勝っています" : excess < 0 ? "戦略がB&Hに負けています" : "戦略とB&Hが同等です"}</span>
-                <span>B&H累積: <span className="font-mono">{pctFmt(bhTotal)}</span></span>
-                <span>戦略累積: <span className="font-mono">{pctFmt(stats.totalReturn)}</span></span>
-                <span>超過リターン: <span className={`font-mono font-medium ${excess > 0 ? "text-green-700" : excess < 0 ? "text-red-700" : ""}`}>{excess > 0 ? "+" : ""}{pctFmt(excess)}</span></span>
-                <span>超過年率: <span className={`font-mono font-medium ${excessAnnual > 0 ? "text-green-700" : excessAnnual < 0 ? "text-red-700" : ""}`}>{excessAnnual > 0 ? "+" : ""}{pctFmt(excessAnnual)}</span></span>
-              </div>
-            );
-          })()}
+          {/* バイ&ホールドとの比較（共通部品。コスト控除・回転率つき） */}
+          {buyHoldReturns.length > 0 && (
+            <StrategyVsBenchmark
+              strategyDaily={returns.map((r) => r.dailyReturn)}
+              buyHoldDaily={buyHoldReturns.map((r) => r.dailyReturn)}
+              spreadRT={spreadRT}
+              roundTripsPerBar={1}
+              unrealizable={isExtremeBased}
+              unrealizableNote="「安値買い→高値売り」など、その日の高値・安値での約定を前提にした設定です。高値/安値は事後にしか分からないため執行できず、日中レンジの理論上限を示す参考値です。"
+            />
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
             <StatCell label="累積リターン" value={pctFmt(stats.totalReturn)} positive={stats.totalReturn > 0} />
             <StatCell label="年率リターン" value={pctFmt(stats.annualReturn)} positive={stats.annualReturn > 0} />
@@ -541,7 +546,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
           <li><span className="font-medium">最大ドローダウン:</span> max(cumReturn_peak - cumReturn_t)。累積リターン曲線の最高値からの最大下落幅。戦略の最悪期を表します。</li>
           <li><span className="font-medium">プロフィットファクター:</span> PF = |ΣProfit| / |ΣLoss| = (AvgWin × WinCount) / |AvgLoss × LossCount|。1超で期待値プラス。</li>
         </ul>
-        <p><span className="font-medium">注意点:</span> この分析は取引コスト（手数料・スプレッド・スリッページ）を含みません。特に「高値買い」「安値売り」などの極値ベースの戦略は実際には執行不可能であり、あくまで理論的な上下限の参考値です。</p>
+        <p><span className="font-medium">注意点:</span> 上の B&H 比較パネルで「取引コストを控除」をONにすると、日足高安から推定した往復スプレッドと手数料を実額で差し引けます（既定はOFF＝コスト前）。この戦略は毎日建て直すため年約252往復あり、コストの効き方が B&H と大きく違うので、必ず控除後で判断してください。スリッページ・市場インパクト・税は含みません。また「高値買い」「安値売り」などの極値ベースの設定は事後情報を使うため執行不可能で、あくまで理論的な上下限の参考値です。</p>
       </AnalysisGuide>
     </div>
   );

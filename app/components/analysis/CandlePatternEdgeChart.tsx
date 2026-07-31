@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { patternEdges } from "../../lib/candle-patterns";
+import { patternEdges, patternSignalIndices, PATTERNS, type PatternKind } from "../../lib/candle-patterns";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import StrategyVsBenchmark from "./StrategyVsBenchmark";
+import { positionsFromSignals } from "../../lib/strategy-vs-benchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -15,7 +18,18 @@ const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 
 export default function CandlePatternEdgeChart({ prices }: Props) {
   const [horizon, setHorizon] = useState(5);
+  const [stratKind, setStratKind] = useState<PatternKind>("bullEngulf");
   const result = useMemo(() => (prices.length < 100 ? null : patternEdges(prices, horizon)), [prices, horizon]);
+
+  // 選択パターン検出日の引けで建て、N日保有する戦略の建玉ベクトル。
+  // 弱気パターンは下落で当たりなので売り持ち（side=−1）にする。
+  const stratMeta = PATTERNS.find((p) => p.kind === stratKind) ?? PATTERNS[0];
+  const positions = useMemo(() => {
+    if (prices.length < 100) return [];
+    const idx = patternSignalIndices(prices, stratKind, horizon);
+    return positionsFromSignals(prices.length, idx, horizon, stratMeta.bias === "bear" ? -1 : 1);
+  }, [prices, stratKind, horizon, stratMeta.bias]);
+  const spreadRT = useMemo(() => (prices.length < 100 ? 0 : representativeSpread(prices)), [prices]);
 
   if (prices.length < 100 || !result) return null;
   const maxAbs = Math.max(1e-9, ...result.edges.map((e) => Math.abs(e.meanFwd)));
@@ -89,6 +103,33 @@ export default function CandlePatternEdgeChart({ prices }: Props) {
       </div>
       <p className="text-[11px] text-gray-400">※「方向調整」: 弱気パターンは下落で当たりのため符号を反転し、プラス＝パターン的中として比較。</p>
 
+      {/* パターン追随戦略を B&H と比較（往復回数を実測してコストを実額控除） */}
+      <div className="pt-2 border-t border-gray-100 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h4 className="text-sm font-medium text-gray-700">
+            パターン追随戦略 vs バイ&ホールド（検出日の引けで{stratMeta.bias === "bear" ? "売り" : "買い"}・{horizon}日保有）
+          </h4>
+          <select
+            value={stratKind}
+            onChange={(e) => setStratKind(e.target.value as PatternKind)}
+            className="text-xs px-2 py-1 border border-gray-200 rounded bg-white"
+          >
+            {PATTERNS.map((p) => (
+              <option key={p.kind} value={p.kind}>
+                {p.bias === "bull" ? "▲" : "▼"} {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <StrategyVsBenchmark
+          mode="positions"
+          prices={prices}
+          positions={positions}
+          spreadRT={spreadRT}
+          label={`${stratMeta.label}追随`}
+        />
+      </div>
+
       <AnalysisGuide title="ローソク足パターン統計的エッジの詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>
         <p>
@@ -111,7 +152,8 @@ export default function CandlePatternEdgeChart({ prices }: Props) {
           <li>多パターン×多ホライズンを試すと偶然の“当たり”が出る。FDR補正後で判断すること。</li>
           <li>パターン定義（ヒゲ比率の閾値等）に依存し、定義を変えると結果も動く。</li>
           <li>相場環境（トレンド/レンジ）で効きが変わる。トレンドフィルタとの併用が望ましい。</li>
-          <li>取引コスト未控除。短いNでは特に実効リターンが目減りする。</li>
+          <li>上の「パターン追随戦略 vs B&H」パネルで取引コストを実額控除できる（表の平均リターンはコスト前）。短いNでは往復が増えるのでコストの目減りが大きい。</li>
+          <li>戦略パネルは弱気パターンを売り持ちとして評価する。信用取引の貸株料・逆日歩は含んでいない。</li>
         </ul>
       </AnalysisGuide>
     </div>

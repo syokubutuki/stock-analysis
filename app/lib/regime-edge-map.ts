@@ -140,6 +140,9 @@ export interface RegimeEdgeRow {
   edge: EdgeSignal;
   overall: RegimeEdgeCell | null;          // 全局面
   byRegime: (RegimeEdgeCell | null)[];     // regimeOrder に対応
+  roundTrips: number;                      // 期間内の往復回数（Σ|Δpos|/2）
+  tripsPerYear: number;                    // 回転率
+  costPerDay: number;                      // 建玉日1日あたりに配ったコスト（対数リターン単位）
 }
 
 export interface RegimeEdgeMap {
@@ -165,10 +168,19 @@ function cellStats(rets: number[]): Omit<RegimeEdgeCell, "pAdj"> | null {
   };
 }
 
-export function buildRegimeEdgeMap(prices: PricePoint[], scheme: RegimeScheme): RegimeEdgeMap {
+// costRT: 往復コスト（比率）。0 なら控除なし。
+// シグナルごとに回転率 Σ|Δpos|/2 を実測し、総コスト（1往復 −ln(1−c)）を建玉日に均等配分して
+// 各活性日リターンから引く。均等配分は総額を保つ（strategy-vs-benchmark と同じ規約）。
+// 回転の速いシグナルほど自動的に重く罰せられるので、セル値の比較がコスト後で公平になる。
+export function buildRegimeEdgeMap(
+  prices: PricePoint[],
+  scheme: RegimeScheme,
+  costRT = 0
+): RegimeEdgeMap {
   const n = prices.length;
   const cls = buildClassifier(prices, scheme);
   const signals = buildSignalCatalog(prices);
+  const perTrip = costRT > 0 ? -Math.log(1 - costRT) : 0;
 
   // レジーム日数
   const regimeCounts = cls.order.map(() => 0);
@@ -183,6 +195,11 @@ export function buildRegimeEdgeMap(prices: PricePoint[], scheme: RegimeScheme): 
   interface Raw { overall: number[]; byRegime: number[][]; }
   const raws: Raw[] = signals.map(() => ({ overall: [], byRegime: cls.order.map(() => []) }));
 
+  // シグナルごとの回転率も同じ走査で実測する（Σ|Δpos| を数え、最後に畳む分を足す）
+  const turnover = signals.map(() => 0);
+  const prevPos = signals.map(() => 0);
+  const activeDays = signals.map(() => 0);
+
   for (let i = 0; i < n - 1; i++) {
     const c0 = prices[i].close, c1 = prices[i + 1].close;
     if (!(c0 > 0) || !(c1 > 0)) continue;
@@ -191,10 +208,28 @@ export function buildRegimeEdgeMap(prices: PricePoint[], scheme: RegimeScheme): 
     const regIdx = reg === null ? -1 : cls.order.indexOf(reg);
     for (let s = 0; s < signals.length; s++) {
       const pos = signals[s].positionOf(i);
+      turnover[s] += Math.abs(pos - prevPos[s]);
+      prevPos[s] = pos;
       if (pos === 0) continue;
+      activeDays[s]++;
       const dayRet = pos * nextRet;
       raws[s].overall.push(dayRet);
       if (regIdx >= 0) raws[s].byRegime[regIdx].push(dayRet);
+    }
+  }
+  for (let s = 0; s < signals.length; s++) turnover[s] += Math.abs(prevPos[s]); // 最後に畳む
+
+  // 総コストを建玉日に均等配分（総額を保つ）
+  const roundTripsBySignal = turnover.map((t) => t / 2);
+  const costPerDayBySignal = roundTripsBySignal.map((trips, s) =>
+    activeDays[s] > 0 ? (perTrip * trips) / activeDays[s] : 0
+  );
+  if (perTrip > 0) {
+    for (let s = 0; s < signals.length; s++) {
+      const c = costPerDayBySignal[s];
+      if (c === 0) continue;
+      raws[s].overall = raws[s].overall.map((r) => r - c);
+      raws[s].byRegime = raws[s].byRegime.map((arr) => arr.map((r) => r - c));
     }
   }
 
@@ -217,10 +252,14 @@ export function buildRegimeEdgeMap(prices: PricePoint[], scheme: RegimeScheme): 
       const cell: RegimeEdgeCell = { ...st, pAdj: flatAdj[padjCursor++] };
       return cell;
     });
+    const years = activeDays[s] > 0 ? n / TRADING_DAYS : 0;
     return {
       edge,
       overall: overallSt ? { ...overallSt, pAdj: overallSt.p } : null,
       byRegime,
+      roundTrips: roundTripsBySignal[s],
+      tripsPerYear: years > 0 ? roundTripsBySignal[s] / years : 0,
+      costPerDay: costPerDayBySignal[s],
     };
   });
 

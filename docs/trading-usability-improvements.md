@@ -133,6 +133,12 @@ export function buildStateFn(prices: PricePoint[], axis: StateAxis, cfg?: AxisCo
 
 ## 5. B&H比較・取引コスト控除の共通部品化 ★★
 
+> **状態: 完了（2026-07-31）**。共通部品 `StrategyVsBenchmark` を8箇所に配線し、
+> B&H比較の形でない2件（RMultiple / RegimeEdgeMap）はネイティブ単位でコストを実額化。
+> 最後の1件 `WeekdayVsBuyHoldChart` は検定が週次/日次の2データ経路に分かれるため
+> 汎用バーを貼らず専用実装にした（`docs/weekday-vs-bh-cost.md`）。
+> `grep -rn "コスト未考慮\|コスト未控除" app/components/analysis` は空。
+
 ### 改善内容
 `CustomReturnChart.tsx:478-493` のバイ&ホールド比較バー（超過リターン・超過年率の色分け）が秀逸。
 これを条件付き戦略系の**共通部品 `<StrategyVsBenchmark>`** に昇格させ、全戦略系で再利用。

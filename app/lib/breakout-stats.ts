@@ -33,6 +33,39 @@ export interface BreakoutResult {
   horizon: number;
 }
 
+// ブレイク後 horizon 日だけ建てる戦略の建玉ベクトル q_t ∈ {0,1} を作る。
+// 上抜け(side="up")なら買い持ち、下抜け(side="down")なら売り持ち（q=−1）。
+// シグナルが重なった場合は積み増さず、保有期間だけ延長する（ピラミッディングなし）。
+//
+// これを StrategyVsBenchmark の positions モードに渡すと、往復回数が実測できるので
+// 「ブレイク戦略は往復が多い」という定性的な注記を、コスト実額として出せる。
+// 先読み回避: ブレイク判定は i 日の高安で確定するが、約定は i 日の引けとみなし、
+// 損益に効くのは i+1 日以降の終値変化とする（q は i 日に立てて i+1 から効く）。
+export function donchianPositions(
+  prices: PricePoint[],
+  lookback: number,
+  horizon: number,
+  side: "up" | "down"
+): number[] {
+  const n = prices.length;
+  const q = new Array(n).fill(0);
+  if (n === 0 || lookback < 1 || horizon < 1) return q;
+  const target = side === "up" ? 1 : -1;
+
+  for (let i = lookback; i < n; i++) {
+    let hh = -Infinity, ll = Infinity;
+    for (let j = i - lookback; j < i; j++) {
+      hh = Math.max(hh, prices[j].high);
+      ll = Math.min(ll, prices[j].low);
+    }
+    const broke = side === "up" ? prices[i].high > hh : prices[i].low < ll;
+    if (!broke) continue;
+    // i 日の引けで建て、以降 horizon 日保有（重複は延長として上書き）
+    for (let k = i; k < Math.min(n, i + horizon); k++) q[k] = target;
+  }
+  return q;
+}
+
 export function computeBreakoutStats(prices: PricePoint[], horizon = 10): BreakoutResult {
   const n = prices.length;
   const lookbacks = [20, 55];

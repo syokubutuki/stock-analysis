@@ -60,11 +60,18 @@ export interface RMultipleResult {
   rs: number[];
   expectancyR: number; winRate: number;
   avgWinR: number; avgLossR: number; n: number;
+  meanCostR: number; // 1トレードあたりのコスト（R単位）。costRT=0 なら 0
 }
-export function rMultiples(prices: PricePoint[], maxHold = 20): RMultipleResult | null {
+
+// costRT: 往復コスト（比率）。R 単位では建値 P と リスク幅 risk=ATR_MULT·ATR の比で効く:
+//   コストの金額 = costRT · P  →  R 単位では costRT · P / risk
+// リスク幅は ATR に比例するので、低ボラ銘柄・低ボラ局面ほどコストの R 換算が重くなる。
+// これが「R 倍数はコストに対して一様でない」理由であり、平均を引くだけでは足りない。
+export function rMultiples(prices: PricePoint[], maxHold = 20, costRT = 0): RMultipleResult | null {
   const n = prices.length;
   const atr = computeATR(prices);
   const rs: number[] = [];
+  const costRs: number[] = [];
   for (let i = 200; i < n - maxHold; i++) {
     const e = prices[i].close;
     if (!(e > 0) || isNaN(atr[i]) || atr[i] <= 0) continue;
@@ -74,12 +81,16 @@ export function rMultiples(prices: PricePoint[], maxHold = 20): RMultipleResult 
     for (let k = 1; k <= maxHold; k++) {
       if (prices[i + k].low <= stop) { pnl = stop - e; break; }
     }
-    rs.push(pnl / risk);
+    // 往復コストは建値に比例する金額なので、R 換算してから引く
+    const costR = costRT > 0 ? (costRT * e) / risk : 0;
+    costRs.push(costR);
+    rs.push(pnl / risk - costR);
   }
   if (rs.length < 10) return null;
   const wins = rs.filter((r) => r > 0), losses = rs.filter((r) => r <= 0);
   return {
     rs, expectancyR: mean(rs), winRate: wins.length / rs.length,
     avgWinR: mean(wins), avgLossR: mean(losses), n: rs.length,
+    meanCostR: costRs.length ? mean(costRs) : 0,
   };
 }

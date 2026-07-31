@@ -8,6 +8,9 @@ import {
   type EventStudyResult,
 } from "../../lib/event-study";
 import AnalysisGuide from "./AnalysisGuide";
+import StrategyVsBenchmark from "./StrategyVsBenchmark";
+import { positionsFromSignals } from "../../lib/strategy-vs-benchmark";
+import { representativeSpread } from "../../lib/spread-estimator";
 
 interface Props {
   prices: PricePoint[];
@@ -98,6 +101,19 @@ export default function EventStudyChart({ prices }: Props) {
     if (!triggerSeries || triggerSeries.length === 0) return null;
     return computeEventStudy(prices, triggerSeries, cond, thresholdPct, horizon);
   }, [prices, triggerSeries, cond, thresholdPct, horizon]);
+
+  // トリガー当日の引けで建て、horizon 日保有する戦略の建玉ベクトル。
+  // events[].startTime は日付なので prices のインデックスに引き直す。
+  const eventPositions = useMemo(() => {
+    if (!result || prices.length === 0) return [];
+    const idxOf = new Map<string, number>();
+    prices.forEach((p, i) => idxOf.set(p.time, i));
+    const idx = result.events
+      .map((e) => idxOf.get(e.startTime))
+      .filter((v): v is number => v !== undefined);
+    return positionsFromSignals(prices.length, idx, horizon, 1);
+  }, [result, prices, horizon]);
+  const spreadRT = useMemo(() => (prices.length === 0 ? 0 : representativeSpread(prices)), [prices]);
 
   // 描画
   useEffect(() => {
@@ -351,6 +367,22 @@ export default function EventStudyChart({ prices }: Props) {
         </div>
       )}
 
+      {/* イベント追随戦略を B&H と比較（往復回数を実測してコストを実額控除） */}
+      {result && result.events.length > 0 && (
+        <div className="pt-2 border-t border-gray-100 space-y-2">
+          <h4 className="text-sm font-medium text-gray-700">
+            イベント追随戦略 vs バイ&ホールド（トリガー当日の引けで買い・{horizon}日保有）
+          </h4>
+          <StrategyVsBenchmark
+            mode="positions"
+            prices={prices}
+            positions={eventPositions}
+            spreadRT={spreadRT}
+            label="イベント追随"
+          />
+        </div>
+      )}
+
       <AnalysisGuide title="条件付きイベントスタディの詳細理論">
         <p className="font-medium text-gray-700">1. イベントスタディとは</p>
         <p>「ある出来事（イベント）が起きた後、価格は平均的にどう動くか」を、過去の同種イベントを多数重ね合わせて調べる手法です。例えば「日経平均が+2%以上上昇した翌日以降、対象銘柄はどう動いたか」を、過去の全該当日について<span className="font-medium">起点を0%に揃えて</span>平均化します。多数の事例を重ねることで、ノイズが打ち消され「平均的な反応（傾向）」が浮かび上がります。天気予報で「この気圧配置の翌日は晴れが多い」と過去事例から確率を見るのに似ています。</p>
@@ -392,7 +424,7 @@ export default function EventStudyChart({ prices }: Props) {
         <ul className="list-disc pl-4 space-y-1">
           <li><span className="font-medium">オーバーラップ</span>: 近接した複数のトリガーは観察期間が重複し、サンプルが独立でないため統計的有意性は過大評価されがちです。N（イベント数）が少ないときは特に偶然の可能性に注意。</li>
           <li><span className="font-medium">先読みバイアスなし設計</span>: 起点はトリガー当日の終値であり、その時点で観測可能な情報のみを使います。ただし当日終値での約定を前提とするため、実際の執行とはズレ得ます。</li>
-          <li><span className="font-medium">取引コスト未考慮</span>: 手数料・スプレッド・スリッページは含みません。</li>
+          <li><span className="font-medium">取引コスト</span>: 上の「イベント追随戦略 vs B&H」パネルで実額控除できます（パス図と表はコスト前）。トリガーが密集する局面では往復が増えるため、回転率とコスト後の超過リターンを確認してください。スリッページ・市場インパクトは含みません。</li>
           <li><span className="font-medium">レジーム依存</span>: 過去の傾向は市場環境（強気/弱気・低ボラ/高ボラ）に依存し、将来も続く保証はありません。期間を区切って安定性を確認することを推奨します。</li>
         </ul>
       </AnalysisGuide>
