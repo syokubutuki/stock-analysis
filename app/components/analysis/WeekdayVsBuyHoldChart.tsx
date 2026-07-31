@@ -13,8 +13,13 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { computeVsBH, type Timing, type VsBHResult } from "../../lib/weekday-vs-bh";
-import { representativeSpread } from "../../lib/spread-estimator";
+import {
+  computeVsBH,
+  type CostMode,
+  type Timing,
+  type VsBHResult,
+} from "../../lib/weekday-vs-bh";
+import { representativeSpread, type SpreadEstimator } from "../../lib/spread-estimator";
 import { roundTripCost } from "../../lib/strategy-vs-benchmark";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -55,16 +60,33 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
   // このトグルは「自分の実際のコストを入れて4検定を再計算する」ための副次的な操作系。
   const [deduct, setDeduct] = useState(false);
   const [feeBps, setFeeBps] = useState(0);
+  const [costMode, setCostMode] = useState<CostMode>("time-varying");
+  const [spreadEstimator, setSpreadEstimator] = useState<SpreadEstimator>("cs");
+  const [spreadWindow, setSpreadWindow] = useState(21);
+  const [entryMultiplier, setEntryMultiplier] = useState(1.5);
 
-  const spreadRT = useMemo(() => representativeSpread(prices), [prices]);
+  const spreadRT = useMemo(
+    () => representativeSpread(prices, spreadWindow, spreadEstimator),
+    [prices, spreadWindow, spreadEstimator],
+  );
   const costRT = useMemo(
-    () => roundTripCost({ enabled: deduct, spreadRT, feeBps }),
-    [deduct, spreadRT, feeBps],
+    () => roundTripCost({ enabled: deduct && costMode === "constant", spreadRT, feeBps }),
+    [deduct, costMode, spreadRT, feeBps],
   );
 
   const result = useMemo<VsBHResult | null>(
-    () => computeVsBH(prices, { entryTiming, exitTiming, costRT }),
-    [prices, entryTiming, exitTiming, costRT],
+    () => computeVsBH(prices, {
+      entryTiming,
+      exitTiming,
+      costRT,
+      costEnabled: deduct,
+      costMode,
+      spreadEstimator,
+      spreadWindow,
+      feeBps,
+      entryCostMultiplier: costMode === "time-varying" ? entryMultiplier : 1,
+    }),
+    [prices, entryTiming, exitTiming, costRT, deduct, costMode, spreadEstimator, spreadWindow, feeBps, entryMultiplier],
   );
   const hasResult = result !== null; // コンテナは result 有効時のみ描画されるので初期化effectの依存に入れる
 
@@ -128,10 +150,15 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
     );
   }
 
-  const { metrics, weekend, robust, sharpe, annual, meta, breakeven } = result;
+  const { metrics, weekend, robust, sharpe, annual, meta, breakeven, costDynamics } = result;
   const be = breakeven;
   const absorbs = be.perRoundTripMean > 0; // コストを吸収できるエッジがそもそも有るか
   const sigAtZero = be.perRoundTripSig95 > 0; // コストゼロで片側5%有意か
+  const isVariableCost = costDynamics.mode === "time-varying";
+  const pathScale = costDynamics.pathScaleMean;
+  const pathAbsorbs = pathScale !== null && pathScale > 0;
+  const headerAbsorbs = isVariableCost ? pathAbsorbs : absorbs;
+  const estimatorLabel = costDynamics.estimator === "cs" ? "CS" : "AR";
   const turnoverRatio = be.tripsPerYearBH > 0 ? be.tripsPerYearStrat / be.tripsPerYearBH : 0;
   // exitTiming="open" だと週末ギャップは戦略の保有区間に含まれる＝「週末を避ける」物語が成立しない
   const avoidsWeekend = exitTiming === "close";
@@ -197,9 +224,9 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
           : sigCount >= 1
           ? " 一部の検定で優位ですが、頑健とは言い切れません。"
           : " 統計的に有意な優位性は検出されませんでした（差は偶然の範囲）。"}
-        {meta.costRT > 0 && (
+        {meta.costApplied && (
           <span className="text-xs text-gray-600">
-            {" "}（往復コスト {bpAbs(meta.costRT)} を控除した後の判定）
+            {" "}（{isVariableCost ? `時変${estimatorLabel}` : `往復 ${bpAbs(meta.costRT)}`} コスト控除後）
           </span>
         )}
       </div>
@@ -207,20 +234,22 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
       {/* Break-even（損益分岐コスト）— コスト控除の ON/OFF に依らず常時表示 */}
       <div className="rounded-lg border border-gray-200 p-3 space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <span className="text-sm font-medium text-gray-700">このエッジが吸収できる往復コスト</span>
+          <span className="text-sm font-medium text-gray-700">{isVariableCost ? "このエッジが吸収できる時変コスト系列" : "このエッジが吸収できる往復コスト"}</span>
           <span
             className={`text-xs rounded border px-1.5 py-0.5 ${
-              absorbs ? "bg-amber-50 text-amber-800 border-amber-300" : "bg-gray-100 text-gray-600 border-gray-300"
+              headerAbsorbs ? "bg-amber-50 text-amber-800 border-amber-300" : "bg-gray-100 text-gray-600 border-gray-300"
             }`}
           >
-            {absorbs ? `損益分岐 ${bpAbs(be.perRoundTripMean)}` : "吸収余地なし"}
+            {isVariableCost
+              ? (pathAbsorbs ? `系列倍率 λ*=${pathScale!.toFixed(2)}×` : "吸収余地なし")
+              : (absorbs ? `損益分岐 ${bpAbs(be.perRoundTripMean)}` : "吸収余地なし")}
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <tbody>
               <tr className="border-b border-gray-100">
-                <td className="py-1 px-2 text-gray-600">期待値がゼロになる c*</td>
+                <td className="py-1 px-2 text-gray-600">{isVariableCost ? "定数・対称換算 c*" : "期待値がゼロになる c*"}</td>
                 <td className={`text-right px-2 font-mono ${cls(be.perRoundTripMean)}`}>{bp(be.perRoundTripMean)}</td>
                 <td className="px-2 text-xs text-gray-500">
                   {absorbs
@@ -237,11 +266,34 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
                     : "コストゼロでも有意でない（片側5%を満たさない）"}
                 </td>
               </tr>
+              {isVariableCost && (
+                <>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-1 px-2 text-gray-600">時変系列の損益分岐 λ*</td>
+                    <td className={`text-right px-2 font-mono ${pathAbsorbs ? "text-green-600" : "text-red-600"}`}>
+                      {pathScale === null ? "-" : `${pathScale.toFixed(2)}×`}
+                    </td>
+                    <td className="px-2 text-xs text-gray-500">
+                      Σv<sub>w</sub> / Σk<sub>w</sub>。1未満なら推定コスト系列を全額吸収できない
+                    </td>
+                  </tr>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-1 px-2 text-gray-600">v<sub>w</sub> と k<sub>w</sub> の共変動</td>
+                    <td className="text-right px-2 font-mono text-gray-700">
+                      Cov {(costDynamics.covarianceValueCost * 1e8).toFixed(2)} bp²
+                    </td>
+                    <td className="px-2 text-xs text-gray-500">
+                      σ(k)/σ(v)={(costDynamics.sigmaCostOverValue * 100).toFixed(1)}%
+                      {" "}／ λ(95%)={costDynamics.pathScaleSig95.toFixed(2)}×
+                    </td>
+                  </tr>
+                </>
+              )}
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 text-gray-600">推定往復スプレッド</td>
                 <td className="text-right px-2 font-mono text-gray-700">{bpAbs(be.spreadRT)}</td>
                 <td className="px-2 text-xs text-gray-500">
-                  Corwin-Schultz 中央値。手数料は別途（下の入力欄）
+                  {estimatorLabel} ローリング中央値（窓{costDynamics.window}日）。手数料は別途
                   {absorbs && be.spreadRT > 0 && (
                     <span className="text-red-700">
                       {" "}／ エッジの {(be.spreadRT / be.perRoundTripMean).toFixed(1)} 倍
@@ -253,7 +305,9 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
                 <td className="py-1 px-2 text-gray-600">推定スプレッドでの年ドラッグ</td>
                 <td className="text-right px-2 font-mono text-red-700">−{(be.annualDragAtSpread * 100).toFixed(2)}%</td>
                 <td className="px-2 text-xs text-gray-500">
-                  年 {be.tripsPerYearStrat.toFixed(0)} 往復 × 往復 {bpAbs(be.spreadRT)}
+                  {isVariableCost
+                    ? `1日ラグの時変${estimatorLabel}、入り k=${costDynamics.entryMultiplier.toFixed(1)} を約定日ごとに集計`
+                    : `年 ${be.tripsPerYearStrat.toFixed(0)} 往復 × 往復 ${bpAbs(be.spreadRT)}`}
                 </td>
               </tr>
               <tr>
@@ -268,48 +322,101 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
           </table>
         </div>
 
-        {/* コスト控除トグル（副次）: ONにすると4検定すべてが再計算される */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 pt-1 border-t border-gray-100">
-          <label className="flex items-center gap-1.5 cursor-pointer" title="往復スプレッド＋手数料を各往復から控除し、4検定を再計算する">
-            <input type="checkbox" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />
-            <span className={deduct ? "font-medium text-gray-800" : ""}>取引コストを控除して4検定を再計算</span>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <span className="text-gray-500">片道手数料</span>
-            <input
-              type="number"
-              min={0}
-              max={200}
-              step={1}
-              value={feeBps}
-              onChange={(e) => setFeeBps(Math.max(0, Number(e.target.value) || 0))}
-              className="w-16 px-1.5 py-0.5 border border-gray-200 rounded font-mono text-right"
-              disabled={!deduct}
-            />
-            <span className="text-gray-500">bps</span>
-          </label>
-          <span className="text-gray-500">
-            適用中の1往復コスト <span className="font-mono">{bpAbs(meta.costRT)}</span>
-          </span>
-          <span className="text-gray-500">
-            期間内の往復 <span className="font-mono">{meta.roundTrips.toFixed(0)}</span> 回
-          </span>
+        {/* コスト感度: ONにすると選択モデルで4検定すべてを再計算 */}
+        <div className="space-y-2 text-xs text-gray-600 pt-2 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className="flex items-center gap-1.5 cursor-pointer" title="選択したコスト系列を各約定から控除し、4検定を再計算する">
+              <input type="checkbox" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />
+              <span className={deduct ? "font-medium text-gray-800" : ""}>取引コストを控除して4検定を再計算</span>
+            </label>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">モデル</span>
+              {(["time-varying", "constant"] as CostMode[]).map((mode) => (
+                <button
+                  type="button"
+                  key={mode}
+                  onClick={() => setCostMode(mode)}
+                  className={`px-2 py-0.5 rounded border ${costMode === mode ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}
+                >
+                  {mode === "time-varying" ? "時変" : "定数"}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-1.5">
+              <span className="text-gray-500">片道手数料</span>
+              <input type="number" min={0} max={200} step={1} value={feeBps}
+                onChange={(e) => setFeeBps(Math.max(0, Number(e.target.value) || 0))}
+                className="w-16 px-1.5 py-0.5 border border-gray-200 rounded font-mono text-right"
+                disabled={!deduct}
+              />
+              <span className="text-gray-500">bps</span>
+            </label>
+          </div>
+          {isVariableCost && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded bg-gray-50 p-2">
+              <div className="flex items-center gap-1">
+                <span>推定量</span>
+                {(["cs", "ar"] as SpreadEstimator[]).map((estimator) => (
+                  <button type="button" key={estimator} onClick={() => setSpreadEstimator(estimator)}
+                    className={`px-2 py-0.5 rounded border ${spreadEstimator === estimator ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-300"}`}>
+                    {estimator === "cs" ? "CS" : "AR"}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5">
+                <span>ローリング窓 {spreadWindow}日</span>
+                <input type="range" min={5} max={63} step={1} value={spreadWindow}
+                  onChange={(e) => setSpreadWindow(Number(e.target.value))} className="w-24" />
+              </label>
+              <label className="flex items-center gap-1.5">
+                <span>入り倍率 k={entryMultiplier.toFixed(1)}</span>
+                <input type="range" min={1} max={3} step={0.1} value={entryMultiplier}
+                  onChange={(e) => setEntryMultiplier(Number(e.target.value))} className="w-24" />
+              </label>
+              <span>
+                約定日の平均 c<sub>t</sub> <span className="font-mono">{bpAbs(costDynamics.averageBaseCostRT)}</span>
+                {costDynamics.warmupLegs > 0 && <> ／ 推定前 {costDynamics.warmupLegs}レグはスプレッド0</>}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-500">
+            <span>
+              {isVariableCost ? "適用系列" : "適用中の1往復コスト"}{" "}
+              <span className="font-mono">{isVariableCost ? `1日ラグ ${estimatorLabel}` : bpAbs(meta.costRT)}</span>
+            </span>
+            <span>期間内の往復 <span className="font-mono">{meta.roundTrips.toFixed(0)}</span> 回</span>
+          </div>
+          {isVariableCost && (
+            <p className="text-amber-800">
+              k は日足から推定できない外生パラメータです。既定1.5は根拠のある推定値ではなく、感度分析の基準点です。
+            </p>
+          )}
         </div>
 
         <p className="text-xs text-gray-500">
-          {absorbs ? (
+          {isVariableCost ? (
+            pathAbsorbs ? (
+              <>
+                推定した時変コスト系列を <span className="font-mono">{pathScale!.toFixed(2)}倍</span>まで吸収できます。
+                λ*&gt;1 なら基準系列を全額払っても期待値は正、λ*&lt;1 なら不足です。CS/AR・窓・kを動かして感度を確認してください。
+              </>
+            ) : (
+              <>
+                v<sub>w</sub> の合計が正でないため、<span className="font-medium">コストをゼロにしても B&H に届きません</span>。
+                時変コスト系列を吸収できる正の λ* はありません。
+              </>
+            )
+          ) : absorbs ? (
             <>
               自分の証券会社の往復コスト（スプレッド＋手数料×2）が <span className="font-mono">{bpAbs(be.perRoundTripMean)}</span> より
-              小さいかどうかで判断してください。コスト推定そのものが誤差の大きい推定量なので、
-              単一の ON/OFF より「何bpまで耐えられるか」のほうが頑健な判断材料になります。
+              小さいかどうかで判断してください。単一の ON/OFF より「何bpまで耐えられるか」が判断材料になります。
             </>
           ) : (
             <>
               週次超過の平均が負なので、<span className="font-medium">コストをゼロにしても B&H に届きません</span>。
-              吸収できる往復コストは存在せず、手数料の多寡は結論を変えません。
               {avoidsWeekend
                 ? "この銘柄・期間では、週末を避けること自体がリターンを捨てる方向に働いています。"
-                : "なお現在の設定（金曜=始値で手仕舞い）では週末ギャップが戦略の保有区間に含まれるため、そもそも「週末を避ける」戦略にはなっていません。"}
+                : "現在の設定では週末ギャップを保有するため、そもそも「週末を避ける」戦略ではありません。"}
             </>
           )}
         </p>
@@ -319,8 +426,8 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
       <div>
         <div className="text-xs text-gray-500 mb-1">
           累積リターン（青=月→金戦略 / 灰=B&H, ホイールでズーム）
-          {meta.costRT > 0
-            ? `／往復 ${bpAbs(meta.costRT)} 控除後（B&Hは期間全体で1往復ぶん）`
+          {meta.costApplied
+            ? (isVariableCost ? `／1日ラグ時変${estimatorLabel}控除後` : `／往復 ${bpAbs(meta.costRT)} 控除後`)
             : "／コスト控除なし"}
         </div>
         <div ref={containerRef} className="w-full" />
@@ -516,32 +623,36 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
         </p>
         <p className="pl-2">{"c = 往復スプレッド + 2 × 片道手数料"}</p>
         <p>
-          本分析では片道1レグを {"ln(1−c)/2"} として、<span className="font-medium">建玉が変化した区間の先頭</span>（＝実際の約定日である
-          月曜・金曜）に課金します。2レグで厳密に {"ln(1−c)"} になるので、週次の検定（①③）と日次の検定（②④）が
-          c² の誤差なく同じコストを見ます。B&H にも期間全体で1往復ぶんを課しています。
+          定数モデルでは片道1レグを {"ln(1−c)/2"} とし、建玉が変わる区間の先頭に課金します。
+          時変モデルでは約定日 i ごとにローリング推定した c<sub>i</sub> を使い、
+        </p>
+        <p className="pl-2">{"ℓ_entry,i = (k/2)·ln(1−c_i),    ℓ_exit,i = (1/2)·ln(1−c_i)"}</p>
+        <p>
+          とします。入り倍率 k は月曜寄りの広い板を模した外生パラメータです。日足高安だけでは寄り付きスプレッドを
+          分離できないため、既定1.5は推定値ではなく感度分析の基準点です。B&H の期間先頭買い・末尾売りにも
+          entry / exit の同じ係数を適用します。
         </p>
         <p>
-          ただしコスト推定そのものが誤差の大きい推定量です（Corwin-Schultz は日足高安からの逆算で、
-          薄い銘柄では負値も出て0にクリップされる）。そこで主役に置くのが<span className="font-medium">損益分岐コスト</span>です。
+          c<sub>i</sub> は Corwin–Schultz（CS）または Abdi–Ranaldo（AR）のローリング系列です。
+          両推定量は表示日 j の計算に j+1 日の高安を使うため、約定日 i には推定点 i−2 を割り当てます。
+          最後に参照する価格日は i−1 となり、約定日の値動きとコストが同じ未来情報を共有しません。
+          これは「昨日までの道路状況だけで今日の通行料を決める」1日ラグです。
         </p>
-        <p className="pl-2">{"c*      = mean(e_w)                 … 期待値がゼロになる往復コスト"}</p>
-        <p className="pl-2">{"c*(95%) = mean(e_w) − 1.645·σ/√n    … 片側5%で有意でなくなる往復コスト"}</p>
+        <p>
+          週ごとの週末回避価値を v<sub>w</sub>、時変・非対称な純コストを k<sub>w</sub> とすると、
+          定数モデルの bp 表示とは別に、コスト系列を何倍まで吸収できるかを
+        </p>
+        <p className="pl-2">{"λ* = Σ_w v_w / Σ_w k_w"}</p>
+        <p>
+          で表示します。λ*=1 が推定系列をちょうど払える境界、1未満は全額を吸収できない状態です。
+          λ(95%) は {"mean(v−λk)−1.645·sd(v−λk)/√n=0"} を数値的に解いた片側95%境界です。
+          従来の c* と c*(95%) は比較可能性のため「定数・対称コストへ換算した参考値」として残します。
+        </p>
         <ul className="list-disc pl-4 space-y-1">
-          <li>
-            c* が正なら「往復◯bp まで吸収できる」の意味。自分の証券会社の実額と突き合わせるだけで判断が完結します。
-          </li>
-          <li>
-            <span className="font-medium">c* が負なら、コストをゼロにしても B&H に届きません</span>。
-            吸収できるコストは存在せず、手数料の多寡は結論を変えません。
-          </li>
-          <li>
-            c*(95%) が負なら「コストゼロでも有意でない」。c* が正でも c*(95%) が負なら、
-            エッジの点推定は正だが誤差に埋もれている状態です。
-          </li>
-          <li>
-            低ボラ銘柄ほど同じコストが相対的に大きく効きます（感度は <span className="font-mono">c/σ</span> と n で決まる）。
-            単一の閾値でなく c* で考えるべき理由のひとつです。
-          </li>
+          <li>Cov(v<sub>w</sub>, k<sub>w</sub>) が正なら、回避価値が大きい週ほど通行料も高い傾向です。</li>
+          <li>CS は負値を0へクリップするため右に歪みます。ARへ切り替え、結論の感度を確認してください。</li>
+          <li>Bootstrap は v と k を別々に引き直さず、合成後の系列をブロック再標本化するため時系列相関を保ちます。</li>
+          <li>c* が負、または λ* が負なら、コストゼロでも B&H に届かず吸収余地はありません。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">6. 結果の読み方</p>
@@ -554,10 +665,10 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
 
         <p className="font-medium text-gray-700 mt-3">7. 検定どうしの結論が割れたとき</p>
         <p>
-          3つの検定はコストに対する感度が違うので、コストを控除すると結論が割れることがあります。
-          t は解析的に <span className="font-mono">Δt = −c√n/σ</span> だけ動きますが、Wilcoxon はそれより鈍く、
-          符号検定が最も鈍い（<span className="font-mono">0 &lt; e &lt; c</span> の帯に入る週の数しか動かないため）。
-          順位検定は「大きさ」を捨てるぶんコストに対して柔らかいのです。
+          検定はコストへの感度が違うため、控除後に結論が割れることがあります。定数モデルの t は
+          <span className="font-mono">Δt = −c√n/σ</span> の純粋な位置シフトですが、時変モデルでは
+          Var(k) と Cov(v,k) も分散へ入り、この式どおりには動きません。Wilcoxon と符号検定は
+          大きさを順位・符号へ落とすため、同じコスト系列でも t と異なる反応をします。
         </p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
@@ -585,7 +696,7 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
           <li>建て/手仕舞いのタイミング（始値/終値）を切り替え、どの区切りが最も優位かを比較できます。</li>
           <li>Sharpeが改善しても総リターンが劣る場合は、余った現金（週末）を別資産に回すことで初めて実利になります。</li>
           <li>
-            採用の最低条件は「損益分岐 c* が自分の往復コストより大きい」こと。c* が負なら検討する意味はありません。
+            定数モデルでは c* が自分の往復コストより大きいこと、時変モデルでは λ*&gt;1 が最低条件です。どちらも期間・推定量を変えて再現するか確認してください。
           </li>
         </ul>
 
@@ -597,13 +708,12 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
             上の Break-even パネルを必ず見てから他の数値を読んでください。
           </li>
           <li>
-            <span className="font-medium">コストは定数と仮定</span>: 実際のスプレッドは時変で、
-            危機週は週末ギャップも大きくスプレッドも広い（正の相関）。つまり戦略は
-            「週末回避の価値が最大の週」に最も高い通行料を払います。定数モデルはこの相関を構造的に見落とします。
+            <span className="font-medium">日足推定の限界</span>: CS/AR は日中平均に近い粗い推定で、実際の月曜寄り・金曜引けの板、
+            スリッページ、市場インパクトを観測していません。窓と推定量を変えた感度分析が必要です。
           </li>
           <li>
-            <span className="font-medium">レグは対称と仮定</span>: 月曜寄りは週で最もスプレッドが広い瞬間
-            （週末情報を織り込む寄り付き板）なので、対称な c/2 は入りのコストを過小評価している可能性があります。
+            <span className="font-medium">入り倍率 k は外生</span>: 既定1.5に統計的根拠はありません。k=1〜3を動かし、
+            結論が特定の値だけで成立していないか確認してください。
           </li>
           <li>
             <span className="font-medium">スリッページ・市場インパクト・税は含みません</span>。

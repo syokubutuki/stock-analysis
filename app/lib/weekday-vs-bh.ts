@@ -28,9 +28,16 @@
 import { PricePoint } from "./types";
 import { runStrategyTrades, type Timing } from "./weekday-trade";
 import { mean, std, quantileSorted, median, tTest } from "./stats-significance";
-import { representativeSpread } from "./spread-estimator";
+import {
+  estimateSpread,
+  representativeSpread,
+  type SpreadEstimator,
+} from "./spread-estimator";
+import { proportionalLegLogCost } from "./strategy-vs-benchmark";
 
 export type { Timing };
+export type CostMode = "constant" | "time-varying";
+export type LegKind = "entry" | "exit";
 
 export interface VsBHSpec {
   entryTiming: Timing; // 月曜の建て（始値/終値）
@@ -38,6 +45,13 @@ export interface VsBHSpec {
   // 往復コスト（比率）= 往復スプレッド + 2×片道手数料。既定 0（＝控除なし・従来の値）。
   // strategy-vs-benchmark.ts の roundTripCost() と同じ規約で作った値を渡すこと。
   costRT?: number;
+  costEnabled?: boolean;
+  costMode?: CostMode;
+  spreadEstimator?: SpreadEstimator;
+  spreadWindow?: number;
+  feeBps?: number; // 片道手数料。時変モデルでは日次スプレッドへ往復分を加える
+  // 入りの外生倍率 k。既定1（対称・後方互換）。UIの感度分析基準点は1.5。
+  entryCostMultiplier?: number;
 }
 
 // ---------- 数値ユーティリティ ----------
@@ -166,6 +180,23 @@ export interface BreakevenInfo {
   annualDragAtSpread: number; // 推定スプレッドで年間いくら削られるか（対数、正値）
 }
 
+export interface CostDynamicsInfo {
+  mode: CostMode;
+  estimator: SpreadEstimator;
+  window: number;
+  lagDays: number; // 約定日から見て最後に使う価格日までの完全なラグ
+  entryMultiplier: number;
+  averageBaseCostRT: number;
+  meanWeeklyCostLog: number;
+  sdWeeklyCostLog: number;
+  covarianceValueCost: number;
+  sigmaCostOverValue: number;
+  pathScaleMean: number | null; // λ*=Σv_w/Σk_w
+  pathScaleSig95: number; // 片側95%下限が0になるコスト系列倍率。0ならλ=0でも非有意
+  warmupLegs: number;
+  pathAgreementError: number; // 経路A/Bの適用コスト総和の差（絶対値）
+}
+
 export interface VsBHResult {
   meta: {
     entryTiming: Timing;
@@ -173,7 +204,9 @@ export interface VsBHResult {
     nDays: number;
     years: number;
     nWeeks: number;
-    costRT: number; // 実際に適用した往復コスト
+    costRT: number; // 定数モデルの c、時変モデルでは約定日の平均ベース c_t
+    costApplied: boolean;
+    costMode: CostMode;
     roundTrips: number; // 期間内の戦略側往復回数（レグ数/2）
   };
   metrics: { strat: Metrics; bh: Metrics };
@@ -183,6 +216,7 @@ export interface VsBHResult {
   sharpe: SharpeDiffTest;
   annual: AnnualDiffTest;
   breakeven: BreakevenInfo;
+  costDynamics: CostDynamicsInfo;
 }
 
 // ---------- 指標計算 ----------
@@ -210,6 +244,38 @@ function bootStats(dailyRet: number[]): { annual: number; sharpe: number } {
   return { annual: Math.exp(252 * meanLog) - 1, sharpe: s > 0 ? (m / s) * Math.sqrt(252) : 0 };
 }
 
+function sampleCovariance(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  if (n < 2) return 0;
+  const ma = mean(a.slice(0, n)), mb = mean(b.slice(0, n));
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += (a[i] - ma) * (b[i] - mb);
+  return sum / (n - 1);
+}
+
+// 時変コスト系列 k_w を一律に λ 倍したとき、片側95%下限
+// mean(v−λk)−1.645·sd(v−λk)/√n が0になる λ。λ=0でも非有意なら0を返す。
+function significantCostScale95(value: number[], cost: number[]): number {
+  const n = Math.min(value.length, cost.length);
+  if (n < 2) return 0;
+  const lower = (lambda: number) => {
+    const net = new Array(n);
+    for (let i = 0; i < n; i++) net[i] = value[i] - lambda * cost[i];
+    return mean(net) - 1.645 * std(net) / Math.sqrt(n);
+  };
+  if (lower(0) <= 0) return 0;
+  let hi = 1;
+  while (hi < 1024 && lower(hi) > 0) hi *= 2;
+  if (lower(hi) > 0) return hi;
+  let lo = 0;
+  for (let iter = 0; iter < 60; iter++) {
+    const mid = (lo + hi) / 2;
+    if (lower(mid) > 0) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 // ---------- メイン ----------
 export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 20260710): VsBHResult | null {
   const n = prices.length;
@@ -233,23 +299,68 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
   }
 
   // ===== 取引コスト =====
-  // 建玉 pos[] が変化する区間の先頭＝約定。そこに片道1レグを立てる。
-  // legs[s] は「区間 s の先頭で発生するレグ数」、legs[nSeg] は期間末に建玉が残っていた場合の手仕舞い。
-  const costRT = Number.isFinite(spec.costRT) && (spec.costRT as number) > 0
+  // legKind[s] は区間 s の先頭の約定方向、legCostLog[s] は実際に両経路が引く唯一の配列。
+  // 時変推定値のラベル j は CS/AR とも prices[j+1] まで使うため、約定日 i には
+  // 推定点 i-2 を対応させる。参照する最後の価格日は i-1 となり、完全な1日ラグを確保する。
+  const costMode = spec.costMode ?? "constant";
+  const spreadEstimator = spec.spreadEstimator ?? "cs";
+  const spreadWindow = Number.isFinite(spec.spreadWindow)
+    ? Math.min(252, Math.max(5, Math.round(spec.spreadWindow as number)))
+    : 21;
+  const entryMultiplier = Number.isFinite(spec.entryCostMultiplier)
+    ? Math.min(5, Math.max(0.25, spec.entryCostMultiplier as number))
+    : 1;
+  const constantCostRT = Number.isFinite(spec.costRT) && (spec.costRT as number) > 0
     ? Math.min(0.5, spec.costRT as number)
     : 0;
-  const halfLegLog = costRT > 0 ? Math.log(1 - costRT) / 2 : 0; // 1レグ＝ln(1−c)/2（2レグで厳密に ln(1−c)）
-  const legs = new Array(nSeg + 1).fill(0);
-  {
-    let prevP = 0;
-    for (let s = 0; s < nSeg; s++) {
-      if (pos[s] !== prevP) legs[s] += 1;
-      prevP = pos[s];
+  const feeRT = Number.isFinite(spec.feeBps) && (spec.feeBps as number) > 0
+    ? Math.min(0.5, ((spec.feeBps as number) * 2) / 10000)
+    : 0;
+  const costEnabled = spec.costEnabled ?? (costMode === "time-varying" || constantCostRT > 0);
+
+  const laggedSpread: Array<number | null> = new Array(n).fill(null);
+  if (costMode === "time-varying") {
+    const spreadByTime = new Map(
+      estimateSpread(prices, spreadWindow).map((point) => [point.time, point[spreadEstimator]]),
+    );
+    for (let i = 2; i < n; i++) {
+      const value = spreadByTime.get(prices[i - 2].time);
+      if (Number.isFinite(value) && (value as number) >= 0) laggedSpread[i] = value as number;
     }
-    if (prevP !== 0) legs[nSeg] += 1; // 最終週が期間末で切れている場合に畳む
   }
-  let totalLegs = 0;
-  for (const v of legs) totalLegs += v;
+  const baseCostRTByDay = new Array(n).fill(0).map((_, i) => {
+    const spread = costMode === "time-varying" ? (laggedSpread[i] ?? 0) : constantCostRT;
+    return Math.min(0.5, Math.max(0, spread + (costMode === "time-varying" ? feeRT : 0)));
+  });
+
+  const legKind: Array<LegKind | null> = new Array(nSeg + 1).fill(null);
+  const modeledLegCostLog = new Array(nSeg + 1).fill(0);
+  const legCostLog = new Array(nSeg + 1).fill(0);
+  let prevP = 0;
+  for (let s = 0; s < nSeg; s++) {
+    if (pos[s] !== prevP) {
+      const kind: LegKind = pos[s] === 1 ? "entry" : "exit";
+      legKind[s] = kind;
+      const weight = kind === "entry" ? entryMultiplier / 2 : 0.5;
+      modeledLegCostLog[s] = proportionalLegLogCost(baseCostRTByDay[Math.floor(s / 2)], weight);
+      if (costEnabled) legCostLog[s] = modeledLegCostLog[s];
+    }
+    prevP = pos[s];
+  }
+  if (prevP !== 0) {
+    legKind[nSeg] = "exit";
+    modeledLegCostLog[nSeg] = proportionalLegLogCost(baseCostRTByDay[n - 1], 0.5);
+    if (costEnabled) legCostLog[nSeg] = modeledLegCostLog[nSeg];
+  }
+  const totalLegs = legKind.reduce((sum, kind) => sum + (kind ? 1 : 0), 0);
+  const legBaseCosts = legKind.flatMap((kind, s) =>
+    kind ? [baseCostRTByDay[Math.min(n - 1, Math.floor(s / 2))]] : [],
+  );
+  const warmupLegs = costMode === "time-varying"
+    ? legKind.reduce((sum, kind, s) =>
+        sum + (kind && laggedSpread[Math.min(n - 1, Math.floor(s / 2))] === null ? 1 : 0), 0)
+    : 0;
+  const averageBaseCostRT = legBaseCosts.length ? mean(legBaseCosts) : 0;
 
   // 日次リターン系列（戦略 / B&H）を区間から再構成。dailyW は各営業日の終値時点の富。
   // 約定日（月曜・金曜）に課金するので dailyStrat にのこぎり状の成分が入り σ がわずかに増える。
@@ -262,16 +373,20 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
   const equity: EquityRow[] = [];
   let prevWs = 1, prevWb = 1;
   let held = 0;
-  // B&H も現実には建てて畳むので期間全体で1往復ぶんを払う（回転率の非対称性を誠実に出すため）。
-  Wb *= Math.exp(halfLegLog); // 期間先頭の買い付け
+  // B&H も期間先頭の entry / 末尾の exit とし、戦略と同じ日別系列・非対称係数を使う。
+  const modeledBHEntryLog = proportionalLegLogCost(baseCostRTByDay[0], entryMultiplier / 2);
+  const modeledBHExitLog = proportionalLegLogCost(baseCostRTByDay[n - 1], 0.5);
+  const bhEntryLog = costEnabled ? modeledBHEntryLog : 0;
+  const bhExitLog = costEnabled ? modeledBHExitLog : 0;
+  Wb *= Math.exp(bhEntryLog);
   for (let s = 0; s < nSeg; s++) {
     const r = Math.exp(segs[s].logret) - 1; // 区間の簡易リターン
     Wb *= 1 + r;
-    if (legs[s] > 0) Ws *= Math.exp(halfLegLog * legs[s]); // 区間先頭で約定＝片道課金
+    if (legCostLog[s] !== 0) Ws *= Math.exp(legCostLog[s]); // 単一のレグコスト配列から課金
     if (pos[s] === 1) { Ws *= 1 + r; held++; }
     if (s === nSeg - 1) {
-      if (legs[nSeg] > 0) Ws *= Math.exp(halfLegLog * legs[nSeg]);
-      Wb *= Math.exp(halfLegLog); // 期間末尾の売却
+      if (legCostLog[nSeg] !== 0) Ws *= Math.exp(legCostLog[nSeg]);
+      Wb *= Math.exp(bhExitLog);
     }
     if (segs[s].isClose) {
       const i = s / 2; // 営業日index
@@ -291,12 +406,15 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
   // 超過 e_w = 戦略_w − B&H_w = −(捨てた区間 [X_w, nextE-1])。
   const excessLog: number[] = []; // e_w（対数, コスト後）
   const excessSimple: number[] = []; // e_w（簡易, コスト後。表示・頑健検定用）
-  const excessGross: number[] = []; // e_w（簡易, コスト前。Break-even の算出用）
+  const excessGross: number[] = []; // e_w（簡易, コスト前。定数換算Break-even用）
+  const valueLog: number[] = []; // v_w = コスト前の週次超過（対数）
+  const weeklyCostLog: number[] = []; // k_w = 時変・非対称コストの週次純ドラッグ（正値）
   const skipLog: number[] = []; // 捨てた区間の合計対数（週あたり）
   const weekendGaps: number[] = []; // 金終値→次営業日始値の単一区間（参考）
   // B&H の1往復を週へ均等配分する。週次系列を均質に保つため（Wilcoxon・符号検定は標本の均質性を仮定）。
   // 金額としては ln(1−c)/446週 で無視できるが、経路A/Bの不変量を厳密に成立させるために入れる。
-  const bhShare = trades.length > 0 ? (halfLegLog * 2) / trades.length : 0;
+  const bhShare = trades.length > 0 ? (bhEntryLog + bhExitLog) / trades.length : 0;
+  const modeledBHShare = trades.length > 0 ? (modeledBHEntryLog + modeledBHExitLog) / trades.length : 0;
   for (let w = 0; w < trades.length; w++) {
     const tr = trades[w];
     const E = 2 * tr.entryIdx + (spec.entryTiming === "open" ? 0 : 1);
@@ -313,14 +431,22 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
     }
     // 経路Bと同一のレグ数で課金する（週の範囲 [E, nextE) に落ちるレグ。最終週は期間末の手仕舞いも含む）。
     // これにより Σ_w の合計が経路Bの総コストと厳密に一致し、§7.2 の不変量が成り立つ。
-    let legLog = 0;
-    for (let s = E; s < nextE && s < nSeg; s++) legLog += halfLegLog * legs[s];
-    if (isLast) legLog += halfLegLog * legs[nSeg];
+    let legLog = 0, modeledLegLog = 0;
+    for (let s = E; s < nextE && s < nSeg; s++) {
+      legLog += legCostLog[s];
+      modeledLegLog += modeledLegCostLog[s];
+    }
+    if (isLast) {
+      legLog += legCostLog[nSeg];
+      modeledLegLog += modeledLegCostLog[nSeg];
+    }
     // 対数側で引いてから exp する。単利側を −c で引くと O(c²) の不整合が生じ、
     // 同じコストのはずの①と③が違う結論を出す（§7.1）。
     excessLog.push(sHeld - sAll + legLog - bhShare);
     excessSimple.push(Math.exp(sHeld + legLog) - Math.exp(sAll + bhShare));
     excessGross.push(Math.exp(sHeld) - Math.exp(sAll));
+    valueLog.push(sHeld - sAll);
+    weeklyCostLog.push(-(modeledLegLog - modeledBHShare));
     skipLog.push(sSkip);
     // 金曜終値の直後の区間（overnight_exitIdx）＝週末ギャップ
     const gapOrd = 2 * tr.exitIdx + 1;
@@ -355,23 +481,48 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
   // ===== 4) 年率差Bootstrap CI =====
   const annual = annualDiffTest(dailyStrat, dailyBH, seed + 2);
 
-  // ===== Break-even（コスト前の e_w から算出。costRT の値には依らない）=====
+  // ===== Break-even と時変コスト診断 =====
   const years = n / 252;
   const roundTrips = totalLegs / 2;
   const gMean = mean(excessGross);
   const gSd = std(excessGross);
-  const spreadRT = representativeSpread(prices);
+  const spreadRT = representativeSpread(prices, spreadWindow, spreadEstimator);
+  const weeklyCostMean = mean(weeklyCostLog);
+  const weeklyCostSd = std(weeklyCostLog);
+  const valueSd = std(valueLog);
+  const pathACostLog = excessLog.reduce((sum, value) => sum + value, 0)
+    - valueLog.reduce((sum, value) => sum + value, 0);
+  const pathBCostLog = legCostLog.reduce((sum, value) => sum + value, 0) - bhEntryLog - bhExitLog;
+  const costDynamics: CostDynamicsInfo = {
+    mode: costMode,
+    estimator: spreadEstimator,
+    window: spreadWindow,
+    lagDays: 1,
+    entryMultiplier,
+    averageBaseCostRT,
+    meanWeeklyCostLog: weeklyCostMean,
+    sdWeeklyCostLog: weeklyCostSd,
+    covarianceValueCost: sampleCovariance(valueLog, weeklyCostLog),
+    sigmaCostOverValue: valueSd > 0 ? weeklyCostSd / valueSd : 0,
+    pathScaleMean: weeklyCostMean > 0 ? mean(valueLog) / weeklyCostMean : null,
+    pathScaleSig95: weeklyCostMean > 0 ? significantCostScale95(valueLog, weeklyCostLog) : 0,
+    warmupLegs,
+    pathAgreementError: Math.abs(pathACostLog - pathBCostLog),
+  };
+  const modeledStrategyCostTotal = -modeledLegCostLog.reduce((sum, value) => sum + value, 0);
+  const annualDragAtSpread = costMode === "time-varying"
+    ? (years > 0 ? modeledStrategyCostTotal / years : 0)
+    : spreadRT > 0 && spreadRT < 1 && years > 0
+      ? -Math.log(1 - spreadRT) * ((entryMultiplier + 1) / 2) * (roundTrips / years)
+      : 0;
   const breakeven: BreakevenInfo = {
+    // 定数・対称モデルへ換算した従来の c*。時変モデルの主指標は costDynamics.pathScaleMean。
     perRoundTripMean: gMean,
-    // 片側5%（z=1.645）で有意でなくなる往復コスト。負なら「コストゼロでも有意でない」。
     perRoundTripSig95: nWeeks > 1 ? gMean - 1.645 * (gSd / Math.sqrt(nWeeks)) : gMean,
     tripsPerYearStrat: years > 0 ? roundTrips / years : 0,
     tripsPerYearBH: years > 0 ? 1 / years : 0,
     spreadRT,
-    annualDragAtSpread:
-      spreadRT > 0 && spreadRT < 1 && years > 0
-        ? -Math.log(1 - spreadRT) * (roundTrips / years)
-        : 0,
+    annualDragAtSpread,
   };
 
   return {
@@ -381,7 +532,9 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
       nDays: n,
       years,
       nWeeks,
-      costRT,
+      costRT: costMode === "constant" ? constantCostRT : averageBaseCostRT,
+      costApplied: costEnabled && (modeledStrategyCostTotal > 0 || modeledBHEntryLog < 0 || modeledBHExitLog < 0),
+      costMode,
       roundTrips,
     },
     metrics: { strat: metricsStrat, bh: metricsBH },
@@ -391,6 +544,7 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
     sharpe,
     annual,
     breakeven,
+    costDynamics,
   };
 }
 

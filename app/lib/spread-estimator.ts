@@ -12,6 +12,8 @@ export interface SpreadPoint {
   amihud: number; // Amihud非流動性（×1e6, スケール済）
 }
 
+export type SpreadEstimator = "cs" | "ar";
+
 const K = 3 - 2 * Math.sqrt(2);
 
 // 1日ペア (t, t+1) の Corwin-Schultz スプレッド推定。
@@ -76,11 +78,15 @@ export function estimateSpread(prices: PricePoint[], window = 21): SpreadPoint[]
   return out;
 }
 
-// 取引コスト控除用の代表スプレッド（割合, 片道）。ローリングCSスプレッドの中央値を
-// 頑健な推定として返す。バックテストのコスト控除のデフォルト値に使う。
-export function representativeSpread(prices: PricePoint[], window = 21): number {
+// 取引コスト控除用の代表スプレッド（割合）。選択したローリング推定量の中央値を
+// 頑健な代表値として返す。既定の CS は従来呼び出しと同値。
+export function representativeSpread(
+  prices: PricePoint[],
+  window = 21,
+  estimator: SpreadEstimator = "cs",
+): number {
   const series = estimateSpread(prices, window);
-  const vals = series.map((s) => s.cs).filter((v) => v > 0 && isFinite(v)).sort((a, b) => a - b);
+  const vals = series.map((s) => s[estimator]).filter((v) => v > 0 && isFinite(v)).sort((a, b) => a - b);
   if (vals.length === 0) return 0;
   return vals[Math.floor(vals.length / 2)];
 }

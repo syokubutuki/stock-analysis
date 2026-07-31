@@ -38,6 +38,15 @@ export function roundTripCost(c: CostModel): number {
   return Math.min(0.5, Math.max(0, total));
 }
 
+// 往復コスト c を対数富の控除へ変換する共通規約。
+// weight=1/2 なら対称な片道1レグ、entryMultiplier=k の入りは weight=k/2 とする。
+// 時変コストでも各約定日の c_t をこの関数へ渡せば、定数モデルを特殊ケースとして保てる。
+export function proportionalLegLogCost(costRT: number, weight = 0.5): number {
+  const safeCost = Number.isFinite(costRT) && costRT > 0 ? Math.min(0.5, costRT) : 0;
+  const safeWeight = Number.isFinite(weight) && weight > 0 ? weight : 0;
+  return safeCost > 0 && safeWeight > 0 ? Math.log(1 - safeCost) * safeWeight : 0;
+}
+
 // ───────────────────────── パフォーマンス統計 ─────────────────────────
 
 export interface PerfStats {
