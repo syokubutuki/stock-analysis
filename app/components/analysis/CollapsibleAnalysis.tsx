@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 import { OPEN_PANEL_EVENT, type OpenPanelDetail } from "../../lib/panel-nav";
 
 interface Props {
@@ -21,6 +22,18 @@ interface Props {
 }
 
 const storageKey = (id: string) => `sa:open:${id}`;
+
+function updatePanelQuery(id: string, open: boolean) {
+  const url = new URL(window.location.href);
+  if (open) {
+    url.searchParams.set("panel", id);
+  } else if (url.searchParams.get("panel") === id) {
+    url.searchParams.delete("panel");
+  } else {
+    return;
+  }
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
 
 /**
  * 分析ひとつを折りたたみ可能なパネルで包む。
@@ -70,6 +83,8 @@ export default function CollapsibleAnalysis({
       try {
         localStorage.setItem(storageKey(id), next ? "1" : "0");
       } catch {}
+      updatePanelQuery(id, next);
+      if (next) track("panel_open", { panel: id });
       return next;
     });
   };
@@ -85,6 +100,8 @@ export default function CollapsibleAnalysis({
       try {
         localStorage.setItem(storageKey(id), "1");
       } catch {}
+      updatePanelQuery(id, true);
+      track("panel_open", { panel: id });
       requestAnimationFrame(() =>
         sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
       );

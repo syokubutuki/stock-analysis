@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { track } from "@vercel/analytics";
 import { useAnalysisData, PeriodKey } from "./hooks/useAnalysisData";
 import PeriodSelector from "./components/analysis/PeriodSelector";
 import SeriesModeSelector from "./components/analysis/SeriesModeSelector";
@@ -1103,12 +1104,28 @@ const SERIES_AWARE_SECTIONS = new Set<SectionKey>([
   "simulation", "quantum",
 ]);
 
+const SECTION_KEYS = new Set<SectionKey>(SECTIONS.map(({ key }) => key));
+const PERIOD_KEYS = new Set<PeriodKey>(["1m", "3m", "6m", "1y", "2y", "3y", "5y", "10y"]);
+const SERIES_MODES = new Set<SeriesMode>([
+  "close", "diff", "logReturn", "open", "overnightReturn", "intradayReturn",
+]);
+const DEFAULT_TICKER = "7203.T";
+const PANEL_ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
+
+function replacePanelParam(panel: string | null) {
+  const url = new URL(window.location.href);
+  if (panel) url.searchParams.set("panel", panel);
+  else url.searchParams.delete("panel");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function AnalysisPage() {
   const { data, allPrices, filteredPrices, loading, error, fetchStock, period, setPeriod } =
     useAnalysisData();
   const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [seriesMode, setSeriesMode] = useState<SeriesMode>("close");
   const [tickerInput, setTickerInput] = useState("");
+  const [restored, setRestored] = useState(false);
   // 折りたたみ節: 一括開閉（アクティブ節で共有）
   const [sectionBulk, setSectionBulk] = useState<{ nonce: number; open: boolean }>({
     nonce: 0,
@@ -1123,27 +1140,100 @@ export default function AnalysisPage() {
   const [showFloat, setShowFloat] = useState(false);
   const headerBarRef = useRef<HTMLDivElement>(null);
 
-  // 初回マウント時に前回の状態（銘柄・セクション・系列モード・期間）を復元する
+  // 初回マウント時は共有URLを最優先し、不足する項目だけ前回状態で補う。
+  // 初回利用者には既定銘柄を読み込み、空の分析画面を見せない。
   const restoredRef = useRef(false);
+  const initialPanelRef = useRef<string | null>(null);
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const urlSection = params.get("sec") as SectionKey | null;
+    const urlMode = params.get("mode") as SeriesMode | null;
+    const urlPeriod = params.get("period") as PeriodKey | null;
+    const urlTicker = params.get("ticker")?.trim() || null;
+    const urlPanel = params.get("panel");
+
+    let savedSection: SectionKey | null = null;
+    let savedMode: SeriesMode | null = null;
+    let savedPeriod: PeriodKey | null = null;
+    let savedTicker: string | null = null;
     try {
-      const savedSection = localStorage.getItem("sa:section") as SectionKey | null;
-      const savedMode = localStorage.getItem("sa:seriesMode") as SeriesMode | null;
-      const savedPeriod = localStorage.getItem("sa:period") as PeriodKey | null;
-      const savedTicker = localStorage.getItem("sa:lastTicker");
-      if (savedSection) setActiveSection(savedSection);
-      if (savedMode) setSeriesMode(savedMode);
-      if (savedPeriod) setPeriod(savedPeriod);
-      if (savedTicker) {
-        setTickerInput(savedTicker);
-        fetchStock(savedTicker);
-      }
+      savedSection = localStorage.getItem("sa:section") as SectionKey | null;
+      savedMode = localStorage.getItem("sa:seriesMode") as SeriesMode | null;
+      savedPeriod = localStorage.getItem("sa:period") as PeriodKey | null;
+      savedTicker = localStorage.getItem("sa:lastTicker");
     } catch {
       // localStorage 利用不可（プライベートモード等）の場合は無視
     }
+
+    const nextSection = SECTION_KEYS.has(urlSection as SectionKey)
+      ? urlSection
+      : SECTION_KEYS.has(savedSection as SectionKey) ? savedSection : "basic";
+    const nextMode = SERIES_MODES.has(urlMode as SeriesMode)
+      ? urlMode
+      : SERIES_MODES.has(savedMode as SeriesMode) ? savedMode : "close";
+    const nextPeriod = PERIOD_KEYS.has(urlPeriod as PeriodKey)
+      ? urlPeriod
+      : PERIOD_KEYS.has(savedPeriod as PeriodKey) ? savedPeriod : "6m";
+    const nextTicker = urlTicker ?? savedTicker?.trim() ?? DEFAULT_TICKER;
+
+    setActiveSection(nextSection ?? "basic");
+    setSeriesMode(nextMode ?? "close");
+    setPeriod(nextPeriod ?? "6m");
+    setTickerInput(nextTicker);
+
+    if (urlPanel && PANEL_ID_PATTERN.test(urlPanel)) {
+      initialPanelRef.current = urlPanel;
+      try { localStorage.setItem(`sa:open:${urlPanel}`, "1"); } catch {}
+    }
+    fetchStock(nextTicker);
+    setRestored(true);
   }, [fetchStock, setPeriod]);
+
+  // 現在の分析状態を共有可能なURLへ反映する。パネルIDは共通ラッパーが管理するため、
+  // ここでは既存の panel パラメータを保ったまま他の状態だけを同期する。
+  useEffect(() => {
+    if (!restored || !data?.ticker) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("ticker", data.ticker);
+    url.searchParams.set("sec", activeSection);
+    url.searchParams.set("period", period);
+    url.searchParams.set("mode", seriesMode);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [activeSection, data?.ticker, period, restored, seriesMode]);
+
+  // 共有URLで指定されたパネルを、データ取得とセクション描画の完了後に表示する。
+  useEffect(() => {
+    const panel = initialPanelRef.current;
+    if (!panel || !data?.ticker) return;
+    let tries = 0;
+    const tick = () => {
+      const el = document.getElementById(`panel-${panel}`);
+      if (el) {
+        initialPanelRef.current = null;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.add("sa-flash");
+        setTimeout(() => el.classList.remove("sa-flash"), 1200);
+        return;
+      }
+      if (tries++ < 60) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [activeSection, data?.ticker]);
+
+  const submitTicker = useCallback((ticker: string) => {
+    const normalized = ticker.trim();
+    if (!normalized) return;
+    track("search_ticker", { ticker: normalized });
+    fetchStock(normalized);
+  }, [fetchStock]);
+
+  const changeSection = useCallback((section: SectionKey) => {
+    replacePanelParam(null);
+    setActiveSection(section);
+    track("section_change", { section });
+  }, []);
 
   // 取得成功した銘柄・現在の表示状態を保存する
   useEffect(() => {
@@ -1209,6 +1299,7 @@ export default function AnalysisPage() {
     if (anchor) {
       try { localStorage.setItem(`sa:open:${anchor}`, "1"); } catch {}
     }
+    replacePanelParam(anchor ?? null);
     pendingScrollRef.current = anchor ?? null;
     setActiveSection(section as SectionKey);
   }, []);
@@ -1276,7 +1367,7 @@ export default function AnalysisPage() {
             <TickerSearchInput
               value={tickerInput}
               onChange={setTickerInput}
-              onSubmit={fetchStock}
+              onSubmit={submitTicker}
               loading={loading}
             />
             <WatchlistPanel
@@ -1309,7 +1400,7 @@ export default function AnalysisPage() {
               {SECTIONS.map(({ key, label, description }) => (
                 <button
                   key={key}
-                  onClick={() => setActiveSection(key)}
+                  onClick={() => changeSection(key)}
                   title={description}
                   className={`shrink-0 whitespace-nowrap px-3 py-1 text-sm rounded font-medium transition-colors ${
                     activeSection === key
@@ -1335,7 +1426,7 @@ export default function AnalysisPage() {
             <TickerSearchInput
               value={tickerInput}
               onChange={setTickerInput}
-              onSubmit={fetchStock}
+              onSubmit={submitTicker}
               loading={loading}
             />
           </div>
@@ -2103,7 +2194,7 @@ export default function AnalysisPage() {
           </>
         )}
 
-        {!data && !loading && !error && (
+        {restored && !data && !loading && !error && (
           <div className="py-12">
             <div className="max-w-4xl mx-auto">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">

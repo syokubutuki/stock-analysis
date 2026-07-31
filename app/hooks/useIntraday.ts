@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { track } from "@vercel/analytics";
 import { IntradayBar } from "../lib/intraday-core";
 
 export interface IntradayResponse {
@@ -30,6 +31,7 @@ export function fetchIntraday(ticker: string, interval: string): Promise<Intrada
   const running = inflight.get(key);
   if (running) return running;
 
+  track("intraday_fetch", { ticker, interval });
   const p = fetch(`/api/intraday?ticker=${encodeURIComponent(ticker)}&interval=${interval}`)
     .then(async (r) => {
       const json = (await r.json()) as IntradayResponse;

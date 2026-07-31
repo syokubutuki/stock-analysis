@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@vercel/analytics";
 
 interface Props {
   title: string;
@@ -10,10 +11,18 @@ interface Props {
 export default function AnalysisGuide({ title, children }: Props) {
   const [open, setOpen] = useState(false);
 
+  const toggle = () => {
+    setOpen((current) => {
+      const next = !current;
+      if (next) track("guide_open", { guide: title });
+      return next;
+    });
+  };
+
   return (
     <div className="mt-3 border-t border-gray-100 pt-2">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
       >
         <span

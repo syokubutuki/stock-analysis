@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { track } from "@vercel/analytics";
 import {
   WatchlistItem,
   getWatchlist,
@@ -25,6 +26,8 @@ export default function WatchlistPanel({
 
   // Hydrate from localStorage on mount
   useEffect(() => {
+    // SSR時はwindowがないため、マウント後に端末の保存内容へ同期する必要がある。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWatchlist(getWatchlist());
   }, []);
 
@@ -51,6 +54,7 @@ export default function WatchlistPanel({
       setWatchlist(removeFromWatchlist(currentTicker));
     } else {
       setWatchlist(addToWatchlist(currentTicker, currentName ?? currentTicker));
+      track("watchlist_add", { ticker: currentTicker });
     }
   }
 
