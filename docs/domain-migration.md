@@ -76,13 +76,15 @@ https://stock-analysis-self.vercel.app/domain-migration  200（告知期間中�
 
 ## Phase 5: Search Console
 
-- [ ] 旧ホストを301へ変更し、同一パスとクエリが維持されることを本番で確認
+- [x] 旧ホストを301へ変更し、同一パスとクエリが維持されることを本番で確認
 - [ ] `kabugenron.com` のDomainプロパティをDNS TXTで確認
 - [ ] 旧URLのURLプレフィックスプロパティを同じGoogleアカウントで所有者確認
 - [ ] 新しい `/sitemap.xml` を送信
 - [ ] 旧プロパティからアドレス変更を申請
 - [ ] 主要URLをURL検査
 - [ ] 旧・新のインデックス、検索流入、404を180日以上監視
+
+2026-08-01 に apex 200、www / 旧ホスト 301、旧ホストの `/domain-migration` 200、canonical・robots・sitemap、Vercel のエラー / 500 ログなしを本番で確認した。
 
 設定順序:
 
