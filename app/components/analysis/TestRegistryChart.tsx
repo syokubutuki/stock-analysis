@@ -28,7 +28,11 @@ export default function TestRegistryChart() {
   const [live, setLive] = useState<LiveLedger | null>(null);
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
-    setLive(liveLedger(alpha, effDivisor));
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setLive(liveLedger(alpha, effDivisor));
+    });
+    return () => { cancelled = true; };
   }, [alpha, effDivisor, nonce]);
 
   const sections = useMemo(() => {

@@ -77,21 +77,31 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
   // 計算リクエスト送信
   useEffect(() => {
     const worker = workerRef.current;
-    if (!worker || values.length < 60) {
-      if (values.length < 60) setLoading(false);
-      return;
+    if (!worker) return;
+    let cancelled = false;
+    if (values.length < 60) {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setResp(null);
+        setLoading(false);
+      });
+      return () => { cancelled = true; };
     }
     const reqId = ++reqIdRef.current;
-    setLoading(true);
-    worker.postMessage({
-      reqId,
-      values,
-      s: season,
-      horizon,
-      ranges: RANGES,
-      manualSpec,
-      topN: 8,
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      worker.postMessage({
+        reqId,
+        values,
+        s: season,
+        horizon,
+        ranges: RANGES,
+        manualSpec,
+        topN: 8,
+      });
     });
+    return () => { cancelled = true; };
   }, [values, season, horizon, manualSpec]);
 
   // season 変更時は手動指定をリセット

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import {
   conditionalForwardReturns,
@@ -37,11 +37,12 @@ export default function CustomBucketChart({ prices, minBars = 250 }: Props) {
   const [horizon, setHorizon] = useState(5);
   const [entry, setEntry] = useState<"close" | "open">("close");
 
-  // 指標切替時に既定パラメータ/閾値へリセット
-  useEffect(() => {
-    setParam(desc.defaultParam);
-    setThresholdText(desc.defaultThresholds.join(", "));
-  }, [metric, desc]);
+  const changeMetric = (nextMetric: CustomMetric) => {
+    const next = CUSTOM_METRICS.find((item) => item.value === nextMetric)!;
+    setMetric(nextMetric);
+    setParam(next.defaultParam);
+    setThresholdText(next.defaultThresholds.join(", "));
+  };
 
   const thresholds = useMemo(
     () =>
@@ -86,7 +87,7 @@ export default function CustomBucketChart({ prices, minBars = 250 }: Props) {
         {CUSTOM_METRICS.map((m) => (
           <button
             key={m.value}
-            onClick={() => setMetric(m.value)}
+            onClick={() => changeMetric(m.value)}
             className={`px-2.5 py-1 text-xs rounded font-medium ${metric === m.value ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
           >
             {m.label}

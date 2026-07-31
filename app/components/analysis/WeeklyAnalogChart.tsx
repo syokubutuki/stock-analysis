@@ -279,17 +279,22 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
   // C4: 設定の localStorage 永続化(銘柄非依存)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
-      if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
-      if (typeof s.dtwBandFrac === "number") setDtwBandFrac(s.dtwBandFrac);
-      if (typeof s.hlWeight === "number") setHlWeight(s.hlWeight);
-      if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K);
-      if (s.usMode) setUsMode(s.usMode); if (s.scheme) setScheme(s.scheme);
-    } catch { /* ignore */ }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
+        if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
+        if (typeof s.dtwBandFrac === "number") setDtwBandFrac(s.dtwBandFrac);
+        if (typeof s.hlWeight === "number") setHlWeight(s.hlWeight);
+        if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K);
+        if (s.usMode) setUsMode(s.usMode); if (s.scheme) setScheme(s.scheme);
+      } catch { /* ignore */ }
+    });
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ mode, metric, align, weight, volNorm, dtwBandFrac, hlWeight, L, H, K, usMode, scheme })); } catch { /* ignore */ }
@@ -594,7 +599,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
         <p className="font-medium text-gray-700 mt-3">2. 2つの絞り方</p>
         <ul className="list-disc pl-4 space-y-1">
           <li><strong>前夜米国ビンで絞る</strong>: 窓の起点(週初め)の前夜米国が指定ビン(例: 米大幅高)だった過去週だけを集める。「同じ地合いで始まった週はその後どうなったか」。米国ビンは各JP立会日に『寄り前で最後に確定した米国立会日(暦日が厳密に小さい最新)』のリターンを対応付けて層別(祝日・連休も自動整合)。</li>
-          <li><strong>似た形で絞る(アナログ)</strong>: 今週のリードイン形状に最も近い過去K局面を距離で探す。各窓を「窓末=0%の累積リターン列」にしz化(水準・ボラの差を吸収し"形"だけ比較)、距離が小さい順。</li>
+          <li><strong>似た形で絞る(アナログ)</strong>: 今週のリードイン形状に最も近い過去K局面を距離で探す。各窓を「窓末=0%の累積リターン列」にしz化(水準・ボラの差を吸収し「形」だけ比較)、距離が小さい順。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">2b. 形の距離: ユークリッド と DTW</p>

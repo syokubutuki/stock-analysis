@@ -42,13 +42,12 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
     }
     const q = value.trim();
     if (q.length < 2) {
-      setSuggestions([]);
-      setSearching(false);
+      abortRef.current?.abort();
       return;
     }
     if (!focusedRef.current) return;
-    setSearching(true);
     const handle = setTimeout(async () => {
+      setSearching(true);
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -68,6 +67,8 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
     }, 250);
     return () => clearTimeout(handle);
   }, [value]);
+
+  const effectiveOpen = open && value.trim().length >= 2;
 
   // 外側クリックで閉じる
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      if (open && highlight >= 0 && highlight < suggestions.length) {
+      if (effectiveOpen && highlight >= 0 && highlight < suggestions.length) {
         selectSuggestion(suggestions[highlight]);
         return;
       }
@@ -105,12 +106,12 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
         onSubmit(t);
       }
     },
-    [open, highlight, suggestions, value, onSubmit, selectSuggestion]
+    [effectiveOpen, highlight, suggestions, value, onSubmit, selectSuggestion]
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (!open || suggestions.length === 0) return;
+      if (!effectiveOpen || suggestions.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setHighlight((h) => (h + 1) % suggestions.length);
@@ -121,7 +122,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
         setOpen(false);
       }
     },
-    [open, suggestions]
+    [effectiveOpen, suggestions]
   );
 
   return (
@@ -145,7 +146,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
             placeholder="コード or 社名 (例: 9984, トヨタ, AAPL)"
             className="px-4 py-2 border border-gray-300 rounded-lg text-base w-52 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          {searching && (
+          {searching && value.trim().length >= 2 && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
               …
             </span>
@@ -160,7 +161,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
         </button>
       </form>
 
-      {open && suggestions.length > 0 && (
+      {effectiveOpen && suggestions.length > 0 && (
         <ul className="absolute z-50 left-0 top-full mt-1 w-72 max-w-[calc(100vw-2rem)] max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
           {suggestions.map((s, i) => (
             <li

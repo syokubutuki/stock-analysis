@@ -11,11 +11,12 @@ import { PortfolioData } from "./usePortfolioData";
 
 // 損切り警告 vs 機械ストップの出口比較。重いので run() の明示実行のみ。
 export function useStopCompare(data: PortfolioData, horizon: Horizon) {
-  const [result, setResult] = useState<StopCompareResult | null>(null);
-  const [running, setRunning] = useState(false);
+  const [storedResult, setStoredResult] = useState<StopCompareResult | null>(null);
+  const [runningState, setRunningState] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const workerRef = useRef<Worker | null>(null);
   const reqIdRef = useRef(0);
+  const [resultKey, setResultKey] = useState("");
 
   useEffect(() => {
     const worker = new Worker(
@@ -26,8 +27,8 @@ export function useStopCompare(data: PortfolioData, horizon: Horizon) {
       if (ev.data.reqId !== reqIdRef.current) return;
       if (ev.data.progress) setProgress(ev.data.progress);
       if (ev.data.result) {
-        setResult(ev.data.result);
-        setRunning(false);
+        setStoredResult(ev.data.result);
+        setRunningState(false);
       }
     };
     return () => {
@@ -37,11 +38,10 @@ export function useStopCompare(data: PortfolioData, horizon: Horizon) {
   }, []);
 
   const dataKey = Object.keys(data).sort().join(",");
-  useEffect(() => {
-    setResult(null);
-    setRunning(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataKey, horizon]);
+  const inputKey = `${dataKey}|${horizon}`;
+  const current = resultKey === inputKey;
+  const result = current ? storedResult : null;
+  const running = current && runningState;
 
   const run = useCallback(() => {
     const worker = workerRef.current;
@@ -51,11 +51,13 @@ export function useStopCompare(data: PortfolioData, horizon: Horizon) {
       .map(([ticker, v]) => ({ ticker, name: v.name, prices: v.prices }));
     if (jobs.length === 0) return;
     const reqId = ++reqIdRef.current;
-    setRunning(true);
+    setResultKey(inputKey);
+    setStoredResult(null);
+    setRunningState(true);
     setProgress({ done: 0, total: jobs.length });
     const req: StopCompareWorkerRequest = { reqId, jobs, horizon };
     worker.postMessage(req);
-  }, [data, horizon]);
+  }, [data, horizon, inputKey]);
 
   return { result, running, progress, run };
 }

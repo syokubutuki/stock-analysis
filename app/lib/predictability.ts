@@ -433,7 +433,6 @@ export function computeBacktest(prices: PricePoint[]): BacktestResult[] {
   {
     let holdDays = 0;
     let flatDays = 0;
-    let inPosition = 0; // 1 = long, -1 = forced flat, 0 = neutral
     for (let i = 0; i < n; i++) {
       const rsi = rsiValues[i + 1]; // RSI at close of prices[i+1], signal for next day
       if (holdDays > 0) {
@@ -455,7 +454,7 @@ export function computeBacktest(prices: PricePoint[]): BacktestResult[] {
         rsiPositions[i] = 0;
         flatDays = 4;
       } else {
-        rsiPositions[i] = inPosition === 1 ? 1 : 0;
+        rsiPositions[i] = 0;
       }
     }
   }

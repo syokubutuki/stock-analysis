@@ -110,9 +110,9 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
     }
     return null;
   }, [st, prices]);
-  useEffect(() => {
-    setStateLabel((prev) => (st && prev && st.order.includes(prev) ? prev : nowLabel));
-  }, [st, nowLabel]);
+  const effectiveStateLabel = st && stateLabel && st.order.includes(stateLabel)
+    ? stateLabel
+    : nowLabel;
 
   // 選択期間 → 集計対象述語（価格はスライスせずサンプルのみ限定）
   const accept = useMemo(() => {
@@ -126,12 +126,22 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
     return conditionalForwardReturns(prices, st, horizon, { entry, accept });
   }, [st, prices, horizon, entry, accept]);
 
-  const selBucket = result?.buckets.find((b) => b.label === stateLabel) ?? null;
+  const selBucket = result?.buckets.find((b) => b.label === effectiveStateLabel) ?? null;
   const baseMean = result?.baselineMean ?? 0;
 
   // ── チャート初期化（マウント時一度だけ） ──
-  const stateRefs = useRef({ prices, st, horizon, entry, stateLabel, selectMode, selRange });
-  stateRefs.current = { prices, st, horizon, entry, stateLabel, selectMode, selRange };
+  const stateRefs = useRef({ prices, st, horizon, entry, stateLabel: effectiveStateLabel, selectMode, selRange });
+  useEffect(() => {
+    stateRefs.current = {
+      prices,
+      st,
+      horizon,
+      entry,
+      stateLabel: effectiveStateLabel,
+      selectMode,
+      selRange,
+    };
+  }, [prices, st, horizon, entry, effectiveStateLabel, selectMode, selRange]);
 
   const drawHighlight = (x1: number | null, x2: number | null) => {
     const ov = overlayRef.current;
@@ -303,13 +313,13 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
 
   // 条件発生マーカー（選択状態の点灯日を、その後N日リターンの符号で色分け）
   useEffect(() => {
-    if (!markersRef.current || !st || !stateLabel) {
+    if (!markersRef.current || !st || !effectiveStateLabel) {
       markersRef.current?.setMarkers([]);
       return;
     }
     const ms: SeriesMarker<Time>[] = [];
     for (let i = 0; i < prices.length; i++) {
-      if (st.stateOf(i) !== stateLabel) continue;
+      if (st.stateOf(i) !== effectiveStateLabel) continue;
       const fr = forwardReturnAt(prices, i, horizon, entry);
       const up = fr != null && fr > 0;
       const inSel = !selRange || (i >= selRange.from && i <= selRange.to);
@@ -328,13 +338,13 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
         indicator ? ms.map((m) => ({ ...m, position: "aboveBar" }) as SeriesMarker<Time>) : []
       );
     }
-  }, [st, stateLabel, horizon, entry, prices, selRange, indicator]);
+  }, [st, effectiveStateLabel, horizon, entry, prices, selRange, indicator]);
 
   if (prices.length < minBars || !st || !result) return null;
 
   const markerCount = (() => {
     let c = 0;
-    for (let i = 0; i < prices.length; i++) if (st.stateOf(i) === stateLabel) c++;
+    for (let i = 0; i < prices.length; i++) if (st.stateOf(i) === effectiveStateLabel) c++;
     return c;
   })();
   const selDays = selRange
@@ -375,7 +385,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
       <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
         <span>表示する状態:</span>
         <select
-          value={stateLabel ?? ""}
+          value={effectiveStateLabel ?? ""}
           onChange={(e) => setStateLabel(e.target.value)}
           className="px-2 py-1 border border-gray-300 rounded"
         >
@@ -414,7 +424,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
       {/* 現在の集計サマリー（選択期間で再計算） */}
       {selBucket && (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-          <span className="font-bold">状態「{stateLabel}」</span>
+          <span className="font-bold">状態「{effectiveStateLabel}」</span>
           {" の"}{horizon}日先: 平均 <span className="font-bold">{fmtPct(selBucket.meanFwd)}</span>
           {"・勝率 "}<span className="font-bold">{(selBucket.winRate * 100).toFixed(0)}%</span>
           {"（n="}{selBucket.n}{"、基準平均 "}{fmtPct(baseMean)}{" 比 "}
@@ -447,7 +457,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
         <span className="flex items-center gap-1"><span className="inline-block w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "7px solid #16a34a" }} /> 点灯後{horizon}日 上昇</span>
         <span className="flex items-center gap-1"><span className="inline-block w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "7px solid #dc2626" }} /> 点灯後{horizon}日 下落</span>
-        <span className="text-gray-400">状態「{stateLabel}」点灯 {markerCount}回</span>
+        <span className="text-gray-400">状態「{effectiveStateLabel}」点灯 {markerCount}回</span>
       </div>
 
       <AnalysisGuide title="条件発生マーカー & 区間クロスフィルタの詳細">

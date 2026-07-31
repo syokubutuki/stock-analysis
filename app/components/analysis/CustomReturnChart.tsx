@@ -126,22 +126,18 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
   const [endDate, setEndDate] = useState("");
   const [predResult, setPredResult] = useState<PredictionResult | null>(null);
 
-  // 初期日付の設定（デフォルト: 直近1年分）
-  useEffect(() => {
-    if (prices.length > 0 && !startDate) {
-      const lastDate = prices[prices.length - 1].time;
-      const oneYearAgo = new Date(lastDate);
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10);
-      // prices内で1年前以降の最初の日付を探す
-      const firstValid = prices.find((p) => p.time >= oneYearAgoStr);
-      setStartDate(firstValid ? firstValid.time : prices[0].time);
-      setEndDate(lastDate);
-    }
-  }, [prices, startDate]);
-
-  const effectiveStart = startDate || (prices.length > 0 ? prices[0].time : "");
-  const effectiveEnd = endDate || (prices.length > 0 ? prices[prices.length - 1].time : "");
+  // 未指定時の既定範囲はrender中に導出し、銘柄変更時に古い日付を副作用で書き換えない。
+  const defaultRange = useMemo(() => {
+    if (prices.length === 0) return { start: "", end: "" };
+    const end = prices[prices.length - 1].time;
+    const oneYearAgo = new Date(end);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const boundary = oneYearAgo.toISOString().slice(0, 10);
+    const firstValid = prices.find((p) => p.time >= boundary);
+    return { start: firstValid?.time ?? prices[0].time, end };
+  }, [prices]);
+  const effectiveStart = startDate || defaultRange.start;
+  const effectiveEnd = endDate || defaultRange.end;
 
   const returns = useMemo(
     () => computeCustomReturns(prices, entry, exit, effectiveStart, effectiveEnd),

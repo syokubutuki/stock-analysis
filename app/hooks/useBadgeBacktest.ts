@@ -12,11 +12,12 @@ import { PortfolioData } from "./usePortfolioData";
 // 判定実績化のバックテスト。重いので run() の明示実行のみ。
 // data / horizon が変わったら結果を破棄(再実行を促す)。
 export function useBadgeBacktest(data: PortfolioData, horizon: Horizon) {
-  const [result, setResult] = useState<BacktestResult | null>(null);
-  const [running, setRunning] = useState(false);
+  const [storedResult, setStoredResult] = useState<BacktestResult | null>(null);
+  const [runningState, setRunningState] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const workerRef = useRef<Worker | null>(null);
   const reqIdRef = useRef(0);
+  const [resultKey, setResultKey] = useState("");
 
   useEffect(() => {
     const worker = new Worker(
@@ -27,8 +28,8 @@ export function useBadgeBacktest(data: PortfolioData, horizon: Horizon) {
       if (ev.data.reqId !== reqIdRef.current) return;
       if (ev.data.progress) setProgress(ev.data.progress);
       if (ev.data.result) {
-        setResult(ev.data.result);
-        setRunning(false);
+        setStoredResult(ev.data.result);
+        setRunningState(false);
       }
     };
     return () => {
@@ -37,13 +38,11 @@ export function useBadgeBacktest(data: PortfolioData, horizon: Horizon) {
     };
   }, []);
 
-  // 入力が変わったら古い実績を無効化
   const dataKey = Object.keys(data).sort().join(",");
-  useEffect(() => {
-    setResult(null);
-    setRunning(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataKey, horizon]);
+  const inputKey = `${dataKey}|${horizon}`;
+  const current = resultKey === inputKey;
+  const result = current ? storedResult : null;
+  const running = current && runningState;
 
   const run = useCallback(() => {
     const worker = workerRef.current;
@@ -53,11 +52,13 @@ export function useBadgeBacktest(data: PortfolioData, horizon: Horizon) {
       .map(([ticker, v]) => ({ ticker, name: v.name, prices: v.prices }));
     if (jobs.length === 0) return;
     const reqId = ++reqIdRef.current;
-    setRunning(true);
+    setResultKey(inputKey);
+    setStoredResult(null);
+    setRunningState(true);
     setProgress({ done: 0, total: jobs.length });
     const req: BacktestWorkerRequest = { reqId, jobs, horizon };
     worker.postMessage(req);
-  }, [data, horizon]);
+  }, [data, horizon, inputKey]);
 
   return { result, running, progress, run };
 }

@@ -75,18 +75,21 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
   // 非ウォッチリスト時は自前で取得(3層キャッシュ: メモリ→IndexedDB→Yahoo)
   useEffect(() => {
     if (uniMode === "watchlist") return;
-    if (uniTickers.length === 0) { setFetched({ prices: {}, names: {} }); return; }
+    if (uniTickers.length === 0) return;
     const ctrl = new AbortController();
     const force = forceRef.current; // 「更新」ボタン押下時のみ true
     forceRef.current = false;
-    setFetching(true);
-    setProgress({ done: 0, total: uniTickers.length, fromCache: 0 });
-    fetchUniverse(uniTickers, {
-      onProgress: (done, total, fromCache) => setProgress({ done, total, fromCache }),
-      signal: ctrl.signal,
-      forceRefresh: force,
-    })
-      .then((res) => {
+    const loadUniverse = async () => {
+      await Promise.resolve();
+      if (ctrl.signal.aborted) return;
+      setFetching(true);
+      setProgress({ done: 0, total: uniTickers.length, fromCache: 0 });
+      try {
+        const res = await fetchUniverse(uniTickers, {
+          onProgress: (done, total, fromCache) => setProgress({ done, total, fromCache }),
+          signal: ctrl.signal,
+          forceRefresh: force,
+        });
         if (ctrl.signal.aborted) return;
         const prices: Record<string, PricePoint[]> = {};
         const nm: Record<string, string> = {};
@@ -96,13 +99,16 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         }
         if (preset) for (const t of preset.tickers) if (!nm[t.ticker]) nm[t.ticker] = t.name;
         setFetched({ prices, names: nm });
-      })
-      .finally(() => { if (!ctrl.signal.aborted) { setFetching(false); refreshCacheStats(); } });
+      } finally {
+        if (!ctrl.signal.aborted) { setFetching(false); refreshCacheStats(); }
+      }
+    };
+    void loadUniverse();
     return () => ctrl.abort();
   }, [uniMode, uniTickers, refreshNonce]);
 
-  const activePrices = uniMode === "watchlist" ? pricesByTicker : fetched.prices;
-  const activeNames = uniMode === "watchlist" ? (names ?? {}) : fetched.names;
+  const activePrices = uniMode === "watchlist" ? pricesByTicker : uniTickers.length > 0 ? fetched.prices : {};
+  const activeNames = uniMode === "watchlist" ? (names ?? {}) : uniTickers.length > 0 ? fetched.names : {};
   const activeCount = Object.keys(activePrices).length;
 
   const result = useMemo<XResult>(

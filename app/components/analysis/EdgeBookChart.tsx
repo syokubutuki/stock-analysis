@@ -81,22 +81,16 @@ export default function EdgeBookChart({ prices }: Props) {
   const [costBps, setCostBps] = useState(0);
   const [contention, setContention] = useState(-1); // -1=自動
 
-  // 初期選択: 1取引あたりのエッジ(|平均|)が大きい上位3本。スプレッドを越えて容量が
-  // 出やすく、食い合いの目減りが具体的な金額で見える(日中/夜間の微小エッジだけだと0円になる)。
-  useEffect(() => {
-    if (catalog.length > 0 && selected.length === 0) {
-      const ranked = [...catalog]
-        .map((e) => ({ id: e.id, m: Math.abs(mean(e.trades.map((t) => t.ret))) }))
-        .sort((a, b) => b.m - a.m)
-        .slice(0, Math.min(3, catalog.length))
-        .map((x) => x.id);
-      setSelected(ranked);
-    }
-  }, [catalog, selected.length]);
+  // 未選択時は1取引あたりのエッジ(|平均|)上位3本をrender中に既定値として導出する。
+  const effectiveSelected = useMemo(() => selected.length > 0 ? selected : [...catalog]
+    .map((e) => ({ id: e.id, m: Math.abs(mean(e.trades.map((t) => t.ret))) }))
+    .sort((a, b) => b.m - a.m)
+    .slice(0, Math.min(3, catalog.length))
+    .map((x) => x.id), [catalog, selected]);
 
   const result = useMemo<EdgeBookResult>(
-    () => computeEdgeBook(prices, catalog, selected, { ...DEFAULT_BOOK_PARAMS, costBps, contention }),
-    [prices, catalog, selected, costBps, contention],
+    () => computeEdgeBook(prices, catalog, effectiveSelected, { ...DEFAULT_BOOK_PARAMS, costBps, contention }),
+    [prices, catalog, effectiveSelected, costBps, contention],
   );
 
   useEffect(() => {
@@ -108,7 +102,9 @@ export default function EdgeBookChart({ prices }: Props) {
   }, [result]);
 
   const toggle = (id: string) =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelected(effectiveSelected.includes(id)
+      ? effectiveSelected.filter((x) => x !== id)
+      : [...effectiveSelected, id]);
 
   if (prices.length < 300) {
     return <div className="text-xs text-gray-400 p-3">データが不足しています(300営業日以上必要)。</div>;
@@ -135,7 +131,7 @@ export default function EdgeBookChart({ prices }: Props) {
           <button
             key={e.id}
             onClick={() => toggle(e.id)}
-            className={`px-2 py-0.5 rounded border text-[11px] ${selected.includes(e.id) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}
+            className={`px-2 py-0.5 rounded border text-[11px] ${effectiveSelected.includes(e.id) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300"}`}
           >
             {e.label}
           </button>

@@ -153,10 +153,7 @@ const BADGE: Record<string, string> = {
 function ViewPanel({ view, result, colorMode, showTraj }: { view: EmbeddingView; result: WeekEmbeddingResult; colorMode: ColorMode; showTraj: boolean }) {
   const atlasRef = useRef<HTMLCanvasElement>(null);
   const eigenRef = useRef<HTMLCanvasElement>(null);
-  const [ready, setReady] = useState(false);
-  useEffect(() => { setReady(true); }, []);
   useEffect(() => {
-    if (!ready) return;
     if (atlasRef.current) drawAtlas(atlasRef.current, view, result, colorMode, showTraj);
     if (eigenRef.current) {
       const init = initCanvas(eigenRef.current, 90);
@@ -178,7 +175,7 @@ function ViewPanel({ view, result, colorMode, showTraj }: { view: EmbeddingView;
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [ready, view, result, colorMode, showTraj]);
+  }, [view, result, colorMode, showTraj]);
 
   const vd = verdict(view);
   return (

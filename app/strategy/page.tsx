@@ -38,19 +38,27 @@ export default function StrategyLabPage() {
 
   useEffect(() => {
     const wl = getWatchlist();
-    setWatchlist(wl);
-    if (wl.length > 0) setTicker(wl[0].ticker);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setWatchlist(wl);
+      if (wl.length > 0) setTicker(wl[0].ticker);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   // 選択銘柄を取得
   useEffect(() => {
     if (!ticker) return;
     let cancelled = false;
-    setPrices(null);
-    setLoading(true);
-    fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`)
-      .then((r) => r.json())
-      .then((j: StockData & { error?: string }) => {
+    const loadPrices = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setPrices(null);
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`);
+        const j = (await response.json()) as StockData & { error?: string };
         if (cancelled) return;
         if (j.error) {
           setPrices([]);
@@ -59,9 +67,13 @@ export default function StrategyLabPage() {
           setPrices(j.prices ?? []);
           setName(j.name ?? ticker);
         }
-      })
-      .catch(() => !cancelled && setPrices([]))
-      .finally(() => !cancelled && setLoading(false));
+      } catch {
+        if (!cancelled) setPrices([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void loadPrices();
     return () => {
       cancelled = true;
     };

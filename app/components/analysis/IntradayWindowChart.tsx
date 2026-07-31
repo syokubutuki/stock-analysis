@@ -87,17 +87,18 @@ export default function IntradayWindowChart({ ticker }: Props) {
     return probe?.windowOptions ?? null;
   }, [resp, interval]);
 
-  // 初期ウィンドウ: 寄り後（最初のビン）→ 当日中盤
-  useEffect(() => {
-    if (!options || options.length === 0) return;
-    setStartMin(options[0].minute);
-    setEndMin(options[Math.min(options.length - 1, Math.max(1, Math.floor(options.length / 2)))].minute);
-  }, [options]);
+  // 未選択・無効値は、利用可能なビンから既定ウィンドウをrender中に導出する。
+  const effectiveStartMin = options?.some((item) => item.minute === startMin)
+    ? startMin
+    : options?.[0]?.minute ?? null;
+  const effectiveEndMin = options?.some((item) => item.minute === endMin)
+    ? endMin
+    : options?.[Math.min(options.length - 1, Math.max(1, Math.floor(options.length / 2)))]?.minute ?? null;
 
   const result = useMemo(() => {
-    if (!resp || resp.bars.length === 0 || startMin === null || endMin === null) return null;
-    return computeWindowWeekday(resp.bars, resp.gmtoffset, startMin, endMin, intervalToMin(interval));
-  }, [resp, startMin, endMin, interval]);
+    if (!resp || resp.bars.length === 0 || effectiveStartMin === null || effectiveEndMin === null) return null;
+    return computeWindowWeekday(resp.bars, resp.gmtoffset, effectiveStartMin, effectiveEndMin, intervalToMin(interval));
+  }, [resp, effectiveStartMin, effectiveEndMin, interval]);
   const showResult = !!result;
 
   useEffect(() => {
@@ -115,9 +116,9 @@ export default function IntradayWindowChart({ ticker }: Props) {
 
   // 分位ビン × 時間軸位置
   const timing = useMemo(() => {
-    if (!resp || resp.bars.length === 0 || startMin === null || endMin === null || effectiveWd === null) return null;
-    return computeWindowBinTiming(resp.bars, resp.gmtoffset, startMin, endMin, effectiveWd);
-  }, [resp, startMin, endMin, effectiveWd]);
+    if (!resp || resp.bars.length === 0 || effectiveStartMin === null || effectiveEndMin === null || effectiveWd === null) return null;
+    return computeWindowBinTiming(resp.bars, resp.gmtoffset, effectiveStartMin, effectiveEndMin, effectiveWd);
+  }, [resp, effectiveStartMin, effectiveEndMin, effectiveWd]);
 
   // タイムラインチャート初期化（コンテナがDOMに出現したら生成）
   useEffect(() => {
@@ -185,11 +186,11 @@ export default function IntradayWindowChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
 
-      {options && startMin !== null && endMin !== null && (
+      {options && effectiveStartMin !== null && effectiveEndMin !== null && (
         <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
           <span className="font-medium text-gray-700">時刻ウィンドウ:</span>
           <select
-            value={startMin}
+            value={effectiveStartMin}
             onChange={(e) => setStartMin(Number(e.target.value))}
             className="px-2 py-1 border border-gray-300 rounded"
           >
@@ -199,7 +200,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
           </select>
           <span>〜</span>
           <select
-            value={endMin}
+            value={effectiveEndMin}
             onChange={(e) => setEndMin(Number(e.target.value))}
             className="px-2 py-1 border border-gray-300 rounded"
           >

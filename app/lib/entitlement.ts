@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { PAYWALL_ENABLED, type Tier } from "./tiers";
 
 /**
@@ -16,18 +16,30 @@ import { PAYWALL_ENABLED, type Tier } from "./tiers";
  *   localStorage.setItem("dev-tier", "free")
  * とすると無料枠として描画される（PAYWALL_ENABLED が true のときのみ有効）。
  */
+const DEFAULT_TIER: Tier = PAYWALL_ENABLED ? "free" : "pro";
+
+function getTierSnapshot(): Tier {
+  if (!PAYWALL_ENABLED) return "pro";
+  try {
+    const dev = localStorage.getItem("dev-tier");
+    return dev === "pro" || dev === "free" ? dev : "free";
+  } catch {
+    return "free";
+  }
+}
+
+function subscribeTier(onStoreChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === "dev-tier") onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
 export function useEntitlement(): Tier {
-  const [tier, setTier] = useState<Tier>(PAYWALL_ENABLED ? "free" : "pro");
-
-  useEffect(() => {
-    if (!PAYWALL_ENABLED) return;
-    try {
-      const dev = localStorage.getItem("dev-tier");
-      if (dev === "pro" || dev === "free") setTier(dev);
-    } catch {
-      // localStorage が使えない環境では無料枠のまま
-    }
-  }, []);
-
-  return tier;
+  return useSyncExternalStore(
+    subscribeTier,
+    getTierSnapshot,
+    () => DEFAULT_TIER,
+  );
 }

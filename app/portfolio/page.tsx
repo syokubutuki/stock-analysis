@@ -233,8 +233,13 @@ export default function PortfolioPage() {
       addToWatchlist(t, t);
       router.replace("/portfolio");
     }
-    setWatchlist(getWatchlist());
-    setSnapshot(getSnapshot());
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setWatchlist(getWatchlist());
+      setSnapshot(getSnapshot());
+    });
+    return () => { cancelled = true; };
   }, [router]);
 
   const tickers = useMemo(() => watchlist.map((w) => w.ticker), [watchlist]);
@@ -259,7 +264,7 @@ export default function PortfolioPage() {
         changed = true;
       }
     }
-    if (changed) setWatchlist(getWatchlist());
+    if (changed) queueMicrotask(() => setWatchlist(getWatchlist()));
   }, [data, watchlist]);
   // 分析パネルの一括開閉(既定は全て折りたたみ)。
   const [bulk, setBulk] = useState({ nonce: 0, open: false });

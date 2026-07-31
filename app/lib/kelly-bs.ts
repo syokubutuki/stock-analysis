@@ -129,7 +129,7 @@ export function varianceSwapAnalysis(
 
   // GARCH(1,1) implied variance (simple estimation)
   const variance = sumR2 / n;
-  let alpha = 0.1, beta = 0.85;
+  const alpha = 0.1, beta = 0.85;
   const omega = variance * (1 - alpha - beta);
 
   // Forward-looking expected variance from GARCH

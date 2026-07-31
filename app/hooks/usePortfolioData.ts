@@ -96,7 +96,7 @@ export function usePortfolioData(tickers: string[]) {
   }, []);
 
   useEffect(() => {
-    load(tickers);
+    queueMicrotask(() => { void load(tickers); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickers.join(",")]);
 

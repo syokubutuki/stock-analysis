@@ -215,14 +215,19 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
 
   // 設定の localStorage 永続化(C4)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
-      if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
-      if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K); if (s.maxWeeks) setMaxWeeks(s.maxWeeks);
-    } catch { /* ignore */ }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
+        if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
+        if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K); if (s.maxWeeks) setMaxWeeks(s.maxWeeks);
+      } catch { /* ignore */ }
+    });
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ mode, metric, align, weight, volNorm, L, H, K, maxWeeks })); } catch { /* ignore */ }

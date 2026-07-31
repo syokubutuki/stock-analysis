@@ -507,9 +507,9 @@ export function kalmanFilter3State(
   // State: [price, velocity, acceleration]
   // F = [[1,1,0.5],[0,1,1],[0,0,1]]
   // H = [1,0,0]
-  let x = [observations[0], diff.length > 0 ? diff[0] : 0, 0];
+  const x = [observations[0], diff.length > 0 ? diff[0] : 0, 0];
   // 3x3 covariance (stored flat row-major)
-  let P = [
+  const P = [
     diffVar, 0, 0,
     0, diffVar, 0,
     0, 0, diffVar,

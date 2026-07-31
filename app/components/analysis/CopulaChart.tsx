@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
+import { useBenchmarkPrices } from "../../hooks/useBenchmarkPrices";
 import { SeriesMode } from "../../lib/series-mode";
 import { alignSeries } from "../../lib/benchmark";
 import { computeCopulaAnalysis, type CopulaResult } from "../../lib/copula";
 import AnalysisGuide from "./AnalysisGuide";
+import DataQualityNotice from "./DataQualityNotice";
 
 interface Props {
   prices: PricePoint[];
@@ -274,35 +276,10 @@ export default function CopulaChart({ prices }: Props) {
   const copulaCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const [benchKey, setBenchKey] = useState<BenchmarkKey>("nikkei");
-  const [benchPrices, setBenchPrices] = useState<PricePoint[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchBenchmark = useCallback(async (key: BenchmarkKey) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/stock?ticker=${encodeURIComponent(BENCHMARKS[key].ticker)}&range=3y`
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "ベンチマーク取得失敗");
-        setBenchPrices(null);
-        return;
-      }
-      setBenchPrices(json.prices);
-    } catch {
-      setError("ネットワークエラー");
-      setBenchPrices(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBenchmark(benchKey);
-  }, [benchKey, fetchBenchmark]);
+  const benchmark = useBenchmarkPrices(BENCHMARKS[benchKey].ticker);
+  const benchPrices = benchmark.prices;
+  const loading = benchmark.loading;
+  const error = benchmark.error;
 
   const result = useMemo<CopulaResult | null>(() => {
     if (!benchPrices) return null;
@@ -385,6 +362,8 @@ export default function CopulaChart({ prices }: Props) {
       {error && (
         <div className="text-sm text-red-500 py-4 text-center">{error}</div>
       )}
+
+      <DataQualityNotice report={benchmark.dataQuality} />
 
       {result && !loading && (
         <>

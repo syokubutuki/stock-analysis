@@ -48,14 +48,21 @@ export function usePortfolioDigests(data: PortfolioData, horizon: Horizon) {
     const jobs = Object.entries(data)
       .filter(([, v]) => v.prices.length > 0)
       .map(([ticker, v]) => ({ ticker, name: v.name, prices: v.prices }));
-    if (jobs.length === 0) {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (jobs.length === 0) {
+        setDigests({});
+        setComputing(false);
+        return;
+      }
+      const reqId = ++reqIdRef.current;
       setDigests({});
-      return;
-    }
-    const reqId = ++reqIdRef.current;
-    setComputing(true);
-    const req: DigestWorkerRequest = { reqId, jobs, horizon };
-    worker.postMessage(req);
+      setComputing(true);
+      const req: DigestWorkerRequest = { reqId, jobs, horizon };
+      worker.postMessage(req);
+    });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, horizon]);
 

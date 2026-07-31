@@ -305,7 +305,13 @@ export default function WeekClockChart({ prices, ticker }: Props) {
   }, [gran, daily, dailyView, intra, view]);
 
   // データ・粒度・原点が変わったらズームを全体表示に戻す
-  useEffect(() => { setView({ a: 0, b: 1 }); }, [gran, intervalKey, anchorMode, intra]);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setView({ a: 0, b: 1 });
+    });
+    return () => { cancelled = true; };
+  }, [gran, intervalKey, anchorMode, intra]);
 
   // 日中足クロックの横軸ズーム/パン（ホイール=拡大, ドラッグ=移動, ダブルクリック=全体）
   useEffect(() => {

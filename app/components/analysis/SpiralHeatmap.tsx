@@ -207,6 +207,17 @@ function computeFieldStats(arr: number[]) {
   return { mean: mean(arr), median: median(arr), std: std(arr), winRate: winRate(arr), pValue: tTestPValue(arr) };
 }
 
+type FieldStats = ReturnType<typeof computeFieldStats>;
+type BucketStats = { n: number } & Record<RawFieldKey, FieldStats>;
+
+function computeBucketStats(bucket: RawBucket): BucketStats {
+  const fields = {} as Record<RawFieldKey, FieldStats>;
+  for (const key of Object.keys(bucket) as RawFieldKey[]) {
+    fields[key] = computeFieldStats(bucket[key]);
+  }
+  return { n: bucket.close.length, ...fields };
+}
+
 // ============================================================
 export default function SpiralHeatmap({ prices }: Props) {
   // canvas refs
@@ -328,11 +339,7 @@ export default function SpiralHeatmap({ prices }: Props) {
   const dowStats = useMemo(() =>
     DOW_TRADING.map(dow => {
       const c = dowRaw[dow]; if (!c || c.close.length === 0) return null;
-      const result: Record<string, { mean: number; median: number; std: number; winRate: number; pValue: number | null }> & { n: number } = { n: c.close.length } as any;
-      for (const key of Object.keys(c) as RawFieldKey[]) {
-        (result as any)[key] = computeFieldStats(c[key]);
-      }
-      return result;
+      return computeBucketStats(c);
     })
   , [dowRaw]);
 
@@ -357,11 +364,7 @@ export default function SpiralHeatmap({ prices }: Props) {
   const monthStats = useMemo(() =>
     monthRaw.map(s => {
       if (s.close.length === 0) return null;
-      const result: Record<string, { mean: number; median: number; std: number; winRate: number; pValue: number | null }> & { n: number } = { n: s.close.length } as any;
-      for (const key of Object.keys(s) as RawFieldKey[]) {
-        (result as any)[key] = computeFieldStats(s[key]);
-      }
-      return result;
+      return computeBucketStats(s);
     })
   , [monthRaw]);
 
@@ -1326,7 +1329,7 @@ export default function SpiralHeatmap({ prices }: Props) {
                         <td className="py-1 px-2 text-gray-400">{key === "mean" ? "平均" : key === "median" ? "中央値" : key === "std" ? "標準偏差" : key === "winRate" ? "勝率" : "p値"}</td>
                         {dowStats.map((s, i) => {
                           if (!s) return <td key={i} className="py-1 px-2 text-center">-</td>;
-                          const fieldStats = (s as any)[field] as { mean: number; median: number; std: number; winRate: number; pValue: number | null };
+                          const fieldStats = s[field];
                           if (!fieldStats) return <td key={i} className="py-1 px-2 text-center">-</td>;
                           if (key === "pValue") { const pv = pValueLabel(fieldStats.pValue); return <td key={i} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; }
                           if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(fieldStats.winRate)}</td>;
@@ -1450,21 +1453,21 @@ export default function SpiralHeatmap({ prices }: Props) {
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="py-1 px-1.5 text-gray-500">平均</td>
-                      {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; return <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(fs.mean)}`}>{pct2(fs.mean)}</td>; })}
+                      {monthStats.map((s, m) => { if (!s) return null; const fs = s[field]; return <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(fs.mean)}`}>{pct2(fs.mean)}</td>; })}
                     </tr>
                     {isFirst && (
                       <>
                         <tr className="border-b border-gray-100">
                           <td className="py-1 px-1.5 text-gray-500">標準偏差</td>
-                          {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; return <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(fs.std)}</td>; })}
+                          {monthStats.map((s, m) => { if (!s) return null; const fs = s[field]; return <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(fs.std)}</td>; })}
                         </tr>
                         <tr className="border-b border-gray-100">
                           <td className="py-1 px-1.5 text-gray-500">勝率</td>
-                          {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; return <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(fs.winRate)}</td>; })}
+                          {monthStats.map((s, m) => { if (!s) return null; const fs = s[field]; return <td key={m} className="py-1 px-1.5 text-center font-mono text-gray-600">{pct2(fs.winRate)}</td>; })}
                         </tr>
                         <tr className="border-b border-gray-100">
                           <td className="py-1 px-1.5 text-gray-500">p値</td>
-                          {monthStats.map((s, m) => { if (!s) return null; const fs = (s as any)[field]; if (!fs) return null; const pv = pValueLabel(fs.pValue); return <td key={m} className={`py-1 px-1.5 text-center font-mono ${pv.cls}`}>{pv.text}</td>; })}
+                          {monthStats.map((s, m) => { if (!s) return null; const fs = s[field]; const pv = pValueLabel(fs.pValue); return <td key={m} className={`py-1 px-1.5 text-center font-mono ${pv.cls}`}>{pv.text}</td>; })}
                         </tr>
                       </>
                     )}

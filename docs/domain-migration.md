@@ -55,7 +55,7 @@ A  www  76.76.21.21  DNS only
 
 ## Phase 4: 検証とカットオーバー
 
-- [ ] `npm run lint`
+- [x] `npm run lint`
 - [x] `npm run build`
 - [x] preview deploymentでcanonical・sitemap・robotsを確認
 - [x] デスクトップと狭い画面で移行画面を確認
@@ -63,7 +63,7 @@ A  www  76.76.21.21  DNS only
 - [x] previewでcanonical、sitemap、robotsを確認
 - [x] 本番デプロイ後にエラーログを確認
 
-`npm run lint` は既存コードの47エラーで失敗する。今回変更したファイルだけのESLintは成功済み。
+2026-08-01 に全体の `npm run lint` がエラー0件で成功した。警告は段階的に解消する既存課題として残す。
 
 期待するHTTP結果:
 

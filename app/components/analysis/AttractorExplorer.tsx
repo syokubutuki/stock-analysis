@@ -65,8 +65,13 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
   }, [embedding, dim]);
 
   useEffect(() => {
-    cometPosRef.current = 0; setScrubValue(0);
-    zoomRef.current = 1; panRef.current = { x: 0, y: 0 };
+    const frame = requestAnimationFrame(() => {
+      cometPosRef.current = 0;
+      setScrubValue(0);
+      zoomRef.current = 1;
+      panRef.current = { x: 0, y: 0 };
+    });
+    return () => cancelAnimationFrame(frame);
   }, [normalized.length, tau, dim]);
 
   // Project a single normalized point to screen coords

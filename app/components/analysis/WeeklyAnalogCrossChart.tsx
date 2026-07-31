@@ -164,18 +164,23 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
 
   // C4: 設定の localStorage 永続化
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
-      if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
-      if (typeof s.dtwBandFrac === "number") setDtwBandFrac(s.dtwBandFrac);
-      if (typeof s.hlWeight === "number") setHlWeight(s.hlWeight);
-      if (typeof s.pool === "boolean") setPool(s.pool);
-      if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K);
-      if (s.usMode) setUsMode(s.usMode); if (s.scheme) setScheme(s.scheme);
-    } catch { /* ignore */ }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (s.mode) setMode(s.mode); if (s.metric) setMetric(s.metric); if (s.align) setAlign(s.align);
+        if (s.weight) setWeight(s.weight); if (typeof s.volNorm === "boolean") setVolNorm(s.volNorm);
+        if (typeof s.dtwBandFrac === "number") setDtwBandFrac(s.dtwBandFrac);
+        if (typeof s.hlWeight === "number") setHlWeight(s.hlWeight);
+        if (typeof s.pool === "boolean") setPool(s.pool);
+        if (s.L) setL(s.L); if (s.H) setH(s.H); if (s.K) setK(s.K);
+        if (s.usMode) setUsMode(s.usMode); if (s.scheme) setScheme(s.scheme);
+      } catch { /* ignore */ }
+    });
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ mode, metric, align, weight, volNorm, dtwBandFrac, hlWeight, pool, L, H, K, usMode, scheme })); } catch { /* ignore */ }
@@ -193,17 +198,23 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
   const [computing, setComputing] = useState(false);
   const runIdRef = useRef(0);
   useEffect(() => {
-    if (us.length === 0 || uniq.length < 1) { setRows([]); return; }
+    if (us.length === 0 || uniq.length < 1) return;
     const myId = ++runIdRef.current;
-    setComputing(true);
-    run({
-      kind: "cross", tickers: uniq, pricesByTicker, us, pool,
-      params: { L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight },
-    }).then((resp) => {
-      if (myId !== runIdRef.current) return;
+    let cancelled = false;
+    const compute = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setComputing(true);
+      const resp = await run({
+        kind: "cross", tickers: uniq, pricesByTicker, us, pool,
+        params: { L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight },
+      });
+      if (cancelled || myId !== runIdRef.current) return;
       setRows((resp.rows as Row[]) ?? []);
       setComputing(false);
-    });
+    };
+    void compute();
+    return () => { cancelled = true; };
   }, [run, uniq, pricesByTicker, us, L, H, K, mode, usMode, scheme, selBinOverride, metric, align, weight, volNorm, dtwBandFrac, hlWeight, pool]);
 
   // ── 改善B: 銘柄別 OOS 検証(「この設定がこの銘柄で過去当たっていたか」) ──
