@@ -14,16 +14,30 @@
 //  2) Sharpe差検定        : Jobson–Korkie–Memmel の解析z検定 + ペア・ブロックBootstrap
 //  3) 週次ペア差の頑健検定: Wilcoxon符号順位検定 + 符号検定（非正規・外れ値に頑健）
 //  4) 年率差Bootstrap CI  : 年率リターン差の95%信頼区間（ペア・ブロックBootstrap）
+//
+// ■ 取引コスト（docs/weekday-vs-bh-cost.md）
+// この戦略は年52往復、B&H は期間全体で1往復＝回転率が 500 倍以上違う。したがってコストは
+// 「注記」ではなく検定の内部に入れないと結論が変わる。ここでは単一の costRT を唯一の課金源とし、
+//   経路B（日次の富ループ）: 建玉 pos[] が変化した区間の先頭で片道1レグぶん課金
+//   経路A（週次の超過）    : 同じレグ数ぶんを対数で控除し、B&H の1往復を週へ均等配分
+// の両方へ伝播させる。片方だけに入れると①③（週次）と②④（日次）が矛盾した結論を出す。
+// 1レグの控除は ln(1−c)/2。2レグで厳密に ln(1−c) になり、経路A・Bが c² の誤差なく一致する
+// （strategy-vs-benchmark.ts の「1往復あたり ln(1−c)」と同一規約）。
+// なお costRT に依らず常に Break-even（このエッジが吸収できる往復コスト）を算出する。
 
 import { PricePoint } from "./types";
 import { runStrategyTrades, type Timing } from "./weekday-trade";
 import { mean, std, quantileSorted, median, tTest } from "./stats-significance";
+import { representativeSpread } from "./spread-estimator";
 
 export type { Timing };
 
 export interface VsBHSpec {
   entryTiming: Timing; // 月曜の建て（始値/終値）
   exitTiming: Timing; // 金曜の手仕舞い（始値/終値）
+  // 往復コスト（比率）= 往復スプレッド + 2×片道手数料。既定 0（＝控除なし・従来の値）。
+  // strategy-vs-benchmark.ts の roundTripCost() と同じ規約で作った値を渡すこと。
+  costRT?: number;
 }
 
 // ---------- 数値ユーティリティ ----------
@@ -139,14 +153,36 @@ export interface AnnualDiffTest {
   probPositive: number;
 }
 
+// 損益分岐コスト。コスト控除の ON/OFF に依らず、常にコスト前の週次超過 e_w から算出する。
+// 「この戦略のエッジは往復◯bp まで吸収できる」を出し、利用者が自分の手数料と突き合わせられるようにする。
+// スプレッド推定（Corwin-Schultz）自体が誤差の大きい推定量なので、単一の ON/OFF より
+// 損益分岐のほうが判断材料として頑健である（docs/weekday-vs-bh-cost.md §6.1）。
+export interface BreakevenInfo {
+  perRoundTripMean: number; // c*      = mean(e_w)：期待値がゼロになる往復コスト（負なら吸収余地なし）
+  perRoundTripSig95: number; // c*(95%) = mean − 1.645·σ/√n：片側5%で有意でなくなる往復コスト
+  tripsPerYearStrat: number; // 戦略の回転率（≈52往復/年）
+  tripsPerYearBH: number; // B&H の回転率（= 1/years）
+  spreadRT: number; // representativeSpread(prices)（参考表示）
+  annualDragAtSpread: number; // 推定スプレッドで年間いくら削られるか（対数、正値）
+}
+
 export interface VsBHResult {
-  meta: { entryTiming: Timing; exitTiming: Timing; nDays: number; years: number; nWeeks: number };
+  meta: {
+    entryTiming: Timing;
+    exitTiming: Timing;
+    nDays: number;
+    years: number;
+    nWeeks: number;
+    costRT: number; // 実際に適用した往復コスト
+    roundTrips: number; // 期間内の戦略側往復回数（レグ数/2）
+  };
   metrics: { strat: Metrics; bh: Metrics };
   equity: EquityRow[];
   weekend: WeekendTest;
   robust: RobustTest;
   sharpe: SharpeDiffTest;
   annual: AnnualDiffTest;
+  breakeven: BreakevenInfo;
 }
 
 // ---------- 指標計算 ----------
@@ -196,17 +232,47 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
     for (let s = E; s < X && s < nSeg; s++) pos[s] = 1;
   }
 
+  // ===== 取引コスト =====
+  // 建玉 pos[] が変化する区間の先頭＝約定。そこに片道1レグを立てる。
+  // legs[s] は「区間 s の先頭で発生するレグ数」、legs[nSeg] は期間末に建玉が残っていた場合の手仕舞い。
+  const costRT = Number.isFinite(spec.costRT) && (spec.costRT as number) > 0
+    ? Math.min(0.5, spec.costRT as number)
+    : 0;
+  const halfLegLog = costRT > 0 ? Math.log(1 - costRT) / 2 : 0; // 1レグ＝ln(1−c)/2（2レグで厳密に ln(1−c)）
+  const legs = new Array(nSeg + 1).fill(0);
+  {
+    let prevP = 0;
+    for (let s = 0; s < nSeg; s++) {
+      if (pos[s] !== prevP) legs[s] += 1;
+      prevP = pos[s];
+    }
+    if (prevP !== 0) legs[nSeg] += 1; // 最終週が期間末で切れている場合に畳む
+  }
+  let totalLegs = 0;
+  for (const v of legs) totalLegs += v;
+
   // 日次リターン系列（戦略 / B&H）を区間から再構成。dailyW は各営業日の終値時点の富。
+  // 約定日（月曜・金曜）に課金するので dailyStrat にのこぎり状の成分が入り σ がわずかに増える。
+  // 「平均だけシフトさせた場合」より Sharpe の低下がわずかに大きくなるが、これは忠実さの代償であって
+  // バグではない（docs/weekday-vs-bh-cost.md §7.3）。解析式 Δt = −c√n/σ は経路A（週次）には
+  // 厳密に当てはまるが、経路Bの Sharpe には当てはまらない。
   let Ws = 1, Wb = 1;
   const dailyStrat: number[] = [];
   const dailyBH: number[] = [];
   const equity: EquityRow[] = [];
   let prevWs = 1, prevWb = 1;
   let held = 0;
+  // B&H も現実には建てて畳むので期間全体で1往復ぶんを払う（回転率の非対称性を誠実に出すため）。
+  Wb *= Math.exp(halfLegLog); // 期間先頭の買い付け
   for (let s = 0; s < nSeg; s++) {
     const r = Math.exp(segs[s].logret) - 1; // 区間の簡易リターン
     Wb *= 1 + r;
+    if (legs[s] > 0) Ws *= Math.exp(halfLegLog * legs[s]); // 区間先頭で約定＝片道課金
     if (pos[s] === 1) { Ws *= 1 + r; held++; }
+    if (s === nSeg - 1) {
+      if (legs[nSeg] > 0) Ws *= Math.exp(halfLegLog * legs[nSeg]);
+      Wb *= Math.exp(halfLegLog); // 期間末尾の売却
+    }
     if (segs[s].isClose) {
       const i = s / 2; // 営業日index
       dailyStrat.push(Ws / prevWs - 1);
@@ -223,15 +289,20 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
   // ===== 週次サンプル（トレード＝月→金サイクルごと）=====
   // サイクル w の範囲 [E_w, nextE-1]。B&H_w = Σ 全区間、戦略_w = Σ 保有区間、
   // 超過 e_w = 戦略_w − B&H_w = −(捨てた区間 [X_w, nextE-1])。
-  const excessLog: number[] = []; // e_w（対数）
-  const excessSimple: number[] = []; // e_w（簡易, 表示・頑健検定用）
+  const excessLog: number[] = []; // e_w（対数, コスト後）
+  const excessSimple: number[] = []; // e_w（簡易, コスト後。表示・頑健検定用）
+  const excessGross: number[] = []; // e_w（簡易, コスト前。Break-even の算出用）
   const skipLog: number[] = []; // 捨てた区間の合計対数（週あたり）
   const weekendGaps: number[] = []; // 金終値→次営業日始値の単一区間（参考）
+  // B&H の1往復を週へ均等配分する。週次系列を均質に保つため（Wilcoxon・符号検定は標本の均質性を仮定）。
+  // 金額としては ln(1−c)/446週 で無視できるが、経路A/Bの不変量を厳密に成立させるために入れる。
+  const bhShare = trades.length > 0 ? (halfLegLog * 2) / trades.length : 0;
   for (let w = 0; w < trades.length; w++) {
     const tr = trades[w];
     const E = 2 * tr.entryIdx + (spec.entryTiming === "open" ? 0 : 1);
     const X = 2 * tr.exitIdx + (spec.exitTiming === "open" ? 0 : 1);
-    const nextE = w + 1 < trades.length
+    const isLast = w + 1 >= trades.length;
+    const nextE = !isLast
       ? 2 * trades[w + 1].entryIdx + (spec.entryTiming === "open" ? 0 : 1)
       : nSeg;
     let sHeld = 0, sAll = 0, sSkip = 0;
@@ -240,8 +311,16 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
       if (s < X) sHeld += segs[s].logret;
       else sSkip += segs[s].logret;
     }
-    excessLog.push(sHeld - sAll);
-    excessSimple.push(Math.exp(sHeld) - Math.exp(sAll));
+    // 経路Bと同一のレグ数で課金する（週の範囲 [E, nextE) に落ちるレグ。最終週は期間末の手仕舞いも含む）。
+    // これにより Σ_w の合計が経路Bの総コストと厳密に一致し、§7.2 の不変量が成り立つ。
+    let legLog = 0;
+    for (let s = E; s < nextE && s < nSeg; s++) legLog += halfLegLog * legs[s];
+    if (isLast) legLog += halfLegLog * legs[nSeg];
+    // 対数側で引いてから exp する。単利側を −c で引くと O(c²) の不整合が生じ、
+    // 同じコストのはずの①と③が違う結論を出す（§7.1）。
+    excessLog.push(sHeld - sAll + legLog - bhShare);
+    excessSimple.push(Math.exp(sHeld + legLog) - Math.exp(sAll + bhShare));
+    excessGross.push(Math.exp(sHeld) - Math.exp(sAll));
     skipLog.push(sSkip);
     // 金曜終値の直後の区間（overnight_exitIdx）＝週末ギャップ
     const gapOrd = 2 * tr.exitIdx + 1;
@@ -276,14 +355,42 @@ export function computeVsBH(prices: PricePoint[], spec: VsBHSpec, seed = 2026071
   // ===== 4) 年率差Bootstrap CI =====
   const annual = annualDiffTest(dailyStrat, dailyBH, seed + 2);
 
+  // ===== Break-even（コスト前の e_w から算出。costRT の値には依らない）=====
+  const years = n / 252;
+  const roundTrips = totalLegs / 2;
+  const gMean = mean(excessGross);
+  const gSd = std(excessGross);
+  const spreadRT = representativeSpread(prices);
+  const breakeven: BreakevenInfo = {
+    perRoundTripMean: gMean,
+    // 片側5%（z=1.645）で有意でなくなる往復コスト。負なら「コストゼロでも有意でない」。
+    perRoundTripSig95: nWeeks > 1 ? gMean - 1.645 * (gSd / Math.sqrt(nWeeks)) : gMean,
+    tripsPerYearStrat: years > 0 ? roundTrips / years : 0,
+    tripsPerYearBH: years > 0 ? 1 / years : 0,
+    spreadRT,
+    annualDragAtSpread:
+      spreadRT > 0 && spreadRT < 1 && years > 0
+        ? -Math.log(1 - spreadRT) * (roundTrips / years)
+        : 0,
+  };
+
   return {
-    meta: { entryTiming: spec.entryTiming, exitTiming: spec.exitTiming, nDays: n, years: n / 252, nWeeks },
+    meta: {
+      entryTiming: spec.entryTiming,
+      exitTiming: spec.exitTiming,
+      nDays: n,
+      years,
+      nWeeks,
+      costRT,
+      roundTrips,
+    },
     metrics: { strat: metricsStrat, bh: metricsBH },
     equity,
     weekend,
     robust,
     sharpe,
     annual,
+    breakeven,
   };
 }
 
