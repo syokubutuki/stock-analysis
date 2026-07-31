@@ -275,8 +275,14 @@ export function olsNW(y: number[], X: number[][], lag = 5): OlsFit | null {
   return { beta, se, t: tvals, resid, r2, sigmaResid: Math.sqrt(sse / (n - k)), n };
 }
 
-/** y を X（定数項こみ）に回帰した残差を返す＝直交化。失敗時は y をそのまま返す。 */
-function orthogonalize(y: number[], x: number[]): number[] {
+/**
+ * y を x（定数項こみ）に回帰した残差を返す＝直交化。失敗時は y をそのまま返す。
+ *
+ * セクター因子から市場成分を抜いて「セクターだけの動き」を作るのに使う。
+ * 直交化しておくと Var(r) = c²Var(M) + b²Var(F) + Var(ε) がきれいに割れる。
+ * P2（sector-factor-stability.ts）もローリング推定で同じ直交化を使うため export する。
+ */
+export function orthogonalize(y: number[], x: number[]): number[] {
   const X = x.map((v) => [1, v]);
   const fit = olsNW(y, X, 0);
   return fit ? fit.resid : y;
@@ -790,5 +796,417 @@ export function premiseVerdict(d: PremiseDiag): { level: "ok" | "weak" | "fail";
         `セクターの動きの ${((1 - d.rateR2) * 100).toFixed(0)}% は金利以外の要因である。` +
         `金利観が当たっても、それだけでセクターの値動きが決まるわけではない点は織り込むこと。`
       : "金利上昇はセクターの上昇と有意に結びついており、説明力も十分。感応度による銘柄選別（P1以降）へ進む前提が満たされている。",
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// P1: 銘柄別の感応度推定と S = b/σ_ε ランキング
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface SectorSelectParams extends SectorPremiseParams {
+  /** James-Stein 収縮を S の計算に使うか（既定 true）。 */
+  shrink: boolean;
+  /** 採用本数（表の強調と推奨ウェイトの対象）。 */
+  topK: number;
+  /** 1銘柄あたりのウェイト上限。 */
+  maxWeight: number;
+  /** 順位CI のブートストラップ反復数。 */
+  nBoot: number;
+  /** ブロック・ブートストラップのブロック長（営業日）。 */
+  blockLen: number;
+  /** 乱数種（再現性）。 */
+  seed: number;
+  /** C26 の必要期間 T* を計算するときの t ハードル κ。 */
+  kappa: number;
+}
+
+export const DEFAULT_SELECT_PARAMS: SectorSelectParams = {
+  ...DEFAULT_PREMISE_PARAMS,
+  shrink: true,
+  topK: 5,
+  maxWeight: 0.35,
+  nBoot: 300,
+  blockLen: 21,
+  seed: 42,
+  kappa: 2,
+};
+
+export interface AssetFactorFit {
+  ticker: string;
+
+  // ---- セクター感応度（選別の主役）----
+  /** b̂: 市場に直交化したセクター因子への感応度。 */
+  b: number;
+  bSe: number;
+  bT: number;
+  bLo: number; // 95%CI
+  bHi: number;
+  /** James-Stein で横断平均へ収縮した b。 */
+  bShrunk: number;
+
+  // ---- 市場感応度（「金利プレイのつもりが実は高β」の切り分け用）----
+  /** ĉ: 市場βそのもの。F は市場に直交化済みなので単回帰の市場βと一致する。 */
+  cMkt: number;
+  cMktSe: number;
+  cMktT: number;
+
+  // ---- 分散の分解（この銘柄の中で何が効いているか）----
+  marketShare: number; // c²Var(M)/Var(r)
+  sectorShare: number; // b²Var(F)/Var(r)
+  residShare: number; // Var(ε)/Var(r)
+  /**
+   * 露出の純度 = セクター寄与 /（市場寄与＋セクター寄与）。
+   * 1 に近いほど「純粋なセクター（金利）プレイ」、0 に近いほど
+   * 「金利プレイのつもりで実は市場全体を買っている」。
+   */
+  purity: number;
+
+  // ---- リスクとランク ----
+  sigmaEps: number; // 固有ボラ（年率）
+  sigmaTot: number; // 総ボラ（年率）
+  r2: number;
+  /** S = b/σ_ε（shrink=true なら bShrunk を使用）＝情報比。ランクの基準。 */
+  score: number;
+  rank: number;
+  rankLo: number; // ブートによる順位95%CI
+  rankHi: number;
+  /** 順位が最上位（1位）になったブート比率。 */
+  rankTopShare: number;
+
+  // ---- C26 との並置（同じ標本で μ は測れないことを示す）----
+  muHat: number; // 実現年率ドリフト
+  muSe: number; // σ/√T（年率）
+  muT: number; // 横断平均との差の t
+  yearsNeeded: number; // T* =(κσ/Δμ)²
+
+  // ---- 配分 ----
+  weightUnc: number; // w ∝ b/σ_ε²（制約なし）
+  weight: number; // long-only＋上限を適用後（topK 外は 0）
+}
+
+export interface SectorSelectResult {
+  params: SectorSelectParams;
+  premise: PremiseDiag;
+  assets: AssetFactorFit[]; // score 降順
+  /** b̂ の横断平均（収縮の中心）。 */
+  bMean: number;
+  /** James-Stein の収縮率（0=収縮なし, 1=全部平均へ）。見かけの差のうちノイズの割合。 */
+  shrinkFactor: number;
+  /** b の差の識別力: 上位と下位の b 差 / その差の SE。 */
+  spreadT: number;
+
+  // ---- μ 側（C26 との並置）--------------------------------------------------
+  /** 観測された μ̂ の最大−最小（年率）。 */
+  muSpreadObs: number;
+  /**
+   * 「真の μ が全銘柄同一」というヌルの下で期待される μ̂ 最大−最小（年率）。
+   * 極値統計の近似 E[max−min] ≈ SE·2√(2 ln N)（C26 の勝者の呪いと同じ式）。
+   * 観測スプレッドがこれを下回るなら、μ̂ の順位は**丸ごとノイズと整合**する。
+   */
+  muSpreadNull: number;
+  /** 観測 μ̂ スプレッドがヌル期待の何倍か。1未満なら μ で選ぶ根拠はゼロ。 */
+  muSpreadRatio: number;
+  /** 経済的に意味のある差 Δμ=5pp を t>κ で識別するのに必要な年数（中央値σを使用）。 */
+  muYearsFor5pp: number;
+  nBootDone: number;
+  warnings: string[];
+}
+
+/** mulberry32（種つき一様乱数）。既存の他モジュールと同じ実装。P2 のブートでも使う。 */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * James-Stein 収縮（横断平均 b̄ へ）。
+ *   b_JS = b̄ + max(0, 1 − (N−3)·s̄² / Σ(b_i−b̄)²)·(b_i − b̄),  s̄² = mean(SE_i²)
+ * 収縮率 1−c がそのまま「見かけの銘柄間差のうちノイズが占める割合」の推定になる。
+ * 銀行の b は SE が小さい（§3.2）ため収縮はほとんどかからないはずで、
+ * **かかってしまう場合は「順位に意味が無い」というシグナル**として読む。
+ */
+function jamesStein(b: number[], se: number[]): { shrunk: number[]; factor: number; mean: number } {
+  const N = b.length;
+  const bMean = mean(b);
+  if (N < 4) return { shrunk: [...b], factor: 0, mean: bMean };
+  const ss = b.reduce((s, v) => s + (v - bMean) * (v - bMean), 0);
+  const s2 = mean(se.map((v) => v * v));
+  if (ss <= 0) return { shrunk: b.map(() => bMean), factor: 1, mean: bMean };
+  const c = Math.max(0, 1 - ((N - 3) * s2) / ss); // 保持率
+  return { shrunk: b.map((v) => bMean + c * (v - bMean)), factor: 1 - c, mean: bMean };
+}
+
+/** long-only＋1銘柄上限の反復キャップ。合計1に正規化する。 */
+function capWeights(raw: number[], maxWeight: number): number[] {
+  let w = raw.map((v) => Math.max(0, v));
+  let sum = w.reduce((s, v) => s + v, 0);
+  if (sum <= 0) return raw.map(() => 0);
+  w = w.map((v) => v / sum);
+  // 上限を超えた銘柄を上限に固定し、残りを再配分（最大 20 回）。
+  for (let iter = 0; iter < 20; iter++) {
+    const over = w.map((v) => v > maxWeight + 1e-9);
+    if (!over.some(Boolean)) break;
+    const fixed = w.reduce((s, v, i) => s + (over[i] ? maxWeight : 0), 0);
+    const freeSum = w.reduce((s, v, i) => s + (over[i] ? 0 : v), 0);
+    const room = Math.max(0, 1 - fixed);
+    w = w.map((v, i) => (over[i] ? maxWeight : freeSum > 0 ? (v / freeSum) * room : 0));
+  }
+  sum = w.reduce((s, v) => s + v, 0);
+  return sum > 0 ? w.map((v) => v / sum) : w;
+}
+
+/** 各銘柄が使うセクター因子（basket なら leave-one-out）を市場直交化して返す。 */
+function factorFor(panel: ReturnPanel, i: number, source: FactorSource, common: number[]): number[] {
+  if (source === "basket") return orthogonalize(leaveOneOut(panel, i), panel.market);
+  return common;
+}
+
+/**
+ * P1 本体。L0（前提診断）に銘柄別の b̂・S ランキング・推奨ウェイトを重ねて返す。
+ *
+ * 設計の核心は「b と市場β を必ず並べて出す」こと。銀行株は分散の 46% が市場由来で、
+ * セクター由来（22%）より大きい（P0 実測）。b だけを見て選ぶと
+ * **金利プレイのつもりで単に高βの銘柄を買う**事故が起きるので、purity（露出の純度）を
+ * 常に併記し、散布図でも2軸に分けて見せる。
+ */
+export function computeSectorSelect(
+  pricesByTicker: Record<string, PricePoint[]>,
+  factors: FactorPrices,
+  paramsIn: Partial<SectorSelectParams> = {}
+): SectorSelectResult | null {
+  const params = { ...DEFAULT_SELECT_PARAMS, ...paramsIn };
+  const premise = computeSectorPremise(pricesByTicker, factors, params);
+  if (!premise) return null;
+
+  const panel = buildPanel(pricesByTicker, factors.market, factors.sector, params.window);
+  if (!panel) return null;
+  const T = panel.market.length;
+  const N = panel.ret.length;
+  const warnings: string[] = [];
+
+  const source = premise.usedFactorSource;
+  const rawSector = source === "etf" && panel.etf ? panel.etf : panel.basket;
+  const Fcommon = orthogonalize(rawSector, panel.market);
+  const varM = variance(panel.market);
+  const years = T / TRADING_DAYS;
+
+  // ---- 各銘柄の回帰（NW 標準誤差）------------------------------------------
+  const bs: number[] = [];
+  const bSes: number[] = [];
+  const rows: Omit<AssetFactorFit, "bShrunk" | "score" | "rank" | "rankLo" | "rankHi" | "rankTopShare" | "weight" | "weightUnc" | "muT" | "yearsNeeded">[] = [];
+
+  for (let i = 0; i < N; i++) {
+    const Fi = factorFor(panel, i, source, Fcommon);
+    const X: number[][] = [];
+    for (let t = 0; t < T; t++) X.push([1, panel.market[t], Fi[t]]);
+    const fit = olsNW(panel.ret[i], X, 5);
+    if (!fit) continue;
+
+    const c = fit.beta[1];
+    const b = fit.beta[2];
+    const vTot = variance(panel.ret[i]);
+    const varF = variance(Fi);
+    const marketShare = vTot > 0 ? (c * c * varM) / vTot : 0;
+    const sectorShare = vTot > 0 ? (b * b * varF) / vTot : 0;
+    const residShare = vTot > 0 ? variance(fit.resid) / vTot : 1;
+    const sysShare = marketShare + sectorShare;
+
+    const sigmaEps = fit.sigmaResid * Math.sqrt(TRADING_DAYS);
+    const sigmaTot = Math.sqrt(vTot) * Math.sqrt(TRADING_DAYS);
+    const muHat = mean(panel.ret[i]) * TRADING_DAYS;
+
+    bs.push(b);
+    bSes.push(fit.se[2]);
+    rows.push({
+      ticker: panel.tickers[i],
+      b,
+      bSe: fit.se[2],
+      bT: fit.t[2],
+      bLo: b - 1.96 * fit.se[2],
+      bHi: b + 1.96 * fit.se[2],
+      cMkt: c,
+      cMktSe: fit.se[1],
+      cMktT: fit.t[1],
+      marketShare,
+      sectorShare,
+      residShare,
+      purity: sysShare > 0 ? sectorShare / sysShare : 0,
+      sigmaEps,
+      sigmaTot,
+      r2: fit.r2,
+      muHat,
+      // σ/√T（年率）。C26 の通り観測頻度では縮まない。
+      muSe: years > 0 ? sigmaTot / Math.sqrt(years) : 0,
+    });
+  }
+  if (rows.length < 3) return null;
+
+  // ---- James-Stein 収縮 -----------------------------------------------------
+  const js = jamesStein(bs, bSes);
+
+  // ---- μ 側（C26 との並置）--------------------------------------------------
+  const muMean = mean(rows.map((r) => r.muHat));
+
+  // ---- スコアと配分 ---------------------------------------------------------
+  const scored = rows.map((r, i) => {
+    const bUse = params.shrink ? js.shrunk[i] : r.b;
+    const dMu = r.muHat - muMean;
+    return {
+      ...r,
+      bShrunk: js.shrunk[i],
+      score: r.sigmaEps > 0 ? bUse / r.sigmaEps : 0,
+      muT: r.muSe > 0 ? dMu / r.muSe : 0,
+      // T* = (κσ/Δμ)²: この銘柄の μ が横断平均と違うことを t>κ で言うのに必要な年数
+      yearsNeeded:
+        Math.abs(dMu) > 1e-9 ? Math.pow((params.kappa * r.sigmaTot) / Math.abs(dMu), 2) : Infinity,
+    };
+  });
+
+  const order = [...scored.keys()].sort((a, b) => scored[b].score - scored[a].score);
+  const rankOf = new Map<number, number>();
+  order.forEach((idx, pos) => rankOf.set(idx, pos + 1));
+
+  // 推奨ウェイト w ∝ b/σ_ε²（採用は上位 topK のみ）
+  const topSet = new Set(order.slice(0, Math.max(1, Math.min(params.topK, order.length))));
+  const rawAll = scored.map((s) => {
+    const bUse = params.shrink ? s.bShrunk : s.b;
+    return s.sigmaEps > 0 ? bUse / (s.sigmaEps * s.sigmaEps) : 0;
+  });
+  const rawTop = rawAll.map((v, i) => (topSet.has(i) ? v : 0));
+  const wTop = capWeights(rawTop, params.maxWeight);
+  const sumUnc = rawAll.reduce((s, v) => s + Math.max(0, v), 0);
+  const wUnc = rawAll.map((v) => (sumUnc > 0 ? Math.max(0, v) / sumUnc : 0));
+
+  // ---- 順位のブートストラップCI（移動ブロック）------------------------------
+  // NW は使わない（点推定だけあればよく、B×N 回まわすので軽さを優先）。
+  const rand = mulberry32(params.seed);
+  const nBlocks = Math.ceil(T / params.blockLen);
+  const rankCount: number[][] = scored.map(() => new Array(scored.length + 1).fill(0));
+  let nBootDone = 0;
+
+  for (let bIter = 0; bIter < params.nBoot; bIter++) {
+    // 時間インデックス列を作り、全銘柄・全因子に同じ列を適用＝横断相関を保存する。
+    const idx: number[] = [];
+    for (let k = 0; k < nBlocks; k++) {
+      const start = Math.floor(rand() * Math.max(1, T - params.blockLen));
+      for (let j = 0; j < params.blockLen && idx.length < T; j++) idx.push(start + j);
+    }
+    const Mb = idx.map((t) => panel.market[t]);
+    const Fb = idx.map((t) => Fcommon[t]);
+    const sc: { i: number; s: number }[] = [];
+    for (let i = 0; i < scored.length; i++) {
+      const yb = idx.map((t) => panel.ret[i][t]);
+      const Xb: number[][] = [];
+      for (let t = 0; t < yb.length; t++) Xb.push([1, Mb[t], Fb[t]]);
+      const f = olsNW(yb, Xb, 0);
+      if (!f) continue;
+      const se = f.sigmaResid * Math.sqrt(TRADING_DAYS);
+      sc.push({ i, s: se > 0 ? f.beta[2] / se : 0 });
+    }
+    if (sc.length !== scored.length) continue;
+    sc.sort((a, b) => b.s - a.s);
+    sc.forEach((x, pos) => rankCount[x.i][pos + 1]++);
+    nBootDone++;
+  }
+
+  const assets: AssetFactorFit[] = scored.map((s, i) => {
+    let lo = 1;
+    let hi = scored.length;
+    let top = 0;
+    if (nBootDone > 0) {
+      const counts = rankCount[i];
+      top = counts[1] / nBootDone;
+      let acc = 0;
+      for (let r = 1; r <= scored.length; r++) {
+        acc += counts[r];
+        if (acc >= 0.025 * nBootDone) {
+          lo = r;
+          break;
+        }
+      }
+      acc = 0;
+      for (let r = scored.length; r >= 1; r--) {
+        acc += counts[r];
+        if (acc >= 0.025 * nBootDone) {
+          hi = r;
+          break;
+        }
+      }
+    }
+    return {
+      ...s,
+      rank: rankOf.get(i) ?? 0,
+      rankLo: lo,
+      rankHi: hi,
+      rankTopShare: top,
+      weight: wTop[i],
+      weightUnc: wUnc[i],
+    };
+  });
+  assets.sort((a, b) => a.rank - b.rank);
+
+  // ---- 識別力の要約: b の上下差は測れるが μ の上下差は測れない ---------------
+  const best = assets[0];
+  const worst = assets[assets.length - 1];
+  const dB = best.b - worst.b;
+  const seDiff = Math.sqrt(best.bSe * best.bSe + worst.bSe * worst.bSe);
+  const spreadT = seDiff > 0 ? dB / seDiff : 0;
+
+  // μ 側は「観測スプレッドから必要年数を逆算」してはいけない。
+  // 最大−最小は選抜バイアスが最も強く乗る統計量なので、そこから T* を出すと
+  // μ が測れるかのように見えてしまう（実際 7203.T 級の分散でも「7年」と出る）。
+  // 正しい問いは「観測スプレッドは、真の μ が全銘柄同じでも出る大きさか」。
+  const muHats = assets.map((a) => a.muHat);
+  const muSpreadObs = Math.max(...muHats) - Math.min(...muHats);
+  const meanMuSe = mean(assets.map((a) => a.muSe));
+  const muSpreadNull = meanMuSe * 2 * Math.sqrt(2 * Math.log(Math.max(2, assets.length)));
+  const muSpreadRatio = muSpreadNull > 0 ? muSpreadObs / muSpreadNull : 0;
+  const sigmasSorted = [...assets.map((a) => a.sigmaTot)].sort((a, b) => a - b);
+  const sigMed = sigmasSorted[Math.floor(sigmasSorted.length / 2)];
+  const muYearsFor5pp = Math.pow((params.kappa * sigMed) / 0.05, 2);
+
+  if (muSpreadRatio < 1) {
+    warnings.push(
+      `μ̂ の銘柄間スプレッドは ${(muSpreadObs * 100).toFixed(0)}pp/年だが、真の μ が全銘柄同一でも` +
+        `ノイズだけで ${(muSpreadNull * 100).toFixed(0)}pp/年 は出る（勝者の呪い）。` +
+        `**過去リターンの順位はノイズと区別できない**ので、選別に使わないこと。`
+    );
+  }
+
+  if (js.factor > 0.3) {
+    warnings.push(
+      `James-Stein の収縮率が ${(js.factor * 100).toFixed(0)}% と大きい。見かけの b の銘柄間差の` +
+        `${(js.factor * 100).toFixed(0)}% は推定ノイズと整合的で、順位の信頼度は低い。`
+    );
+  }
+  const lowPurity = assets.filter((a) => a.purity < 0.25);
+  if (lowPurity.length > 0) {
+    warnings.push(
+      `純度が 25% 未満の銘柄が ${lowPurity.length} 本ある（${lowPurity.slice(0, 4).map((a) => a.ticker).join(", ")}${lowPurity.length > 4 ? " ほか" : ""}）。` +
+        `これらは金利ではなく市場全体に連動している比率が高く、b が大きくても「金利プレイ」にはならない。`
+    );
+  }
+  if (nBootDone < params.nBoot * 0.8) {
+    warnings.push(`順位ブートストラップが ${nBootDone}/${params.nBoot} 回しか成立しなかった。順位CIは参考値。`);
+  }
+
+  return {
+    params,
+    premise,
+    assets,
+    bMean: js.mean,
+    shrinkFactor: js.factor,
+    spreadT,
+    muSpreadObs,
+    muSpreadNull,
+    muSpreadRatio,
+    muYearsFor5pp,
+    nBootDone,
+    warnings,
   };
 }
