@@ -2,9 +2,9 @@
 // ウォッチリストに追加せず、その場限りのユニバース(プリセット/貼り付け)を読み込むための
 // 自己完結フェッチャ。/api/stock?ticker=X&range=10y を使う(usePortfolioData と同じ経路)。
 //
-// 3層キャッシュで Yahoo 負荷を抑える: L1=モジュール内Map(セッション内・最速) →
-// L2=IndexedDB(ページ再読込を跨ぐ永続・TTL 8h) → L3=Yahoo(実取得)。
-// 初回だけ実取得し、以後の再読込はキャッシュ命中で Yahoo ゼロ。新規追加銘柄だけ差分取得。
+// 4層キャッシュで Yahoo 負荷を抑える: L1=モジュール内Map(セッション内・最速) →
+// L2=IndexedDB(ページ再読込を跨ぐ永続・TTL 8h) → L3=サーバー共有キャッシュ → L4=Yahoo。
+// 初回だけサーバーへ問い合わせ、共有キャッシュ命中時は Yahoo を再取得しない。
 import { PricePoint, StockData } from "./types";
 import { getCached, putCached, DEFAULT_TTL_MS } from "./price-cache";
 
@@ -21,7 +21,7 @@ export interface FetchUniverseOptions {
   onProgress?: (done: number, total: number, fromCache: number) => void;
   signal?: AbortSignal;
   ttlMs?: number; // これより新しい IndexedDB キャッシュは Yahoo を叩かず再利用
-  forceRefresh?: boolean; // true でキャッシュを無視して実取得(手動更新)
+  forceRefresh?: boolean; // true でブラウザ内のL1/L2だけを無視してサーバーへ問い合わせる
 }
 
 async function fetchOne(
@@ -42,7 +42,7 @@ async function fetchOne(
       return { stock, cached: true };
     }
   }
-  // L3: Yahoo 実取得
+  // L3: /api/stock。サーバー側の共有キャッシュ命中時は Yahoo を叩かない。
   try {
     const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}&range=10y`, { signal });
     const json = (await res.json()) as StockData & { error?: string };
