@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PricePoint, StockData } from "./types";
+import { isFundCode, yahooSymbolFromTicker } from "./instrument-resolver";
 
 export const STOCK_RANGES = [
   "1mo",
@@ -16,9 +17,6 @@ export const STOCK_RANGES = [
 export type StockRange = (typeof STOCK_RANGES)[number];
 
 const STOCK_RANGE_SET = new Set<string>(STOCK_RANGES);
-const FUND_CODE_PATTERN = /^\d{7,8}$/;
-const TSE_CODE_PATTERN = /^\d[0-9A-Za-z]\d[0-9A-Za-z]$/;
-const YAHOO_SYMBOL_PATTERN = /^[A-Z0-9.^=-]+$/;
 
 export class StockSourceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -32,14 +30,7 @@ export function parseStockRange(range: string | null): StockRange {
 }
 
 export function normalizeStockTicker(ticker: string): string | null {
-  const normalized = ticker.trim().toUpperCase();
-  if (!normalized || normalized.length > 32 || !YAHOO_SYMBOL_PATTERN.test(normalized)) return null;
-  if (FUND_CODE_PATTERN.test(normalized)) return normalized;
-  return TSE_CODE_PATTERN.test(normalized) ? `${normalized}.T` : normalized;
-}
-
-function isFundCode(ticker: string): boolean {
-  return FUND_CODE_PATTERN.test(ticker);
+  return yahooSymbolFromTicker(ticker);
 }
 
 async function fetchFundData(ticker: string, range: StockRange): Promise<StockData> {
