@@ -1335,6 +1335,12 @@ export default function AnalysisPage() {
           </div>
           <div className="shrink-0 flex items-center flex-wrap gap-2">
             <Link
+              href="/guide"
+              className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+            >
+              分析ガイド
+            </Link>
+            <Link
               href="/axioms"
               className="text-sm text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50"
             >
@@ -2213,6 +2219,10 @@ export default function AnalysisPage() {
       <footer className="text-center text-xs text-gray-400 py-8 space-y-1">
         <p>株価データはYahoo Financeより取得。投資判断の参考としてご利用ください。</p>
         <p>
+          <Link href="/guide" className="text-blue-500 hover:text-blue-600 underline">
+            分析手法の数式・読み方はこちら
+          </Link>
+          <span aria-hidden="true"> ・ </span>
           <Link href="/feedback" className="text-blue-500 hover:text-blue-600 underline">
             機能改善のご意見・ご要望はこちら
           </Link>
