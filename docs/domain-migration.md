@@ -77,14 +77,28 @@ https://stock-analysis-self.vercel.app/domain-migration  200（告知期間中�
 ## Phase 5: Search Console
 
 - [x] 旧ホストを301へ変更し、同一パスとクエリが維持されることを本番で確認
-- [ ] `kabugenron.com` のDomainプロパティをDNS TXTで確認
-- [ ] 旧URLのURLプレフィックスプロパティを同じGoogleアカウントで所有者確認
-- [ ] 新しい `/sitemap.xml` を送信
-- [ ] 旧プロパティからアドレス変更を申請
-- [ ] 主要URLをURL検査
+- [x] `kabugenron.com` のDomainプロパティをDNS TXTで確認
+- [x] 旧URLのURLプレフィックスプロパティを同じGoogleアカウントで所有者確認
+- [x] 新しい `/sitemap.xml` を送信
+- [x] 旧プロパティからアドレス変更を申請
+- [x] 主要URLをURL検査
 - [ ] 旧・新のインデックス、検索流入、404を180日以上監視
 
 2026-08-01 に apex 200、www / 旧ホスト 301、旧ホストの `/domain-migration` 200、canonical・robots・sitemap、Vercel のエラー / 500 ログなしを本番で確認した。
+
+### 2026-08-01 実施結果
+
+- Domainプロパティ `kabugenron.com` は確認済み所有者で、確認方法は「ドメイン名プロバイダ」。既存のDNS TXT確認が有効だったため、CloudflareのDNSレコードは追加・変更していない。
+- 旧URLプレフィックスプロパティ `https://stock-analysis-self.vercel.app/` は、既存のHTMLタグにより同じGoogleアカウントで自動確認された。
+- `https://kabugenron.com/sitemap.xml` は2026-07-31送信・最終読み込み済みで、ステータス「成功しました」、検出ページ数4件を確認した。重複送信はしていない。
+- 旧プロパティから `kabugenron.com` へのアドレス変更を申請した。Search Console上の開始日は2026-08-01で、状態は「このサイトは現在移行中です」。
+- URL検査結果:
+  - `https://kabugenron.com/`: 「URL は Google に登録されています」「ページはインデックスに登録済みです」。
+  - `https://kabugenron.com/axioms`: 「検出 - インデックス未登録」。サイトマップは認識済み、前回のクロールは該当なし。
+  - `https://kabugenron.com/portfolio`: 「検出 - インデックス未登録」。サイトマップは認識済み、前回のクロールは該当なし。
+  - `https://kabugenron.com/strategy`: 「検出 - インデックス未登録」。サイトマップは認識済み、前回のクロールは該当なし。
+
+未登録の3 URLは、サイトマップ経由のクロールとインデックス推移を監視する。今回のURL検査ではインデックス登録リクエストを送信していない。
 
 設定順序:
 
