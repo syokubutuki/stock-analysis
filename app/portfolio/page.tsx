@@ -8,10 +8,12 @@ import {
   WatchKind,
   getWatchlist,
   addToWatchlist,
+  addManyToWatchlist,
   removeFromWatchlist,
   updateWatchlistItem,
   effectiveKind,
 } from "../lib/watchlist";
+import { UNIVERSES, getUniverse } from "../lib/universes";
 import {
   Horizon,
   HORIZON_CONFIG,
@@ -224,6 +226,9 @@ export default function PortfolioPage() {
   }, []);
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [addInput, setAddInput] = useState("");
+  // 一括追加。既定は銀行(拡張)＝この画面の主用途。結果は押した直後だけ文言で返す。
+  const [bulkUniverse, setBulkUniverse] = useState("sec-bank-wide");
+  const [bulkResult, setBulkResult] = useState<string | null>(null);
 
   useEffect(() => {
     // 株式原論の合流点(/axioms → /portfolio?add=…)からの銘柄追加を受ける(双方向連携)。
@@ -381,6 +386,18 @@ export default function PortfolioPage() {
     setAddInput("");
   }, [addInput]);
 
+  const handleBulkAdd = useCallback(() => {
+    const uni = getUniverse(bulkUniverse);
+    if (!uni) return;
+    const res = addManyToWatchlist(uni.tickers);
+    setWatchlist(res.list);
+    setBulkResult(
+      res.added === 0
+        ? `追加なし（${res.skipped}件はすべて登録済み）`
+        : `${res.added}件を追加${res.skipped > 0 ? `（${res.skipped}件は登録済み）` : ""}`
+    );
+  }, [bulkUniverse]);
+
   const handleRemove = useCallback((ticker: string) => {
     setWatchlist(removeFromWatchlist(ticker));
   }, []);
@@ -499,7 +516,7 @@ export default function PortfolioPage() {
         </div>
 
         {/* 追加 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input
             value={addInput}
             onChange={(e) => setAddInput(e.target.value)}
@@ -513,6 +530,35 @@ export default function PortfolioPage() {
           >
             追加
           </button>
+
+          {/* ユニバース一括追加。業種バスケットは分析側の選択肢としては既にあったが、
+              お気に入りへ流し込む導線が無く、30銘柄を手で打つしかなかった。 */}
+          <span className="text-gray-300">|</span>
+          <select
+            value={bulkUniverse}
+            onChange={(e) => {
+              setBulkUniverse(e.target.value);
+              setBulkResult(null);
+            }}
+            title={getUniverse(bulkUniverse)?.note}
+            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 max-w-56"
+          >
+            {UNIVERSES.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.label}（{u.tickers.length}）
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleBulkAdd}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
+          >
+            一括追加
+          </button>
+          {bulkResult ? (
+            <span className="text-xs text-gray-500">{bulkResult}</span>
+          ) : null}
+
           {loading ? (
             <span className="text-xs text-gray-400">
               取得中… {progress.done}/{progress.total}
@@ -547,7 +593,8 @@ export default function PortfolioPage() {
 
         {watchlist.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
-            ウォッチリストが空です。上の入力欄か、個別分析画面の ★ で銘柄を追加してください。
+            ウォッチリストが空です。上の「一括追加」で業種バスケットをまとめて入れるか、
+            入力欄／個別分析画面の ★ で1銘柄ずつ追加してください。
           </div>
         ) : (
           <>

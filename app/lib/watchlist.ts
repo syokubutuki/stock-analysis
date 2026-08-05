@@ -39,6 +39,34 @@ export function addToWatchlist(ticker: string, name: string): WatchlistItem[] {
   return save([...current, { ticker, name, addedAt: Date.now() }]);
 }
 
+/**
+ * ユニバース(業種バスケット等)をまとめて追加する。
+ *
+ * `addToWatchlist` を30回ループしても結果は同じだが、あれは1件ごとに
+ * localStorage の読み(JSON.parse)と書き(JSON.stringify)を往復する。ここは読み書きを
+ * 各1回に畳む。重複排除の意味論は `addToWatchlist` と同じ（ticker 完全一致でスキップ）で、
+ * 加えて**渡された配列自身の中の重複**も潰す（ユニバースを2つ連結して渡せるように）。
+ *
+ * added/skipped を返すのは、UI が「n件追加（m件は既存）」と結果を出せるようにするため。
+ * 一括操作は何が起きたのか見えないと、押したのに増えていないのか既に入っていたのか区別できない。
+ */
+export function addManyToWatchlist(
+  items: { ticker: string; name: string }[]
+): { list: WatchlistItem[]; added: number; skipped: number } {
+  const current = getWatchlist();
+  const seen = new Set(current.map((item) => item.ticker));
+  const now = Date.now();
+  const appended: WatchlistItem[] = [];
+  for (const row of items) {
+    if (seen.has(row.ticker)) continue;
+    seen.add(row.ticker);
+    appended.push({ ticker: row.ticker, name: row.name, addedAt: now });
+  }
+  const skipped = items.length - appended.length;
+  if (appended.length === 0) return { list: current, added: 0, skipped };
+  return { list: save([...current, ...appended]), added: appended.length, skipped };
+}
+
 export function removeFromWatchlist(ticker: string): WatchlistItem[] {
   return save(getWatchlist().filter((item) => item.ticker !== ticker));
 }

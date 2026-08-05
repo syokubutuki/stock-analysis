@@ -49,12 +49,22 @@ const extras: Extra[] = [
   ["QQQ", "Invesco QQQ Trust", "etf", "NASDAQ", ["NASDAQ100 ETF", "ナスダック100 ETF"]],
   ["GLD", "SPDR Gold Shares", "etf", "NYSE Arca", ["ゴールド", "金", "GOLD"]],
   ["0331418A", "eMAXIS Slim 全世界株式（オール・カントリー）", "fund", "投資信託", ["オルカン", "全世界株式", "Emaxis Slim オールカントリー"]],
+  // 国内ETF。SectorFactorSelectChart が因子系列として定数参照しているのにカタログに無く、
+  // 個別分析画面から開けなかった。Yahoo の銘柄検索はどちらにも運用会社名
+  // (NOMURA ASSET MANAGEMENT) しか返さないので、日本語名で引けるかはローカル側次第。
+  ["1306.T", "NEXT FUNDS TOPIX連動型上場投信", "etf", "東証", ["TOPIX ETF", "トピックス連動", "1306"]],
+  ["1615.T", "NEXT FUNDS 東証銀行業株価指数連動型上場投信", "etf", "東証", ["銀行ETF", "東証銀行業", "TOPIX銀行業", "銀行株指数", "1615"]],
 ];
 
-const otherInstruments: Instrument[] = extras.map(([ticker, name, type, market, aliases, nameEn]) => ({
-  ticker, yahooSymbol: ticker, name, nameEn, aliases, type, market,
-  currency: market === "日本" || market === "投資信託" ? "JPY" : "USD",
-  priceSupported: type !== "fund", major: true,
+const otherInstruments: Instrument[] = extras.map(([symbol, name, type, market, aliases, nameEn]) => ({
+  // 国内銘柄の正準表記は majorJpStocks と同じく ".T" を落とした形（8306.T → 8306）。
+  // extras に国内ETFを入れる場合、ここを通さないと "1306.T" が正準 ticker になり、
+  // URL・お気に入り・価格取得で JP株と表記が揃わなくなる。米国株・指数・投信は素通り。
+  ticker: canonicalTickerFromYahooSymbol(symbol) ?? symbol,
+  yahooSymbol: symbol, name, nameEn, aliases, type, market,
+  // "東証" は majorJpStocks 側の表記に合わせたもの。ここに入れ忘れると国内ETFが USD 建て扱いになる。
+  currency: market === "日本" || market === "投資信託" || market === "東証" ? "JPY" : "USD",
+  priceSupported: true, major: true,
 }));
 
 export const INSTRUMENTS: readonly Instrument[] = [...majorJpStocks, ...otherInstruments];

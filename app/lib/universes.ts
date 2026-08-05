@@ -199,7 +199,7 @@ const SEC_FIN: { ticker: string; name: string }[] = [
   { ticker: "7182.T", name: "ゆうちょ銀行" },
   { ticker: "8331.T", name: "千葉銀行" },
   { ticker: "8354.T", name: "ふくおかFG" },
-  { ticker: "7186.T", name: "コンコルディアFG" },
+  { ticker: "7186.T", name: "横浜FG" },
   { ticker: "8591.T", name: "オリックス" },
   { ticker: "8604.T", name: "野村HD" },
   { ticker: "8601.T", name: "大和証券グループ" },
@@ -231,12 +231,50 @@ const SEC_BANK: { ticker: string; name: string }[] = [
   { ticker: "8331.T", name: "千葉銀行" },
   { ticker: "5831.T", name: "静岡フィナンシャルG" },
   { ticker: "8354.T", name: "ふくおかFG" },
-  { ticker: "7186.T", name: "コンコルディアFG" },
+  { ticker: "7186.T", name: "横浜FG" }, // 旧コンコルディアFG(商号変更・コードは据え置き)
   { ticker: "5844.T", name: "京都フィナンシャルG" },
   { ticker: "5830.T", name: "いよぎんHD" },
   { ticker: "8377.T", name: "ほくほくFG" },
   { ticker: "8524.T", name: "北洋銀行" },
 ];
+
+// SEC_BANK に足す主要地銀。SEC_BANK 自体は**書き換えない**。
+// 理由: セクター因子の推定(sector-factor-select.ts / C27・C29)はユニバースが変われば
+// b・σ_ε・順位相関 π が全部変わる。docs/sector-factor-selection.md と
+// docs/sector-factor-stability.md に残した実測値が再現できなくなるため、
+// 「因子推定用の固定ユニバース(純)」と「ブレッドス用(拡張)」を分けて持つ。
+//
+// コードは 2026-08-05 に Yahoo Finance の銘柄検索で全件照合済み。地銀は持株会社化で
+// コードが飛ぶため、記憶で書くと**別会社の価格を静かに分析してしまう**。旧コードは失効を確認:
+//   8379 広島銀行     → 7337 ひろぎんHD
+//   8382 中国銀行     → 5832 ちゅうぎんFG
+//   8394 肥後銀行 ─┐
+//   8397 鹿児島銀行 ┴→ 7180 九州FG
+// (既に SEC_BANK に入っている 8355→5831 / 8369→5844 / 8385→5830 も同種の付け替え)
+//
+// 付け替え後のコードは**上場日以降しか履歴が無い**。10y を取ると 2026-08 時点で:
+//   5832 ちゅうぎんFG 約940本(2022-10〜) / 7380 十六FG 約1185本(2021-10〜) /
+//   7337 ひろぎんHD 約1429本(2020-10〜) ← 他は約2463本
+// 長い窓を選ぶと buildPanel の履歴フィルタでパネルから自動的に落ちる(5830/5831 と同じ挙動)。
+// 「銘柄が消えた」のではなく履歴不足。統合前の旧行の系列とは連続していない点にも注意。
+const SEC_BANK_REGIONAL: { ticker: string; name: string }[] = [
+  { ticker: "7167.T", name: "めぶきFG" },
+  { ticker: "8359.T", name: "八十二銀行" },
+  { ticker: "7337.T", name: "ひろぎんHD" },
+  { ticker: "8418.T", name: "山口FG" },
+  { ticker: "5832.T", name: "ちゅうぎんFG" },
+  { ticker: "7180.T", name: "九州FG" },
+  { ticker: "8334.T", name: "群馬銀行" },
+  { ticker: "8341.T", name: "七十七銀行" },
+  { ticker: "7380.T", name: "十六FG" },
+  { ticker: "8366.T", name: "滋賀銀行" },
+  { ticker: "8367.T", name: "南都銀行" },
+  { ticker: "8368.T", name: "百五銀行" },
+  { ticker: "7189.T", name: "西日本FHD" },
+  { ticker: "8381.T", name: "山陰合同銀行" },
+];
+
+const SEC_BANK_WIDE = [...SEC_BANK, ...SEC_BANK_REGIONAL];
 
 // 電機・精密・半導体
 const SEC_TECH: { ticker: string; name: string }[] = [
@@ -379,6 +417,15 @@ export const UNIVERSES: UniverseDef[] = [
       "銀行のみ。セクター因子を「金融」でなく「銀行」で定義するための純ユニバース（金利感応度による選別＝C27 用）。" +
       "注意: 地銀は統合・再編で消えた行が多く、この現存リストは過去の勝者に偏る（生存者バイアス）。",
     tickers: dedupe(SEC_BANK),
+  },
+  {
+    id: "sec-bank-wide",
+    label: "業種:銀行（拡張30）",
+    note:
+      "銀行30本。純(sec-bank)に主要地銀14本を足してブレッドスを倍にしたもの。お気に入りへの一括追加と横断分析の既定。" +
+      "因子推定は純の側を使う（ユニバースを変えると b・σ_ε・順位相関が変わり、過去の実測値と比較できなくなるため分けてある）。" +
+      "生存者バイアスは純と同様、あるいは地銀を増やした分だけ強い。",
+    tickers: dedupe(SEC_BANK_WIDE),
   },
   {
     id: "sec-tech",
