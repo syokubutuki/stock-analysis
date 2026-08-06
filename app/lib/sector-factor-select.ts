@@ -1000,12 +1000,19 @@ export function computeSectorSelect(
   const bSes: number[] = [];
   const rows: Omit<AssetFactorFit, "bShrunk" | "score" | "rank" | "rankLo" | "rankHi" | "rankTopShare" | "weight" | "weightUnc" | "muT" | "yearsNeeded">[] = [];
 
+  // 回帰が落ちた銘柄は rows に入らないので、rows の添字とパネルの添字がずれる。
+  // 順位ブートは panel.ret を引くため、対応表を持たないと**別の銘柄の系列で順位を作る**。
+  const keptIdx: number[] = [];
+  const keptFactor: number[][] = [];
+
   for (let i = 0; i < N; i++) {
     const Fi = factorFor(panel, i, source, Fcommon);
     const X: number[][] = [];
     for (let t = 0; t < T; t++) X.push([1, panel.market[t], Fi[t]]);
     const fit = olsNW(panel.ret[i], X, 5);
     if (!fit) continue;
+    keptIdx.push(i);
+    keptFactor.push(Fi);
 
     const c = fit.beta[1];
     const b = fit.beta[2];
@@ -1097,12 +1104,15 @@ export function computeSectorSelect(
       for (let j = 0; j < params.blockLen && idx.length < T; j++) idx.push(start + j);
     }
     const Mb = idx.map((t) => panel.market[t]);
-    const Fb = idx.map((t) => Fcommon[t]);
     const sc: { i: number; s: number }[] = [];
     for (let i = 0; i < scored.length; i++) {
-      const yb = idx.map((t) => panel.ret[i][t]);
+      // 因子は点推定と同じもの（basket モードなら leave-one-out）を使う。
+      // Fcommon を共用すると basket モードで自分自身を含むバスケットに回帰することになり、
+      // b̂ が上振れ・σ_ε が下振れして、順位CI が点推定と別のスコア定義の上で作られてしまう。
+      const Fi = keptFactor[i];
+      const yb = idx.map((t) => panel.ret[keptIdx[i]][t]);
       const Xb: number[][] = [];
-      for (let t = 0; t < yb.length; t++) Xb.push([1, Mb[t], Fb[t]]);
+      for (let t = 0; t < yb.length; t++) Xb.push([1, Mb[t], Fi[idx[t]]]);
       const f = olsNW(yb, Xb, 0);
       if (!f) continue;
       const se = f.sigmaResid * Math.sqrt(TRADING_DAYS);
@@ -1151,8 +1161,13 @@ export function computeSectorSelect(
   assets.sort((a, b) => a.rank - b.rank);
 
   // ---- 識別力の要約: b の上下差は測れるが μ の上下差は測れない ---------------
-  const best = assets[0];
-  const worst = assets[assets.length - 1];
+  //
+  // 「b の差は測れる」を示す統計量なので、**b の最大と最小**で取る。assets は S=b/σ_ε 順なので
+  // その両端を使うと、b が最大でも σ_ε が大きくて S が最下位、という銘柄で t が負になり、
+  // 「b は測れる」の緑カードに負の t が出る（画面の文言と矛盾する）。
+  const byB = [...assets].sort((x, y) => y.b - x.b);
+  const best = byB[0];
+  const worst = byB[byB.length - 1];
   const dB = best.b - worst.b;
   const seDiff = Math.sqrt(best.bSe * best.bSe + worst.bSe * worst.bSe);
   const spreadT = seDiff > 0 ? dB / seDiff : 0;

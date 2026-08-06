@@ -21,7 +21,6 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import {
-  computeSectorStability,
   BOJ_POLICY_EVENTS,
   DEFAULT_STABILITY_PARAMS,
   type StabilityParams,
@@ -96,8 +95,13 @@ export interface StabilityState {
 }
 
 /**
- * L2 の計算。P1 の描画を止めないよう、重い同期計算は次のフレームへ送ってから走らせる。
- * L2-C だけは Worker（supWald のブートが全体の計算量を支配するため）。
+ * L2 の計算。**全部 Worker で走らせる。**
+ *
+ * 当初は L2-C だけ Worker に載せ、残りは `setTimeout(…, 0)` でメインスレッドに置いていたが、
+ * それは実行を遅らせるだけで逃がしていない。刻み5日・窓500日を選ぶと数百窓 × 16銘柄の
+ * NW 回帰＋ブート＋順列が同じタスクで走り、UI が数秒固まったうえ「計算中」の表示すら出なかった
+ * （setState と重い計算が同一タスクなので、その間に描画が挟まらない）。
+ * 結果は main（L2-A/B/D＋建玉翻訳）→ breaks（L2-C）の2段階で返し、描画は先へ進める。
  */
 export function useSectorStability(
   pricesByTicker: Record<string, PricePoint[]>,
@@ -119,7 +123,7 @@ export function useSectorStability(
 
   useEffect(() => {
     let cancelled = false;
-    // P1 の描画を先に出してから重い計算に入る（同期 setState を効果本体に置かない）。
+    // 同期 setState を効果本体に置かないため、起動そのものも次のタスクへ送る。
     const id = setTimeout(() => {
       if (cancelled) return;
       if (!enabled || !factors?.market || Object.keys(pricesByTicker).length < 3) {
@@ -131,23 +135,6 @@ export function useSectorStability(
       setComputing(true);
       setBreaks(null);
       setBreakError(null);
-      let res: StabilityResult | null = null;
-      try {
-        res = computeSectorStability(
-          pricesByTicker,
-          factors,
-          { ...extra, ...controls },
-          names
-        );
-      } catch (err) {
-        console.error("sector stability compute failed", err);
-      }
-      if (cancelled) return;
-      setResult(res);
-      setComputing(false);
-
-      // ── L2-C を Worker へ ────────────────────────────────
-      if (!res) return;
       try {
         if (!workerRef.current) {
           workerRef.current = new Worker(
@@ -158,29 +145,31 @@ export function useSectorStability(
         const reqId = ++reqRef.current;
         w.onmessage = (ev: MessageEvent<StabilityWorkerResponse>) => {
           if (ev.data.reqId !== reqRef.current) return;
-          if (ev.data.progress) setBreakProgress(ev.data.progress);
-          if (ev.data.error) setBreakError(ev.data.error);
-          if (ev.data.result) {
-            setBreaks(ev.data.result);
+          const d = ev.data;
+          if (d.kind === "progress" && d.progress) setBreakProgress(d.progress);
+          else if (d.kind === "error") {
+            setBreakError(d.error ?? "unknown");
+            setComputing(false);
+          } else if (d.kind === "main") {
+            setResult(d.result ?? null);
+            setComputing(false);
+            if (d.result) setBreakProgress({ done: 0, total: d.result.tickers.length + 1 });
+          } else if (d.kind === "breaks") {
+            setBreaks(d.breaks ?? null);
             setBreakProgress(null);
           }
         };
         const req: StabilityWorkerRequest = {
           reqId,
-          kind: "breaks",
-          panel: res.panel,
-          params: {
-            trim: res.params.trim,
-            rollStep: res.params.rollStep,
-            nBoot: res.params.nBoot,
-            blockLen: res.params.blockLen,
-            seed: res.params.seed,
-          },
+          pricesByTicker,
+          factors,
+          params: { ...extra, ...controls },
+          names,
         };
-        setBreakProgress({ done: 0, total: res.tickers.length + 1 });
         w.postMessage(req);
       } catch (err) {
         setBreakError(String(err));
+        setComputing(false);
       }
     }, 0);
     return () => {
@@ -281,7 +270,6 @@ interface PanelProps {
 
 export default function SectorStabilityPanel({ state, controls, setControls, names, heldSet }: PanelProps) {
   const { result, breaks, breakProgress, computing, breakError } = state;
-  const [twoStage, setTwoStage] = useState(true);
   const [lambda, setLambda] = useState(1);
   const [costBps, setCostBps] = useState(10);
   const [breakTicker, setBreakTicker] = useState<string | null>(null);
@@ -797,69 +785,48 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
     return [...breaks.byTicker].sort((a, b) => a.bootP - b.bootP)[0] ?? null;
   }, [breaks, breakTicker]);
 
-  const pathRef = useRef<HTMLCanvasElement | null>(null);
+  // 横軸が分割点の「日付」なので CLAUDE.md の規約どおり lightweight-charts。
+  // W(s) の山がどの時期に立っているかを拡大して確かめられることが、この図の価値そのもの。
+  const pathRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const cv = pathRef.current;
-    if (!cv || !breakRow) return;
-    const init = initCanvas(cv, 170);
-    if (!init) return;
-    const { ctx, width, height } = init;
-    const padL = 40;
-    const padR = 16;
-    const padT = 14;
-    const padB = 24;
-    const plotW = width - padL - padR;
-    const plotH = height - padT - padB;
-    const p = breakRow.path;
-    const yMax = Math.max(breakRow.crit95, ...p.map((x) => x.w)) * 1.1 || 1;
-    const X = (i: number) => padL + (i / Math.max(1, p.length - 1)) * plotW;
-    const Y = (v: number) => padT + plotH - (v / yMax) * plotH;
-
-    ctx.font = "10px sans-serif";
-    ctx.strokeStyle = "#e5e7eb";
-    for (let k = 0; k <= 4; k++) {
-      const v = (yMax * k) / 4;
-      ctx.beginPath();
-      ctx.moveTo(padL, Y(v));
-      ctx.lineTo(padL + plotW, Y(v));
-      ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
-      ctx.textAlign = "right";
-      ctx.fillText(v.toFixed(0), padL - 5, Y(v) + 3);
-    }
-    ctx.strokeStyle = "#4f46e5";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    p.forEach((x, i) => (i === 0 ? ctx.moveTo(X(i), Y(x.w)) : ctx.lineTo(X(i), Y(x.w))));
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    // ブート臨界値
-    ctx.strokeStyle = "#dc2626";
-    ctx.setLineDash([5, 3]);
-    ctx.beginPath();
-    ctx.moveTo(padL, Y(breakRow.crit95));
-    ctx.lineTo(padL + plotW, Y(breakRow.crit95));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = "#dc2626";
-    ctx.textAlign = "left";
-    ctx.fillText(`ブート臨界値95% = ${breakRow.crit95.toFixed(0)}`, padL + 4, Y(breakRow.crit95) - 4);
-    // 最大点
-    const best = p.reduce((a, b, i) => (b.w > p[a].w ? i : a), 0);
-    ctx.fillStyle = "#111827";
-    ctx.beginPath();
-    ctx.arc(X(best), Y(p[best].w), 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.textAlign = X(best) > padL + plotW / 2 ? "right" : "left";
-    ctx.fillText(`${p[best].date}  W=${p[best].w.toFixed(0)}`, X(best) + (X(best) > padL + plotW / 2 ? -6 : 6), Y(p[best].w) - 6);
-    // 日付軸
-    for (const k of [0, Math.floor(p.length / 2), p.length - 1]) {
-      ctx.fillStyle = "#9ca3af";
-      ctx.textAlign = k === 0 ? "left" : k === p.length - 1 ? "right" : "center";
-      ctx.fillText(p[k].date, X(k), height - 8);
-    }
-    ctx.strokeStyle = "#d1d5db";
-    ctx.strokeRect(padL, padT, plotW, plotH);
+    const el = pathRef.current;
+    if (!el || !breakRow) return;
+    const chart = createChart(el, {
+      layout: { background: { color: "#ffffff" }, textColor: "#333" },
+      grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
+      width: el.clientWidth,
+      height: 190,
+      crosshair: { mode: 0 },
+      rightPriceScale: { visible: true },
+      timeScale: { timeVisible: false },
+    });
+    const s = chart.addSeries(LineSeries, { color: "#4f46e5", lineWidth: 2, title: "W(s)" });
+    s.setData(breakRow.path.map((x) => ({ time: x.date as Time, value: x.w })));
+    s.createPriceLine({
+      price: breakRow.crit95,
+      color: "#dc2626",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "ブート臨界値95%",
+    });
+    const best = breakRow.path.reduce((a, b) => (b.w > a.w ? b : a), breakRow.path[0]);
+    createSeriesMarkers(s, [
+      {
+        time: best.date as Time,
+        position: "aboveBar",
+        color: "#111827",
+        shape: "arrowDown",
+        text: `${best.date} W=${best.w.toFixed(0)}`,
+      },
+    ]);
+    chart.timeScale().fitContent();
+    const onResize = () => chart.applyOptions({ width: el.clientWidth });
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.remove();
+    };
   }, [breakRow]);
 
   if (!result) {
@@ -870,7 +837,6 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
 
   const p = result.persistence;
   const d = result.decision;
-  const useW = twoStage ? d.weight : d.weightBase;
   const sigBreaks = breaks?.byTicker.filter((r) => r.q < 0.1) ?? [];
 
   return (
@@ -918,10 +884,9 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
             </button>
           ))}
         </div>
-        <label className="ml-1 flex items-center gap-1">
-          <input type="checkbox" checked={twoStage} onChange={(e) => setTwoStage(e.target.checked)} />
-          <span className="text-gray-600">二段収縮</span>
-        </label>
+        {/* 設計書 §7.5 の「二段収縮 ON/OFF」トグルは置かない。目的は差分を体感させることだが、
+            下のウェイト図が π を掛けない値と掛けた値を常に並べて描いているので、
+            トグルは表示を切り替えるだけの空振りの操作になる（実際に一度そう実装して外した）。 */}
         <span className="ml-1 text-gray-500">コスト</span>
         <select
           value={costBps}
@@ -1143,7 +1108,9 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
           <span className="font-mono"> r = α + γD + cM + bF + δ(F·D)</span> で b|D=0 と b|D=0+δ を同時に出す。
           δ の検定は銘柄横断で BH-FDR 補正。<b className="text-red-700">「暴落増幅」＝市場下落日にセクター露出が有意に増える</b>銘柄で、
           分散のつもりが暴落時に集中する（C11 と衝突）。
-          S&apos; は下げで強まるぶんにペナルティを掛けた順位で、λ=0 にすれば P1 と同じ並びに戻る。
+          S&apos; は下げで強まるぶんにペナルティを掛けた順位で、λ=0 なら左の S 列と一致する。
+          <b>この S 列は P1 の順位表とは数値が一致しない</b> ── 定義（符号分割を入れない b/σ_ε）は同じだが、
+          P2 は独自の窓（{result.params.window}日）で走っているため。比べるのは P1 の表ではなく、この表の中の S と S&apos; の差。
         </div>
       </div>
 
@@ -1182,7 +1149,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
                 </button>
               ))}
             </div>
-            <canvas ref={pathRef} className="mt-1" />
+            <div ref={pathRef} className="mt-1" />
             {breakRow && (
               <div className="mt-1 text-[10px] text-gray-500">
                 {breakRow.ticker.startsWith("＊") ? "共通成分" : label(breakRow.ticker)} の W(s) 経路。
@@ -1295,7 +1262,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
           {result.tickers.map((t, i) => (
             <span
               key={t}
-              title={`安定度 ${d.trust[i].toFixed(2)} / 推奨w ${pct(useW[i], 1)}`}
+              title={`安定度 ${d.trust[i].toFixed(2)} / 二段収縮後の推奨w ${pct(d.weight[i], 1)}`}
               className={`rounded border px-1.5 py-0.5 text-[10px] ${
                 d.trust[i] > 0.2
                   ? "border-green-300 bg-green-50 text-green-800"

@@ -605,7 +605,11 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
               <div className="mt-1 font-mono text-xs text-gray-700">SE(b̂) = σ_ε/(σ_F√T) は観測頻度で縮む</div>
               <div className="mt-1 font-mono text-lg font-bold text-green-700">t = {result.spreadT.toFixed(1)}</div>
               <div className="text-[10px] text-gray-500">
-                同じ標本・同じ2銘柄の b の差（Δb = {(result.assets[0].b - result.assets[result.assets.length - 1].b).toFixed(2)}）の t 値
+                同じ標本での b の最大−最小（Δb ={" "}
+                {(
+                  Math.max(...result.assets.map((a) => a.b)) - Math.min(...result.assets.map((a) => a.b))
+                ).toFixed(2)}
+                ）の t 値
               </div>
             </div>
           </div>

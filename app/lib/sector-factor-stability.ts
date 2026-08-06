@@ -250,8 +250,13 @@ export interface AsymmetryRow {
   bRateDown: number;
   rateDeltaT: number;
   rateAvailable: boolean;
+  /** 固有ボラ（年率）。符号分割を入れない素の回帰から取る＝P1 と同じ定義。 */
   sigmaEps: number;
-  /** P1 と同じ S = b/σ_ε（対称の b を使った基準値）。 */
+  /**
+   * S = b/σ_ε（符号分割なしの b と σ_ε）。定義は P1 と同じだが、
+   * **P2 は独自の窓（既定 2400 日）で走るので P1 の表と数値は一致しない**。
+   * 比較すべきは同じ画面の P1 列ではなく、この表の中での S と S' の差。
+   */
   score: number;
   /** 非対称ペナルティ後の S'。 */
   scoreAdj: number;
@@ -301,6 +306,16 @@ export interface StabilityPanelExport {
   factor: number[];
   /** 銘柄別のセクター因子（basket モードの leave-one-out）。 */
   factors?: number[][];
+  /**
+   * 共通成分（等加重バスケット）の構造変化を検定するときの因子。**必ずパネル外の系列**。
+   *
+   * ここを `factor`（basket モードでは leave-one-out バスケット）で代用してはいけない。
+   * 被説明変数の等加重バスケット eq は ((N−1)·F^(−0) + r_0)/N なので相関が 0.99 を超え、
+   * b̂ が機械的に (N−1)/N へ張り付き残差がほぼ 0 になる。degenerate な自己回帰から
+   * 「b の水準が揃って動いた」という結論を出すことになり、この層の主張が丸ごと崩れる。
+   * 外生因子（セクターETF）が無ければ共通成分の検定は**行わない**（null を返す）。
+   */
+  commonFactor: number[] | null;
 }
 
 export interface StabilityResult {
@@ -873,12 +888,14 @@ export function computeAsymmetry(
       }
     }
 
-    const sigmaEps = fSign.sigmaResid * Math.sqrt(TRADING_DAYS);
-    // 対称の b（＝P1 と同じ値）は F・M 双方の分割を入れない素の回帰から取る。
+    // 対称の b と σ_ε は、符号分割を入れない素の回帰（P1 と同じ 3 変数）から取る。
+    // **σ_ε を分割回帰の残差から取ってはいけない**: 交互作用を足したぶん残差が必ず小さくなり、
+    // S = b/σ_ε が P1 の同名の列と別物になる（λ=0 で P1 の並びに戻る、が成り立たなくなる）。
     const X: number[][] = [];
     for (let t = 0; t < T; t++) X.push([1, M[t], F[t]]);
     const plain = olsNW(y, X, 5);
     const bSym = plain ? plain.beta[2] : (fSign.b0 + fSign.b1) / 2;
+    const sigmaEps = (plain ? plain.sigmaResid : fSign.sigmaResid) * Math.sqrt(TRADING_DAYS);
 
     pF.push(fSign.p);
     pM.push(mSign.p);
@@ -1214,15 +1231,25 @@ export function computeBreaks(
   }
 
   // 共通成分（等加重バスケット）。個別の分割点が「共通の水準変化」なのかを切り分ける。
-  const T2 = panel.market.length;
-  const eq = new Array(T2).fill(0);
-  for (let t = 0; t < T2; t++) {
-    let s = 0;
-    for (let i = 0; i < N; i++) s += panel.ret[i][t];
-    eq[t] = s / N;
+  // 因子は必ずパネル外（commonFactor の注記を参照）。無ければこの検定は行わない。
+  let commonRow: BreakRow | null = null;
+  if (panel.commonFactor) {
+    const T2 = panel.market.length;
+    const eq = new Array(T2).fill(0);
+    for (let t = 0; t < T2; t++) {
+      let s = 0;
+      for (let i = 0; i < N; i++) s += panel.ret[i][t];
+      eq[t] = s / N;
+    }
+    commonRow = scanOne("＊共通（等加重）", eq, panel.commonFactor).row;
+    commonRow.q = commonRow.bootP;
+  } else {
+    warnings.push(
+      "セクターETFが無いため、共通成分（等加重バスケット）の構造変化は検定できない。" +
+        "等加重バスケットをパネル内の因子に回帰すると自己回帰になり、b̂ が機械的に 1 近傍へ張り付くため。" +
+        "個別銘柄の分割点が「共通の水準変化」なのか「銘柄ごとの構造変化」なのかは、この標本では切り分けられない。"
+    );
   }
-  const commonRow = scanOne("＊共通（等加重）", eq, panel.factor).row;
-  commonRow.q = commonRow.bootP;
   onProgress?.(N + 1, N + 1);
 
   const q = benjaminiHochberg(pvals);
@@ -1268,8 +1295,9 @@ export function computeBreaks(
       "BH-FDR 後に構造変化が有意な銘柄は無い。長い窓を使ってよい（分散が減るぶん有利）。" +
         "ただし検出力は高くないので「変化が無い」の証明ではない。"
     );
-  } else if (commonRow.bootP < 0.1) {
-    const sameSign = rows.filter((r) => r.q < 0.1 && Math.sign(r.bAfter - r.bBefore) === Math.sign(commonRow.bAfter - commonRow.bBefore)).length;
+  } else if (commonRow && commonRow.bootP < 0.1) {
+    const cr = commonRow;
+    const sameSign = rows.filter((r) => r.q < 0.1 && Math.sign(r.bAfter - r.bBefore) === Math.sign(cr.bAfter - cr.bBefore)).length;
     warnings.push(
       `共通成分（等加重バスケット）自体に分割点がある（p=${commonRow.bootP.toFixed(3)}, ` +
         `b ${commonRow.bBefore.toFixed(2)}→${commonRow.bAfter.toFixed(2)}）。` +
@@ -1361,6 +1389,8 @@ export function computeSectorStability(
     market: panel.market,
     factor: facs[0],
     factors: usedFactorSource === "basket" ? facs : undefined,
+    // 共通成分の検定はパネル外の因子でしか成立しない。basket モードでも ETF があれば使う。
+    commonFactor: panel.etf,
   };
 
   return {
