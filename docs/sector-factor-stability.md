@@ -723,7 +723,7 @@ CLAUDE.md の7項目＋原論ブロック。P2 固有で外せない説明:
 |---|---|
 | 1 | π(h) の減衰曲線が CI・ヌル付きで描かれ、**半減期が日数で1つの数字として出る** |
 | 2 | 二段収縮の ON/OFF で推奨ウェイトが実際に動き、その差分がバーで見える |
-| 3 | 「π がヌルと区別できない」ケースで、**赤バッジ＋等加重推奨**が正しく出る（合成データで確認） |
+| 3 | 「π がヌルと区別できない」ケースで、**赤バッジ＋等加重推奨**が正しく出る（合成データで確認）→ **達成（2026-08-07・§12.8）** |
 | 4 | ローリング b(t) が lightweight-charts で描かれ、時間軸ズームが効く |
 | 5 | supWald がブロック・ブートの臨界値付きで出て、BH-FDR 後の有意銘柄が特定される |
 | 6 | b⁺/b⁻ の非対称性が銘柄ごとに検定され、「暴落増幅」判定が出る |
@@ -978,3 +978,453 @@ leave-one-out 因子で走らせると、検出された分割点が政策日に
 ETF 因子は各銘柄自身を時価加重で含むため、銘柄固有の構造変化が因子側にも同時に現れて
 差が相殺される。**銘柄ごとの構造変化を見たいときは basket（L-O-O）に切り替えること。**
 π（横断の持続性）は etf/basket でほぼ変わらない。
+
+### 12.8 合成データによる赤経路の検証（2026-08-07）
+
+受け入れ基準 #3 の唯一の未達項目だった。実データが π=0.97 だったため、
+**「持続性が測れないなら等加重に退避する」という本層の安全装置が一度も実行されていなかった**
+（`docs/sector-factor-p2-session-record.md` §2.3 の宿題）。安全装置は、それが必要な状況を
+作って踏んでみるまで、実装されているとは言えない。
+
+#### 作ったデータ
+
+```
+r_{i,t} = a_i·M_t + b_{i,t}·F_t + ε_{i,t},    F_t = 0.9·M_t + f_t
+b_{i,t} = β_i + η_{i,t}     η は減衰時定数 τ_η の OU 過程
+```
+
+推定側の回帰は `r ~ [1, M, F]` なので、b は F の係数としてそのまま識別される。
+14銘柄・2600営業日・σ_ε=0.012・b̄=0.8（実データに合わせた）。
+
+| ケース | 恒久成分 β_i の sd | 時変成分 η | 真の π(250日) |
+|---|---|---|---|
+| `null` | **0** | OU（τ_η=40日・sd 0.5） | **0.07** |
+| `persistent` | 0.28 | なし | 1.00 |
+| `mixed` | 0.25 | OU（同上） | 0.27 |
+
+**π=0 の作り方の要点**は、分母を潰さずに分子だけを 0 にすること。恒久成分をゼロにしたうえで
+η の減衰時定数（40日）をローリング窓（250日）より十分短く取ると、窓平均された b̂ の横断ばらつきは
+`0.5·√(2·40/250) = 0.28` と実データ並みに残る一方、非重複の2窓（h=250）は独立になる。
+**b を日次で振ってはいけない**（横断分散が推定誤差だけになり π が 0/0 の不定形になって検証にならない）。
+
+#### 結果（種 20260807・既定パラメータ・因子 etf）
+
+```
+ケース null（真の π=0）
+   h   真のπ   観測π      95%CI      ヌル95%  重複φ
+   63    0.84    0.85  [ 0.82, 0.88]    0.06   0.75
+  125    0.60    0.60  [ 0.52, 0.68]    0.06   0.50
+  250    0.07    0.12  [ 0.00, 0.31]    0.06   0.00   ← 判断に使う点
+  500   -0.12   -0.06  [-0.09, 0.01]    0.06   0.00
+  → indistinguishableFromNull=true / piForDecision=0.00 / 半減期 93日
+  → バッジ赤「この順位は使えない（持続性を測れていない）」／推奨w列 灰色化
+  → b_forecast の散らばり 0.0e+0（全銘柄 b̄ に一致）
+  → 推奨 w と 1/σ_ε²（採用内で正規化）の最大乖離 2.8e-17 ＝ 実質リスクパリティへ退避
+
+ケース persistent（真の π=1）  π=1.02 [1.00,1.04] → 緑・piForDecision=1.00・灰色化なし
+ケース mixed（真の π=0.27）    π=0.33 [0.25,0.55] → 黄・piForDecision=0.25
+```
+
+赤・黄・緑の3分岐がすべて踏まれ、15項目の assert が通った。バッジは式を写したのではなく
+**`StabilityVerdictBadge` を `react-dom/server` で実際に描画**して `border-red-300` と文言を確認している。
+
+#### この検証で分かった3つのこと
+
+1. **判定を CI 下限で切っている設計が、まさにここで効いた。** null ケースの π の点推定は 0.12 で、
+   ヌル95%点 0.06 を**超えている**。点推定で判定していたら赤は出ず、真の π=0 のデータに対して
+   チルトを許してしまっていた。実際に赤を出したのは CI 下限（0.00）で切る規則のほう。
+2. **重複窓の補正（§12.2-1）が真値に対して正しいことを初めて確認した。** 真の π と観測 π が
+   h=63 で 0.84 vs 0.85、h=125 で 0.60 vs 0.60 と一致する。これまで補正の妥当性は
+   実データでしか見ておらず、**真値と比べたことがなかった**。
+3. **安全装置は連続量で効いており、バッジの色は要約にすぎない。** 種を20本振ると、
+   真の π=0 で赤になるのは **14/20**。残り6本は黄に落ちるが、その piForDecision は 0.07〜0.23 で
+   チルトはほぼ畳まれている。**危険なのは緑が出ることだが、それは 0/20**。
+   逆に真の π=1 で誤って退避したのは 0/10（10本すべて緑・piForDecision 0.94〜1.00）。
+
+```
+真の π = 0（20種）: 赤 14 / 黄 6 / 緑 0     黄の piForDecision = 0.07〜0.23
+真の π = 1（10種）: 赤  0 / 黄 0 / 緑 10    piForDecision = 0.94〜1.00
+```
+
+#### 残った論点（未決）
+
+- **黄のとき推奨w列は灰色化されない。** 上の6本のように真の π=0 でも黄に落ちることがあり、
+  そのとき π=0.07〜0.23 の弱いチルトを太字で見せることになる。灰色化の条件を
+  `indistinguishableFromNull` から `piLo ≤ 0.5`（＝緑以外）へ広げるかは未決。
+  実害は小さい（チルト自体は畳まれている）が、太字は「使ってよい」の合図として読まれる。
+- **ブラウザでの目視はしていない。** 灰色化は `tiltUnusable` 1つのブール値が
+  `SectorFactorSelectChart.tsx:677-685` の三項演算子2つを切り替えるだけなので、
+  ブール値とバッジの markup までで止めた。合成データを実画面に流すには
+  `/api/stock` に合成銘柄を通す口を開ける必要があり、そこまではしていない。
+
+再現スクリプトは付録B。
+
+
+---
+
+## 付録B. 赤経路の検証スクリプト（§12.8 の全文）
+
+外部データ不要（合成データ）。**本書だけで安全装置の検証を再現できるようにするため全文を残す。**
+
+リポジトリ直下に `.scratch/` を作り、下の3ファイルを置いて実行する
+（`react-dom` の解決に `node_modules` が要るのでスクラッチパッドからは動かない。
+`lightweight-charts` はブラウザ専用ビルドなので node では読めず、stub に差し替える）。
+
+```bash
+npx tsx --tsconfig .scratch/tsconfig.json .scratch/pi-null-verify.tsx           # 3ケースの assert（15項目）
+npx tsx --tsconfig .scratch/tsconfig.json .scratch/pi-null-verify.tsx --seeds   # 種を振って発火率を測る
+```
+
+確認が済んだら `.scratch/` ごと消すこと（リポジトリに入れない）。
+
+### `.scratch/tsconfig.json`
+
+```json
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./*"],
+      "lightweight-charts": [".scratch/lw-stub.ts"]
+    }
+  }
+}
+```
+
+### `.scratch/lw-stub.ts`
+
+```ts
+// lightweight-charts のブラウザ専用ビルドを node で読ませないためのスタブ。
+// バッジは描画に一切関与しないので、型だけ通ればよい。
+export const createChart = () => {
+  throw new Error("stub");
+};
+export const LineSeries = {};
+export const createSeriesMarkers = () => undefined;
+export const LineStyle = { Dashed: 1, Solid: 0, LargeDashed: 2 };
+export type SeriesMarker<T> = { time: T };
+export type Time = string;
+```
+
+### `.scratch/pi-null-verify.tsx`
+
+```tsx
+// 系C29 P2 の「赤経路」検証 ─ 合成データで真の π = 0 を作る。
+//
+// docs/sector-factor-p2-session-record.md §2.3 の宿題:
+//   実データ（銀行14本）は π(1年)=0.97 だったため、受け入れ基準 #3
+//   「持続性が測れないなら等加重に退避する」の赤経路が一度も踏まれていない。
+//
+// b の生成過程を自分で決めて3ケース回し、判定の3分岐すべてを踏む。
+//   null       : 恒久成分 β_i を持たず、b は減衰時定数 40日 の OU だけ → 真の π(250日) = 0
+//   persistent : b_i は時間に対して定数                                → 真の π = 1
+//   mixed      : 恒久成分と OU の両方                                  → 真の π ≈ 0.3
+//
+//   r_{i,t} = a_i·M_t + b_{i,t}·F_t + ε_{i,t},   F_t = 0.9·M_t + f_t
+//   推定側の回帰は r ~ [1, M, F] なので、b は F の係数としてそのまま識別される。
+//
+// 実行（リポジトリ直下に .scratch/ を作って置く。react-dom の解決に node_modules が要るため
+// スクラッチパッドからは動かない。lightweight-charts はブラウザ専用ビルドなので stub する）:
+//   npx tsx --tsconfig .scratch/tsconfig.json .scratch/pi-null-verify.tsx
+//   npx tsx --tsconfig .scratch/tsconfig.json .scratch/pi-null-verify.tsx --seeds   ← 種を振って発火率を測る
+
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import {
+  computeSectorStability,
+  DEFAULT_STABILITY_PARAMS,
+} from "../app/lib/sector-factor-stability";
+import { mulberry32, type FactorPrices } from "../app/lib/sector-factor-select";
+import type { PricePoint } from "../app/lib/types";
+import { StabilityVerdictBadge } from "../app/components/analysis/SectorFactorStabilityPanel";
+
+// ── 生成パラメータ ──────────────────────────────────────────────
+const N_ASSETS = 14; // 実データ（銀行）と同じ本数
+const T_DAYS = 2600; // window=2400 より長く取る
+const SD_MKT = 0.011; // 市場の日次 sd
+const SD_SECTOR_SPEC = 0.008; // セクター固有ぶん
+const SD_EPS = 0.012; // 残差 σ_ε
+const B_BAR = 0.8; // b の横断平均（実データの b̄ ≈ 0.78 に合わせる）
+const OU_TAU = 40; // η の減衰時定数（営業日）
+const OU_SD = 0.5; // η の定常 sd → 250日窓平均の sd ≈ 0.5·√(2·40/250) = 0.28
+const PERM_SD = { null: 0, persistent: 0.28, mixed: 0.25 } as const;
+const USE_OU = { null: true, persistent: false, mixed: true } as const;
+
+type Case = keyof typeof PERM_SD;
+
+function businessDays(n: number): string[] {
+  const out: string[] = [];
+  const d = new Date(Date.UTC(2015, 0, 5));
+  while (out.length < n) {
+    const wd = d.getUTCDay();
+    if (wd !== 0 && wd !== 6) out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+/** ret[t] は dates[t+1] のリターン（buildPanel が log(c1/c0) を取るので長さ dates.length−1）。 */
+function toPrices(dates: string[], ret: number[], p0 = 1000): PricePoint[] {
+  const out: PricePoint[] = [];
+  let p = p0;
+  for (let t = 0; t < dates.length; t++) {
+    if (t > 0) p *= Math.exp(ret[t - 1]);
+    out.push({ time: dates[t], open: p, high: p, low: p, close: p, volume: 0 });
+  }
+  return out;
+}
+
+/** 標準正規（Box-Muller）。乱数は本体と同じ mulberry32 を使い、種で再現する。 */
+function makeNormal(seed: number) {
+  const rand = mulberry32(seed);
+  let spare: number | null = null;
+  return () => {
+    if (spare !== null) {
+      const v = spare;
+      spare = null;
+      return v;
+    }
+    let u = 0;
+    let v = 0;
+    let s = 0;
+    do {
+      u = rand() * 2 - 1;
+      v = rand() * 2 - 1;
+      s = u * u + v * v;
+    } while (s === 0 || s >= 1);
+    const f = Math.sqrt((-2 * Math.log(s)) / s);
+    spare = v * f;
+    return u * f;
+  };
+}
+
+function generate(kind: Case, seed: number) {
+  const z = makeNormal(seed);
+  const dates = businessDays(T_DAYS);
+  const T = dates.length - 1;
+
+  const M: number[] = [];
+  const F: number[] = [];
+  for (let t = 0; t < T; t++) {
+    const m = SD_MKT * z();
+    M.push(m);
+    F.push(0.9 * m + SD_SECTOR_SPEC * z());
+  }
+
+  const rho = Math.exp(-1 / OU_TAU);
+  const permSd = PERM_SD[kind];
+  const useOu = USE_OU[kind];
+
+  const pricesByTicker: Record<string, PricePoint[]> = {};
+  const names: Record<string, string> = {};
+  const trueB: number[][] = []; // [asset][t]
+
+  for (let i = 0; i < N_ASSETS; i++) {
+    const a = 0.8 + 0.15 * z(); // 市場ローディング
+    const beta = B_BAR + permSd * z(); // 恒久成分
+    let eta = useOu ? OU_SD * z() : 0; // 定常分布から開始
+    const ret: number[] = [];
+    const bPath: number[] = [];
+    for (let t = 0; t < T; t++) {
+      if (useOu) eta = rho * eta + Math.sqrt(1 - rho * rho) * OU_SD * z();
+      const b = beta + eta;
+      bPath.push(b);
+      ret.push(a * M[t] + b * F[t] + SD_EPS * z());
+    }
+    const tk = `S${String(i + 1).padStart(2, "0")}.X`;
+    pricesByTicker[tk] = toPrices(dates, ret);
+    names[tk] = `合成${i + 1}`;
+    trueB.push(bPath);
+  }
+
+  const factors: FactorPrices = {
+    market: toPrices(dates, M),
+    sector: toPrices(dates, F),
+    rate: null, // 金利プロキシは本検証の対象外（L2-D の金利診断はスキップされる）
+    marketTicker: "SYN-MKT",
+    sectorTicker: "SYN-SECTOR",
+    rateTicker: "",
+  };
+
+  return { pricesByTicker, factors, names, trueB };
+}
+
+/** 真の π: 生成過程の b を窓平均し、h 日離れた横断共分散/横断分散を直接測る（推定誤差なし）。 */
+function truePi(trueB: number[][], rollWindow: number, h: number): number {
+  const T = trueB[0].length;
+  const winMean = (t0: number) =>
+    trueB.map((p) => p.slice(t0, t0 + rollWindow).reduce((s, v) => s + v, 0) / rollWindow);
+  let num = 0;
+  let den = 0;
+  let n = 0;
+  for (let t0 = 0; t0 + rollWindow + h < T; t0 += 21) {
+    const b1 = winMean(t0);
+    const b2 = winMean(t0 + h);
+    const m1 = b1.reduce((s, v) => s + v, 0) / b1.length;
+    const m2 = b2.reduce((s, v) => s + v, 0) / b2.length;
+    let c = 0;
+    let v1 = 0;
+    for (let i = 0; i < b1.length; i++) {
+      c += (b1[i] - m1) * (b2[i] - m2);
+      v1 += (b1[i] - m1) * (b1[i] - m1);
+    }
+    num += c / (b1.length - 1);
+    den += v1 / (b1.length - 1);
+    n++;
+  }
+  return n > 0 && den > 0 ? num / den : NaN;
+}
+
+const f2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "—");
+const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
+const stripTags = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+const ok: string[] = [];
+const ng: string[] = [];
+function check(cond: boolean, label: string) {
+  (cond ? ok : ng).push(label);
+  console.log(`   ${cond ? "OK  " : "NG !!"} ${label}`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// --seeds: 種を振って「安全装置の発火率」と「誤退避率」を数える
+// ════════════════════════════════════════════════════════════════════════════
+if (process.argv.includes("--seeds")) {
+  const sweep = (label: string, kind: Case, seeds: number[]) => {
+    console.log(`\n■ ${label}`);
+    console.log("  seed        π    CI下限   ヌル95%   判定   piForDecision");
+    let red = 0;
+    let green = 0;
+    for (const s of seeds) {
+      const g = generate(kind, s);
+      const res = computeSectorStability(g.pricesByTicker, g.factors, {}, {});
+      if (!res) {
+        console.log(`  ${String(s).padStart(6)}  計算不能`);
+        continue;
+      }
+      const p = res.persistence;
+      const c = p.curve.find((x) => x.h === p.decisionH)!;
+      const verdict = p.indistinguishableFromNull ? "赤" : p.piLo > 0.5 ? "緑" : "黄";
+      if (verdict === "赤") red++;
+      if (verdict === "緑") green++;
+      console.log(
+        `  ${String(s).padStart(6)}  ${f2(p.piPoint).padStart(5)}  ${f2(p.piLo).padStart(6)}  ` +
+          `${f2(c.nullHi).padStart(7)}     ${verdict}    ${p.piForDecision.toFixed(2)}`
+      );
+    }
+    console.log(`  → 赤 ${red}/${seeds.length} / 緑 ${green}/${seeds.length}`);
+    return { red, green };
+  };
+
+  const a = sweep(
+    "真の π = 0（赤が出てほしい）",
+    "null",
+    Array.from({ length: 20 }, (_, i) => 1000 + i * 7)
+  );
+  const b = sweep(
+    "真の π = 1（赤が出てはいけない）",
+    "persistent",
+    Array.from({ length: 10 }, (_, i) => 500 + i * 13)
+  );
+  console.log(`\n${"═".repeat(80)}`);
+  console.log(`安全装置の発火率  : ${a.red}/20   誤って緑を出した率: ${a.green}/20`);
+  console.log(`誤退避率          : ${b.red}/10   正しく緑           : ${b.green}/10`);
+  process.exit(0);
+}
+
+for (const kind of ["null", "persistent", "mixed"] as Case[]) {
+  const g = generate(kind, 20260807);
+  const res = computeSectorStability(g.pricesByTicker, g.factors, {}, g.names);
+  console.log(`\n${"═".repeat(80)}`);
+  console.log(
+    `■ ケース "${kind}"  恒久成分 sd=${PERM_SD[kind]} / OU=${USE_OU[kind] ? `sd ${OU_SD}・τ ${OU_TAU}日` : "なし"}`
+  );
+  console.log("═".repeat(80));
+  if (!res) {
+    check(false, `${kind}: computeSectorStability が null を返した`);
+    continue;
+  }
+  const p = res.persistence;
+  const P = DEFAULT_STABILITY_PARAMS;
+
+  console.log(
+    `標本 ${res.nObs}日 (${res.dateFrom}〜${res.dateTo}) / ${res.tickers.length}銘柄 / 因子 ${res.usedFactorSource} / ローリング ${res.rolls.length}点`
+  );
+  console.log("\n   h   真のπ   観測π    95%CI          ヌル95%  nPairs  重複φ");
+  for (const c of p.curve) {
+    console.log(
+      `  ${String(c.h).padStart(3)}  ${f2(truePi(g.trueB, P.rollWindow, c.h)).padStart(6)}  ${f2(c.pi).padStart(6)}  ` +
+        `[${f2(c.lo).padStart(5)}, ${f2(c.hi).padStart(5)}]  ${f2(c.nullHi).padStart(7)}  ` +
+        `${String(c.nPairs).padStart(6)}  ${f2(c.overlap)}`
+    );
+  }
+  console.log(
+    `\n  判断点 h=${p.decisionH}日: indistinguishableFromNull=${p.indistinguishableFromNull} / ` +
+      `piForDecision=${p.piForDecision.toFixed(2)} / 半減期 ${p.halfLife !== null ? Math.round(p.halfLife) + "日" : "—"}`
+  );
+
+  // ── バッジを実物のコンポーネントで描画する ─────────────────────
+  const html = renderToStaticMarkup(
+    <StabilityVerdictBadge
+      state={{ result: res, breaks: null, breakProgress: null, computing: false, breakError: null }}
+    />
+  );
+  const color = html.includes("border-red-300")
+    ? "赤"
+    : html.includes("border-green-300")
+      ? "緑"
+      : html.includes("border-amber-300")
+        ? "黄"
+        : "?";
+  console.log(`\n  [バッジ ${color}] ${stripTags(html).slice(0, 150)}…`);
+  // 推奨w列の灰色化（SectorFactorSelectChart.tsx:447 の tiltUnusable と同一式）
+  const tiltUnusable = res.persistence.indistinguishableFromNull;
+  console.log(`  [推奨w列] tiltUnusable=${tiltUnusable} → ${tiltUnusable ? "text-gray-400（灰色・参考値）" : "太字"}`);
+
+  // ── 建玉への翻訳（π=0 なら w ∝ 1/σ_ε² に退避するはず）──────────
+  const d = res.decision;
+  const last = res.rolls[res.rolls.length - 1];
+  const invVar = last.sigmaEps.map((s) => (s > 0 ? 1 / (s * s) : 0));
+  const held = d.weight.map((w, i) => (w > 0 ? i : -1)).filter((i) => i >= 0);
+  const ivSum = held.reduce((s, j) => s + invVar[j], 0);
+  const maxDev = Math.max(...held.map((i) => Math.abs(d.weight[i] - invVar[i] / ivSum)));
+  const bSpreadHeld =
+    Math.max(...held.map((i) => d.bForecast[i])) - Math.min(...held.map((i) => d.bForecast[i]));
+  console.log(
+    `  [建玉] 採用${held.length}本 / チルト移動量 ${pct(d.tiltReduction, 1)} / ` +
+      `b_fcst の散らばり ${bSpreadHeld.toExponential(1)} / w と 1/σ_ε² の最大乖離 ${maxDev.toExponential(1)}`
+  );
+
+  console.log("");
+  if (kind === "null") {
+    check(p.indistinguishableFromNull === true, "赤経路: indistinguishableFromNull が立つ");
+    check(p.piForDecision === 0, "piForDecision が 0 に潰れる");
+    check(color === "赤", "バッジが赤で描画される（実コンポーネント）");
+    check(html.includes("この順位は使えない"), "バッジの文言が「この順位は使えない（持続性を測れていない）」");
+    check(html.includes("等加重"), "バッジが等加重への退避を指示する");
+    check(tiltUnusable === true, "推奨w列が灰色化される（tiltUnusable）");
+    check(bSpreadHeld < 1e-12, "b_forecast が全銘柄で b̄ に一致（チルトが畳まれた）");
+    check(maxDev < 1e-9, "推奨ウェイトが w ∝ 1/σ_ε²（実質リスクパリティ）へ退避");
+    check(
+      res.warnings.some((w) => w.includes("持続性はこの標本では測れていない")),
+      "警告文が出る"
+    );
+  } else if (kind === "persistent") {
+    check(p.indistinguishableFromNull === false, "対照: 真の π=1 では赤にならない");
+    check(color === "緑", "対照: バッジが緑");
+    check(p.piForDecision > 0.5, "対照: piForDecision がチルトを通す");
+    check(tiltUnusable === false, "対照: 推奨w列は灰色化されない");
+  } else {
+    check(color === "黄", "中間: バッジが黄（持続はするが CI が広い）");
+    check(p.piForDecision > 0 && p.piForDecision < 0.5, "中間: piForDecision が部分的に効く");
+  }
+}
+
+console.log(`\n${"═".repeat(80)}`);
+console.log(`OK ${ok.length} 件 / NG ${ng.length} 件`);
+if (ng.length) {
+  for (const s of ng) console.log(`  NG: ${s}`);
+  process.exitCode = 1;
+}
+```
