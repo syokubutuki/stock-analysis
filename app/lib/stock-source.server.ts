@@ -2,6 +2,12 @@ import "server-only";
 
 import type { PricePoint, StockData } from "./types";
 import { isFundCode, yahooSymbolFromTicker } from "./instrument-resolver";
+import {
+  parseYahooFundPage,
+  yahooFundHistoryToPrice,
+  type YahooFundHistoryItem,
+  type YahooFundHistoryResponse,
+} from "./yahoo-fund-history";
 
 export const STOCK_RANGES = [
   "1mo",
@@ -45,39 +51,70 @@ async function fetchFundData(ticker: string, range: StockRange): Promise<StockDa
   const headers: Record<string, string> = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
   };
-  const pageRes = await fetch(`https://finance.yahoo.co.jp/quote/${encodeURIComponent(ticker)}/history`, { headers, cache: "no-store" });
+  const pageUrl = `https://finance.yahoo.co.jp/quote/${encodeURIComponent(ticker)}/history`;
+  const pageRes = await fetch(pageUrl, { headers, cache: "no-store" });
   if (!pageRes.ok) throw new StockSourceError(`Failed to fetch data for ${ticker}`, pageRes.status);
   const html = await pageRes.text();
-  const jwtMatch = html.match(/"jwtToken":"([^"]+)"/);
-  if (!jwtMatch) throw new StockSourceError("Failed to get fund authentication token", 502);
-  const nameMatch = html.match(/"mainFundPriceBoard":\{[^}]*"name"\s*:\s*"([^"]+)"/);
-  const fundName = nameMatch ? nameMatch[1] : ticker;
-  const bffHeaders = { ...headers, "jwt-token": jwtMatch[1], Referer: `https://finance.yahoo.co.jp/quote/${ticker}/history` };
-  type HistoryItem = { date: string; price: string; priceChange: string; netAssetsBalance: string };
-  let allHistories: HistoryItem[] = [];
-  let page = 1;
-  const size = 100;
-  while (true) {
-    const apiUrl = `https://finance.yahoo.co.jp/bff-pc/v1/main/fund/price/history/${encodeURIComponent(ticker)}?fromDate=${fromDate}&toDate=${toDate}&page=${page}&size=${size}&timeFrame=daily`;
+  const pageData = parseYahooFundPage(html);
+  if (!pageData) throw new StockSourceError("Failed to get fund authentication token", 502);
+  const fundName = pageData.name ?? ticker;
+
+  const getSetCookie = (pageRes.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const setCookies = getSetCookie?.call(pageRes.headers)
+    ?? [pageRes.headers.get("set-cookie") ?? ""];
+  const cookie = setCookies
+    .flatMap((value) => value.split(/,(?=\s*[^;,=\s]+=)/))
+    .map((value) => value.split(";", 1)[0].trim())
+    .filter(Boolean)
+    .join("; ");
+  if (!cookie) throw new StockSourceError("Failed to establish fund data session", 502);
+
+  const bffHeaders = {
+    ...headers,
+    Accept: "application/json",
+    Cookie: cookie,
+    Referer: pageUrl,
+    "x-jwt-token": pageData.jwtToken,
+  };
+  const fetchHistoryPage = async (page: number): Promise<YahooFundHistoryResponse> => {
+    const params = new URLSearchParams({
+      code: ticker,
+      fromDate,
+      toDate,
+      timeFrameId: "d",
+      page: String(page),
+    });
+    const apiUrl = `https://finance.yahoo.co.jp/bff-quote/v1/ajax/funds/history?${params}`;
     const response = await fetch(apiUrl, { headers: bffHeaders, cache: "no-store" });
     if (!response.ok) throw new StockSourceError(`Failed to fetch data for ${ticker}`, response.status);
-    const data = await response.json();
-    if (data.error) throw new StockSourceError(data.error[0]?.message || "Fund data source error", 502);
-    const histories: HistoryItem[] = data.histories || [];
-    allHistories = allHistories.concat(histories);
-    if (!data.paging?.hasNext) break;
-    page++;
-    if (page > 50) break;
+    const data = await response.json() as YahooFundHistoryResponse;
+    if (!data.isSuccess || !data.response) {
+      throw new StockSourceError(data.message || "Fund data source error", 502);
+    }
+    return data;
+  };
+
+  const first = await fetchHistoryPage(1);
+  const firstItems = first.response?.historyTable?.items ?? [];
+  const totalPage = first.response?.paging?.totalPage ?? 1;
+  if (totalPage < 1 || totalPage > 200) {
+    throw new StockSourceError("Unexpected fund history page count", 502);
+  }
+
+  const allHistories: YahooFundHistoryItem[] = [...firstItems];
+  const concurrency = 4;
+  for (let start = 2; start <= totalPage; start += concurrency) {
+    const pages = Array.from(
+      { length: Math.min(concurrency, totalPage - start + 1) },
+      (_, index) => start + index,
+    );
+    const responses = await Promise.all(pages.map(fetchHistoryPage));
+    for (const response of responses) {
+      allHistories.push(...(response.response?.historyTable?.items ?? []));
+    }
   }
   const prices = allHistories
-    .map((history): PricePoint | null => {
-      const match = history.date.match(/(\d{4})\u5e74(\d{1,2})\u6708(\d{1,2})\u65e5/);
-      if (!match) return null;
-      const close = Number(history.price.replace(/,/g, ""));
-      if (!Number.isFinite(close)) return null;
-      const time = `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
-      return { time, open: close, high: close, low: close, close, volume: 0 };
-    })
+    .map(yahooFundHistoryToPrice)
     .filter((price): price is PricePoint => price !== null)
     .sort((a, b) => a.time.localeCompare(b.time));
   return { ticker, name: fundName, currency: "JPY", prices };

@@ -21,6 +21,7 @@ import {
   premiseVerdict,
   DEFAULT_SELECT_PARAMS,
   ASSUMED_SHARPE,
+  RHO_ODD_THRESHOLD,
   type FactorSource,
   type SectorSelectResult,
   type AssetFactorFit,
@@ -49,6 +50,7 @@ type UniverseMode = "watchlist" | "paste" | string;
 const MARKET_TICKER = "1306.T"; // TOPIX ETF
 const SECTOR_TICKER = "1615.T"; // 東証銀行業ETF
 const RATE_TICKER = "^TNX"; // 米10年利回り（円金利は本APIで安定取得できないための代理）
+const EXCLUSION_STORAGE_KEY = "sa:sector-exclude:v1";
 
 const WINDOWS = [250, 500, 750, 1250];
 
@@ -141,6 +143,21 @@ function PurityBar({ v }: { v: number }) {
   );
 }
 
+/** leave-one-out バスケット相関。純度とは別の尺度なので、独立したシアン系の色を使う。 */
+function RhoBar({ v }: { v: number }) {
+  return (
+    <div className="flex items-center gap-1">
+      <div className="h-1.5 w-10 overflow-hidden rounded bg-sky-100">
+        <div
+          className="h-full bg-cyan-600"
+          style={{ width: `${Math.max(0, Math.min(100, v * 100))}%` }}
+        />
+      </div>
+      <span className="font-mono text-[10px]">{v.toFixed(3)}</span>
+    </div>
+  );
+}
+
 export default function SectorFactorSelectChart({ tickers, pricesByTicker, names }: Props) {
   const [uniMode, setUniMode] = useState<UniverseMode>("sec-bank");
   const [pasteRaw, setPasteRaw] = useState("");
@@ -149,6 +166,43 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
   const [windowLen, setWindowLen] = useState(DEFAULT_SELECT_PARAMS.window);
   const [shrink, setShrink] = useState(DEFAULT_SELECT_PARAMS.shrink);
   const [topK, setTopK] = useState(DEFAULT_SELECT_PARAMS.topK);
+  const [excluded, setExcluded] = useState<Record<string, string[]>>({});
+  const [exclusionsHydrated, setExclusionsHydrated] = useState(false);
+  const [exclusionOpen, setExclusionOpen] = useState(false);
+
+  useEffect(() => {
+    let restored: Record<string, string[]> = {};
+    try {
+      const raw = localStorage.getItem(EXCLUSION_STORAGE_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          for (const [mode, value] of Object.entries(parsed)) {
+            if (Array.isArray(value)) {
+              restored[mode] = value.filter((ticker): ticker is string => typeof ticker === "string");
+            }
+          }
+        }
+      }
+    } catch {
+      // localStorage が壊れている／利用不可なら既定の除外0件を使う。
+      restored = {};
+    }
+    const timer = window.setTimeout(() => {
+      setExcluded(restored);
+      setExclusionsHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!exclusionsHydrated) return;
+    try {
+      localStorage.setItem(EXCLUSION_STORAGE_KEY, JSON.stringify(excluded));
+    } catch {
+      // 永続化できなくても現在のセッションでは操作を続けられる。
+    }
+  }, [excluded, exclusionsHydrated]);
 
   const [fetched, setFetched] = useState<{ prices: Record<string, PricePoint[]>; names: Record<string, string> }>({
     prices: {},
@@ -212,6 +266,19 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
   );
   const activeCount = Object.keys(activePrices).length;
   const heldSet = useMemo(() => new Set(tickers), [tickers]);
+  const currentExcluded = useMemo(() => {
+    const activeSet = new Set(Object.keys(activePrices));
+    return (excluded[uniMode] ?? []).filter((ticker) => activeSet.has(ticker));
+  }, [activePrices, excluded, uniMode]);
+  const currentExcludedSet = useMemo(() => new Set(currentExcluded), [currentExcluded]);
+  const keptPrices = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(activePrices).filter(([ticker]) => !currentExcludedSet.has(ticker))
+      ),
+    [activePrices, currentExcludedSet]
+  );
+  const keptCount = Object.keys(keptPrices).length;
 
   const factorPrices = useMemo(
     () =>
@@ -228,25 +295,48 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
     [market.prices, sector.prices, rate.prices]
   );
 
-  const result = useMemo<SectorSelectResult | null>(() => {
+  // 除外された行もチェックを戻せるよう、全銘柄の軽い診断を別に持つ。
+  const diagnosticResult = useMemo<SectorSelectResult | null>(() => {
     if (!factorPrices || activeCount < 3) return null;
     return computeSectorSelect(activePrices, factorPrices, {
       factorSource,
       window: windowLen,
       shrink,
       topK,
+      nBoot: 0,
     });
   }, [factorPrices, activePrices, activeCount, factorSource, windowLen, shrink, topK]);
+
+  // 採用計算。lib 側でも除外し、「そのユニバースに最初から居なかった」のと同じ扱いにする。
+  const result = useMemo<SectorSelectResult | null>(() => {
+    if (!factorPrices || keptCount < 3) return null;
+    return computeSectorSelect(activePrices, factorPrices, {
+      factorSource,
+      window: windowLen,
+      shrink,
+      topK,
+      excludeTickers: currentExcluded,
+    });
+  }, [
+    factorPrices,
+    activePrices,
+    keptCount,
+    factorSource,
+    windowLen,
+    shrink,
+    topK,
+    currentExcluded,
+  ]);
 
   // ── P2: 持続性の層（同じ画面に差し込む。docs/sector-factor-stability.md §7.6）──
   const [p2Controls, setP2Controls] = useState<StabilityControls>(DEFAULT_STABILITY_CONTROLS);
   const stability = useSectorStability(
-    activePrices,
+    keptPrices,
     factorPrices,
     p2Controls,
     useMemo(() => ({ factorSource, topK }), [factorSource, topK]),
     activeNames,
-    activeCount >= 3
+    keptCount >= 3
   );
 
   const diag = result?.premise ?? null;
@@ -443,6 +533,29 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
   }, [result, activeNames, heldSet]);
 
   const topAssets: AssetFactorFit[] = result ? result.assets.slice(0, topK) : [];
+  const diagnosticAssets = diagnosticResult?.assets ?? [];
+  const oddTickers = diagnosticAssets
+    .filter((asset) => asset.rhoBasket < RHO_ODD_THRESHOLD)
+    .map((asset) => asset.ticker);
+
+  const setTickerIncluded = (ticker: string, included: boolean) => {
+    setExcluded((previous) => {
+      const next = new Set(previous[uniMode] ?? []);
+      if (included) next.delete(ticker);
+      else next.add(ticker);
+      return { ...previous, [uniMode]: [...next] };
+    });
+  };
+  const applyRecommendedExclusions = () => {
+    setExcluded((previous) => ({
+      ...previous,
+      [uniMode]: [...new Set([...(previous[uniMode] ?? []), ...oddTickers])],
+    }));
+  };
+  const clearCurrentExclusions = () => {
+    setExcluded((previous) => ({ ...previous, [uniMode]: [] }));
+  };
+
   /** P2 が「持続性を測れていない」と判定したら、推奨ウェイトは参考値として灰色化する。 */
   const tiltUnusable = stability.result?.persistence.indistinguishableFromNull ?? false;
 
@@ -509,6 +622,94 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
         <span className="font-mono text-gray-700">{topK}本</span>
       </div>
 
+      <div className="rounded border border-gray-200 bg-gray-50/60 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setExclusionOpen((open) => !open)}
+            aria-expanded={exclusionOpen}
+            className="flex items-center gap-2 text-left font-medium text-gray-700"
+          >
+            <span
+              className="text-gray-400 transition-transform"
+              style={{ transform: exclusionOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+            >
+              ▶
+            </span>
+            銘柄の除外
+            <span className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
+              {currentExcluded.length}/{activeCount} 除外中
+            </span>
+          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={applyRecommendedExclusions}
+              disabled={oddTickers.length === 0}
+              className="rounded border border-rose-300 bg-white px-2 py-1 text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              推奨を適用
+            </button>
+            <button
+              type="button"
+              onClick={clearCurrentExclusions}
+              disabled={currentExcluded.length === 0}
+              className="rounded border border-gray-300 bg-white px-2 py-1 text-gray-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              全解除
+            </button>
+          </div>
+        </div>
+        {exclusionOpen && (
+          <div className="border-t border-gray-200 px-3 py-2">
+            {diagnosticAssets.length > 0 ? (
+              <div className="max-h-72 space-y-0.5 overflow-y-auto">
+                {diagnosticAssets.map((asset) => {
+                  const included = !currentExcludedSet.has(asset.ticker);
+                  const odd = asset.rhoBasket < RHO_ODD_THRESHOLD;
+                  return (
+                    <label
+                      key={asset.ticker}
+                      className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-2 rounded px-1.5 py-1 hover:bg-white"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={included}
+                        onChange={(event) => setTickerIncluded(asset.ticker, event.target.checked)}
+                      />
+                      <span className="min-w-0 truncate text-gray-700">
+                        <span className="mr-1 font-mono text-[10px] text-gray-500">{asset.ticker}</span>
+                        {activeNames[asset.ticker] ?? asset.ticker}
+                      </span>
+                      <span className="font-mono text-[10px] text-cyan-700">
+                        ρ={asset.rhoBasket.toFixed(3)}
+                      </span>
+                      <span className="font-mono text-[10px] text-gray-500">b={asset.b.toFixed(2)}</span>
+                      <span className="flex items-center justify-end gap-1 font-mono text-[10px] text-gray-500">
+                        純度{pct(asset.purity, 0)}
+                        {odd && (
+                          <span className="rounded bg-red-100 px-1.5 py-0.5 font-sans font-medium text-red-700">
+                            値動きが違う
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-2 text-[11px] text-gray-500">
+                価格取得後に、各銘柄と残りの等加重バスケットとの相関 ρ を表示する。
+              </div>
+            )}
+            <div className="mt-2 text-[10px] leading-relaxed text-gray-500">
+              チェック ON = 採用。ρ &lt; {RHO_ODD_THRESHOLD.toFixed(2)} は候補として示すだけで、自動では除外しない。
+              {uniMode === "watchlist" && " 除外してもウォッチリストや保有銘柄そのものは削除されない。"}
+            </div>
+          </div>
+        )}
+      </div>
+
       {uniMode === "paste" && (
         <div className="flex items-center gap-2 text-xs">
           <input
@@ -547,8 +748,8 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
 
       {!result && !fetching && !factorLoading && (
         <div className="rounded border border-gray-200 px-3 py-4 text-xs text-gray-500">
-          {activeCount < 3
-            ? "銘柄が3本未満のため診断できない。ユニバースを選ぶか、ウォッチリストに銘柄を追加すること。"
+          {keptCount < 3
+            ? "銘柄が足りない（3本未満）ため診断できない。除外を解除するか、ユニバースに銘柄を追加すること。"
             : "共通営業日が不足しているため診断できない。窓を短くするか、履歴の短い銘柄を外すこと。"}
         </div>
       )}
@@ -617,9 +818,34 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
           {/* ── L2-A 判定バッジ（順位表を読む前に信用度を見せる）───── */}
           <StabilityVerdictBadge state={stability} />
 
+          {currentExcluded.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded border border-rose-200 bg-rose-50/60 px-2.5 py-1.5 text-[11px]">
+              <span className="font-medium text-rose-800">除外中:</span>
+              {currentExcluded.map((ticker) => (
+                <button
+                  key={ticker}
+                  type="button"
+                  onClick={() => setTickerIncluded(ticker, true)}
+                  className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-rose-700 hover:bg-rose-100"
+                  title={`${ticker} を採用へ戻す`}
+                >
+                  {activeNames[ticker] ?? ticker} ×
+                </button>
+              ))}
+            </div>
+          )}
+
+          {currentExcluded.length > 0 && diagnosticResult && (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+              除外により b の横断スプレッドが縮み、収縮率が{" "}
+              <b>{pct(diagnosticResult.shrinkFactor, 1)}</b> → <b>{pct(result.shrinkFactor, 1)}</b> に上がった。
+              バスケットの目的には合うが、<b>残った銘柄どうしの順位の識別力は下がっている</b>。
+            </div>
+          )}
+
           {/* ── P1-② ランキング表 ─────────────────────────── */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-[11px]">
+            <table className="w-full min-w-[920px] border-collapse text-[11px]">
               <thead>
                 <tr className="border-b border-gray-300 text-gray-500">
                   <th className="px-1.5 py-1 text-left">#</th>
@@ -627,6 +853,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
                   <th className="px-1.5 py-1 text-right">セクターβ b̂ ± SE</th>
                   <th className="px-1.5 py-1 text-right">t</th>
                   <th className="px-1.5 py-1 text-right">市場β</th>
+                  <th className="px-1.5 py-1 text-left">ρ</th>
                   <th className="px-1.5 py-1 text-left">純度</th>
                   <th className="px-1.5 py-1 text-right">σ_ε</th>
                   <th className="px-1.5 py-1 text-right">S = b/σ_ε</th>
@@ -660,6 +887,9 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
                       </td>
                       <td className="px-1.5 py-1 text-right font-mono text-gray-600">{a.bT.toFixed(1)}</td>
                       <td className="px-1.5 py-1 text-right font-mono text-slate-600">{a.cMkt.toFixed(2)}</td>
+                      <td className="px-1.5 py-1">
+                        <RhoBar v={a.rhoBasket} />
+                      </td>
                       <td className="px-1.5 py-1">
                         <PurityBar v={a.purity} />
                       </td>
@@ -940,6 +1170,30 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
         <p>
           1 に近いほど純粋な金利プレイ、0 に近いほど「市場を買っているだけ」。散布図の左上（市場β低・
           セクターβ高）が狙うべき領域で、右下は避けるべき領域です。
+        </p>
+
+        <p className="font-medium text-gray-700 mt-3">5.1 ρ による「値動きが違う」銘柄の診断</p>
+        <p>
+          銘柄 i と、i 自身を除いた残り N−1 本の等加重バスケットとの生リターン相関を測ります。
+          自分を含むバスケットとの相関は構造的に上振れするため、必ず leave-one-out にします。
+        </p>
+        <p className="font-mono text-[11px] bg-white/70 rounded px-2 py-1">
+          {"ρ_i = corr(r_i, (N·r̄ − r_i)/(N−1))"}
+        </p>
+        <p>
+          <b>ρ と純度は別の問いです。</b>低純度には、「市場に連動しすぎる」銘柄
+          （三井住友トラストG: ρ≈0.89・純度≈22%）と、「残りの銀行とそもそも違う値動きをする」銘柄
+          （セブン銀行: ρ≈0.56・純度≈18%）があります。除外候補は後者であり、純度の低さだけでは外しません。
+        </p>
+        <p>
+          ρ が <b>{RHO_ODD_THRESHOLD.toFixed(2)} 未満</b>なら、金利以外の要因で動いている可能性が強いと読みます。
+          セブン銀行の ATM 手数料中心の事業や、あおぞら銀行の事業構成などが理由だという説明は
+          <b>業態からの推測</b>であり、データが直接示すのは相関が低いことだけです。
+        </p>
+        <p>
+          除外は低い b の外れ値も取り除くため、b の横断スプレッドが縮んで James-Stein 収縮率が上がり、
+          残った銘柄どうしの順位識別力が下がります。また、<b>除外しても純度は上がりません</b>。
+          実測では採用5本の加重市場βは約1.29のままで、市場露出を減らすのは銘柄選別ではなく市場ヘッジの役割です。
         </p>
 
         <p className="font-medium text-gray-700 mt-3">6. 用語の定義</p>

@@ -38,6 +38,9 @@ const MIN_OBS = 240;
  */
 export const ASSUMED_SHARPE = 0.5;
 
+/** 「値動きが違う」と判定する ρ の閾値。実測の断層（0.564 → 0.775）の中間に置く。 */
+export const RHO_ODD_THRESHOLD = 0.75;
+
 /** 何に対する感応度を測るか。 */
 export type FactorMode = "sector" | "rate";
 /** セクター因子の作り方。ETF が窓長に足りなければ basket へ自動退避する。 */
@@ -518,14 +521,18 @@ export function prevSessionRateDiff(
 export function computeSectorPremise(
   pricesByTicker: Record<string, PricePoint[]>,
   factors: FactorPrices,
-  paramsIn: Partial<SectorPremiseParams> = {}
+  paramsIn: Partial<SectorPremiseParams> & { excludeTickers?: string[] } = {}
 ): PremiseDiag | null {
+  const excluded = new Set(paramsIn.excludeTickers ?? []);
+  const includedPrices = excluded.size
+    ? Object.fromEntries(Object.entries(pricesByTicker).filter(([ticker]) => !excluded.has(ticker)))
+    : pricesByTicker;
   const params = { ...DEFAULT_PREMISE_PARAMS, ...paramsIn };
   const warnings: string[] = [];
 
   // ETF は factorSource に関わらず常にパネルへ載せる。basket モードでも
   // 残差相関 ρ̄_ε の識別には「パネル外の因子」が要るため（下の実装注記を参照）。
-  const panel = buildPanel(pricesByTicker, factors.market, factors.sector, params.window);
+  const panel = buildPanel(includedPrices, factors.market, factors.sector, params.window);
   if (!panel) return null;
 
   const T = panel.market.length;
@@ -804,6 +811,8 @@ export function premiseVerdict(d: PremiseDiag): { level: "ok" | "weak" | "fail";
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface SectorSelectParams extends SectorPremiseParams {
+  /** ユニバースから最初から存在しなかったものとして除外する銘柄。 */
+  excludeTickers: string[];
   /** James-Stein 収縮を S の計算に使うか（既定 true）。 */
   shrink: boolean;
   /** 採用本数（表の強調と推奨ウェイトの対象）。 */
@@ -822,6 +831,7 @@ export interface SectorSelectParams extends SectorPremiseParams {
 
 export const DEFAULT_SELECT_PARAMS: SectorSelectParams = {
   ...DEFAULT_PREMISE_PARAMS,
+  excludeTickers: [],
   shrink: true,
   topK: 5,
   maxWeight: 0.35,
@@ -833,6 +843,9 @@ export const DEFAULT_SELECT_PARAMS: SectorSelectParams = {
 
 export interface AssetFactorFit {
   ticker: string;
+
+  /** 残り全行の等加重バスケット（leave-one-out）との生リターン相関。低いほど「値動きが違う」。 */
+  rhoBasket: number;
 
   // ---- セクター感応度（選別の主役）----
   /** b̂: 市場に直交化したセクター因子への感応度。 */
@@ -980,10 +993,14 @@ export function computeSectorSelect(
   paramsIn: Partial<SectorSelectParams> = {}
 ): SectorSelectResult | null {
   const params = { ...DEFAULT_SELECT_PARAMS, ...paramsIn };
-  const premise = computeSectorPremise(pricesByTicker, factors, params);
+  const excluded = new Set(params.excludeTickers);
+  const includedPrices = excluded.size
+    ? Object.fromEntries(Object.entries(pricesByTicker).filter(([ticker]) => !excluded.has(ticker)))
+    : pricesByTicker;
+  const premise = computeSectorPremise(includedPrices, factors, params);
   if (!premise) return null;
 
-  const panel = buildPanel(pricesByTicker, factors.market, factors.sector, params.window);
+  const panel = buildPanel(includedPrices, factors.market, factors.sector, params.window);
   if (!panel) return null;
   const T = panel.market.length;
   const N = panel.ret.length;
@@ -998,7 +1015,7 @@ export function computeSectorSelect(
   // ---- 各銘柄の回帰（NW 標準誤差）------------------------------------------
   const bs: number[] = [];
   const bSes: number[] = [];
-  const rows: Omit<AssetFactorFit, "bShrunk" | "score" | "rank" | "rankLo" | "rankHi" | "rankTopShare" | "weight" | "weightUnc" | "muT" | "yearsNeeded">[] = [];
+  const rows: Omit<AssetFactorFit, "rhoBasket" | "bShrunk" | "score" | "rank" | "rankLo" | "rankHi" | "rankTopShare" | "weight" | "weightUnc" | "muT" | "yearsNeeded">[] = [];
 
   // 回帰が落ちた銘柄は rows に入らないので、rows の添字とパネルの添字がずれる。
   // 順位ブートは panel.ret を引くため、対応表を持たないと**別の銘柄の系列で順位を作る**。
@@ -1065,6 +1082,8 @@ export function computeSectorSelect(
     const dMu = r.muHat - muMean;
     return {
       ...r,
+      // 回帰失敗で rows と panel の添字はずれうるため、必ず keptIdx を経由する。
+      rhoBasket: corr(panel.ret[keptIdx[i]], leaveOneOut(panel, keptIdx[i])),
       bShrunk: js.shrunk[i],
       score: r.sigmaEps > 0 ? bUse / r.sigmaEps : 0,
       muT: r.muSe > 0 ? dMu / r.muSe : 0,

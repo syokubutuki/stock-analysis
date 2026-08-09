@@ -95,7 +95,7 @@ async function fetchYahoo(query: string): Promise<YahooSearchResult> {
         type,
         market: quote.exchDisp || quote.exchange || "その他",
         currency: symbol.endsWith(".T") || type === "fund" ? "JPY" : undefined,
-        priceSupported: type !== "fund",
+        priceSupported: true,
         source: "yahoo",
       }];
     });
