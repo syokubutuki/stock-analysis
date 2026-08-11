@@ -12,6 +12,7 @@ import TickerSearchInput from "./components/TickerSearchInput";
 import AccordionSection from "./components/analysis/AccordionSection";
 import DataQualityNotice from "./components/analysis/DataQualityNotice";
 import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
+import { formatSummaryPrice } from "./lib/format";
 import { SeriesMode } from "./lib/series-mode";
 import { recordTicker } from "./lib/test-ledger";
 
@@ -1490,11 +1491,14 @@ export default function AnalysisPage() {
               >
                 <SummaryCard
                   label="現在値"
-                  value={filteredPrices[filteredPrices.length - 1].close.toLocaleString()}
+                  value={formatSummaryPrice(
+                    filteredPrices[filteredPrices.length - 1].close,
+                    data.currency
+                  )}
                 />
                 <SummaryCard
                   label="期間始値"
-                  value={filteredPrices[0].close.toLocaleString()}
+                  value={formatSummaryPrice(filteredPrices[0].close, data.currency)}
                 />
                 <SummaryCard
                   label="期間変動"
