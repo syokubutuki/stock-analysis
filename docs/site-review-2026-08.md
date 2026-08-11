@@ -3,6 +3,23 @@
 Google / Apple / Vercel / Stripe のシニアエンジニア視点による横断レビュー。
 本番（https://kabugenron.com）の実測・本番HTML取得・コードリーディングに基づく。
 
+> ## ⚠ この文書には誤りが3点ある。実装の根拠にしないこと。
+>
+> 本書は外部視点のレビュー原文であり、既存の設計文書と実装を照合する前に書かれた。
+> 照合の結果、以下3点が誤りと判明している。
+> **実装に着手する場合は `docs/site-improvement-execution-plan.md` を正とすること。**
+>
+> | 誤り | 実際 |
+> |---|---|
+> | 「前向き検証台帳が localStorage にあり失われやすい」 | **誤り。2026-07-30 に Postgres へ移行済み**（`docs/prospective-ledger-server.md`・`app/lib/ledger-store.ts`）。localStorage は DB未設定・オフライン時の退避専用 |
+> | 「289本のガイドは規約が統一されているので機械的に自動生成できる」 | **誤り。** `AnalysisGuide` の props は `children: React.ReactNode` のみで、中身は自由形式のJSX散文。構造化スキーマ `AnalysisGuideEntry` への変換は**1本ずつの手作業**。現実的な対象は上位20本程度 |
+> | 「`text-gray-400` の一括置換は極小コスト」 | **誤り。** 896箇所あり、暗色背景上の使用も含まれるため無条件置換は退行を生む。またコントラスト問題の本体は Canvas にハードコードされた 386箇所で、クラス置換では届かない |
+>
+> また本書は `NEXT_SESSION.md`・`docs/growth-strategy.md`・`docs/asset-utilization.md` を
+> 参照せずに書かれているため、**既に計画済み・実装済みの項目を「未実装の提案」として
+> 挙げている箇所がある**（例: 銘柄別ルート、動的OG画像、URL共有、独自ドメイン）。
+> 実装状況の正しい一覧は実行計画書 §2 にある。
+
 ---
 
 ## 総評：中身95点、外殻45点
