@@ -1096,7 +1096,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
 
 // 入力系列(seriesMode)を実際に消費するセクション。これ以外のセクション
 // (基礎・テクニカル・OHLC・リスク・カレンダー)はチャートが OHLC ベースで
-// 系列変換が効かないため、SeriesModeSelector をグレーアウト表示にする。
+// 系列変換が効かないため、SeriesModeSelector の中身を表示しない。
 // 将来コンポーネントを seriesMode 対応化した際は、ここにキーを追加すること。
 const SERIES_AWARE_SECTIONS = new Set<SectionKey>([
   "transform", "distribution", "volatility", "frequency", "nonlinear",
@@ -1412,11 +1412,14 @@ export default function AnalysisPage() {
                   {data.name}
                 </span>
                 <PeriodSelector current={period} onChange={setPeriod} />
-                <SeriesModeSelector
-                  current={seriesMode}
-                  onChange={setSeriesMode}
-                  disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
-                />
+                {/* セレクタ用の行高は常に確保し、セクション切替時のレイアウトシフトを防ぐ。 */}
+                <div className="basis-full min-h-7 min-w-0 w-full">
+                  <SeriesModeSelector
+                    current={seriesMode}
+                    onChange={setSeriesMode}
+                    disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
+                  />
+                </div>
               </>
             )}
           </div>
