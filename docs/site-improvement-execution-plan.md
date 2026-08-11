@@ -1234,7 +1234,7 @@ AGENTS.md の要求（チャート・操作を変更した場合）:
 | ID | 項目 | 状態 | 完了日 | 備考 |
 |---|---|---|---|---|
 | B1 | 待機リスト取得 | **完了** | 2026-08-11 | `91deb1e`。**実DBでの保存・一覧は未検証**（デプロイ後に要確認 → 下記フォローアップ） |
-| M1 | CI 導入 | **完了** | 2026-08-11 | GitHub Actions に Node 24 / `npm ci` / lint / build の最小CIを追加。lintは既存272警告・0エラーで成功（警告解消はFU3）、秘密情報なしのbuildも成功。実CIの確認結果は同ブランチのActions実行を参照 |
+| M1 | CI 導入 | **完了** | 2026-08-11 | GitHub Actions に Node 24 / `npm ci` / lint / build の最小CIを追加。[初回push CI](https://github.com/syokubutuki/stock-analysis/actions/runs/31490292135) は成功（`npm ci` 13秒、lint 55秒、build 37秒）。lintは既存272警告・0エラーで通過し、秘密情報なしのbuildも成功。警告解消はFU3 |
 | Q1 | 数値フォーマット統一 | 未着手 | | 投信検証は R0 待ち |
 | R3a | 静的OG画像 | 未着手 | | |
 | R0 | 投信価格アダプター修復 | 未着手 | | 仕様は `NEXT_SESSION.md` §4。「直せない」も可 |
