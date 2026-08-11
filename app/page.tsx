@@ -1323,6 +1323,28 @@ export default function AnalysisPage() {
     requestAnimationFrame(tick);
   }, [activeSection]);
 
+  const hasDataQualityIssues =
+    (data?.dataQuality?.repaired.length ?? 0) > 0 ||
+    (data?.dataQuality?.suspects.length ?? 0) > 0;
+
+  // 破損点検は「どこをどう直したか」の詳細（表＋修復前後チャート）。
+  // 報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
+  // 問題がある場合はサマリーより先に、問題がなければサマリーの後に開示する。
+  const dataQualityPanel = data ? (
+    <CollapsibleAnalysis
+      id="data-quality"
+      title="価格データの破損点検"
+      subtitle="配信元のスケール破損を検出・修復した記録。修復した日の配信値と修復値・年率σの膨張・修復前後を重ねたチャート・ベンチマーク指数の点検"
+      defaultOpen={hasDataQualityIssues}
+    >
+      <DataQualityPanel
+        ticker={data.ticker}
+        prices={allPrices}
+        report={data.dataQuality}
+      />
+    </CollapsibleAnalysis>
+  ) : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-4">
@@ -1452,54 +1474,45 @@ export default function AnalysisPage() {
               {SECTIONS.find(s => s.key === activeSection)?.description}
             </div>
 
-            {/* 破損点検は「どこをどう直したか」の詳細（表＋修復前後チャート）。
-                報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
-                破損していた 1306.T はベンチマーク側なので、パネル内でベンチマークも点検できる。 */}
-            <CollapsibleAnalysis
-              id="data-quality"
-              title="価格データの破損点検"
-              subtitle="配信元のスケール破損を検出・修復した記録。修復した日の配信値と修復値・年率σの膨張・修復前後を重ねたチャート・ベンチマーク指数の点検"
-              defaultOpen={
-                (data.dataQuality?.repaired.length ?? 0) > 0 ||
-                (data.dataQuality?.suspects.length ?? 0) > 0
-              }
-            >
-              <DataQualityPanel
-                ticker={data.ticker}
-                prices={allPrices}
-                report={data.dataQuality}
-              />
-            </CollapsibleAnalysis>
+            <div className="flex flex-col gap-4">
+              <div className={hasDataQualityIssues ? "order-1" : "order-2"}>
+                {dataQualityPanel}
+              </div>
 
-            {/* サマリー */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <SummaryCard
-                label="現在値"
-                value={filteredPrices[filteredPrices.length - 1].close.toLocaleString()}
-              />
-              <SummaryCard
-                label="期間始値"
-                value={filteredPrices[0].close.toLocaleString()}
-              />
-              <SummaryCard
-                label="期間変動"
-                value={`${(
-                  ((filteredPrices[filteredPrices.length - 1].close -
-                    filteredPrices[0].close) /
-                    filteredPrices[0].close) *
-                  100
-                ).toFixed(2)}%`}
-                color={
-                  filteredPrices[filteredPrices.length - 1].close >=
-                  filteredPrices[0].close
-                    ? "text-green-600"
-                    : "text-red-600"
-                }
-              />
-              <SummaryCard
-                label="データ数"
-                value={`${filteredPrices.length}日`}
-              />
+              {/* サマリー */}
+              <div
+                className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${
+                  hasDataQualityIssues ? "order-2" : "order-1"
+                }`}
+              >
+                <SummaryCard
+                  label="現在値"
+                  value={filteredPrices[filteredPrices.length - 1].close.toLocaleString()}
+                />
+                <SummaryCard
+                  label="期間始値"
+                  value={filteredPrices[0].close.toLocaleString()}
+                />
+                <SummaryCard
+                  label="期間変動"
+                  value={`${(
+                    ((filteredPrices[filteredPrices.length - 1].close -
+                      filteredPrices[0].close) /
+                      filteredPrices[0].close) *
+                    100
+                  ).toFixed(2)}%`}
+                  color={
+                    filteredPrices[filteredPrices.length - 1].close >=
+                    filteredPrices[0].close
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }
+                />
+                <SummaryCard
+                  label="データ数"
+                  value={`${filteredPrices.length}日`}
+                />
+              </div>
             </div>
 
             {/* セクション内容 */}
