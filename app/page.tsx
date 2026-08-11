@@ -1035,7 +1035,7 @@ const ConsolidatedScorecardChart = dynamic(
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
-      className="w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400"
+      className="w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500"
       style={{ height }}
     >
       読み込み中...
@@ -1473,7 +1473,7 @@ export default function AnalysisPage() {
 
         {data && filteredPrices.length > 0 && (
           <>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-gray-500">
               {SECTIONS.find(s => s.key === activeSection)?.description}
             </div>
 
@@ -2223,7 +2223,7 @@ export default function AnalysisPage() {
                 {SECTIONS.map(({ key, label, description }) => (
                   <div key={key} className="p-3 rounded-lg border border-gray-200">
                     <div className="font-medium text-gray-700 mb-0.5">{label}</div>
-                    <div className="text-xs text-gray-400">{description}</div>
+                    <div className="text-xs text-gray-500">{description}</div>
                   </div>
                 ))}
               </div>
@@ -2232,7 +2232,7 @@ export default function AnalysisPage() {
         )}
       </main>
 
-      <footer className="text-center text-xs text-gray-400 py-8 space-y-1">
+      <footer className="text-center text-xs text-gray-500 py-8 space-y-1">
         <p>株価データはYahoo Financeより取得。投資判断の参考としてご利用ください。</p>
         <p>
           <Link href="/guide" className="text-blue-500 hover:text-blue-600 underline">
