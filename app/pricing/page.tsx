@@ -23,7 +23,34 @@ const PRO_FEATURES = [
   "CSV / 画像エクスポート",
 ];
 
-export default function PricingPage() {
+type PricingPageProps = {
+  searchParams: Promise<{ waitlist?: string | string[] }>;
+};
+
+const WAITLIST_MESSAGES: Record<string, { text: string; success: boolean }> = {
+  registered: {
+    text: "登録を受け付けました。すでに登録済みの場合も、追加の操作は不要です。",
+    success: true,
+  },
+  db_unconfigured: {
+    text: "現在この環境では登録先が設定されていません。提供環境の準備後に、もう一度お試しください。",
+    success: false,
+  },
+  invalid_request: { text: "送信内容を確認して、もう一度お試しください。", success: false },
+  invalid_email: { text: "メールアドレスの形式を確認してください。", success: false },
+  email_too_long: { text: "メールアドレスが長すぎます。", success: false },
+  consent_required: { text: "利用目的を確認し、同意してください。", success: false },
+  error: {
+    text: "登録に失敗しました。時間をおいて再度お試しください。",
+    success: false,
+  },
+};
+
+export default async function PricingPage({ searchParams }: PricingPageProps) {
+  const waitlistParam = (await searchParams).waitlist;
+  const waitlistStatus = Array.isArray(waitlistParam) ? waitlistParam[0] : waitlistParam;
+  const waitlistMessage = waitlistStatus ? WAITLIST_MESSAGES[waitlistStatus] : undefined;
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
       <Link href="/" className="text-sm text-blue-600 hover:underline">
@@ -74,12 +101,55 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
-          <button
-            disabled
-            className="mt-5 w-full cursor-not-allowed rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-500"
-          >
-            準備中
-          </button>
+          <form id="waitlist" action="/api/waitlist" method="post" className="mt-5 border-t border-gray-200 pt-5">
+            <h3 className="text-sm font-semibold text-gray-800">Pro の案内を受け取る</h3>
+            <p id="waitlist-purpose" className="mt-1 text-xs leading-relaxed text-gray-600">
+              登録したメールアドレスは、Pro の提供開始、予定機能、料金に関する案内の送信にのみ使用します。
+            </p>
+            <label htmlFor="waitlist-email" className="mt-3 block text-xs font-medium text-gray-700">
+              メールアドレス
+            </label>
+            <input
+              id="waitlist-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              maxLength={254}
+              aria-describedby="waitlist-purpose waitlist-status"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              placeholder="you@example.com"
+            />
+            <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-gray-600">
+              <input
+                type="checkbox"
+                name="consent"
+                value="yes"
+                required
+                className="mt-0.5 size-4 shrink-0"
+              />
+              <span>上記の利用目的を確認し、メールアドレスの保存と案内の受信に同意します。</span>
+            </label>
+            <button
+              type="submit"
+              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              待機リストに登録
+            </button>
+            <p
+              id="waitlist-status"
+              role="status"
+              className={`mt-3 text-xs leading-relaxed ${
+                waitlistMessage
+                  ? waitlistMessage.success
+                    ? "text-green-700"
+                    : "text-amber-700"
+                  : "text-gray-500"
+              }`}
+            >
+              {waitlistMessage?.text ?? "登録は無料です。決済情報の入力はありません。"}
+            </p>
+          </form>
         </section>
       </div>
 
