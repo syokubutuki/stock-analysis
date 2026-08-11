@@ -1,6 +1,22 @@
 # 次セッション実装引き継ぎ
 
-更新日: 2026-08-01
+更新日: 2026-08-01（進捗注記を 2026-08-05 に追記）
+
+> ## 進捗（2026-08-05 時点・コード確認済み）
+>
+> **下の「実装順」§1〜§3 は完了している。残件は §4 と §5 だけ。**
+>
+> | 手順 | 状態 | 根拠 |
+> |---|---|---|
+> | §1 統合銘柄モデルと検索正規化 | **完了** | `app/lib/instruments.ts` / `instrument-search.ts` / `instrument-resolver.ts` |
+> | §2 `/api/search` をローカル優先の集約検索へ | **完了** | `app/api/search/route.ts` に `source: catalog\|yahoo`・`degraded`・Runtime Cache |
+> | §3 検索UIを一般利用者向けに | **完了** | `TickerSearchInput.tsx` に種類バッジ・`priceSupported`・combobox |
+> | §4 投信価格アダプターの修復 | **未着手** | `app/lib/stock-source.server.ts:77` が旧 `x-jwt-token` 方式のまま |
+> | §5 `/t/[ticker]` と SSR サマリー | **未着手** | `app/t/` が存在しない |
+>
+> この2件は `docs/site-improvement-execution-plan.md` で **R0**（§4）・**R1**（§5）として
+> 優先順位・依存関係に組み込まれている。着手前にそちらも読むこと。
+> **実装仕様は本書（NEXT_SESSION.md）が正**、優先順位と全体の位置づけは実行計画書が正。
 
 ## 目的
 
