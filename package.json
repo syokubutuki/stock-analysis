@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --import tsx --test \"app/lib/__tests__/**/*.test.ts\"",
+    "test:fixtures": "tsx app/lib/__tests__/tools/generate-fixtures.ts"
   },
   "dependencies": {
     "@types/katex": "^0.16.8",
