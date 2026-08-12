@@ -12,6 +12,7 @@ import TickerSearchInput from "./components/TickerSearchInput";
 import AccordionSection from "./components/analysis/AccordionSection";
 import DataQualityNotice from "./components/analysis/DataQualityNotice";
 import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
+import { formatSummaryPrice } from "./lib/format";
 import { SeriesMode } from "./lib/series-mode";
 import { recordTicker } from "./lib/test-ledger";
 
@@ -1035,7 +1036,7 @@ const ConsolidatedScorecardChart = dynamic(
 function ChartPlaceholder({ height }: { height: number }) {
   return (
     <div
-      className="w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400"
+      className="w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500"
       style={{ height }}
     >
       読み込み中...
@@ -1096,7 +1097,7 @@ const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
 
 // 入力系列(seriesMode)を実際に消費するセクション。これ以外のセクション
 // (基礎・テクニカル・OHLC・リスク・カレンダー)はチャートが OHLC ベースで
-// 系列変換が効かないため、SeriesModeSelector をグレーアウト表示にする。
+// 系列変換が効かないため、SeriesModeSelector の中身を表示しない。
 // 将来コンポーネントを seriesMode 対応化した際は、ここにキーを追加すること。
 const SERIES_AWARE_SECTIONS = new Set<SectionKey>([
   "transform", "distribution", "volatility", "frequency", "nonlinear",
@@ -1323,6 +1324,28 @@ export default function AnalysisPage() {
     requestAnimationFrame(tick);
   }, [activeSection]);
 
+  const hasDataQualityIssues =
+    (data?.dataQuality?.repaired.length ?? 0) > 0 ||
+    (data?.dataQuality?.suspects.length ?? 0) > 0;
+
+  // 破損点検は「どこをどう直したか」の詳細（表＋修復前後チャート）。
+  // 報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
+  // 問題がある場合はサマリーより先に、問題がなければサマリーの後に開示する。
+  const dataQualityPanel = data ? (
+    <CollapsibleAnalysis
+      id="data-quality"
+      title="価格データの破損点検"
+      subtitle="配信元のスケール破損を検出・修復した記録。修復した日の配信値と修復値・年率σの膨張・修復前後を重ねたチャート・ベンチマーク指数の点検"
+      defaultOpen={hasDataQualityIssues}
+    >
+      <DataQualityPanel
+        ticker={data.ticker}
+        prices={allPrices}
+        report={data.dataQuality}
+      />
+    </CollapsibleAnalysis>
+  ) : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-4">
@@ -1390,11 +1413,14 @@ export default function AnalysisPage() {
                   {data.name}
                 </span>
                 <PeriodSelector current={period} onChange={setPeriod} />
-                <SeriesModeSelector
-                  current={seriesMode}
-                  onChange={setSeriesMode}
-                  disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
-                />
+                {/* セレクタ用の行高は常に確保し、セクション切替時のレイアウトシフトを防ぐ。 */}
+                <div className="basis-full min-h-7 min-w-0 w-full">
+                  <SeriesModeSelector
+                    current={seriesMode}
+                    onChange={setSeriesMode}
+                    disabled={!SERIES_AWARE_SECTIONS.has(activeSection)}
+                  />
+                </div>
               </>
             )}
           </div>
@@ -1448,58 +1474,52 @@ export default function AnalysisPage() {
 
         {data && filteredPrices.length > 0 && (
           <>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-gray-500">
               {SECTIONS.find(s => s.key === activeSection)?.description}
             </div>
 
-            {/* 破損点検は「どこをどう直したか」の詳細（表＋修復前後チャート）。
-                報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
-                破損していた 1306.T はベンチマーク側なので、パネル内でベンチマークも点検できる。 */}
-            <CollapsibleAnalysis
-              id="data-quality"
-              title="価格データの破損点検"
-              subtitle="配信元のスケール破損を検出・修復した記録。修復した日の配信値と修復値・年率σの膨張・修復前後を重ねたチャート・ベンチマーク指数の点検"
-              defaultOpen={
-                (data.dataQuality?.repaired.length ?? 0) > 0 ||
-                (data.dataQuality?.suspects.length ?? 0) > 0
-              }
-            >
-              <DataQualityPanel
-                ticker={data.ticker}
-                prices={allPrices}
-                report={data.dataQuality}
-              />
-            </CollapsibleAnalysis>
+            <div className="flex flex-col gap-4">
+              <div className={hasDataQualityIssues ? "order-1" : "order-2"}>
+                {dataQualityPanel}
+              </div>
 
-            {/* サマリー */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <SummaryCard
-                label="現在値"
-                value={filteredPrices[filteredPrices.length - 1].close.toLocaleString()}
-              />
-              <SummaryCard
-                label="期間始値"
-                value={filteredPrices[0].close.toLocaleString()}
-              />
-              <SummaryCard
-                label="期間変動"
-                value={`${(
-                  ((filteredPrices[filteredPrices.length - 1].close -
-                    filteredPrices[0].close) /
-                    filteredPrices[0].close) *
-                  100
-                ).toFixed(2)}%`}
-                color={
-                  filteredPrices[filteredPrices.length - 1].close >=
-                  filteredPrices[0].close
-                    ? "text-green-600"
-                    : "text-red-600"
-                }
-              />
-              <SummaryCard
-                label="データ数"
-                value={`${filteredPrices.length}日`}
-              />
+              {/* サマリー */}
+              <div
+                className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${
+                  hasDataQualityIssues ? "order-2" : "order-1"
+                }`}
+              >
+                <SummaryCard
+                  label="現在値"
+                  value={formatSummaryPrice(
+                    filteredPrices[filteredPrices.length - 1].close,
+                    data.currency
+                  )}
+                />
+                <SummaryCard
+                  label="期間始値"
+                  value={formatSummaryPrice(filteredPrices[0].close, data.currency)}
+                />
+                <SummaryCard
+                  label="期間変動"
+                  value={`${(
+                    ((filteredPrices[filteredPrices.length - 1].close -
+                      filteredPrices[0].close) /
+                      filteredPrices[0].close) *
+                    100
+                  ).toFixed(2)}%`}
+                  color={
+                    filteredPrices[filteredPrices.length - 1].close >=
+                    filteredPrices[0].close
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }
+                />
+                <SummaryCard
+                  label="データ数"
+                  value={`${filteredPrices.length}日`}
+                />
+              </div>
             </div>
 
             {/* セクション内容 */}
@@ -2207,7 +2227,7 @@ export default function AnalysisPage() {
                 {SECTIONS.map(({ key, label, description }) => (
                   <div key={key} className="p-3 rounded-lg border border-gray-200">
                     <div className="font-medium text-gray-700 mb-0.5">{label}</div>
-                    <div className="text-xs text-gray-400">{description}</div>
+                    <div className="text-xs text-gray-500">{description}</div>
                   </div>
                 ))}
               </div>
@@ -2216,7 +2236,7 @@ export default function AnalysisPage() {
         )}
       </main>
 
-      <footer className="text-center text-xs text-gray-400 py-8 space-y-1">
+      <footer className="text-center text-xs text-gray-500 py-8 space-y-1">
         <p>株価データはYahoo Financeより取得。投資判断の参考としてご利用ください。</p>
         <p>
           <Link href="/guide" className="text-blue-500 hover:text-blue-600 underline">
