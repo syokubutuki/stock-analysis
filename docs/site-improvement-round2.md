@@ -66,18 +66,37 @@
 
 ## 2. worktree の準備
 
+**未コミットがあると worktree から参照文書が見えない**（ラウンド1で実際に起きた）。
+下のスクリプトは、その状態なら worktree を作らずに中断する。
+
 ```bash
 cd C:/Users/hikar/next/stock-analysis
-git worktree add ../sa-s5 -b feat/price-round
-git worktree add ../sa-s6 -b feat/fund-fix
-git worktree add ../sa-s7 -b feat/contrast
-git worktree add ../sa-s8 -b feat/nav-labels
 
-cd ../sa-s5 && npm install
-cd ../sa-s6 && npm install
-cd ../sa-s7 && npm install
-cd ../sa-s8 && npm install
+if [ -n "$(git status --porcelain)" ]; then
+  echo "中断: 未コミットの変更があります。worktree から見えないので先にコミットしてください。"
+  git status --short
+else
+  for pair in "sa-s5:feat/price-round" "sa-s6:feat/fund-fix" \
+              "sa-s7:feat/contrast"    "sa-s8:feat/nav-labels"; do
+    dir="../${pair%%:*}"; br="${pair##*:}"
+    git worktree add "$dir" -b "$br" && (cd "$dir" && npm install)
+  done
+  echo "完了。参照文書の存在を確認します:"
+  for d in sa-s5 sa-s6 sa-s7 sa-s8; do
+    n=0
+    for f in AGENTS.md CLAUDE.md NEXT_SESSION.md \
+             docs/site-improvement-execution-plan.md docs/site-improvement-round2.md; do
+      [ -f "../$d/$f" ] && n=$((n+1))
+    done
+    echo "  ../$d : 5文書中 $n 個"
+  done
+fi
 ```
+
+**5/5 にならなければ投入しないこと。**
+
+作成後に main が進んだ場合は、各 worktree で `git merge main --no-edit` して追従させる
+（Codex セッションが動いていない間に行うこと）。
 
 ### ラウンド1で踏んだ失敗（繰り返さないこと）
 
@@ -106,6 +125,10 @@ cd ../sa-s8 && npm install
 3. docs/site-improvement-execution-plan.md の §0 / §1.3 / §2 / §6 / §7 / §9
 
 §6（共通制約）と §9（やってはいけないこと）は必ず守ること。
+
+**これらのファイルが見つからない場合は、作業を始めずに即座に報告すること。**
+親リポジトリを探しに行ったり、記憶や推測で補ったりしないこと。
+worktree の作成手順に不備がある状態なので、環境側を直す必要がある。
 
 ## 並列作業中である
 他のセッションが別ファイルを同時に編集している。
