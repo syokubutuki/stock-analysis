@@ -1069,30 +1069,30 @@ type SectionKey =
   | "discretionary"
   | "quantum";
 
-const SECTIONS: { key: SectionKey; label: string; description: string }[] = [
-  { key: "basic", label: "基本分析", description: "ローソク足・一目均衡表・支持/抵抗線・フィボナッチ・ベンチマーク比較" },
-  { key: "technical", label: "テクニカル", description: "RSI・MACD・BB・ADX・ストキャスティクス・OBV/VWAP" },
-  { key: "ohlc", label: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
-  { key: "risk", label: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率・ボラティリティスマイル" },
-  { key: "derivatives", label: "デリバティブ", description: "Black-Scholesラボ(ペイオフ/Greeks)・実現Vol/VRP・先物カーブ/ロールイールド・デルタヘッジ" },
-  { key: "transform", label: "スケール変換", description: "対数リターン・順位変換・ボラ正規化・累積リターン・差分・Box-Cox・ドローダウン・Zスコア" },
-  { key: "distribution", label: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF・分散比検定" },
-  { key: "volatility", label: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
-  { key: "frequency", label: "周波数領域", description: "FFT・ウェーブレット・コヒーレンス・EMD・解析信号・HHS・STFT・SSA・Lomb-Scargle" },
-  { key: "nonlinear", label: "非線形動力学", description: "アトラクタ・RQA・Lyapunov・位相空間予測・KM係数・TDA・投資シグナル" },
-  { key: "entropy", label: "情報理論", description: "エントロピー拡張・複雑度・情報フロー・レジーム検出・予測可能性" },
-  { key: "fractal", label: "フラクタル", description: "DFA・Hurst指数・ローリングHurst+サロゲート帯・MF-DFA・R/S・DCCA・相関次元" },
-  { key: "network", label: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
-  { key: "conditional", label: "条件付き分析", description: "状態→先行きリターン表（RSI/ボラ/トレンド別の条件付き期待値・有意性・年次持続性）" },
-  { key: "edge", label: "エッジ探索", description: "条件ペア交互作用スキャン・レジーム別エッジマップ・ウォークフォワード頑健性・シグナル合成・エッジ容量推定・減衰検知(SPRT/CUSUM)・前向き検証台帳・多重検定台帳" },
-  { key: "asof", label: "as-of検証", description: "過去の時点に戻り、その時点で分かる情報だけで出した判断がその後に適切だったかを採点（スナップショット再現・型別スコアカード・アナログ経路リプレイ）" },
-  { key: "regime", label: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
-  { key: "causal", label: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
-  { key: "tailrisk", label: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
-  { key: "calendar", label: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ・ローソク足の季節性・高値/安値の時間帯分布(日中足)" },
-  { key: "simulation", label: "シミュレーション", description: "カスタム売買・GBDT予測・株価予測(モンテカルロ)・バックテスト・分数BM・VG過程・最適停止" },
-  { key: "discretionary", label: "裁量トレード", description: "クリックで任意タイミング売買・Buy&Hold比較・裁量基準の逆算・期間適用バックテスト(シナリオ保存可)" },
-  { key: "quantum", label: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
+const SECTIONS: { key: SectionKey; label: string; method: string; description: string }[] = [
+  { key: "basic", label: "値動きの全体像を見る", method: "基本分析", description: "ローソク足・一目均衡表・支持/抵抗線・フィボナッチ・ベンチマーク比較" },
+  { key: "technical", label: "売買タイミングを探す", method: "テクニカル", description: "RSI・MACD・BB・ADX・ストキャスティクス・OBV/VWAP" },
+  { key: "ohlc", label: "値動きの内訳を見る", method: "OHLC分析", description: "ローソク足構造・MFE/MAE・レンジ・ギャップ散布図・レンジベースVol" },
+  { key: "risk", label: "損失とリスクを測る", method: "リスク指標", description: "ドローダウン・VaR/CVaR・シャープ/ソルティノ比率・ボラティリティスマイル" },
+  { key: "derivatives", label: "派生商品の条件を試す", method: "デリバティブ", description: "Black-Scholesラボ(ペイオフ/Greeks)・実現Vol/VRP・先物カーブ/ロールイールド・デルタヘッジ" },
+  { key: "transform", label: "比べやすい形に整える", method: "スケール変換", description: "対数リターン・順位変換・ボラ正規化・累積リターン・差分・Box-Cox・ドローダウン・Zスコア" },
+  { key: "distribution", label: "値動きの癖を確かめる", method: "分布・相関", description: "リターン分布・QQプロット・ACF/PACF・分散比検定" },
+  { key: "volatility", label: "変動の大きさを読む", method: "ボラティリティ", description: "EWMA・GARCH・ATR・ケルトナーチャネル" },
+  { key: "frequency", label: "繰り返す周期を探す", method: "周波数領域", description: "FFT・ウェーブレット・コヒーレンス・EMD・解析信号・HHS・STFT・SSA・Lomb-Scargle" },
+  { key: "nonlinear", label: "複雑な変化を捉える", method: "非線形動力学", description: "アトラクタ・RQA・Lyapunov・位相空間予測・KM係数・TDA・投資シグナル" },
+  { key: "entropy", label: "予測しやすさを測る", method: "情報理論", description: "エントロピー拡張・複雑度・情報フロー・レジーム検出・予測可能性" },
+  { key: "fractal", label: "傾向の持続性を見る", method: "フラクタル", description: "DFA・Hurst指数・ローリングHurst+サロゲート帯・MF-DFA・R/S・DCCA・相関次元" },
+  { key: "network", label: "値動きのつながりを見る", method: "ネットワーク", description: "NVG・HVG・Ordinal・Recurrence Network" },
+  { key: "conditional", label: "今の条件から先を読む", method: "条件付き分析", description: "状態→先行きリターン表（RSI/ボラ/トレンド別の条件付き期待値・有意性・年次持続性）" },
+  { key: "edge", label: "その優位性は本物か", method: "エッジ探索", description: "条件ペア交互作用スキャン・レジーム別エッジマップ・ウォークフォワード頑健性・シグナル合成・エッジ容量推定・減衰検知(SPRT/CUSUM)・前向き検証台帳・多重検定台帳" },
+  { key: "asof", label: "過去の判断を採点する", method: "as-of検証", description: "過去の時点に戻り、その時点で分かる情報だけで出した判断がその後に適切だったかを採点（スナップショット再現・型別スコアカード・アナログ経路リプレイ）" },
+  { key: "regime", label: "今の相場環境を見極める", method: "レジーム分析", description: "市場状態ダッシュボード・3状態カルマン・スムーザー・HMM・変化点検出・ベイズ変化点検出" },
+  { key: "causal", label: "何が値動きに先行するか", method: "因果・情報", description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果" },
+  { key: "tailrisk", label: "どれだけ下がりうるか", method: "テイルリスク", description: "極値統計・高次キュムラント・テイル依存性・Copula分析" },
+  { key: "calendar", label: "いつ買って、いつ降りるか", method: "カレンダー", description: "曜日/月別アノマリー・ヒートマップ・ローソク足の季節性・高値/安値の時間帯分布(日中足)" },
+  { key: "simulation", label: "将来シナリオを試す", method: "シミュレーション", description: "カスタム売買・GBDT予測・株価予測(モンテカルロ)・バックテスト・分数BM・VG過程・最適停止" },
+  { key: "discretionary", label: "自分の売買を検証する", method: "裁量トレード", description: "クリックで任意タイミング売買・Buy&Hold比較・裁量基準の逆算・期間適用バックテスト(シナリオ保存可)" },
+  { key: "quantum", label: "値動きの癖を見る（上級）", method: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
 // 入力系列(seriesMode)を実際に消費するセクション。これ以外のセクション
@@ -1425,22 +1425,27 @@ export default function AnalysisPage() {
             )}
           </div>
 
-          {/* セクションタブ。スマホは横1行のスクロール帯にして縦に伸ばさず、
-              PCは折り返して全タブを見せる。 */}
+          {/* セクションタブ。全幅で横1行のスクロール帯にして、項目数が多くても
+              ファーストビューを縦に押し下げない。 */}
           {data && filteredPrices.length > 0 && (
-            <div className="flex gap-1 overflow-x-auto sm:flex-wrap sm:overflow-visible pb-0.5">
-              {SECTIONS.map(({ key, label, description }) => (
+            <div className="flex gap-1 overflow-x-auto pb-1" aria-label="分析の目的を選ぶ">
+              {SECTIONS.map(({ key, label, method }) => (
                 <button
                   key={key}
                   onClick={() => changeSection(key)}
-                  title={description}
-                  className={`shrink-0 whitespace-nowrap px-3 py-1 text-sm rounded font-medium transition-colors ${
+                  aria-pressed={activeSection === key}
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-left text-sm rounded font-medium leading-tight transition-colors ${
                     activeSection === key
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  {label}
+                  <span className="block">{label}</span>
+                  <span className={`block text-[11px] font-normal ${
+                    activeSection === key ? "text-blue-100" : "text-gray-500"
+                  }`}>
+                    {method}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1474,8 +1479,16 @@ export default function AnalysisPage() {
 
         {data && filteredPrices.length > 0 && (
           <>
-            <div className="text-xs text-gray-500">
-              {SECTIONS.find(s => s.key === activeSection)?.description}
+            <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
+              <span className="font-medium text-gray-800">
+                {SECTIONS.find(s => s.key === activeSection)?.label}
+              </span>
+              <span className="ml-1 text-gray-500">
+                （{SECTIONS.find(s => s.key === activeSection)?.method}）
+              </span>
+              <span className="mt-1 block">
+                {SECTIONS.find(s => s.key === activeSection)?.description}
+              </span>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -2224,9 +2237,10 @@ export default function AnalysisPage() {
           <div className="py-12">
             <div className="max-w-4xl mx-auto">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
-                {SECTIONS.map(({ key, label, description }) => (
+                {SECTIONS.map(({ key, label, method, description }) => (
                   <div key={key} className="p-3 rounded-lg border border-gray-200">
                     <div className="font-medium text-gray-700 mb-0.5">{label}</div>
+                    <div className="text-xs text-gray-500 mb-1">{method}</div>
                     <div className="text-xs text-gray-500">{description}</div>
                   </div>
                 ))}
