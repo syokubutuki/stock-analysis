@@ -422,7 +422,7 @@ export default function VolTargetingChart({ prices }: Props) {
             </button>
           ))}
         </div>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           {meta.startDate}〜{meta.endDate} / {meta.years.toFixed(1)}年 / 信用金利2.8%（楽天・制度信用）
         </span>
       </div>
@@ -499,7 +499,7 @@ export default function VolTargetingChart({ prices }: Props) {
             </tr>
           </tbody>
         </table>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           年率差の95%CI（ペア・ブロックBootstrap）: [{pct(annual.lo)}, {pct(annual.hi)}]、差&gt;0の確率 {(annual.probPositive * 100).toFixed(0)}%。
         </p>
       </div>
@@ -615,7 +615,7 @@ export default function VolTargetingChart({ prices }: Props) {
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-fg-muted mt-1">
             行クリックでそのソースに切替。ΔDD は最大ドローダウンの改善幅（正=浅くなった）。
             この表は点推定のみ（検定なし）なので、最終判断は上の検定カードで。
           </p>
@@ -630,7 +630,7 @@ export default function VolTargetingChart({ prices }: Props) {
           理論ケリー μ/σ² = {num2(sweep.kKellyGross)}。
         </div>
         <div className="w-full"><canvas ref={sweepRef} /></div>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           定数レバでは k を上げるほど分散ドラッグ（k²σ²/2）と信用金利が幾何リターンを削ります。
           可変レバ戦略の価値は「平均レバは k* 近辺のまま、荒れた日だけ下げる」ことでこの曲線の上に出られるかどうかです。
         </p>

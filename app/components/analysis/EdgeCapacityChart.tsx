@@ -155,10 +155,10 @@ export default function EdgeCapacityChart({ prices }: Props) {
   }, [selected, deflate]);
 
   if (prices.length < 300) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(300営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(300営業日以上必要)。</div>;
   }
   if (table.length === 0) {
-    return <div className="text-xs text-gray-400 p-3">出来高データが無いため容量を推定できません(指数などは出来高0の場合があります)。</div>;
+    return <div className="text-xs text-fg-muted p-3">出来高データが無いため容量を推定できません(指数などは出来高0の場合があります)。</div>;
   }
 
   return (
@@ -254,19 +254,19 @@ export default function EdgeCapacityChart({ prices }: Props) {
                     {(r.muGross * 100).toFixed(3)}%
                     {deflate && <span className="text-blue-600">→{(r.muDeflated * 100).toFixed(3)}%</span>}
                   </td>
-                  <td className={`text-right px-1 font-mono ${Math.abs(r.tStat) > 2 ? "text-gray-800 font-bold" : "text-gray-400"}`}>{Math.abs(r.tStat).toFixed(1)}</td>
+                  <td className={`text-right px-1 font-mono ${Math.abs(r.tStat) > 2 ? "text-gray-800 font-bold" : "text-fg-muted"}`}>{Math.abs(r.tStat).toFixed(1)}</td>
                   <td className={`text-right px-1 font-mono ${aV > 0 ? "" : "text-red-500"}`}>{(aV * 100).toFixed(3)}%</td>
                   <td className="text-right px-1.5 font-mono">{dead ? "—" : fmtYen(kStarV)}</td>
                   <td className="text-right px-1.5 font-mono">{dead ? "0円" : fmtYen(kBeV)}</td>
                   <td className="text-right px-1.5 font-mono text-amber-700">{fmtYen(r.kLiq)}</td>
-                  <td className={`text-right px-1.5 font-mono ${profitV > 0 ? "text-green-700" : "text-gray-400"}`}>{dead ? "—" : fmtYen(profitV)}</td>
+                  <td className={`text-right px-1.5 font-mono ${profitV > 0 ? "text-green-700" : "text-fg-muted"}`}>{dead ? "—" : fmtYen(profitV)}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-gray-400">
+      <p className="text-[10px] text-fg-muted">
         行クリックで下の容量曲線を切替。a≦0(赤)はスプレッドの時点でエッジが消えており、どの資金量でも実運用不可。
         |t|は素朴なt値で多重比較未補正——有意性の判定はスキャン系分析(FDR補正あり)側で行うこと。
       </p>

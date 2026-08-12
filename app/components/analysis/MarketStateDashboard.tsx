@@ -304,16 +304,16 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
         {/* Score gauge */}
         <div className="p-3 bg-gray-50 rounded border border-gray-100 text-center col-span-2 sm:col-span-1">
-          <div className="text-[10px] text-gray-400 mb-1">総合スコア</div>
+          <div className="text-[10px] text-fg-muted mb-1">総合スコア</div>
           <div className="text-3xl font-bold" style={{ color: scoreColor }}>
             {score > 0 ? "+" : ""}{score.toFixed(0)}
           </div>
-          <div className="text-[10px] text-gray-400 mt-1">-100 〜 +100</div>
+          <div className="text-[10px] text-fg-muted mt-1">-100 〜 +100</div>
         </div>
 
         {/* Trend */}
         <div className="p-2 bg-gray-50 rounded border border-gray-100">
-          <div className="text-[10px] text-gray-400">トレンド強度</div>
+          <div className="text-[10px] text-fg-muted">トレンド強度</div>
           <div className="flex items-center gap-1 mt-1">
             <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
@@ -328,14 +328,14 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
               {(latest?.trend || 0) > 0 ? "+" : ""}{(latest?.trend || 0).toFixed(1)}
             </span>
           </div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-[10px] text-fg-muted mt-0.5">
             {(latest?.trend || 0) > 1 ? "強い上昇" : (latest?.trend || 0) > 0.3 ? "弱い上昇" : (latest?.trend || 0) > -0.3 ? "横ばい" : (latest?.trend || 0) > -1 ? "弱い下降" : "強い下降"}
           </div>
         </div>
 
         {/* Acceleration */}
         <div className="p-2 bg-gray-50 rounded border border-gray-100">
-          <div className="text-[10px] text-gray-400">加速度</div>
+          <div className="text-[10px] text-fg-muted">加速度</div>
           <div className="flex items-center gap-1 mt-1">
             <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
@@ -350,27 +350,27 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
               {(latest?.accel || 0) > 0 ? "+" : ""}{(latest?.accel || 0).toFixed(1)}
             </span>
           </div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-[10px] text-fg-muted mt-0.5">
             {(latest?.accel || 0) > 0.5 ? "加速中" : (latest?.accel || 0) > -0.5 ? "安定" : "減速中"}
           </div>
         </div>
 
         {/* Volatility */}
         <div className="p-2 bg-gray-50 rounded border border-gray-100">
-          <div className="text-[10px] text-gray-400">ボラティリティ</div>
+          <div className="text-[10px] text-fg-muted">ボラティリティ</div>
           <div className="text-sm font-bold text-gray-700 mt-1">{(latest?.vol || 0).toFixed(2)}</div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-[10px] text-fg-muted mt-0.5">
             {(latest?.vol || 0) > (marketState.volatilityState.reduce((a, v) => a + v, 0) / n) * 1.5 ? "高い" : "通常"}
           </div>
         </div>
 
         {/* Regime */}
         <div className="p-2 rounded border border-gray-100" style={{ backgroundColor: latest ? REGIME_COLORS[latest.regime] + "15" : "#f9fafb" }}>
-          <div className="text-[10px] text-gray-400">現在のレジーム</div>
+          <div className="text-[10px] text-fg-muted">現在のレジーム</div>
           <div className="text-sm font-bold mt-1" style={{ color: latest ? REGIME_COLORS[latest.regime] : "#374151" }}>
             {latest ? REGIME_LABELS[latest.regime] : "—"}
           </div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-[10px] text-fg-muted mt-0.5">
             信頼度: {((latest?.conf || 0) * 100).toFixed(0)}%
           </div>
         </div>
@@ -386,7 +386,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
       <div className="space-y-3 mb-3">
         <div>
           <div className="text-xs text-gray-500 mb-1">
-            価格 + レジーム分類: <span className="text-gray-400">背景色=レジーム</span> /
+            価格 + レジーム分類: <span className="text-fg-muted">背景色=レジーム</span> /
             <span className="text-blue-500"> 3状態カルマン</span> /
             <span className="text-red-500"> スムーザー</span>
           </div>
@@ -423,7 +423,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: REGIME_COLORS[regime] }} />
                 </div>
-                <span className="text-gray-400 w-10 text-right">{pct}%</span>
+                <span className="text-fg-muted w-10 text-right">{pct}%</span>
               </div>
             ))}
           </div>
@@ -443,7 +443,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
               ))}
             </div>
           ) : (
-            <div className="text-gray-400">転換点なし</div>
+            <div className="text-fg-muted">転換点なし</div>
           )}
         </div>
       </div>

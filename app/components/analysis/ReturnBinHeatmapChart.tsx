@@ -112,7 +112,7 @@ export default function ReturnBinHeatmapChart({ prices, minBars = 250 }: Props) 
             {h}日
           </button>
         ))}
-        <span className="ml-auto text-gray-400">全標本 {result.totalN}日</span>
+        <span className="ml-auto text-fg-muted">全標本 {result.totalN}日</span>
       </div>
 
       {/* リターンビン設定 */}
@@ -230,7 +230,7 @@ export default function ReturnBinHeatmapChart({ prices, minBars = 250 }: Props) 
           </tbody>
         </table>
       </div>
-      <div className="text-[11px] text-gray-400">
+      <div className="text-[11px] text-fg-muted">
         セルの数値＝その状態における各リターンビンの出現割合(%)。色の濃さ＝割合の高さ、色相＝ビンの符号(緑=上昇/赤=下落)。
       </div>
 

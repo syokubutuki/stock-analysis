@@ -45,7 +45,7 @@ function Card({ label, value, sub, tone }: { label: string; value: string; sub?:
     <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-semibold tabular-nums ${color}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -135,7 +135,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
 
   if (!valid || !point) {
     return (
-      <div className="text-xs text-gray-400 p-3">
+      <div className="text-xs text-fg-muted p-3">
         データが不足しています（時間軸「{HORIZON_CONFIG[horizon].label}」の再現には
         最低 {range.min + MAX_H} 本必要、現在 {prices.length} 本）。
       </div>
@@ -176,7 +176,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
           onChange={(e) => setAsOfIdx(Number(e.target.value))}
           className="flex-1 min-w-[12rem] accent-blue-600"
         />
-        <span className="text-gray-400">
+        <span className="text-fg-muted">
           選べる範囲 {prices[range.min].time} 〜 {prices[range.max].time}
         </span>
       </div>
@@ -244,7 +244,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
                 if (!f) return (
                   <tr key={h} className="border-b border-gray-100">
                     <td className="py-1 px-1.5">{h}日後</td>
-                    <td colSpan={7} className="px-1.5 text-gray-400">実測データがありません</td>
+                    <td colSpan={7} className="px-1.5 text-fg-muted">実測データがありません</td>
                   </tr>
                 );
                 const dirOk = d.direction === "flat" ? null
@@ -278,7 +278,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-gray-400 mt-1">
+        <p className="text-[11px] text-fg-muted mt-1">
           1日ぶんの当否には情報がほぼありません（コイン1回と同じ）。この画面は仕組みの確認用で、
           判定は次の「as-of スコアカード」でまとめて行ってください。
         </p>

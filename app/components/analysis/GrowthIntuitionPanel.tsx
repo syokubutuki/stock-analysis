@@ -604,7 +604,7 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
                 >
                   <td className="py-1.5 px-2 whitespace-nowrap">
                     <span className="text-green-700">+{r.swing}%</span>
-                    <span className="text-gray-400"> / </span>
+                    <span className="text-fg-muted"> / </span>
                     <span className="text-red-700">−{r.swing}%</span>
                     {r.note && (
                       <span
@@ -631,7 +631,7 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
                   <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">
                     {signPct(r.perStep, 2)}
                   </td>
-                  <td className="py-1.5 px-2 text-right tabular-nums text-gray-400">
+                  <td className="py-1.5 px-2 text-right tabular-nums text-fg-muted">
                     {signPct(r.approx, 2)}
                   </td>
                 </tr>

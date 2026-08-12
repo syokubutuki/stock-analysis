@@ -133,7 +133,7 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
           <div className={`font-mono font-medium text-sm ${clustering > 0.3 ? "text-orange-600" : ""}`}>
             {clustering.toFixed(3)}
           </div>
-          <div className="text-gray-400">{clustering > 0.3 ? "強い" : clustering > 0.1 ? "中程度" : "弱い"}</div>
+          <div className="text-fg-muted">{clustering > 0.3 ? "強い" : clustering > 0.1 ? "中程度" : "弱い"}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">低ボラ閾値 (年率)</div>

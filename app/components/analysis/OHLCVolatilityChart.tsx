@@ -169,7 +169,7 @@ export default function OHLCVolatilityChart({ prices }: Props) {
                 {m.label}
               </div>
               <div className="font-mono font-medium text-gray-800">年率 {fmtPct(latest[m.key])}</div>
-              <div className="font-mono text-gray-400 text-[10px]">日次 {(latest[m.key] / Math.sqrt(252) * 100).toFixed(2)}%</div>
+              <div className="font-mono text-fg-muted text-[10px]">日次 {(latest[m.key] / Math.sqrt(252) * 100).toFixed(2)}%</div>
             </div>
           ))}
         </div>

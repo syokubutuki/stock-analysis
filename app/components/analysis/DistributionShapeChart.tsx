@@ -340,14 +340,14 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">KS検定 D値</div>
           <div className="font-mono font-medium">{ks.D.toFixed(4)}</div>
-          <div className={`text-gray-400 ${ks.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`text-fg-muted ${ks.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
             p={ks.pValue.toFixed(4)} {ks.pValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">AD検定 A²*</div>
           <div className="font-mono font-medium">{ad.A2star.toFixed(4)}</div>
-          <div className={`text-gray-400 ${ad.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`text-fg-muted ${ad.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
             p={ad.pValue.toFixed(4)} {ad.pValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>
@@ -356,17 +356,17 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
           <div className={`font-mono font-medium ${tFit.nu < 5 ? "text-red-600" : tFit.nu < 10 ? "text-orange-600" : ""}`}>
             {tFit.nu.toFixed(1)}
           </div>
-          <div className="text-gray-400">{tFit.nu < 5 ? "非常に重いテール" : tFit.nu < 10 ? "やや重いテール" : "軽いテール"}</div>
+          <div className="text-fg-muted">{tFit.nu < 5 ? "非常に重いテール" : tFit.nu < 10 ? "やや重いテール" : "軽いテール"}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">上側テール &gt;1%</div>
           <div className="font-mono font-medium text-green-600">{pctFmt(tails.upper.exceedance1pct, 2)}</div>
-          <div className="text-gray-400">&gt;2%: {pctFmt(tails.upper.exceedance2pct, 2)}</div>
+          <div className="text-fg-muted">&gt;2%: {pctFmt(tails.upper.exceedance2pct, 2)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">下側テール &lt;-1%</div>
           <div className="font-mono font-medium text-red-600">{pctFmt(tails.lower.exceedance1pct, 2)}</div>
-          <div className="text-gray-400">&lt;-2%: {pctFmt(tails.lower.exceedance2pct, 2)}</div>
+          <div className="text-fg-muted">&lt;-2%: {pctFmt(tails.lower.exceedance2pct, 2)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">テール非対称性</div>
@@ -375,7 +375,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
               ? (tails.upper.n / tails.lower.n).toFixed(2)
               : "-"}
           </div>
-          <div className="text-gray-400">上側N/下側N比</div>
+          <div className="text-fg-muted">上側N/下側N比</div>
         </div>
       </div>
 

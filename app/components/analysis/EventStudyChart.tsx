@@ -246,7 +246,7 @@ export default function EventStudyChart({ prices }: Props) {
       {/* 条件設定 */}
       <div className="flex flex-wrap items-end gap-3 text-xs">
         <div>
-          <div className="text-gray-400 mb-1">トリガー系列</div>
+          <div className="text-fg-muted mb-1">トリガー系列</div>
           <div className="flex gap-1">
             {([["bench", "ベンチマーク"], ["self", "分析銘柄自身"]] as ["bench" | "self", string][]).map(([v, l]) => (
               <button key={v} onClick={() => setSource(v)}
@@ -259,7 +259,7 @@ export default function EventStudyChart({ prices }: Props) {
 
         {source === "bench" && (
           <div>
-            <div className="text-gray-400 mb-1">ベンチマーク銘柄</div>
+            <div className="text-fg-muted mb-1">ベンチマーク銘柄</div>
             <form onSubmit={(e) => { e.preventDefault(); const t = benchInput.trim(); if (t) setBenchTicker(/^\d{4}$/.test(t) ? t : t.toUpperCase()); }}
               className="flex gap-1 items-center">
               <input value={benchInput} onChange={(e) => setBenchInput(e.target.value)}
@@ -271,7 +271,7 @@ export default function EventStudyChart({ prices }: Props) {
         )}
 
         <div>
-          <div className="text-gray-400 mb-1">条件</div>
+          <div className="text-fg-muted mb-1">条件</div>
           <select value={cond} onChange={(e) => setCond(e.target.value as TriggerCond)}
             className="px-2 py-1 border border-gray-300 rounded bg-white focus:outline-none focus:border-blue-400">
             {COND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -279,14 +279,14 @@ export default function EventStudyChart({ prices }: Props) {
         </div>
 
         <div>
-          <div className="text-gray-400 mb-1">しきい値 (%)</div>
+          <div className="text-fg-muted mb-1">しきい値 (%)</div>
           <input type="number" step={0.5} min={0} value={thresholdPct}
             onChange={(e) => setThresholdPct(Math.max(0, Number(e.target.value)))}
             className="w-20 px-1.5 py-1 border border-gray-300 rounded focus:outline-none focus:border-blue-400" />
         </div>
 
         <div>
-          <div className="text-gray-400 mb-1">観察日数</div>
+          <div className="text-fg-muted mb-1">観察日数</div>
           <select value={horizon} onChange={(e) => setHorizon(Number(e.target.value))}
             className="px-2 py-1 border border-gray-300 rounded bg-white focus:outline-none focus:border-blue-400">
             {HORIZON_OPTIONS.map(h => <option key={h} value={h}>{h}日</option>)}
@@ -358,7 +358,7 @@ export default function EventStudyChart({ prices }: Props) {
                     <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>{(s.winRate * 100).toFixed(0)}%</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{pct(base)}</td>
                     <td className={`py-1 px-2 text-center font-mono font-medium ${ex > 0 ? "text-green-700" : ex < 0 ? "text-red-700" : ""}`}>{pct(ex)}</td>
-                    <td className="py-1 px-2 text-center font-mono text-gray-400">{s.n}</td>
+                    <td className="py-1 px-2 text-center font-mono text-fg-muted">{s.n}</td>
                   </tr>
                 );
               })}

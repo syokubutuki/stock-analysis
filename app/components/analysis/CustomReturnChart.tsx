@@ -437,7 +437,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
       {returns.length >= 2 ? (
         <div ref={chartRef} className="w-full rounded border border-gray-100" />
       ) : (
-        <div className="text-sm text-gray-400 py-8 text-center">データが不足しています</div>
+        <div className="text-sm text-fg-muted py-8 text-center">データが不足しています</div>
       )}
 
       {/* 凡例 */}
@@ -459,7 +459,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
               <div className="text-xs font-medium text-gray-600">
                 GBDT日次予測（上のチャートと同一時間軸 ／ 上段=予測・中段=実際・下段=的中）
               </div>
-              <div className="text-[11px] text-gray-400">
+              <div className="text-[11px] text-fg-muted">
                 的中 {hits}/{dl.length}（{((hits / dl.length) * 100).toFixed(1)}%）・上昇予測 {up}日
               </div>
             </div>
@@ -467,7 +467,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(22,163,74,0.85)" }} /> 上昇</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(220,38,38,0.85)" }} /> 下落</span>
-              <span className="text-gray-400">予測行の色の濃さ＝確信度</span>
+              <span className="text-fg-muted">予測行の色の濃さ＝確信度</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-400" /> 的中</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-400" /> 外れ</span>
               <span className={`ml-auto font-medium ${last.predicted === 1 ? "text-green-600" : "text-red-600"}`}>

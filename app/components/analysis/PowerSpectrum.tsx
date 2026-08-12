@@ -104,7 +104,7 @@ export default function PowerSpectrum({ prices, seriesMode }: Props) {
           {topPeriods.map((p, i) => (
             <div key={i} className="font-mono">
               {p.period.toFixed(1)}日
-              <span className="text-gray-400 ml-1">
+              <span className="text-fg-muted ml-1">
                 (P={p.power.toExponential(1)})
               </span>
             </div>

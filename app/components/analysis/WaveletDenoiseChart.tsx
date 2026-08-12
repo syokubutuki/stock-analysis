@@ -106,14 +106,14 @@ export default function WaveletDenoiseChart({ prices }: Props) {
             <div className="font-medium text-sm">
               {res.trendUp ? "上昇 ▲" : "下降 ▼"}
             </div>
-            <div className="text-[10px] text-gray-400">除去後系列の傾き</div>
+            <div className="text-[10px] text-fg-muted">除去後系列の傾き</div>
           </div>
           <div className="p-2 rounded border border-gray-200 bg-gray-50">
             <div className="text-gray-500">ダマシ削減率</div>
             <div className="font-mono font-medium">
               {res.whipsawReduction.toFixed(0)}%
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[10px] text-fg-muted">
               方向転換 {res.rawFlips}→{res.denoisedFlips}回
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function WaveletDenoiseChart({ prices }: Props) {
             <div className="font-mono font-medium">
               {res.sigmaNoisePct.toFixed(2)}%
             </div>
-            <div className="text-[10px] text-gray-400">残差の標準偏差</div>
+            <div className="text-[10px] text-fg-muted">残差の標準偏差</div>
           </div>
           <div className="p-2 rounded border border-gray-200 bg-gray-50">
             <div className="text-gray-500">現在乖離</div>
@@ -130,7 +130,7 @@ export default function WaveletDenoiseChart({ prices }: Props) {
               {res.currentDeviationPct >= 0 ? "+" : ""}
               {res.currentDeviationPct.toFixed(2)}%
             </div>
-            <div className="text-[10px] text-gray-400">観測−除去後</div>
+            <div className="text-[10px] text-fg-muted">観測−除去後</div>
           </div>
         </div>
       )}

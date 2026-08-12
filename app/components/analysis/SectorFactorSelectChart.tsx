@@ -97,7 +97,7 @@ function Stat({
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400 leading-tight">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted leading-tight">{sub}</div>}
     </div>
   );
 }
@@ -763,9 +763,9 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
               {diag.rateAvailable && (
                 <span className="font-mono text-xs text-gray-700">
                   セクターの動きのうち金利で説明できるのは <b className="text-base">{pct(diag.rateR2, 1)}</b>
-                  <span className="mx-1 text-gray-400">/</span>
+                  <span className="mx-1 text-fg-muted">/</span>
                   金利+10bp → セクター <b className="text-base">{signPct(diag.rateBeta * 0.1, 2)}</b>
-                  <span className="mx-1 text-gray-400">/</span>t = <b>{diag.rateT.toFixed(2)}</b>
+                  <span className="mx-1 text-fg-muted">/</span>t = <b>{diag.rateT.toFixed(2)}</b>
                 </span>
               )}
             </div>
@@ -880,7 +880,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
                       </td>
                       <td className="px-1.5 py-1 text-right font-mono">
                         {a.b.toFixed(2)}
-                        <span className="text-gray-400"> ± {a.bSe.toFixed(3)}</span>
+                        <span className="text-fg-muted"> ± {a.bSe.toFixed(3)}</span>
                         {shrink && Math.abs(a.bShrunk - a.b) > 0.005 && (
                           <span className="ml-1 text-indigo-500">→{a.bShrunk.toFixed(2)}</span>
                         )}
@@ -904,7 +904,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
                       {/* 持続性が測れていないなら推奨wは参考値。灰色化して明示する
                           （DriftIdentifiabilityChart と同じ流儀）。 */}
                       <td
-                        className={`px-1.5 py-1 text-right font-mono ${tiltUnusable ? "text-gray-400" : ""}`}
+                        className={`px-1.5 py-1 text-right font-mono ${tiltUnusable ? "text-fg-muted" : ""}`}
                         title={tiltUnusable ? "持続性を測れていないため参考値" : undefined}
                       >
                         {a.weight > 0 ? (

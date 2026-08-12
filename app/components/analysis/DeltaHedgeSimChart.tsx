@@ -170,7 +170,7 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
       </div>
 
       {!result && (
-        <div className="text-xs text-gray-400">データ不足（20営業日以上必要）</div>
+        <div className="text-xs text-fg-muted">データ不足（20営業日以上必要）</div>
       )}
 
       {result && (

@@ -125,7 +125,7 @@ export default function SignalStackingChart({ prices }: Props) {
   }, [result]);
 
   if (prices.length < 260) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(260営業日以上推奨)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(260営業日以上推奨)。</div>;
   }
 
   return (
@@ -164,7 +164,7 @@ export default function SignalStackingChart({ prices }: Props) {
             <select className="border rounded px-1 py-0.5" value={agreeK} onChange={(e) => setAgreeK(Number(e.target.value))}>
               {Array.from({ length: Math.max(1, selected.length) }, (_, i) => i + 1).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
-            <span className="text-gray-400">/ {selected.length}</span>
+            <span className="text-fg-muted">/ {selected.length}</span>
           </label>
         )}
         <label className="flex items-center gap-1">
@@ -175,7 +175,7 @@ export default function SignalStackingChart({ prices }: Props) {
       </div>
 
       {!result ? (
-        <div className="text-xs text-gray-400">シグナルを1つ以上選んでください。</div>
+        <div className="text-xs text-fg-muted">シグナルを1つ以上選んでください。</div>
       ) : (
         <>
           {/* 指標 */}
@@ -228,18 +228,18 @@ export default function SignalStackingChart({ prices }: Props) {
               <tbody>
                 {result.perSignal.map((p, i) => (
                   <tr key={p.id} className="border-b border-gray-100">
-                    <td className="py-1 px-1.5 text-gray-400">{i + 1}</td>
+                    <td className="py-1 px-1.5 text-fg-muted">{i + 1}</td>
                     <td className="px-1.5">{p.label}</td>
                     <td className={`text-right px-1 font-mono ${p.sharpe > 0 ? "text-green-600" : "text-red-600"}`}>{p.sharpe.toFixed(2)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{(p.annReturn * 100).toFixed(1)}%</td>
                     <td className="text-right px-1 font-mono text-gray-600">{scheme === "agreement" ? "–" : (p.weight * 100).toFixed(0) + "%"}</td>
-                    <td className={`text-right px-1.5 font-mono ${p.looDelta > 0 ? "text-blue-600 font-medium" : "text-gray-400"}`}>{p.looDelta >= 0 ? "+" : ""}{p.looDelta.toFixed(2)}</td>
+                    <td className={`text-right px-1.5 font-mono ${p.looDelta > 0 ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{p.looDelta >= 0 ? "+" : ""}{p.looDelta.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-gray-400">
+          <p className="text-[10px] text-fg-muted">
             貢献=そのシグナルを外したときの合成シャープの低下幅。正で大=合成に不可欠。負=むしろ足を引っ張っている(外すと改善)。
           </p>
         </>

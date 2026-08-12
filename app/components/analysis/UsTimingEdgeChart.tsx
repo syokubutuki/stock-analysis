@@ -112,7 +112,7 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
       )}
 
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">この米国ビンは標本が不足しています（別のビン/粗い足を選択）。</div>
+        <div className="text-xs text-fg-muted">この米国ビンは標本が不足しています（別のビン/粗い足を選択）。</div>
       )}
 
       {result && (
@@ -134,13 +134,13 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
                 <span className="opacity-70">p={permShown.p < 0.001 ? "<.001" : permShown.p.toFixed(3)}・max|t|={permShown.obsMaxT.toFixed(2)}</span>
               </span>
             )}
-            <span className="text-[11px] text-gray-400">全窓の最大|t|の帰無分布で、最良窓が偶然でないかを1検定で判定（FDRより厳格）</span>
+            <span className="text-[11px] text-fg-muted">全窓の最大|t|の帰無分布で、最良窓が偶然でないかを1検定で判定（FDRより厳格）</span>
           </div>
 
           <div className="space-y-1">
             <div className="text-xs font-medium text-gray-700">{result.binLabel} の翌日・好機タイミング上位（FDR有意）</div>
             {result.best.length === 0 ? (
-              <p className="text-xs text-gray-400">この条件では有意な時刻ペアは検出されませんでした。</p>
+              <p className="text-xs text-fg-muted">この条件では有意な時刻ペアは検出されませんでした。</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">

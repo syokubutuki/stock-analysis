@@ -58,7 +58,7 @@ function initCanvas(canvas: HTMLCanvasElement, height: number, zoom = 1) {
 function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number) => void }) {
   return (
     <div className="flex items-center gap-1 text-[11px]">
-      <span className="text-gray-400">表示倍率</span>
+      <span className="text-fg-muted">表示倍率</span>
       {[1, 1.5, 2, 3].map((z) => (
         <button
           key={z}
@@ -366,7 +366,7 @@ function Histogram({ values, label }: { values: number[]; label: string }) {
           );
         })}
       </div>
-      <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
+      <div className="flex justify-between text-[9px] text-fg-muted mt-0.5">
         <span>{fmtPct(bins.lo)}</span>
         <span className="text-gray-500">0%</span>
         <span>{fmtPct(bins.hi)}</span>
@@ -385,7 +385,7 @@ function OccurrenceTable({ occ, xLabel, yLabel }: { occ: Occurrence[]; xLabel: s
       <div className="overflow-x-auto">
         <table className="w-full text-[11px]">
           <thead>
-            <tr className="text-gray-400 border-b border-gray-200">
+            <tr className="text-fg-muted border-b border-gray-200">
               <th className="text-left px-1.5 py-0.5">エントリー日</th>
               <th className="text-right px-1.5">{xLabel}</th>
               {yLabel && <th className="text-right px-1.5">{yLabel}</th>}
@@ -521,7 +521,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
       <div className="bg-gray-50 rounded-md">
         <button onClick={() => setShowCond((v) => !v)} className="w-full flex items-center justify-between gap-2 px-2.5 py-2 text-xs text-left">
           <span className="text-gray-600 min-w-0">
-            <span className="text-gray-400 mr-1.5">条件</span>
+            <span className="text-fg-muted mr-1.5">条件</span>
             <span className="font-medium">{condSummary}</span>
           </span>
           <span className="text-indigo-600 shrink-0 font-medium">{showCond ? "閉じる ▲" : "変更 ▼"}</span>
@@ -592,7 +592,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
 
       {/* ===== ビュー: ビン別パス&EV ===== */}
       {view === "path" && (!result ? (
-        <p className="text-xs text-gray-400">この条件では標本が不足しています。</p>
+        <p className="text-xs text-fg-muted">この条件では標本が不足しています。</p>
       ) : (
         <>
           {nowBin && (
@@ -641,14 +641,14 @@ export default function WeekdayConditionalChart({ prices }: Props) {
                 })}
               </tbody>
             </table>
-            <p className="text-[11px] text-gray-400 mt-1">基準（全{WD_LABELS[entryDow]}曜・無条件）: 平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%（n={result.totalN}）。行クリックで分布と発生日を深掘り。</p>
+            <p className="text-[11px] text-fg-muted mt-1">基準（全{WD_LABELS[entryDow]}曜・無条件）: 平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%（n={result.totalN}）。行クリックで分布と発生日を深掘り。</p>
           </div>
 
           {drillBin && (
             <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-indigo-900">深掘り: {WD_LABELS[result.entryDow]}曜・{drillBin.label} → {result.exitLabel}</p>
-                <button onClick={() => setDrillRank(null)} className="text-[11px] text-gray-400 hover:text-gray-600">閉じる ✕</button>
+                <button onClick={() => setDrillRank(null)} className="text-[11px] text-fg-muted hover:text-gray-600">閉じる ✕</button>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <Histogram values={drillBin.occurrences.map((o) => o.fwd)} label="フォワードリターンの分布" />
@@ -661,7 +661,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
 
       {/* ===== ビュー: 2軸ピボット ===== */}
       {view === "pivot" && (!pivot || pivot.cells.length === 0 ? (
-        <p className="text-xs text-gray-400">この条件では標本が不足しています。</p>
+        <p className="text-xs text-fg-muted">この条件では標本が不足しています。</p>
       ) : (
         <>
           <ZoomBar zoom={zoom} setZoom={setZoom} />
@@ -669,12 +669,12 @@ export default function WeekdayConditionalChart({ prices }: Props) {
             <canvas ref={pivotRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[300px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
-          <p className="text-[11px] text-gray-400">緑=上昇/赤=下落、✓=有意(n≥10)、青枠=直近{WD_LABELS[entryDow]}曜の該当セル。「{pivot.yLabel}は小さいのに{pivot.xLabel}は大きい」等の2条件の組合せで先行きが変わるかを読む。セルクリックで深掘り。</p>
+          <p className="text-[11px] text-fg-muted">緑=上昇/赤=下落、✓=有意(n≥10)、青枠=直近{WD_LABELS[entryDow]}曜の該当セル。「{pivot.yLabel}は小さいのに{pivot.xLabel}は大きい」等の2条件の組合せで先行きが変わるかを読む。セルクリックで深掘り。</p>
           {drillPivotCell && (
             <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-indigo-900">深掘り: {WD_LABELS[pivot.entryDow]}曜・{pivot.yLabel}「{pivot.yOrder[drillPivotCell.yi].split(" ")[0]}」× {pivot.xLabel}「{pivot.xOrder[drillPivotCell.xi].split(" ")[0]}」</p>
-                <button onClick={() => setDrillCell(null)} className="text-[11px] text-gray-400 hover:text-gray-600">閉じる ✕</button>
+                <button onClick={() => setDrillCell(null)} className="text-[11px] text-fg-muted hover:text-gray-600">閉じる ✕</button>
               </div>
               <div className="text-[11px] text-gray-600">{result?.exitLabel ?? pivot.exitLabel}まで 平均{fmtPct(drillPivotCell.meanFwd)}・中央値{fmtPct(drillPivotCell.medianFwd)}・勝率{(drillPivotCell.winRate * 100).toFixed(0)}%・95%CI {fmtPct(drillPivotCell.ciLow)}〜{fmtPct(drillPivotCell.ciHigh)}・n={drillPivotCell.n} <StatBadge n={drillPivotCell.n} p={drillPivotCell.p} significant={drillPivotCell.significant} /></div>
               <div className="grid md:grid-cols-2 gap-4">
@@ -688,7 +688,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
 
       {/* ===== ビュー: 全曜日マトリクス ===== */}
       {view === "matrix" && (!matrix ? (
-        <p className="text-xs text-gray-400">この条件では標本が不足しています。</p>
+        <p className="text-xs text-fg-muted">この条件では標本が不足しています。</p>
       ) : (
         <>
           <ZoomBar zoom={zoom} setZoom={setZoom} />
@@ -696,7 +696,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
             <canvas ref={matrixRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[300px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
-          <p className="text-[11px] text-gray-400">行=曜日、列=「{sigLabel}」のビンランク（分位境界は曜日ごとに算出）。色=平均、✓=有意(n≥10)、青枠=各曜日の直近該当ビン。気になるセルをクリックすると「ビン別パス&EV」でその曜日を深掘り。</p>
+          <p className="text-[11px] text-fg-muted">行=曜日、列=「{sigLabel}」のビンランク（分位境界は曜日ごとに算出）。色=平均、✓=有意(n≥10)、青枠=各曜日の直近該当ビン。気になるセルをクリックすると「ビン別パス&EV」でその曜日を深掘り。</p>
         </>
       ))}
 

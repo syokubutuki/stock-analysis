@@ -292,7 +292,7 @@ export default function FuturesCarryChart({ prices }: Props) {
             ))}
           </div>
         </div>
-        {loading && <div className="text-xs text-gray-400">ベンチマーク取得中…</div>}
+        {loading && <div className="text-xs text-fg-muted">ベンチマーク取得中…</div>}
         {error && <div className="text-xs text-red-500">{error}</div>}
         {hedge && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

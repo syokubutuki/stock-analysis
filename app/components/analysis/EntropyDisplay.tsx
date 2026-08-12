@@ -114,21 +114,21 @@ export default function EntropyDisplay({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Shannon Entropy</div>
           <div className="font-mono font-medium text-sm">{shannon.toFixed(3)}</div>
-          <div className="text-gray-400">分布の複雑性</div>
+          <div className="text-fg-muted">分布の複雑性</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Permutation Entropy</div>
           <div className={`font-mono font-medium text-sm ${permEnt < 0.7 ? "text-orange-600" : ""}`}>
             {permEnt.toFixed(3)}
           </div>
-          <div className="text-gray-400">{permInterp}</div>
+          <div className="text-fg-muted">{permInterp}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Sample Entropy</div>
           <div className={`font-mono font-medium text-sm ${sampEnt < 1 ? "text-orange-600" : ""}`}>
             {sampEnt.toFixed(3)}
           </div>
-          <div className="text-gray-400">{sampInterp}</div>
+          <div className="text-fg-muted">{sampInterp}</div>
         </div>
       </div>
 

@@ -199,7 +199,7 @@ export default function VolTermStructureChart({ prices }: Props) {
       <h3 className="font-bold text-gray-800">ボラティリティ期間構造</h3>
 
       {volData.length === 0 ? (
-        <div className="text-sm text-gray-400">データが不足しています (最低121日必要)</div>
+        <div className="text-sm text-fg-muted">データが不足しています (最低121日必要)</div>
       ) : (
         <>
           <div ref={volChartRef} />

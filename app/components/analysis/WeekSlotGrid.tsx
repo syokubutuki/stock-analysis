@@ -21,7 +21,7 @@ export function cycleSide(s: SlotSide): SlotSide {
   return s === "flat" ? "long" : s === "long" ? "short" : "flat";
 }
 export function slotColor(s: SlotSide): string {
-  return s === "long" ? "bg-emerald-600 text-white" : s === "short" ? "bg-rose-600 text-white" : "bg-white text-gray-400 border border-gray-200";
+  return s === "long" ? "bg-emerald-600 text-white" : s === "short" ? "bg-rose-600 text-white" : "bg-white text-fg-muted border border-gray-200";
 }
 export function slotText(s: SlotSide): string {
   return s === "long" ? "買" : s === "short" ? "売" : "―";
@@ -63,7 +63,7 @@ export default function WeekSlotGrid({ sides, onChange, best, title = "週内ど
           </button>
         ))}
       </div>
-      <p className="text-xs text-gray-400 mt-1.5">
+      <p className="text-xs text-fg-muted mt-1.5">
         {hint ?? (
           <>各区間をクリックで 無（現金）→ 買 → 売 を切替。緑=買・赤=売・灰=現金。右端「金→月」が週末ギャップ。</>
         )}

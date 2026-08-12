@@ -901,7 +901,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
               {o.label}
             </button>
           ))}
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-fg-muted">
             X=r(t) / Y=r(t-{tau}) / Z=r(t-{2 * tau})
           </span>
         </div>
@@ -924,7 +924,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
               <span className="text-gray-600">
                 p値 = <b>{result.pValue.toFixed(4)}</b>
               </span>
-              <span className="text-gray-400 text-xs">n={result.n}, サロゲート={result.surrogatePL.length}</span>
+              <span className="text-fg-muted text-xs">n={result.n}, サロゲート={result.surrogatePL.length}</span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
               {significant
@@ -939,7 +939,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
               className={`rounded border border-gray-200 ${is3D ? "cursor-grab active:cursor-grabbing" : ""}`} />
           </div>
           {is3D && (
-            <div className="mt-1 text-center text-[10px] text-gray-400">
+            <div className="mt-1 text-center text-[10px] text-fg-muted">
               左ドラッグ: 回転 / 右ドラッグ: 移動 / ホイール: ズーム（視点ボタンで各面に正対）
             </div>
           )}
@@ -955,7 +955,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                   { ref: planeYZRef, title: "Y-Z面 (r(t-" + tau + ") × r(t-" + 2 * tau + "))" },
                 ] as const).map((p, i) => (
                   <div key={i} className="flex flex-col items-center">
-                    <span className="text-[10px] text-gray-400 mb-0.5">{p.title}</span>
+                    <span className="text-[10px] text-fg-muted mb-0.5">{p.title}</span>
                     <canvas ref={p.ref} className="rounded border border-gray-200 w-full" />
                   </div>
                 ))}
@@ -970,7 +970,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                 {l}
               </span>
             ))}
-            <span className="text-gray-400">(大きい点=曜日重心 / 破線=巡回パス)</span>
+            <span className="text-fg-muted">(大きい点=曜日重心 / 破線=巡回パス)</span>
           </div>
 
           {/* サロゲートヒストグラム */}
@@ -1007,7 +1007,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                 ))}
               </tbody>
             </table>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-fg-muted mt-1">
               ストロボ分散比 = 曜日内平均分散 / 全体平均分散。&lt;1 (赤) なら全体より集中 = その曜日が不動点的(ボラ季節性・位相ロックの兆候)。
             </p>
           </div>
@@ -1054,14 +1054,14 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
               <>
                 <p className="text-xs text-gray-600 mb-1">
                   窓ごと有意の期間割合 = <b>{(rollResult.aboveRatio * 100).toFixed(1)}%</b>
-                  <span className="text-gray-400">
+                  <span className="text-fg-muted">
                     {" "}— 各窓を自分のサロゲートで検定。有意な期間だけ曜日チルトを有効化(メタゲート)
                   </span>
                 </p>
                 <div className="flex justify-center">
                   <canvas ref={rollRef} className="rounded border border-gray-200" />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   全期間で有意でも、位相ロックは出現/消滅を繰り返す(非定常)。常時ではなく閾値超の窓でのみ運用する。
                 </p>
               </>
@@ -1102,15 +1102,15 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                           <td className="py-1 px-2 text-left">{row.label}</td>
                           <td className="py-1 px-2">{row.d.n}</td>
                           <td className={`py-1 px-2 font-mono ${sig ? "text-red-600 font-bold" : ""}`}>{row.d.PL.toFixed(3)}</td>
-                          <td className="py-1 px-2 font-mono text-gray-400">{row.d.q95.toFixed(3)}</td>
+                          <td className="py-1 px-2 font-mono text-fg-muted">{row.d.q95.toFixed(3)}</td>
                           <td className="py-1 px-2 font-mono">{row.d.pValue.toFixed(4)}</td>
-                          <td className={`py-1 px-2 ${sig ? "text-red-600 font-bold" : "text-gray-400"}`}>{sig ? "有意" : "—"}</td>
+                          <td className={`py-1 px-2 ${sig ? "text-red-600 font-bold" : "text-fg-muted"}`}>{sig ? "有意" : "—"}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   日次対数リターンの{21}日ローリングσ中央値で高/低ボラに2分し、各レジームで位相ロックを別々に検定。
                   片方だけ有意なら「週内構造はそのボラ状態でのみ出現」= メタゲートをボラ軸でも条件付け可能。
                 </p>
@@ -1150,15 +1150,15 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                         <tr key={i} className="border-b border-gray-100">
                           <td className="py-1 px-2 text-left">{row.label}</td>
                           <td className={`py-1 px-2 font-mono ${sig ? "text-red-600 font-bold" : ""}`}>{row.d.PL.toFixed(3)}</td>
-                          <td className="py-1 px-2 font-mono text-gray-400">{row.d.q95.toFixed(3)}</td>
+                          <td className="py-1 px-2 font-mono text-fg-muted">{row.d.q95.toFixed(3)}</td>
                           <td className="py-1 px-2 font-mono">{row.d.pValue.toFixed(4)}</td>
-                          <td className={`py-1 px-2 ${sig ? "text-red-600 font-bold" : "text-gray-400"}`}>{sig ? "有意" : "—"}</td>
+                          <td className={`py-1 px-2 ${sig ? "text-red-600 font-bold" : "text-fg-muted"}`}>{sig ? "有意" : "—"}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   EMDで週次近傍のIMFを抽出→Hilbert変換で瞬時位相→{adaptiveResult.nGroups}分割して位相ロックを検定。
                   適応的位相のPLがカレンダー曜日を上回れば、市場の内在サイクルは暦の曜日とずれている可能性。
                 </p>
@@ -1202,14 +1202,14 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                       <td className={`py-1 px-2 font-mono ${simplexResult.improves ? "text-red-600 font-bold" : ""}`}>{simplexResult.rhoAug.toFixed(4)}</td>
                       <td className="py-1 px-2 font-mono">{(simplexResult.dirAug * 100).toFixed(1)}%</td>
                     </tr>
-                    <tr className="border-b border-gray-100 text-gray-400">
+                    <tr className="border-b border-gray-100 text-fg-muted">
                       <td className="py-1 px-2 text-left">位相シャッフル対照</td>
                       <td className="py-1 px-2 font-mono">{simplexResult.rhoShuffled.toFixed(4)}</td>
                       <td className="py-1 px-2">—</td>
                     </tr>
                   </tbody>
                 </table>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   位相つきρが ベースライン と 位相シャッフル対照 の両方を上回って初めて「効く」。
                   対照を超えない改善は座標追加の見かけ。位相座標の重みスライダーで感度を確認。
                 </p>
@@ -1232,14 +1232,14 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                   </span>
                   <span className="text-gray-600">最適θ = <b>{smapResult.bestThetaBase}</b></span>
                   <span className="text-gray-600">ρ(θ=0)={smapResult.rhoLinearBase.toFixed(3)} → ρ_best={smapResult.rhoBestBase.toFixed(3)}</span>
-                  <span className={smapResult.phaseHelps ? "text-red-600 font-bold" : "text-gray-400"}>
+                  <span className={smapResult.phaseHelps ? "text-red-600 font-bold" : "text-fg-muted"}>
                     {smapResult.phaseHelps ? "位相つきで更に改善" : "位相つきの追加改善なし"}
                   </span>
                 </div>
                 <div className="flex justify-center">
                   <canvas ref={smapRef} className="rounded border border-gray-200" />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   θを上げると局所線形(非線形)モデルに近づく。ρがθ&gt;0で改善すれば非線形性の証拠(Sugihara-May)。
                   赤(位相つき)が青(埋め込みのみ)の最大を上回れば、週内位相は非線形予測にも効く。
                 </p>
@@ -1302,7 +1302,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                     (軽量化候補)。
                   </p>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   週次位相 φ(曜日) を状態変数とした KM。ドリフト μ(φ)=曜日別平均リターン、拡散 σ(φ)=曜日別ボラ。
                   累積=月から金への μ の累積。方向バイアスはローリングPLが有意な期間のみ適用すること(メタゲート)。
                 </p>

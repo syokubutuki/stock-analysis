@@ -143,7 +143,7 @@ export default function TestRegistryChart() {
                     <td className="py-1 px-1.5 text-gray-500">{i === 0 ? sec : ""}</td>
                     <td className="px-1.5">{item.label}</td>
                     <td className="text-right px-1 font-mono">{item.count}</td>
-                    <td className="px-1.5 text-gray-400">{item.basis}</td>
+                    <td className="px-1.5 text-fg-muted">{item.basis}</td>
                     <td className="text-center px-1">{item.fdrLocal ? "✓" : "—"}</td>
                   </tr>
                 ))}
@@ -157,7 +157,7 @@ export default function TestRegistryChart() {
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-gray-400">
+      <p className="text-[10px] text-fg-muted">
         検定数は既定パラメータでのオーダーの目安。銘柄を替えて同じスキャンを再実行すれば母数は銘柄数倍に膨らむ——
         その「実際に何を探索したか」は上の<span className="font-medium">実測台帳</span>が自動で数えています(開いた分析×閲覧銘柄)。
       </p>

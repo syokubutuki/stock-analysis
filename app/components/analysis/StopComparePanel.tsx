@@ -42,7 +42,7 @@ export default function StopComparePanel({ result, running, progress, onRun, hor
           ▶
         </span>
         <span className="font-semibold text-gray-800">損切り出口の比較(モデル vs 機械ストップ)</span>
-        <span className="text-xs text-gray-400">中立エントリーで出口ルールだけを比較・{HORIZON_CONFIG[horizon].label}</span>
+        <span className="text-xs text-fg-muted">中立エントリーで出口ルールだけを比較・{HORIZON_CONFIG[horizon].label}</span>
       </button>
 
       {open && (
@@ -56,12 +56,12 @@ export default function StopComparePanel({ result, running, progress, onRun, hor
               {running ? "計算中…" : result ? "再計算" : "比較を計算"}
             </button>
             {running && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-fg-muted">
                 {progress.done}/{progress.total} 銘柄(数十秒〜1分)
               </span>
             )}
             {result && !running && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-fg-muted">
                 {result.nStocks}銘柄 / {result.nTrades.toLocaleString()}トレード / {result.from}〜{result.to}
               </span>
             )}
@@ -103,7 +103,7 @@ export default function StopComparePanel({ result, running, progress, onRun, hor
                         <td className="px-2 py-1.5 whitespace-nowrap font-medium text-gray-700">
                           {EXIT_RULE_LABEL[r.rule]}
                         </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{r.n}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums text-fg-muted">{r.n}</td>
                         <td className={`px-2 py-1.5 text-right tabular-nums ${retColor(r.medianRet)}`}>
                           {r.medianRet >= 0 ? "+" : ""}
                           {r.medianRet.toFixed(2)}%
@@ -124,7 +124,7 @@ export default function StopComparePanel({ result, running, progress, onRun, hor
                         <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
                           {r.medianGiveBack.toFixed(2)}%
                         </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
+                        <td className="px-2 py-1.5 text-right tabular-nums text-fg-muted">
                           {r.medianHold.toFixed(0)}日
                         </td>
                       </tr>
@@ -132,13 +132,13 @@ export default function StopComparePanel({ result, running, progress, onRun, hor
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-fg-muted">
                 戻し幅=手仕舞い時のピークからの下落幅(0に近いほど高値近くで出られた=遅れが小さい)。実現リターンは終値ベース・手数料未考慮。
               </p>
             </>
           ) : (
             !running && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-fg-muted">
                 「比較を計算」で、中立エントリー(5日ごと・最大15日保有)に対し、悪化シグナル・固定−5%・トレーリングATRの3つの出口を当てはめて比較します。
               </p>
             )

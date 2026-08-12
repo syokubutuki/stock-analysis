@@ -347,7 +347,7 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
           className="px-3 py-1.5 rounded text-xs font-medium bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-800">
           {running === "catalog" ? "スキャン中…" : "全設定スキャン(多重比較補正)"}
         </button>
-        {usLoading && <span className="text-xs text-gray-400">米国指数を取得中…</span>}
+        {usLoading && <span className="text-xs text-fg-muted">米国指数を取得中…</span>}
         {usError && <span className="text-xs text-red-500">{usError}</span>}
       </div>
 
@@ -410,7 +410,7 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
                       <div className="font-medium text-gray-700">② 高安(MFE/MAE)の当否</div>
                       <div className="mt-1">
                         IC <span className="text-green-700 font-bold">高値 {num(ps.mfeIC)}</span>
-                        <span className="mx-1 text-gray-400">/</span>
+                        <span className="mx-1 text-fg-muted">/</span>
                         <span className="text-red-700 font-bold">安値 {num(ps.maeIC)}</span>
                       </div>
                       <div className="text-[11px] text-gray-600">
@@ -456,7 +456,7 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
                 </>
               );
             })() : (
-              <div className="text-xs text-gray-400">経路の採点に必要な週数（8週以上）が揃いませんでした。</div>
+              <div className="text-xs text-fg-muted">経路の採点に必要な週数（8週以上）が揃いませんでした。</div>
             )}
           </div>
         </>
@@ -498,7 +498,7 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
       )}
 
       {!result && !catalog && running === null && (
-        <div className="text-xs text-gray-400">上のボタンで検証を実行してください（設定により数秒かかります）。</div>
+        <div className="text-xs text-fg-muted">上のボタンで検証を実行してください（設定により数秒かかります）。</div>
       )}
 
       <AnalysisGuide title="ウォークフォワード OOS 検証の詳細理論">

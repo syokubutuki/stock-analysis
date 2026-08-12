@@ -300,7 +300,7 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
       <h3 className="text-sm font-semibold text-gray-700 mb-1">
         SARIMA モデル推定・予測
       </h3>
-      <p className="text-xs text-gray-400 mb-3">
+      <p className="text-xs text-fg-muted mb-3">
         入力系列: {modeLabel}（季節・差分・自己回帰・移動平均を統合した時系列モデル）
       </p>
 
@@ -373,13 +373,13 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
       )}
 
       {loading && (
-        <div className="text-xs text-gray-400 py-6 text-center animate-pulse">
+        <div className="text-xs text-fg-muted py-6 text-center animate-pulse">
           モデルを推定中…（グリッド探索）
         </div>
       )}
 
       {!loading && values.length < 60 && (
-        <div className="text-xs text-gray-400 py-6 text-center">
+        <div className="text-xs text-fg-muted py-6 text-center">
           データが不足しています（60点以上必要）
         </div>
       )}

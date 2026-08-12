@@ -163,7 +163,7 @@ export default function SignalExecutionChart({ prices, ticker }: Props) {
         </div>
         {/* バケット(シグナル条件) */}
         <div className="flex gap-1 flex-wrap items-center">
-          <span className="text-xs text-gray-400">シグナル条件:</span>
+          <span className="text-xs text-fg-muted">シグナル条件:</span>
           {bucketOptions.map((b) => (
             <button key={b} onClick={() => setBucketLabel(b)}
               className={`px-2 py-0.5 text-xs rounded ${effectiveBucket === b ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>

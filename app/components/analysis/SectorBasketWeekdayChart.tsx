@@ -132,7 +132,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
       <div className="space-y-2">
         <div className="text-xs text-gray-600">
           <span className="font-medium text-gray-700">バスケット銘柄</span>
-          <span className="text-gray-400">（同一業種＝日内の値動きが似ると仮定できる銘柄を足して標本を厚くする）</span>
+          <span className="text-fg-muted">（同一業種＝日内の値動きが似ると仮定できる銘柄を足して標本を厚くする）</span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           {tickers.map((t, i) => {
@@ -191,7 +191,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && ok.length > 0 && !pathResult && (
-        <div className="text-xs text-gray-400">集計できる立会日が不足しています。</div>
+        <div className="text-xs text-fg-muted">集計できる立会日が不足しています。</div>
       )}
 
       {/* ══════════ パスビュー ══════════ */}
@@ -212,7 +212,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={pathResult.bins} timeLabels={pathResult.timeLabels} groupHeader="曜日" />
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             実線=平均・破線=中央値の日内累積リターン（{nStocks}銘柄プール）。▲=平均パスのピーク時刻（＝寄りロングの最良手仕舞い目安）／▽=ボトム時刻。
             95%帯は同一営業日の全銘柄を1クラスタとみなす頑健SEで算出（横断相関で幅が狭くなりすぎるのを防ぐ）。
             {(evo.showSpaghetti || evo.showEras) &&
@@ -252,7 +252,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             「のべ標本」は素朴に数えた銘柄×日。同業種は同じ日に一斉に動くため独立ではなく、
             <strong>実効標本数</strong>（独立標本への換算値）が実際の情報量。プール効率が低い＝銘柄間相関が高く、
             銘柄を増やしてもnEffはあまり伸びない（帯を狭めるのは主に個別ノイズの相殺）。
@@ -296,7 +296,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                   </tbody>
                 </table>
               </div>
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-fg-muted">
                 符号や大小が銘柄間でバラバラなら「似た動き」の仮定が崩れており、プール平均は業種代表として弱い。
                 概ね同符号なら共通の曜日効果として信頼しやすい。
               </p>
@@ -315,7 +315,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
             </button>
             {showDist && (
               <>
-                <div className="text-xs text-gray-400">各立会日を曜日色●で基準銘柄の終値ライン上にプロット。特定曜日が一部期間に偏っていないか確認。</div>
+                <div className="text-xs text-fg-muted">各立会日を曜日色●で基準銘柄の終値ライン上にプロット。特定曜日が一部期間に偏っていないか確認。</div>
                 <PathLegend stats={pathResult.bins} withN={false} />
                 <PathTimeline days={timelineDays} colorOf={colorOf} />
               </>
@@ -383,12 +383,12 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                                 {fmtSignedPct(w.ci.lo, 1)}〜{fmtSignedPct(w.ci.hi, 1)}
                                 {w.ci.lo > 0 || w.ci.hi < 0 ? <span className="text-green-600 font-bold"> ★</span> : null}
                               </span>
-                            ) : <span className="text-gray-400">日数不足</span>}
+                            ) : <span className="text-fg-muted">日数不足</span>}
                           </td>
                           <td className="text-right px-2 text-gray-600 tabular-nums">{(b.win * 100).toFixed(0)}%</td>
                         </>
                       ) : (
-                        <td colSpan={6} className="px-2 text-gray-400">標本不足</td>
+                        <td colSpan={6} className="px-2 text-fg-muted">標本不足</td>
                       )}
                     </tr>
                   );
@@ -396,7 +396,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             全銘柄の立会日をプールし、曜日ごとに（買い建て時刻→手仕舞い時刻）の全組合せをロングで総当たりして最良ウィンドウを選出。
             95%CIは<strong>日付を丸ごと再標本する日クラスタ・ブートストラップ</strong>（同一日の全銘柄を1単位）で算出し、横断相関を壊さない。
             CIが0をまたがない（★）曜日が、プール後も残る候補。実効標本数が小さい行は見かけのnObsに惑わされないこと。

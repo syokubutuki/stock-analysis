@@ -450,14 +450,14 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
         </div>
         <div ref={indContainerRef} className={`w-full rounded border border-gray-100 ${indicator ? "" : "hidden"}`} />
         {!indicator && (
-          <p className="text-[11px] text-gray-400">この軸（{ALL_AXES.find((a) => a.value === axis)?.label}）は数値指標として表せないため、根拠系列は表示できません。RSI(2)・前日リターン・直近高値からの下落・連続下落日数 等の軸でご確認ください。</p>
+          <p className="text-[11px] text-fg-muted">この軸（{ALL_AXES.find((a) => a.value === axis)?.label}）は数値指標として表せないため、根拠系列は表示できません。RSI(2)・前日リターン・直近高値からの下落・連続下落日数 等の軸でご確認ください。</p>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
         <span className="flex items-center gap-1"><span className="inline-block w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "7px solid #16a34a" }} /> 点灯後{horizon}日 上昇</span>
         <span className="flex items-center gap-1"><span className="inline-block w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "7px solid #dc2626" }} /> 点灯後{horizon}日 下落</span>
-        <span className="text-gray-400">状態「{effectiveStateLabel}」点灯 {markerCount}回</span>
+        <span className="text-fg-muted">状態「{effectiveStateLabel}」点灯 {markerCount}回</span>
       </div>
 
       <AnalysisGuide title="条件発生マーカー & 区間クロスフィルタの詳細">

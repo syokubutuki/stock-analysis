@@ -426,7 +426,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-fg-muted">
           条件に合う過去日が不足しています（条件を「米国のみ」「曜日のみ」に緩めるか、60分足を選択）。
         </div>
       )}
@@ -538,7 +538,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   </tbody>
                 </table>
               </div>
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-fg-muted">
                 帯は「平均の精度」ではなく過去日の実測分布。今日がその中のどこにいるかを測るには、この分布帯が正しい物差しになる。
                 パーセンタイルが極端（上位/下位10%）なら、条件を踏まえてもなお異例の動き＝台本外の材料が出ている可能性。
               </p>
@@ -556,7 +556,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                 </span>
               </div>
               <div className="relative"><canvas ref={betaRef} /></div>
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-fg-muted">
                 縦棒＝β（乖離1σあたりの残余リターン）、ヒゲ＝95%ブートCI、★＝時間ビン横断でFDR補正後も有意。
                 最終ビンは残余が定義上ゼロのため対象外。
               </p>
@@ -606,13 +606,13 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                       <div><StatBadge n={result.n} p={result.betas[selG].pAdj} significant={result.betas[selG].pAdj < 0.05} /></div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11px] text-fg-muted">
                     青点＝過去日（横=その日の乖離z、縦=そこから引けまでの残余）。薄い破線＝対象日の現在の乖離。その右にずらした●＝そのzに対する残余の予測値、キャップ付き縦棒＝95%予測区間。
                     予測区間が0（横のゼロ線）を跨いでいる限り、方向は当てにならない（点予測だけ見ないこと）。
                   </p>
                 </>
               ) : (
-                <div className="text-xs text-gray-400">この時刻は標本不足で回帰できません（条件を緩めるか60分足を選択）。</div>
+                <div className="text-xs text-fg-muted">この時刻は標本不足で回帰できません（条件を緩めるか60分足を選択）。</div>
               )}
             </>
           )}
@@ -658,7 +658,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                         <div className="font-bold text-gray-800">{isFinite(medSlope) ? medSlope.toFixed(2) : "-"}</div>
                       </div>
                     </div>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-fg-muted">
                       {signShare > 0.6
                         ? "終端の符号一致率が高い＝少なくとも引けの方向については台本が効いている。台本ベースの方向観をある程度信頼してよい。"
                         : signShare < 0.4

@@ -243,7 +243,7 @@ export default function QBacktestChart({ prices }: Props) {
             <div>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-[11px] text-gray-400">
+                  <tr className="text-[11px] text-fg-muted">
                     <th className="text-left font-normal">指標</th>
                     <th className="text-right font-normal">合流点の q</th>
                     <th className="text-right font-normal">買い持ち</th>
@@ -287,19 +287,19 @@ export default function QBacktestChart({ prices }: Props) {
 
             <div className="space-y-1 text-xs text-gray-600">
               <div>
-                <span className="text-gray-400">リバランス: </span>
+                <span className="text-fg-muted">リバランス: </span>
                 {result.nRebalances} 回（各回 q を再導出）
               </div>
               <div>
-                <span className="text-gray-400">平均建玉 |q|: </span>
+                <span className="text-fg-muted">平均建玉 |q|: </span>
                 {(result.avgExposure * 100).toFixed(0)}%
               </div>
               <div>
-                <span className="text-gray-400">不参加(q=0)の期間: </span>
+                <span className="text-fg-muted">不参加(q=0)の期間: </span>
                 {(result.flatShare * 100).toFixed(0)}%
               </div>
               <div>
-                <span className="text-gray-400">累計コスト: </span>
+                <span className="text-fg-muted">累計コスト: </span>
                 −{(result.totalCost * 100).toFixed(2)}%（公準5）
               </div>
             </div>

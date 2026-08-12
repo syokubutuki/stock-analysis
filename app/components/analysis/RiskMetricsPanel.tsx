@@ -276,7 +276,7 @@ function MetricBox({
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>
       <div className={`font-mono font-medium ${color || ""}`}>{value}</div>
-      {sub && <div className="text-gray-400 mt-0.5">{sub}</div>}
+      {sub && <div className="text-fg-muted mt-0.5">{sub}</div>}
     </div>
   );
 }

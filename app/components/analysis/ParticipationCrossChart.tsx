@@ -90,7 +90,7 @@ function Stat({
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -241,17 +241,17 @@ export default function ParticipationCrossChart({ tickers, pricesByTicker, names
             ))}
           </select>
         </label>
-        {proxyLoading && <span className="text-xs text-gray-400">基準取得中…</span>}
+        {proxyLoading && <span className="text-xs text-fg-muted">基準取得中…</span>}
       </div>
 
       {!hasData && (
-        <div className="py-8 text-center text-gray-400 text-sm">
+        <div className="py-8 text-center text-fg-muted text-sm">
           ウォッチリストに銘柄がありません。
         </div>
       )}
 
       {hasData && rows.length === 0 && (
-        <div className="py-8 text-center text-gray-400 text-sm">
+        <div className="py-8 text-center text-fg-muted text-sm">
           床の実測に十分な履歴（約1年以上の日足）がある銘柄がありません。
         </div>
       )}
@@ -331,7 +331,7 @@ export default function ParticipationCrossChart({ tickers, pricesByTicker, names
                       <td className="px-2 py-1 text-left">
                         <span className="font-mono text-gray-800">{row.ticker}</span>
                         {row.name && row.name !== row.ticker && (
-                          <span className="ml-1 text-gray-400">{row.name}</span>
+                          <span className="ml-1 text-fg-muted">{row.name}</span>
                         )}
                       </td>
                       <td className={`px-2 py-1 text-right font-mono font-semibold ${

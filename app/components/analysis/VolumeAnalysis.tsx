@@ -129,7 +129,7 @@ export default function VolumeAnalysis({ prices, period }: Props) {
                           ? "text-green-600"
                           : s.priceChange < 0
                           ? "text-red-600"
-                          : "text-gray-400"
+                          : "text-fg-muted"
                       }`}
                     >
                       {s.priceChange > 0 ? "+" : ""}

@@ -63,7 +63,7 @@ const VERDICT_FILL: Record<Verdict, string> = {
 const VERDICT_TEXT: Record<Verdict, string> = {
   fwer: "text-green-700",
   single: "text-amber-600",
-  none: "text-gray-400",
+  none: "text-fg-muted",
 };
 const VERDICT_LABEL: Record<Verdict, string> = {
   fwer: "多重補正後も有意",
@@ -315,7 +315,7 @@ export default function NullAnatomyChart({ prices }: Props) {
         <h3 className="text-sm font-semibold text-gray-800">
           曜日構造の解剖：どこに・どんな構造があるか（週末ギャップ込み）
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           F が棄却したあと、選択バイアスを再導入せずに中身を特定する
         </span>
       </div>
@@ -392,7 +392,7 @@ export default function NullAnatomyChart({ prices }: Props) {
       </div>
 
       {loading && (
-        <div className="mt-3 text-xs text-gray-400">
+        <div className="mt-3 text-xs text-fg-muted">
           計算中…{progress ? ` ${progress.done} / ${progress.total}` : ""}
         </div>
       )}
@@ -518,7 +518,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                             ) : (
                               " — スロットが1種類しかないため族内比較は不能"
                             )}
-                            <span className="text-gray-400"> ／ 帰無: {FAMILY_NULL[fam]}</span>
+                            <span className="text-fg-muted"> ／ 帰無: {FAMILY_NULL[fam]}</span>
                           </td>
                         </tr>
                         {rows.map((s) => {
@@ -534,11 +534,11 @@ export default function NullAnatomyChart({ prices }: Props) {
                               >
                                 {bp(s.mean)}
                               </td>
-                              <td className="py-1 px-2 text-right text-gray-400">{pct(s.sd)}</td>
+                              <td className="py-1 px-2 text-right text-fg-muted">{pct(s.sd)}</td>
                               <td className="py-1 px-2 text-right text-gray-700">
                                 {s.t.toFixed(2)}
                               </td>
-                              <td className="py-1 px-2 text-right text-gray-400">
+                              <td className="py-1 px-2 text-right text-fg-muted">
                                 {s.pRaw.toFixed(3)}
                               </td>
                               <td
@@ -559,7 +559,7 @@ export default function NullAnatomyChart({ prices }: Props) {
               </table>
             </div>
             {result.rarePairs.length > 0 && (
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-[10px] text-fg-muted">
                 標本が少なく除外した週末ペア：
                 {result.rarePairs.map((r) => `${r.label}(${r.n}回)`).join("、")}
                 （最小n を下げると検定に含められますが、少数群は t が暴れて maxT
@@ -666,7 +666,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                         </td>
                         <td
                           className={`py-1 pl-2 ${
-                            robust ? "text-green-700" : fragile ? "text-red-700" : "text-gray-400"
+                            robust ? "text-green-700" : fragile ? "text-red-700" : "text-fg-muted"
                           }`}
                         >
                           {robust
@@ -680,7 +680,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                   })}
                 </tbody>
               </table>
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-[10px] text-fg-muted">
                 順位版・刈り込み版は無層別（基準）の帰無でのみ計算します。層別軸を切り替えても
                 この行は変わりません。
               </p>
@@ -729,7 +729,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                       })}
                     </tbody>
                   </table>
-                  <p className="mt-1 text-[10px] text-gray-400">
+                  <p className="mt-1 text-[10px] text-fg-muted">
                     低下率 30% 超（赤）は「たった1週間で F の3割が作られている」という意味で、
                     構造ではなく事件を見ています。10% 未満なら全期間に薄く広がった構造です。
                   </p>
@@ -771,7 +771,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                       );
                     })}
                   </div>
-                  <p className="mt-1 text-[10px] text-gray-400">
+                  <p className="mt-1 text-[10px] text-fg-muted">
                     符号一致率が 70% 未満なら、全期間の平均が正でも「毎年そうだった」わけでは
                     ありません。運用は年単位で行うので、ここが割れている構造に賭けるのは
                     全期間 p 値が示すよりずっと危険です。
@@ -869,13 +869,13 @@ export default function NullAnatomyChart({ prices }: Props) {
                         })}
                         <td className="py-1 pl-2 text-[10px]">
                           {a.key === "none" ? (
-                            <span className="text-gray-400">基準</span>
+                            <span className="text-fg-muted">基準</span>
                           ) : killed.length ? (
                             <span className="text-red-700">
                               {killed.join("・")}の棄却が消滅 — この軸の代理である疑い
                             </span>
                           ) : (
-                            <span className="text-gray-400">棄却の構図は変わらず</span>
+                            <span className="text-fg-muted">棄却の構図は変わらず</span>
                           )}
                         </td>
                       </tr>
@@ -899,7 +899,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                 </li>
               )}
             </ul>
-            <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+            <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
               <b>有効置換率</b>
               ＝サイズ2以上のブロックに属する観測の割合。層を細かく切りすぎるとブロックが
               1個ずつに割れ、値が動かせなくなって検定は「棄却しない」だけの空箱になります。
@@ -947,7 +947,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                         <td className="py-1 px-2 text-right text-gray-700">{fs.fBF.toFixed(2)}</td>
                         <td
                           className={`py-1 px-2 text-right font-medium ${
-                            fs.pBF < 0.05 ? "text-green-700" : "text-gray-400"
+                            fs.pBF < 0.05 ? "text-green-700" : "text-fg-muted"
                           }`}
                         >
                           {fs.pBF.toFixed(3)}
@@ -955,7 +955,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                         <td className="py-1 pl-2 text-gray-600">
                           最大 <b>{hi.label}</b> {pct(hi.volSd)} ／ 最小 <b>{lo.label}</b>{" "}
                           {pct(lo.volSd)}
-                          <span className="text-gray-400">
+                          <span className="text-fg-muted">
                             {" "}
                             （比 {(hi.volSd / Math.max(1e-9, lo.volSd)).toFixed(2)}倍）
                           </span>
@@ -968,7 +968,7 @@ export default function NullAnatomyChart({ prices }: Props) {
             </div>
           </section>
 
-          <p className="mt-4 text-[10px] text-gray-400 leading-relaxed">
+          <p className="mt-4 text-[10px] text-fg-muted leading-relaxed">
             {result.nObs}観測 / {result.nWeeks}週 / サロゲート{result.params.nIter}回 ×{" "}
             {result.axes.length}軸。 p 値は片側モンテカルロ p =（ヌルが実測以上になった回数 +
             1）/（反復数 + 1）。 スロットの t は<b>族平均からの乖離</b>

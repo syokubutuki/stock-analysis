@@ -177,7 +177,7 @@ export default function CausalChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">最適埋め込み遅延 τ</div>
           <div className="font-bold">{optimalTau} 日</div>
-          <div className="text-gray-400">auto-MIの最初の極小</div>
+          <div className="text-fg-muted">auto-MIの最初の極小</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Granger方向</div>

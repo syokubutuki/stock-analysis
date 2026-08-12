@@ -101,7 +101,7 @@ export default function CandlePatternEdgeChart({ prices }: Props) {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-gray-400">※「方向調整」: 弱気パターンは下落で当たりのため符号を反転し、プラス＝パターン的中として比較。</p>
+      <p className="text-[11px] text-fg-muted">※「方向調整」: 弱気パターンは下落で当たりのため符号を反転し、プラス＝パターン的中として比較。</p>
 
       {/* パターン追随戦略を B&H と比較（往復回数を実測してコストを実額控除） */}
       <div className="pt-2 border-t border-gray-100 space-y-2">

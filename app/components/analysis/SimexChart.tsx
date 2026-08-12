@@ -171,14 +171,14 @@ export default function SimexChart({ prices }: Props) {
             <div className="font-mono font-medium text-base">
               {res.naiveSlope.toFixed(4)}
             </div>
-            <div className="text-[10px] text-gray-400">ノイズで縮小</div>
+            <div className="text-[10px] text-fg-muted">ノイズで縮小</div>
           </div>
           <div className="p-2 rounded border border-red-200 bg-red-50">
             <div className="text-gray-500">補正係数 θ(−1)</div>
             <div className="font-mono font-medium text-base text-red-700">
               {res.correctedSlope.toFixed(4)}
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[10px] text-fg-muted">
               {res.reverting ? "平均回帰" : "モメンタム"}
             </div>
           </div>
@@ -187,14 +187,14 @@ export default function SimexChart({ prices }: Props) {
             <div className="font-mono font-medium text-base text-amber-700">
               +{res.attenuationPct.toFixed(0)}%
             </div>
-            <div className="text-[10px] text-gray-400">|補正|/|観測|−1</div>
+            <div className="text-[10px] text-fg-muted">|補正|/|観測|−1</div>
           </div>
           <div className="p-2 rounded border border-gray-200 bg-gray-50">
             <div className="text-gray-500">ノイズ割合 / σ</div>
             <div className="font-mono font-medium">
               {(res.noiseShare * 100).toFixed(0)}% / {res.sigmaUPct.toFixed(2)}%
             </div>
-            <div className="text-[10px] text-gray-400">戻り値分散に占める</div>
+            <div className="text-[10px] text-fg-muted">戻り値分散に占める</div>
           </div>
         </div>
       )}

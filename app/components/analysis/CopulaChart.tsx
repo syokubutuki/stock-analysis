@@ -355,7 +355,7 @@ export default function CopulaChart({ prices }: Props) {
 
       {/* Loading / Error */}
       {loading && (
-        <div className="text-sm text-gray-400 py-8 text-center">
+        <div className="text-sm text-fg-muted py-8 text-center">
           ベンチマークデータ取得中...
         </div>
       )}

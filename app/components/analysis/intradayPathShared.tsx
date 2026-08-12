@@ -287,9 +287,9 @@ export function PathCanvas({
             <div className="mt-0.5 border-b border-gray-100 pb-0.5">
               <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ backgroundColor: hover.day.color }} />
               <span className="font-bold text-gray-800">{hover.day.date}</span>
-              <span className="text-gray-400">（{hover.day.label}）</span>
+              <span className="text-fg-muted">（{hover.day.label}）</span>
               <span className="ml-1 tabular-nums text-gray-600">{fmtSignedPct(hover.day.value)}</span>
-              <span className="ml-1 text-gray-400">引け {fmtSignedPct(hover.day.end)}</span>
+              <span className="ml-1 text-fg-muted">引け {fmtSignedPct(hover.day.end)}</span>
             </div>
           )}
           {visible.map((s) => (
@@ -360,7 +360,7 @@ export function PathEvolutionControls({ stats, evo }: { stats: PathStat[]; evo: 
       </label>
       {(evo.showSpaghetti || evo.showEras) && (
         <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[11px] text-gray-400">群:</span>
+          <span className="text-[11px] text-fg-muted">群:</span>
           <button
             onClick={() => evo.setGroupFilter(null)}
             className={`px-2 py-0.5 text-xs rounded font-medium ${
@@ -454,7 +454,7 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-gray-400">
+      <p className="text-[10px] text-fg-muted">
         {anySig
           ? "★=p<0.05。その群は期間内で日内の形が変わっている＝全期間平均は現在の姿を表していない。直近期の値を優先して読む。"
           : "有意なドリフトなし＝期間内で日内の形は安定しており、全期間平均をそのまま使ってよい。"}
@@ -567,10 +567,10 @@ export function PathSummaryTable({
               <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
               <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(b.endMed)}</td>
               <td className="text-center px-2 text-gray-600">
-                <span className="text-blue-600">▲</span> {timeLabels[b.peakIdx] ?? "-"} <span className="text-gray-400">({fmtSignedPct(b.mean[b.peakIdx])})</span>
+                <span className="text-blue-600">▲</span> {timeLabels[b.peakIdx] ?? "-"} <span className="text-fg-muted">({fmtSignedPct(b.mean[b.peakIdx])})</span>
               </td>
               <td className="text-center px-2 text-gray-600">
-                <span className="text-red-500">▽</span> {timeLabels[b.troughIdx] ?? "-"} <span className="text-gray-400">({fmtSignedPct(b.mean[b.troughIdx])})</span>
+                <span className="text-red-500">▽</span> {timeLabels[b.troughIdx] ?? "-"} <span className="text-fg-muted">({fmtSignedPct(b.mean[b.troughIdx])})</span>
               </td>
               <td className="px-2"><StatBadge n={b.n} p={b.endP} significant={b.endP < 0.05} /></td>
             </tr>
@@ -632,7 +632,7 @@ export function PairDiffMatrix({ stats, pairDiffs }: { stats: PathStat[]; pairDi
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-gray-400">
+      <p className="text-[10px] text-fg-muted">
         {anySig
           ? "★=FDR補正後も有意(p<0.05)。その群ペアは日内の伸びが統計的に異なる=曜日/条件効果の実体。"
           : "FDR補正後に有意なペアなし=群間の終端差は誤差の範囲。層別による日内パスの違いは断定できない。"}

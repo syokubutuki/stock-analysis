@@ -491,7 +491,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
         <h3 className="text-sm font-semibold text-gray-800">
           週次エントリー配分・タイミング配分：どの銘柄に何%、いつ建てるか
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           {r.nStocks}銘柄 / 全銘柄で揃う{r.nWeeks}週 / {r.from}〜{r.to}
           {r.skippedNoMonday > 0 && ` / 月曜休場の週 ${r.skippedNoMonday} を除外`}
         </span>
@@ -554,7 +554,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
             value={capital}
             onChange={(e) => setCapital(Math.max(0, Number(e.target.value)))}
           />
-          <span className="text-gray-400">円</span>
+          <span className="text-fg-muted">円</span>
         </label>
         <label className="flex items-center gap-1">
           <span className="text-gray-500">売買単位</span>
@@ -611,7 +611,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 const o = orders.get(s.ticker);
                 const drift = o ? o.realizedWeight - s.weight : 0;
                 return (
-                  <tr key={s.ticker} className={`border-b border-gray-100 ${s.weight > 1e-6 ? "" : "text-gray-400"}`}>
+                  <tr key={s.ticker} className={`border-b border-gray-100 ${s.weight > 1e-6 ? "" : "text-fg-muted"}`}>
                     <td className="py-1 pr-2 font-mono font-medium text-gray-800 whitespace-nowrap">{s.ticker}</td>
                     <td className="py-1 pr-2 text-gray-600">{s.name === s.ticker ? "—" : s.name}</td>
                     <td className="py-1 px-2 text-right">{bp(s.muRaw)}</td>
@@ -666,7 +666,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
             。現在値は各銘柄の最新終値です（実際の約定は月曜の寄付なので、発注前に株数を再計算してください）。
             {noPrice && <span className="text-amber-600"> 一部の銘柄で現在値が取得できず、株数を算出できていません。</span>}
           </p>
-          <p className="mt-1 text-[10px] text-gray-400">
+          <p className="mt-1 text-[10px] text-fg-muted">
             μ̃ は経験ベイズ縮小後（b=τ²/(τ²+SE²)。b が小さい銘柄は「その銘柄固有のエッジ」が推定誤差に埋もれており、横断平均に寄せられます）。
             Σ は Ledoit-Wolf 収縮。配分は max μ̃ᵀw − (1/2f)·wᵀΣw s.t. 0≤w≤{pct(maxWeight)}, Σw≤{pct(budget)} の解。
             年率Sharpe {r.port.sharpe.toFixed(2)} / 年率成長率近似 g≈{pct(r.port.growth)}。
@@ -688,7 +688,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
               <tbody>
                 <tr className="text-gray-500">
                   <td className="py-0.5">完全予見の最良スロット</td>
-                  <td className="py-0.5 text-right font-medium text-gray-400">{bp(r.hindsight.best)}<span className="ml-1 text-[9px]">到達不能</span></td>
+                  <td className="py-0.5 text-right font-medium text-fg-muted">{bp(r.hindsight.best)}<span className="ml-1 text-[9px]">到達不能</span></td>
                 </tr>
                 <tr>
                   <td className="py-0.5 text-gray-700">月寄に全額（現行ルール）</td>
@@ -704,7 +704,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 </tr>
               </tbody>
             </table>
-            <p className="mt-1 text-[10px] text-gray-400">
+            <p className="mt-1 text-[10px] text-fg-muted">
               月寄が週内で最良だった割合 <b>{pct(r.pMonBest)}</b>（一様なら {pct(1 / r.nSlots)}）。
               最良との差 {bp(hindsightGap)} のうち、実装可能なルールで動かせるのは等分との差 {bp(reachableGap)} 程度までです。
             </p>
@@ -713,11 +713,11 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
             <div className="text-[11px] font-medium text-gray-700">月寄 − 週内スロット平均（対応のある差の検定）</div>
             <div className="mt-1 text-[11px] text-gray-700">
               差 <b className="text-gray-900">{bp(r.monVsAvg.diff)}</b> ± {bp(r.monVsAvg.se)}
-              <span className={`ml-2 font-medium ${monEdgeSignificant ? "text-blue-700" : "text-gray-400"}`}>
+              <span className={`ml-2 font-medium ${monEdgeSignificant ? "text-blue-700" : "text-fg-muted"}`}>
                 t = {r.monVsAvg.t.toFixed(2)}
               </span>
             </div>
-            <p className="mt-1 text-[10px] text-gray-400">
+            <p className="mt-1 text-[10px] text-fg-muted">
               同一週=1クラスタのクラスタ頑健SE。のべ観測に対する実効標本 nEff ≈ {Math.round(r.monVsAvg.nEff).toLocaleString()}。
               t が ±1.96 に届かないなら、月寄と他スロットは統計的に区別できず、
               「月曜に集中する」ことのタイミング面の正当化はできません（それでも執行の単純さという別の理由は残ります）。
@@ -736,7 +736,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                   <tr key={s.slot} className={`border-b border-gray-50 ${s.slot === 0 ? "bg-amber-50/60" : s.slot === r.bestSlot ? "bg-blue-50/60" : ""}`}>
                     <td className="py-0.5 text-gray-700">{s.slot === 0 && "▶ "}{s.label}</td>
                     <td className="py-0.5 text-right">{bp(s.mean)}</td>
-                    <td className={`py-0.5 text-right ${Math.abs(s.t) >= 1.96 ? "text-blue-700 font-medium" : "text-gray-400"}`}>{s.t.toFixed(2)}</td>
+                    <td className={`py-0.5 text-right ${Math.abs(s.t) >= 1.96 ? "text-blue-700 font-medium" : "text-fg-muted"}`}>{s.t.toFixed(2)}</td>
                     <td className="py-0.5 text-right">{s.sharpe.toFixed(2)}</td>
                   </tr>
                 ))}
@@ -759,7 +759,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
             : `（＝先頭${r.bestK}スロットに ${pct(1 / r.bestK)} ずつ。分割で削れるリスクが失う期待値を上回る）`}
           。k=1 の CE {bp(r.split[0].ce)} に対し k={r.bestK} は {bp(r.split[r.bestK - 1].ce)}。
         </div>
-        <p className="mt-1 text-[10px] text-gray-400">
+        <p className="mt-1 text-[10px] text-fg-muted">
           CE(k) = μ_k − (1/2f)·σ_k²。μ_k・σ_k は「全銘柄等加重 × 先頭kスロット等分」の週次実現リターン系列から。
           分割は期待ドリフトを削る代わりに建値分散を {"(1+(k−1)ρ_s)/k"} 倍に縮めます。ρ_s（スロット間の建値相関）が高いほど分割の効きは鈍く、k=1 に寄ります。
         </p>
@@ -805,7 +805,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 <td className="py-1 px-2 text-right text-gray-600">{pct(r.equalSplit.winRate)}</td>
                 <td className="py-1 pl-2 text-right text-gray-500">週内平均</td>
               </tr>
-              <tr className="text-gray-400">
+              <tr className="text-fg-muted">
                 <td className="py-1 pr-2">（参考）同じ方策を全データで学習・適用（IS）</td>
                 <td className="py-1 px-2 text-right">{bp(r.waitIS.mean)}</td>
                 <td className="py-1 px-2 text-right">{pct(r.waitIS.sd)}</td>
@@ -858,7 +858,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 ))}
               </tbody>
             </table>
-            <p className="mt-1 text-[10px] text-gray-400">
+            <p className="mt-1 text-[10px] text-fg-muted">
               左端 z=−4σ …… 右端 z=+4σ（月寄からの累積変動をボラで割った値。買いなら右ほど「もう上がってしまった」）。
               橙=待つ / 青=建てる / 灰=標本なし。標本 {"<"} 12 のビンは「建てる」に倒しています（証拠のある所でだけ素朴ルールから逸脱させる）。
               スロット1行目（月寄）は z≡0 なので全週共通の1つの判断です。

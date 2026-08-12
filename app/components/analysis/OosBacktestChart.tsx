@@ -138,7 +138,7 @@ export default function OosBacktestChart({ data }: Props) {
           ▶
         </span>
         <span className="font-semibold text-gray-800">配分則のアウトオブサンプル検証(ウォークフォワード)</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           {result ? `(${result.nAssets}銘柄 / 再配分${result.nRebalances}回 / ${result.dates.length}本)` : ""}
         </span>
       </button>
@@ -189,7 +189,7 @@ export default function OosBacktestChart({ data }: Props) {
           {err && <div className="text-xs text-red-500">{err}</div>}
 
           {!result ? (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-fg-muted">
               「検証を実行」を押すと、各配分則を過去だけで推定→直後を保有、を全期間で繰り返した実現成績を比較します(やや時間がかかります)。
             </div>
           ) : (
@@ -199,7 +199,7 @@ export default function OosBacktestChart({ data }: Props) {
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] tabular-nums">
                   <thead>
-                    <tr className="text-gray-400 text-left border-b border-gray-200">
+                    <tr className="text-fg-muted text-left border-b border-gray-200">
                       <th className="py-1 pr-2 font-medium">配分則</th>
                       <th className="py-1 px-2 font-medium text-right">実現Sharpe</th>
                       <th className="py-1 px-2 font-medium text-right">CAGR</th>
@@ -228,7 +228,7 @@ export default function OosBacktestChart({ data }: Props) {
                     ))}
                   </tbody>
                 </table>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   推定窓{result.lookback}本・{result.rebalance}本ごと再配分。回転=1回の再配分での片道売買比率(コストの目安)。
                 </p>
               </div>
@@ -464,7 +464,7 @@ function MuReversalCheck({ rf, currentTickers }: { rf: number; currentTickers: s
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] tabular-nums">
                   <thead>
-                    <tr className="text-gray-400 text-left border-b border-gray-200">
+                    <tr className="text-fg-muted text-left border-b border-gray-200">
                       <th className="py-1 pr-2 font-medium">ウォッチリスト</th>
                       {CHECK_LOOKBACKS.map((lb) => (
                         <th key={lb} className="py-1 px-2 font-medium text-right">
@@ -480,7 +480,7 @@ function MuReversalCheck({ rf, currentTickers }: { rf: number; currentTickers: s
                       <tr key={r.label} className="border-b border-gray-100">
                         <td className="py-1 pr-2 text-gray-700">
                           {r.label}
-                          <span className="text-gray-400"> （{r.tickers.length}銘柄）</span>
+                          <span className="text-fg-muted"> （{r.tickers.length}銘柄）</span>
                           {r.note && <span className="text-amber-700"> {r.note}</span>}
                         </td>
                         {r.deltas.length === 0
@@ -613,7 +613,7 @@ function MuModeCompare({ base, alt }: { base: OosResult; alt: OosResult }) {
       <div className="overflow-x-auto mt-1.5">
         <table className="w-full text-[11px] tabular-nums">
           <thead>
-            <tr className="text-gray-400 text-left border-b border-violet-200">
+            <tr className="text-fg-muted text-left border-b border-violet-200">
               <th className="py-1 pr-2 font-medium">推定に使った μ</th>
               <th className="py-1 px-2 font-medium text-right">実現Sharpe</th>
               <th className="py-1 px-2 font-medium text-right">CAGR</th>

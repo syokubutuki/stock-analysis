@@ -483,8 +483,8 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
             </div>
             <span className="text-gray-500">
               <span className="font-mono text-gray-700">{winStart}</span> 〜 <span className="font-mono text-gray-700">{winEndDate}</span>
-              <span className="text-gray-400">（{effWinLen.toLocaleString()}立会日 ≈{(effWinLen / 252).toFixed(1)}年）</span>
-              {isFull && <span className="text-gray-400"> ・全期間</span>}
+              <span className="text-fg-muted">（{effWinLen.toLocaleString()}立会日 ≈{(effWinLen / 252).toFixed(1)}年）</span>
+              {isFull && <span className="text-fg-muted"> ・全期間</span>}
             </span>
           </div>
 
@@ -534,11 +534,11 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                 type="button"
                 onClick={() => setWinEnd(0)}
                 disabled={barsAfter === 0}
-                className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${barsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+                className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${barsAfter === 0 ? "bg-gray-100 text-fg-muted" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
               >最新へ</button>
             </div>
           )}
-          <p className="text-[10px] text-gray-400">
+          <p className="text-[10px] text-fg-muted">
             {winMode === "latest"
               ? "窓長を変えると右端を最新に保ったまま集計期間を伸縮。曲線が期間で大きく変わる＝そのエッジは不安定。"
               : `窓長固定で位置をスライド。現在は最新から ${barsAfter.toLocaleString()} 立会日前で終了。エッジがどの時期に現れ・消えたかを確認。`}
@@ -567,7 +567,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                   {b.label}
                   {isToday && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今</span>}
                 </span>
-                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-gray-400"}`}>
+                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-fg-muted"}`}>
                   {fmtBinRange(b.rangeLo, b.rangeHi)}
                 </span>
               </button>
@@ -599,7 +599,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {METRIC_GROUPS.map((g) => (
             <div key={g} className="flex items-center gap-1 flex-wrap">
-              <span className="text-[10px] text-gray-400">{g}:</span>
+              <span className="text-[10px] text-fg-muted">{g}:</span>
               {METRICS.filter((m) => m.group === g).map((m) => (
                 <button
                   key={m.key}
@@ -619,14 +619,14 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && built && (!binning || !result) && (
-        <div className="text-xs text-gray-400">対象期間内の標本が不足しています。窓長を広げるか、分位を粗く（陰陽/3分位）、または60分足を選んでください。</div>
+        <div className="text-xs text-fg-muted">対象期間内の標本が不足しています。窓長を広げるか、分位を粗く（陰陽/3分位）、または60分足を選んでください。</div>
       )}
 
       {result && selInfo && (
         <>
           <div className="text-xs text-gray-600">
             <span className="font-medium text-gray-700">{metric.label}</span>
-            <span className="text-gray-400">｜{metric.hint}</span>
+            <span className="text-fg-muted">｜{metric.hint}</span>
           </div>
           <div className="text-xs text-gray-500">
             条件: 前夜 {usLabel} の{modeMeta.label}が「{selInfo.label}」（{fmtBinRange(selInfo.rangeLo, selInfo.rangeHi)}）だった翌日。
@@ -655,7 +655,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
               </select>
 
               <span className="inline-flex items-center gap-1 flex-wrap pl-2 border-l border-gray-200">
-                <span className="text-gray-400 text-[10px]">曜日:</span>
+                <span className="text-fg-muted text-[10px]">曜日:</span>
                 {WD_SCOPES.map((s) => (
                   <button
                     key={String(s.value)}
@@ -717,7 +717,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
               </span>
             </div>
 
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-fg-muted">
               {sumFellBack
                 ? `「${sortField.short}」は足し算できない量のため、週合計は自動で平均になっています。`
                 : `並び順＝${sortField.short}（${wdScopeLabel(wdScope)}）の${sortDir === "abs" ? "絶対値の大きい順" : sortDir === "asc" ? "小さい順" : "大きい順"}。値の無い銘柄は常に最下部。`}
@@ -740,7 +740,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                   {s.label}
                 </button>
               ))}
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-fg-muted">
                 {sparkScale === "cell"
                   ? "セルごとに自動フィット（大きさは比較不可・形だけ見る）"
                   : sparkScale === "row"
@@ -765,7 +765,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
             onRename={onRename}
           />
 
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             列(曜日)方向に色が銘柄をまたいで揃う＝そのビンでの曜日効果はウォッチリスト共通。1銘柄だけ突出＝個別要因/ノイズ。
             前夜米国ビンや対象期間を切り替え、同じ曜日列の傾向が反転/強弱・出現/消滅するかを見る。
           </p>
@@ -776,7 +776,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
               onClick={() => setShowRank((v) => !v)}
               className="text-xs font-medium text-gray-700 hover:text-blue-600 inline-flex items-center gap-1"
             >
-              <span className="text-gray-400">{showRank ? "▼" : "▶"}</span>
+              <span className="text-fg-muted">{showRank ? "▼" : "▶"}</span>
               銘柄ランキング（{wdScopeLabel(wdScope)}・{MU_BASES.find((b) => b.value === muBasis)!.label}）
             </button>
             {showRank && result && allocMap && (
@@ -1021,7 +1021,7 @@ function CrossHeatmap({
             <td className="px-2 py-1 sticky left-0 bg-gray-50 z-10" style={nameColStyle(nameCol)}
               title={nameCol === "code" ? `横断平均（${result.nStocks}銘柄プール）` : undefined}>
               <div className="font-bold text-gray-800 truncate">{nameCol === "code" ? "平均" : "横断平均"}</div>
-              <div className="text-[9px] text-gray-400 truncate">
+              <div className="text-[9px] text-fg-muted truncate">
                 {nameCol === "code" ? `${result.nStocks}銘柄` : `${result.nStocks}銘柄プール`}
               </div>
             </td>
@@ -1035,14 +1035,14 @@ function CrossHeatmap({
         </tbody>
       </table>
       {(metric.color === "timeGrid" || metric.color === "timeMin") && (
-        <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-1">
+        <div className="flex items-center gap-2 text-[10px] text-fg-muted mt-1">
           <span>色の濃さ=時刻の遅さ</span>
           <span className="inline-block w-16 h-2 rounded" style={{ background: "linear-gradient(90deg, rgba(37,99,235,0.1), rgba(37,99,235,0.65))" }} />
           <span>寄り → 大引け</span>
         </div>
       )}
       {metric.color === "div" && (
-        <div className="text-[10px] text-gray-400 mt-1">緑=プラス / 赤=マイナス、濃いほど大。</div>
+        <div className="text-[10px] text-fg-muted mt-1">緑=プラス / 赤=マイナス、濃いほど大。</div>
       )}
       {metric.key === "shape" && (
         <div className="flex flex-col gap-0.5 text-[10px] text-gray-500 mt-1.5">
@@ -1051,7 +1051,7 @@ function CrossHeatmap({
             {sparkScale === "cell" ? (
               <>
                 <span className="text-slate-600 font-medium">縦は各セルの山谷レンジに自動フィット</span>（形状をはっきり表示。大きさの比較は不可）。
-                <span className="text-gray-400">左上の%＝山谷の振幅（大きさはここで比較）</span>、
+                <span className="text-fg-muted">左上の%＝山谷の振幅（大きさはここで比較）</span>、
               </>
             ) : (
               <>
@@ -1061,7 +1061,7 @@ function CrossHeatmap({
                 </span>
                 （1%あたりの高さが{sparkScale === "all" ? "表全体" : "その行"}で等しく、
                 <span className="text-gray-700 font-medium">振幅の大小をそのまま形の大きさとして比較できる</span>。平坦なセル＝動きが小さい）。
-                <span className="text-gray-400">左上の%＝山谷の振幅、</span>
+                <span className="text-fg-muted">左上の%＝山谷の振幅、</span>
               </>
             )}
             <span className="text-slate-600">灰帯＝平均の±1標準誤差 σ/√n（枠でクリップ; 帯が枠を超えるほど不確か）</span>。
@@ -1072,7 +1072,7 @@ function CrossHeatmap({
             <span><span style={{ color: SP_RED }} className="font-bold">●</span> 最安時刻（平均パス最小＝仕込み/損切り目安）</span>
             <span><span style={{ color: SP_RED }} className="font-bold">△</span> 安値時刻・中央（各日実測の安値時刻）</span>
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             ●（均された山谷の時刻）と ▽△（典型的な高安の時刻）の横のズレが両者の違い。近ければ一貫、離れれば日によって高安の付け方がばらつく。破線＝寄り(0)の水準。
           </div>
         </div>
@@ -1200,11 +1200,11 @@ function CrossRankTable({
         <div className={`truncate max-w-[150px] ${r.isConsensus ? "font-bold text-gray-800" : "font-medium text-gray-700"}`} title={r.isConsensus ? `全${result.nStocks}銘柄プール` : `${r.name}（${r.ticker}）`}>
           {r.name}
         </div>
-        {!r.isConsensus && r.name !== r.ticker && <div className="text-[9px] text-gray-400 font-mono">{r.ticker}</div>}
+        {!r.isConsensus && r.name !== r.ticker && <div className="text-[9px] text-fg-muted font-mono">{r.ticker}</div>}
       </td>
       <td className="px-2 py-1 text-right tabular-nums text-gray-500">{r.n}</td>
       <td className={`px-2 py-1 text-right tabular-nums font-semibold ${r.mu >= 0 ? "text-emerald-700" : "text-red-600"}`}>{cell(r.mu, pctS)}</td>
-      <td className="px-2 py-1 text-right tabular-nums text-gray-400">{cell(r.se, pct2)}</td>
+      <td className="px-2 py-1 text-right tabular-nums text-fg-muted">{cell(r.se, pct2)}</td>
       <td className="px-2 py-1 text-right tabular-nums">
         {cell(r.t, (x) => x.toFixed(2), Math.abs(r.t) >= 2 ? "text-gray-900 font-semibold" : "text-gray-500")}
         {isFinite(r.t) && Math.abs(r.t) >= 2 && <span className="text-amber-500 ml-0.5">★</span>}
@@ -1260,7 +1260,7 @@ function CrossRankTable({
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-gray-400">
+      <p className="text-[10px] text-fg-muted">
         {positive.length === 0 ? (
           <span className="text-amber-600">配分＝ケリー比 max(0, μ̃/σ²)。保守値 μ̃ がプラスの銘柄が無く、この条件で建てる根拠はない。</span>
         ) : (
@@ -1307,7 +1307,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
     return (
       <div style={innerW} title={`${hasName ? `${name}（${ticker}）` : ticker}｜n=${n}${sortTxt ? `｜${sortLabel} ${sortTxt}` : ""}${allocTxt ? `｜${allocTip}` : ""}`}>
         <div className="font-mono font-medium text-gray-700 truncate">{ticker}</div>
-        <div className="text-[9px] text-gray-400 tabular-nums truncate">
+        <div className="text-[9px] text-fg-muted tabular-nums truncate">
           n={n}
           {allocTxt && <span className="ml-1 text-emerald-600 font-medium">{allocTxt}</span>}
         </div>
@@ -1351,7 +1351,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           >✎</button>
         )}
       </div>
-      <div className="text-[9px] text-gray-400 tabular-nums flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
+      <div className="text-[9px] text-fg-muted tabular-nums flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
         {hasName && <span className="font-mono">{ticker}</span>}
         <span>n={n}</span>
         {sortTxt && (

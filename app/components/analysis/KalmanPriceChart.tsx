@@ -138,14 +138,14 @@ export default function KalmanPriceChart({ prices }: Props) {
             <div className="font-mono font-medium">
               {res.sigmaNoisePct.toFixed(2)}%
             </div>
-            <div className="text-[10px] text-gray-400">残差の標準偏差</div>
+            <div className="text-[10px] text-fg-muted">残差の標準偏差</div>
           </div>
           <div className="p-2 rounded border border-gray-200 bg-gray-50">
             <div className="text-gray-500">ノイズ／日次変動</div>
             <div className="font-mono font-medium">
               {(res.noiseRatio * 100).toFixed(0)}%
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[10px] text-fg-muted">
               1日の値動きに占めるノイズ
             </div>
           </div>
@@ -176,7 +176,7 @@ export default function KalmanPriceChart({ prices }: Props) {
                 {res.reversion.fwdHigh >= 0 ? "+" : ""}
                 {res.reversion.fwdHigh.toFixed(2)}%
               </div>
-              <div className="text-[10px] text-gray-400">
+              <div className="text-[10px] text-fg-muted">
                 マイナスなら反落（売り有利）
               </div>
             </div>
@@ -192,7 +192,7 @@ export default function KalmanPriceChart({ prices }: Props) {
                 {res.reversion.fwdLow >= 0 ? "+" : ""}
                 {res.reversion.fwdLow.toFixed(2)}%
               </div>
-              <div className="text-[10px] text-gray-400">
+              <div className="text-[10px] text-fg-muted">
                 プラスなら反発（買い有利）
               </div>
             </div>

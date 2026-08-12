@@ -229,14 +229,14 @@ export function StabilityVerdictBadge({ state }: { state: StabilityState }) {
             {" "}
             [{p.piLo.toFixed(2)}, {p.piHi.toFixed(2)}]
           </span>
-          <span className="mx-1 text-gray-400">/</span>
+          <span className="mx-1 text-fg-muted">/</span>
           半減期{" "}
           <b>
             {p.halfLife !== null ? `${Math.round(p.halfLife)}日` : "—"}
           </b>
           {surv && (
             <>
-              <span className="mx-1 text-gray-400">/</span>
+              <span className="mx-1 text-fg-muted">/</span>
               上位{result.params.topK}本の1年後生存 <b>{pct(surv.topKSurvival, 0)}</b>
               <span className="text-gray-500">（ヌル {pct(surv.survivalNull, 0)}）</span>
             </>
@@ -1071,7 +1071,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
                       {r.bPlus.toFixed(2)} / {r.bMinus.toFixed(2)}
                     </td>
                     <td className="px-1.5 py-1 text-right font-mono text-gray-600">{r.deltaT.toFixed(1)}</td>
-                    <td className={`px-1.5 py-1 text-right font-mono ${r.deltaQ < 0.1 ? "font-bold text-gray-800" : "text-gray-400"}`}>
+                    <td className={`px-1.5 py-1 text-right font-mono ${r.deltaQ < 0.1 ? "font-bold text-gray-800" : "text-fg-muted"}`}>
                       {r.deltaQ.toFixed(3)}
                     </td>
                     <td className="px-1.5 py-1 text-right font-mono text-gray-600">
@@ -1093,7 +1093,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
                             ? "text-amber-700"
                             : r.verdict === "理想形"
                               ? "text-green-700"
-                              : "text-gray-400"
+                              : "text-fg-muted"
                       }`}
                     >
                       {r.verdict}
@@ -1209,7 +1209,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
                         <td className="px-1.5 py-1 text-right font-mono">{r.supW.toFixed(0)}</td>
                         <td className="px-1.5 py-1 text-right font-mono text-gray-500">{r.crit95.toFixed(0)}</td>
                         <td className="px-1.5 py-1 text-right font-mono text-gray-600">{r.bootP.toFixed(3)}</td>
-                        <td className={`px-1.5 py-1 text-right font-mono ${r.q < 0.1 ? "font-bold text-amber-800" : "text-gray-400"}`}>
+                        <td className={`px-1.5 py-1 text-right font-mono ${r.q < 0.1 ? "font-bold text-amber-800" : "text-fg-muted"}`}>
                           {r.q.toFixed(3)}
                         </td>
                         <td className="px-1.5 py-1 text-center font-mono text-gray-600">{r.breakDate ?? "—"}</td>
@@ -1476,7 +1476,7 @@ function MiniStat({
     <div className="rounded border border-gray-200 bg-white px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400 leading-tight">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted leading-tight">{sub}</div>}
     </div>
   );
 }

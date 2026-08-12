@@ -350,7 +350,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
               className={`px-3 py-1 font-medium ${mode === m ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}>{lbl}</button>
           ))}
         </div>
-        {computing && <span className="text-xs text-gray-400">計算中…（Web Worker）</span>}
+        {computing && <span className="text-xs text-fg-muted">計算中…（Web Worker）</span>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
@@ -453,10 +453,10 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
           <button key={s.key} onClick={() => setSortKey(s.key)} title={s.hint}
             className={`px-2 py-0.5 rounded text-[11px] font-medium ${sortKey === s.key ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>{s.label}</button>
         ))}
-        {onRename && <span className="text-[10px] text-gray-400">｜✎ で名称編集(ウォッチリストに保存)</span>}
+        {onRename && <span className="text-[10px] text-fg-muted">｜✎ で名称編集(ウォッチリストに保存)</span>}
       </div>
 
-      {usLoading && <div className="text-xs text-gray-400">米国指数を取得中…</div>}
+      {usLoading && <div className="text-xs text-fg-muted">米国指数を取得中…</div>}
       {usError && <div className="text-xs text-red-500">{usError}</div>}
 
       {/* 改善B: 銘柄別 OOS 検証 */}
@@ -473,7 +473,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                 className={`px-2 py-0.5 rounded text-[11px] disabled:opacity-40 ${oosWeeks === v ? "bg-blue-600 text-white" : "bg-white border border-gray-200 hover:bg-gray-100 text-gray-600"}`}>{v}</button>
             ))}
           </div>
-          {oosDone && !oosRunning && <span className="text-[11px] text-gray-400">設定を変えると検証結果は破棄されます</span>}
+          {oosDone && !oosRunning && <span className="text-[11px] text-fg-muted">設定を変えると検証結果は破棄されます</span>}
         </div>
         {!oosDone && !oosRunning && (
           <p className="text-[11px] text-gray-500">
@@ -577,7 +577,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                               title="銘柄名を編集(ウォッチリストに保存)" className="text-gray-300 hover:text-blue-500 text-[11px] leading-none flex-shrink-0">✎</button>
                           )}
                         </div>
-                        {hasName && <div className="text-[9px] text-gray-400 font-mono">{r.ticker}</div>}
+                        {hasName && <div className="text-[9px] text-fg-muted font-mono">{r.ticker}</div>}
                       </div>
                     )}
                   </td>
@@ -594,7 +594,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                   <td className={`px-2 py-1 text-right font-semibold tabular-nums ${res ? (res.medianFinal >= 0 ? "text-green-600" : "text-red-600") : "text-gray-300"}`}>
                     {res ? fmtPct(res.medianFinal) : "—"}
                   </td>
-                  <td className={`px-2 py-1 text-right tabular-nums ${res ? (res.diffP < 0.05 ? "text-gray-700 font-medium" : "text-gray-400") : "text-gray-300"}`}
+                  <td className={`px-2 py-1 text-right tabular-nums ${res ? (res.diffP < 0.05 ? "text-gray-700 font-medium" : "text-fg-muted") : "text-gray-300"}`}
                     title={res ? `p=${res.diffP < 0.001 ? "<.001" : res.diffP.toFixed(3)}` : ""}>
                     {res ? `${res.diffMedian >= 0 ? "+" : ""}${(res.diffMedian * 100).toFixed(1)}pt${res.diffP < 0.05 ? "*" : ""}` : "—"}
                   </td>
@@ -607,7 +607,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                   <td className="px-2 py-1 text-right tabular-nums text-gray-600">
                     {res ? `${((res.upCount / (res.upCount + res.downCount || 1)) * 100).toFixed(0)}%` : "—"}
                   </td>
-                  <td className="px-2 py-1 text-right tabular-nums text-gray-400">
+                  <td className="px-2 py-1 text-right tabular-nums text-fg-muted">
                     {res ? <>{res.selected.length}<span className="text-gray-300">/</span><span className="text-gray-600">{res.nEff}</span></> : "—"}
                   </td>
                   {oosDone && (() => {
@@ -622,7 +622,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                           title={o ? `IC=${o.ic.toFixed(3)} 95%CI [${o.icLo.toFixed(3)}, ${o.icHi.toFixed(3)}] / 予測週数 n=${o.n}(実効${o.nEff})${oosCross && o.ic > oosCross.thr ? " / 横断補正閾値超え" : ""}` : pending ? "検証待ち" : "週数不足で算出不可"}>
                           {o ? <>{o.ic.toFixed(3)}{oosCross && o.ic > oosCross.thr ? <span className="text-green-600">✓</span> : null}</> : pending ? "…" : "—"}
                         </td>
-                        <td className={`px-2 py-1 text-right tabular-nums ${o ? (o.hit - o.baseHit > 0 ? "text-gray-700" : "text-gray-400") : "text-gray-300"}`}
+                        <td className={`px-2 py-1 text-right tabular-nums ${o ? (o.hit - o.baseHit > 0 ? "text-gray-700" : "text-fg-muted") : "text-gray-300"}`}
                           title={o ? `方向的中率 ${(o.hit * 100).toFixed(0)}% / 無条件 ${(o.baseHit * 100).toFixed(0)}%` : ""}>
                           {o ? `${o.hit - o.baseHit >= 0 ? "+" : ""}${((o.hit - o.baseHit) * 100).toFixed(0)}pt` : pending ? "…" : "—"}
                         </td>
@@ -646,7 +646,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
         </table>
       </div>
 
-      <p className="text-[11px] text-gray-400">
+      <p className="text-[11px] text-fg-muted">
         ミニチャート: <span className="text-blue-600">青=終値中央</span> / <span className="text-green-600">緑点線=高値到達中央(MFE=利確目安)</span> / <span className="text-red-600">赤点線=安値到達中央(MAE=損切り目安)</span> / 薄青帯=終値25–75%。
         中央値が揃って右肩上がり＝全体に追い風(地合い集中=分散不足の裏返し)。1銘柄だけ逆行＝個別要因/ヘッジ候補。事例小は偶然に振られやすい。
       </p>

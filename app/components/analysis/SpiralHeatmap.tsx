@@ -127,7 +127,7 @@ function lnGamma(z: number): number {
   return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
 }
 function pValueLabel(p: number | null): { text: string; cls: string } {
-  if (p === null) return { text: "-", cls: "text-gray-400" };
+  if (p === null) return { text: "-", cls: "text-fg-muted" };
   const star = p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "";
   return { text: p.toFixed(3) + star, cls: p < 0.05 ? "text-blue-600 font-medium" : "text-gray-500" };
 }
@@ -1127,7 +1127,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h3 className="font-bold text-gray-800 mb-3">カレンダー分析</h3>
-        <p className="text-xs text-gray-400">データが不足しています。</p>
+        <p className="text-xs text-fg-muted">データが不足しています。</p>
       </div>
     );
   }
@@ -1185,12 +1185,12 @@ export default function SpiralHeatmap({ prices }: Props) {
       <div className="border border-blue-100 rounded-lg p-3 bg-blue-50/30">
         <div className="text-sm font-medium text-gray-700 mb-2">
           曜日別リターン分布エクスプローラ
-          <span className="text-xs font-normal text-gray-400">（曜日とリターン種別を選んで分布の形を比較）</span>
+          <span className="text-xs font-normal text-fg-muted">（曜日とリターン種別を選んで分布の形を比較）</span>
         </div>
 
         {/* return field selector */}
         <div className="mb-2">
-          <div className="text-[11px] text-gray-400 mb-1">リターン種別</div>
+          <div className="text-[11px] text-fg-muted mb-1">リターン種別</div>
           <div className="flex flex-wrap gap-1">
             {DIST_FIELDS.map(f => (
               <button
@@ -1206,7 +1206,7 @@ export default function SpiralHeatmap({ prices }: Props) {
 
         {/* weekday selector */}
         <div className="mb-2">
-          <div className="text-[11px] text-gray-400 mb-1">曜日（複数選択で形状を重ね比較）</div>
+          <div className="text-[11px] text-fg-muted mb-1">曜日（複数選択で形状を重ね比較）</div>
           <div className="flex flex-wrap gap-1 items-center">
             {DOW_TRADING.map(dow => {
               const active = distDows.includes(dow);
@@ -1243,7 +1243,7 @@ export default function SpiralHeatmap({ prices }: Props) {
             <input type="checkbox" checked={distShowNormal} onChange={e => setDistShowNormal(e.target.checked)} className="accent-gray-700" />
             正規分布を重ねる
           </label>
-          <span className="text-gray-400">※ ヒストグラム/正規分布は曜日を1つだけ選択したとき表示</span>
+          <span className="text-fg-muted">※ ヒストグラム/正規分布は曜日を1つだけ選択したとき表示</span>
         </div>
 
         <div className="w-full rounded border border-gray-100 bg-white overflow-hidden"><canvas ref={distRef} /></div>
@@ -1326,7 +1326,7 @@ export default function SpiralHeatmap({ prices }: Props) {
                     </tr>
                     {(isFirst ? ["mean", "median", "std", "winRate", "pValue"] as const : ["mean", "median", "winRate"] as const).map(key => (
                       <tr key={`${field}-${key}`} className="border-b border-gray-100">
-                        <td className="py-1 px-2 text-gray-400">{key === "mean" ? "平均" : key === "median" ? "中央値" : key === "std" ? "標準偏差" : key === "winRate" ? "勝率" : "p値"}</td>
+                        <td className="py-1 px-2 text-fg-muted">{key === "mean" ? "平均" : key === "median" ? "中央値" : key === "std" ? "標準偏差" : key === "winRate" ? "勝率" : "p値"}</td>
                         {dowStats.map((s, i) => {
                           if (!s) return <td key={i} className="py-1 px-2 text-center">-</td>;
                           const fieldStats = s[field];
@@ -1360,7 +1360,7 @@ export default function SpiralHeatmap({ prices }: Props) {
       <div>
         <div className="text-xs text-gray-500 mb-1">
           曜日別 平均リターンの推移
-          <span className="text-gray-400 ml-1">※各曜日の前C→当C平均を時系列に。分解能を上げ、ホイールでズーム/ドラッグでパンして詳細の変化を追える</span>
+          <span className="text-fg-muted ml-1">※各曜日の前C→当C平均を時系列に。分解能を上げ、ホイールでズーム/ドラッグでパンして詳細の変化を追える</span>
         </div>
         {/* モード切替 + 分解能/平滑化コントロール */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-1.5">
@@ -1398,7 +1398,7 @@ export default function SpiralHeatmap({ prices }: Props) {
             <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
               窓(直近N回) <span className="text-gray-700 tabular-nums w-8">{trendWindow}</span>
               <input type="range" min={4} max={104} step={1} value={trendWindow} onChange={e => setTrendWindow(Number(e.target.value))} className="w-32" />
-              <span className="text-gray-400">≒{(trendWindow / 52).toFixed(1)}年</span>
+              <span className="text-fg-muted">≒{(trendWindow / 52).toFixed(1)}年</span>
             </label>
           )}
         </div>
@@ -1489,14 +1489,14 @@ export default function SpiralHeatmap({ prices }: Props) {
 
       {/* 週内パターン(月→金→翌月の累積)は「曜日エッジスキャン」の週内クロックに集約。
           そちらは夜間/日中の10素片に分解し、谷=買・山=売の最良窓やエッジの年次推移まで見られる。 */}
-      <p className="text-[11px] text-gray-400">
+      <p className="text-[11px] text-fg-muted">
         週内の累積リターン経路（夜間/日中の分解・週末ギャップ・谷で買い／山で売り）は
         <span className="font-medium text-gray-500">「曜日エッジスキャン」の週内クロック</span>
         に統合しました。
       </p>
 
       {/* 曜日トレード・シミュレータは独立分析「曜日トレード・シミュレータ」へ移設 */}
-      <p className="text-[11px] text-gray-400">
+      <p className="text-[11px] text-fg-muted">
         曜日トレードの売買シミュレータ（最適プラン・フィット窓・逐次WF・全組合せヒートマップ）は、
         カレンダー節の<span className="font-medium text-gray-500">「曜日トレード・シミュレータ」</span>に移設しました。
       </p>
@@ -1664,19 +1664,19 @@ export default function SpiralHeatmap({ prices }: Props) {
           <div className="text-xs text-gray-500 mb-1">連騰・連落分析</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-400">最長連騰</div>
+              <div className="text-fg-muted">最長連騰</div>
               <div className="font-mono text-green-600 text-sm">{streakStats.maxUp}日</div>
             </div>
             <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-400">最長連落</div>
+              <div className="text-fg-muted">最長連落</div>
               <div className="font-mono text-red-600 text-sm">{streakStats.maxDown}日</div>
             </div>
             <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-400">平均連騰</div>
+              <div className="text-fg-muted">平均連騰</div>
               <div className="font-mono text-gray-700 text-sm">{streakStats.avgUp.toFixed(1)}日 ({streakStats.upCount}回)</div>
             </div>
             <div className="p-2 bg-gray-50 rounded">
-              <div className="text-gray-400">平均連落</div>
+              <div className="text-fg-muted">平均連落</div>
               <div className="font-mono text-gray-700 text-sm">{streakStats.avgDown.toFixed(1)}日 ({streakStats.downCount}回)</div>
             </div>
           </div>

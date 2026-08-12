@@ -138,7 +138,7 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
       {surface.rows.length >= 2 ? (
         <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={surfaceRef} /></div>
       ) : (
-        <div className="text-xs text-gray-400 py-8 text-center">データが不足しています (最低60日必要)</div>
+        <div className="text-xs text-fg-muted py-8 text-center">データが不足しています (最低60日必要)</div>
       )}
 
       <AnalysisGuide title="分布ダイナミクスの詳細理論">

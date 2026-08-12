@@ -404,7 +404,7 @@ export default function WeekClockChart({ prices, ticker }: Props) {
           className={gran === "intraday" ? "cursor-grab active:cursor-grabbing touch-none" : ""}
         />
         {gran === "intraday" && intra && (
-          <span className="absolute top-1 right-2 text-[10px] text-gray-400 select-none pointer-events-none">
+          <span className="absolute top-1 right-2 text-[10px] text-fg-muted select-none pointer-events-none">
             ホイール=拡大 / ドラッグ=移動 / ダブルクリック=全体
           </span>
         )}

@@ -233,7 +233,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
   }, [redraw]);
 
   if (prices.length < 200) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています（200営業日以上必要）。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています（200営業日以上必要）。</div>;
   }
 
   const ics = res?.ok ? res.ics : [];
@@ -321,7 +321,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                       <tr key={ds.h} className="border-b border-gray-100">
                         <td className="py-1 px-1.5 text-gray-600">{ds.h}日後</td>
                         <td className="text-right px-1.5 font-mono">{ds.n}</td>
-                        <td className="text-right px-1.5 font-mono text-gray-400">{ds.nFlat}</td>
+                        <td className="text-right px-1.5 font-mono text-fg-muted">{ds.nFlat}</td>
                         <td className="text-right px-1.5 font-mono font-semibold">{pctS(ds.hit)}</td>
                         <td className="text-center px-1.5 font-mono text-gray-500">
                           {isFinite(ds.hitLo) ? `${pctS(ds.hitLo)}–${pctS(ds.hitHi)}` : "—"}
@@ -332,7 +332,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                         <td className="text-center px-1.5">
                           {sig && beats
                             ? <span className="text-green-700 font-medium">情報あり</span>
-                            : <span className="text-gray-400">裏付けなし</span>}
+                            : <span className="text-fg-muted">裏付けなし</span>}
                         </td>
                       </tr>
                     );
@@ -340,7 +340,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-[11px] text-fg-muted mt-1">
               的中率が多数派ヌルを下回っているなら、その方向判断は「何も考えず上と言い続ける」より劣ります。
               PT検定は多数派当てを自動で割り引くので、こちらを主判定に使ってください。
             </p>
@@ -381,7 +381,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                     ))}
                   </tbody>
                 </table>
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-[11px] text-fg-muted mt-1">
                   BSS ≤ 0 なら「常に基準率を答える」より悪い＝確率に情報がありません。
                   分解能がほぼ0なら、当たっていてもそれは基準率を言い当てているだけです。
                 </p>
@@ -434,7 +434,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                     })}
                   </tbody>
                 </table>
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-[11px] text-fg-muted mt-1">
                   「狭すぎ」ならストップが想定より高頻度で刈られます。「広すぎ」は外れないが役に立たない区間です。
                   重複窓のため独立性検定(LR_ind)は解釈できないので、無条件被覆(LR_uc)だけを判定に使っています。
                 </p>
@@ -483,7 +483,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                     ))}
                   </tbody>
                 </table>
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-[11px] text-fg-muted mt-1">
                   理想は a=0・b=1。Wald p が小さいほど「予測がそのままの水準では使えない」ことを意味します。
                   b&lt;1 は予測が振れすぎ（縮めて使う）、予測/実現が 1 から離れるのは水準バイアスです。
                   ボラは方向と違い実際に予測できる量なので、ここは R² が 0.2〜0.5 出ても不思議ではありません。
@@ -527,7 +527,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                               <span className={sig ? (r.ic > 0 ? "text-green-700 font-semibold" : "text-red-600 font-semibold") : "text-gray-600"}>
                                 {fmt(r.ic, 3)}
                               </span>
-                              <span className="text-gray-400 text-[10px]"> ({fmt(r.icLo, 2)},{fmt(r.icHi, 2)})</span>
+                              <span className="text-fg-muted text-[10px]"> ({fmt(r.icLo, 2)},{fmt(r.icHi, 2)})</span>
                             </td>
                           );
                         })}
@@ -537,7 +537,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-[11px] text-fg-muted mt-1">
               CI が 0 をまたぐものは「順位相関の証拠なし」。日次データの実務的な IC は 0.02〜0.05 程度で、
               0.1 を超えたら標本が薄いか、どこかに先読みが混じっていないかを疑う水準です。
               なお 6 判断 × 4 ホライズン = 24 検定を同時に見ているので、5% 有意は期待値で 1.2 件出ます。
@@ -577,7 +577,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-[11px] text-fg-muted mt-1">
               変化点・ボラ急拡大は「その後荒れる」ことを主張する警告なので、実現σの差で採点します。
               リターンの符号を当てる装置ではないので、発生後リターンは参考値です。
             </p>

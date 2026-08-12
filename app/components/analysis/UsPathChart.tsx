@@ -202,7 +202,7 @@ export default function UsPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {result && (
@@ -250,7 +250,7 @@ export default function UsPathChart({ ticker }: Props) {
                   <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: b.color }} />
                   <span className="text-gray-600">
                     {b.label}
-                    <span className="text-gray-400">（{fmtBinRange(b.rangeLo, b.rangeHi)}｜n={b.n}）</span>
+                    <span className="text-fg-muted">（{fmtBinRange(b.rangeLo, b.rangeHi)}｜n={b.n}）</span>
                     {isToday && <span className="text-blue-600 font-bold">◀今</span>}
                   </span>
                 </span>
@@ -294,7 +294,7 @@ export default function UsPathChart({ ticker }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             各線は前夜 {usLabel} の{modeMeta.label}リターンのビンに属する日の、寄り基準の平均累積リターン。右肩上がり＝日中も買われる、
             寄り直後にピークを打って垂れる＝寄り天フェード。
           </p>
@@ -312,7 +312,7 @@ export default function UsPathChart({ ticker }: Props) {
             {showDist && (
             <>
             <div className="text-xs text-gray-600">
-              <span className="text-gray-400">
+              <span className="text-fg-muted">
                 前夜 {usLabel} の各ビンに属するJP立会日が、原系列（対象銘柄の日次終値）のどこに位置するかを色分け表示。
                 ホイールでズーム・ドラッグでパン。
               </span>
@@ -326,11 +326,11 @@ export default function UsPathChart({ ticker }: Props) {
                   <span className="text-gray-600">{b.label}</span>
                 </span>
               ))}
-              <span className="text-gray-400">（灰=原系列の終値ライン／●=各JP立会日を前夜米国ビン色で）</span>
+              <span className="text-fg-muted">（灰=原系列の終値ライン／●=各JP立会日を前夜米国ビン色で）</span>
             </div>
 
             <div ref={tlContainerRef} className="w-full rounded border border-gray-100" />
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-fg-muted">
               特定色（例 米大幅高）が一部期間に固まっていれば、そのビンの平均パスはその時期のレジームが作った
               見かけのエッジの可能性。全期間に均等に散らばっているほど、米国→日中の連動は時期によらず安定。
             </p>

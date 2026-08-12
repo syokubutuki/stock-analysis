@@ -99,11 +99,11 @@ export default function AttractorSignalDashboard({ prices, seriesMode }: Props) 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4 text-xs">
         <div className="p-2 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">τ (AMI)</div>
+          <div className="text-fg-muted">τ (AMI)</div>
           <div className="font-bold text-lg">{tau}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">d (FNN)</div>
+          <div className="text-fg-muted">d (FNN)</div>
           <div className="font-bold text-lg">{dim}</div>
         </div>
         <div className={`p-2 rounded text-center ${recentLyap > 0 ? "bg-red-50" : "bg-green-50"}`}>
@@ -129,7 +129,7 @@ export default function AttractorSignalDashboard({ prices, seriesMode }: Props) 
         <div className="text-sm font-medium text-gray-700 mb-2">投資シグナル一覧</div>
         <div className="space-y-2">
           {signals.length === 0 && (
-            <div className="text-xs text-gray-400 p-3 bg-gray-50 rounded">シグナルなし</div>
+            <div className="text-xs text-fg-muted p-3 bg-gray-50 rounded">シグナルなし</div>
           )}
           {signals.map((sig, i) => {
             const style = directionStyles[sig.direction];

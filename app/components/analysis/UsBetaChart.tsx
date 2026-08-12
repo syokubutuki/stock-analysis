@@ -85,13 +85,13 @@ function BetaCard({ title, line, tone, hint }: { title: string; line: BetaLine; 
     <div className={`p-2 rounded border ${tone}`}>
       <div className="text-gray-500">{title}</div>
       <div className="font-mono font-medium text-base">{fmtBeta(reg.beta)}</div>
-      <div className="text-[10px] text-gray-400">
+      <div className="text-[10px] text-fg-muted">
         95%CI [{fmtBeta(ci.lo)}, {fmtBeta(ci.hi)}]
       </div>
       <div className="mt-0.5">
         <StatBadge n={reg.n} p={reg.pBeta} significant={reg.pBeta < 0.05} />
       </div>
-      <div className="text-[10px] text-gray-400 mt-0.5">{hint}</div>
+      <div className="text-[10px] text-fg-muted mt-0.5">{hint}</div>
     </div>
   );
 }
@@ -140,7 +140,7 @@ export default function UsBetaChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています（日中足の期間が短い可能性）。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています（日中足の期間が短い可能性）。</div>
       )}
 
       {result && activeLine && (
@@ -176,10 +176,10 @@ export default function UsBetaChart({ ticker }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-gray-500">縦軸(JP):</span>
               <ViewTabs value={target} onChange={setTarget} views={TARGETS} />
-              <span className="text-[11px] text-gray-400">緑=プラス日 / 赤=マイナス日・青線=OLS回帰</span>
+              <span className="text-[11px] text-fg-muted">緑=プラス日 / 赤=マイナス日・青線=OLS回帰</span>
             </div>
             <div className="relative"><canvas ref={canvasRef} /></div>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-fg-muted">
               回帰の傾き=β（相関 {activeLine.reg.corr.toFixed(2)} / R² {activeLine.reg.r2.toFixed(2)} / n={activeLine.reg.n}）。
               点が右上・左下に集まるほど正の感応、右下・左上に散るほど逆行。
             </p>

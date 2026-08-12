@@ -95,7 +95,7 @@ export function AnalogFreezeButton({ ticker, res, settings }: { ticker: string; 
       </button>
       {msg
         ? <span className="text-[11px] text-emerald-700">{msg}</span>
-        : <span className="text-[11px] text-gray-400">記録すると後から条件を変えられません。一覧・採点はポートフォリオの「前向き検証台帳」。</span>}
+        : <span className="text-[11px] text-fg-muted">記録すると後から条件を変えられません。一覧・採点はポートフォリオの「前向き検証台帳」。</span>}
     </div>
   );
 }
@@ -244,12 +244,12 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
           className="px-3 py-1.5 rounded font-medium bg-emerald-600 text-white disabled:opacity-40 hover:bg-emerald-700">
           今の予測を台帳に凍結（{freezable.length}銘柄）
         </button>
-        <span className="text-gray-400">設定: {curLabel}</span>
+        <span className="text-fg-muted">設定: {curLabel}</span>
       </div>
       {msg && <div className="text-[11px] text-emerald-700">{msg}</div>}
 
       {evals.length === 0 ? (
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-fg-muted">
           まだ記録がありません。上のボタンで今週の予測を凍結すると、{settings.H}営業日後から採点が始まります。
         </div>
       ) : (
@@ -338,7 +338,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                       <td className="px-2 py-1 text-gray-500 font-mono whitespace-nowrap">{e.asOf}</td>
                       <td className="px-1 py-1 text-center whitespace-nowrap">
                         <span style={{ color: vm.color }} className="font-medium">{vm.label}</span>
-                        {ev.verdict !== "stale" && <span className="text-gray-400"> {ev.daysDone}/{e.settings.H}</span>}
+                        {ev.verdict !== "stale" && <span className="text-fg-muted"> {ev.daysDone}/{e.settings.H}</span>}
                       </td>
                       <td className="px-1 py-0.5 text-center align-middle">
                         {ev.verdict === "stale" ? <span className="text-gray-300">—</span> : <PathCompare ev={ev} scale={scale} />}
@@ -365,7 +365,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                           </>
                         )}
                       </td>
-                      <td className="px-2 py-1 text-gray-400 whitespace-nowrap"
+                      <td className="px-2 py-1 text-fg-muted whitespace-nowrap"
                         title={`${e.label}｜凍結日 ${e.frozenAt}｜事例${e.nSelected}(実効${e.nEff})｜差${(e.diffMedian * 100).toFixed(1)}pt p=${e.diffP < 0.001 ? "<.001" : e.diffP.toFixed(3)}｜勝率${(e.winRate * 100).toFixed(0)}%｜novelty${(e.novelty * 100).toFixed(0)}%`}>
                         実効{e.nEff}/p{e.diffP < 0.001 ? "<.001" : e.diffP.toFixed(2)}
                       </td>
@@ -380,7 +380,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             ミニチャート: <span className="text-blue-600">青点線=凍結時の予測中央値</span> / 薄青帯=予測25–75% / <span className="text-gray-900">黒線=実際に辿った経路</span>。
             黒線が帯からはみ出すほど、予測は経路を捉えられていない。
           </p>

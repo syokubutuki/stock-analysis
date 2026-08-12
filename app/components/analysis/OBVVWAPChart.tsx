@@ -201,7 +201,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
             {obvVsMA.label}
           </div>
           {latestOBV && (
-            <div className="text-xs text-gray-400 mt-0.5">
+            <div className="text-xs text-fg-muted mt-0.5">
               MA: {latestOBV.obvMA.toFixed(0)}
             </div>
           )}

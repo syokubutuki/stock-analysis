@@ -113,7 +113,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
 
   if (!aligned) {
     return (
-      <div className="text-xs text-gray-400">
+      <div className="text-xs text-fg-muted">
         2銘柄以上の共通営業日が必要です。ウォッチリストに銘柄を追加してください。
       </div>
     );
@@ -123,7 +123,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
   }
   if (!result) {
     return (
-      <div className="text-xs text-gray-400">
+      <div className="text-xs text-fg-muted">
         {loading
           ? "3種のヌルでモンテカルロを実行中…（銘柄数が多いと数秒かかります。別スレッドで走るので操作は止まりません）"
           : "計算待ち…"}
@@ -170,11 +170,11 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
           </button>
         ))}
         {result.ok && (
-          <span className="text-gray-400 tabular-nums">
+          <span className="text-fg-muted tabular-nums">
             {result.tickers.length}銘柄 / {result.nPairs}ペア / {result.T}日 / ヌル{result.sims}本
           </span>
         )}
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           既定は最長窓。テールは標本が急に薄くなるので、短い窓だと θ=1.5σ が測れません。
         </span>
       </div>
@@ -201,7 +201,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
           </button>
         ))}
         {result.ok && Number.isFinite(result.excessKurtosis) && (
-          <span className="text-gray-400 tabular-nums">
+          <span className="text-fg-muted tabular-nums">
             超過尖度 {result.excessKurtosis.toFixed(1)}
             {nullMode === "t" && Number.isFinite(result.nu) && ` → ν=${result.nu.toFixed(1)}`}
           </span>
@@ -289,7 +289,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] tabular-nums border-collapse">
                   <thead>
-                    <tr className="text-gray-400 text-left border-b border-gray-200">
+                    <tr className="text-fg-muted text-left border-b border-gray-200">
                       <th className="py-1 pr-2 font-medium">ヌル</th>
                       <th className="py-1 px-2 font-medium text-right">Ā = ρ⁻−ρ⁺</th>
                       <th className="py-1 px-2 font-medium text-right">両側 p</th>
@@ -312,7 +312,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                           <td className="py-1 pr-2 text-gray-700">
                             {NULL_MODE_LABEL[m]}
                             {m === "t" && Number.isFinite(r.nu) && (
-                              <span className="text-gray-400"> ν={r.nu.toFixed(1)}</span>
+                              <span className="text-fg-muted"> ν={r.nu.toFixed(1)}</span>
                             )}
                           </td>
                           <td className="py-1 px-2 text-right">{sv(r.asymMean)}</td>
@@ -398,7 +398,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] tabular-nums border-collapse">
               <thead>
-                <tr className="text-gray-400 text-left border-b border-gray-200">
+                <tr className="text-fg-muted text-left border-b border-gray-200">
                   <th className="py-1 pr-2 font-medium">閾値 θ</th>
                   <th className="py-1 px-2 font-medium text-right">下側 ρ⁻</th>
                   <th className="py-1 px-2 font-medium text-right">ヌル平均</th>
@@ -423,35 +423,35 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                       <td className="py-1 pr-2 text-gray-700">
                         ±{l.theta.toFixed(1)}σ
                         {l.theta === result.refTheta && (
-                          <span className="ml-1 text-[9px] text-gray-400">参照</span>
+                          <span className="ml-1 text-[9px] text-fg-muted">参照</span>
                         )}
                       </td>
                       <td className="py-1 px-2 text-right font-medium" style={{ color: DOWN_COLOR }}>
                         {cv(l.down.corr)}
                       </td>
-                      <td className="py-1 px-2 text-right text-gray-400">{cv(l.down.nullMean)}</td>
+                      <td className="py-1 px-2 text-right text-fg-muted">{cv(l.down.nullMean)}</td>
                       <td
                         className={`py-1 px-2 text-right ${
-                          Number.isFinite(l.down.p) && l.down.p < 0.05 ? "text-red-700 font-medium" : "text-gray-400"
+                          Number.isFinite(l.down.p) && l.down.p < 0.05 ? "text-red-700 font-medium" : "text-fg-muted"
                         }`}
                       >
                         {pv(l.down.p)}
                       </td>
-                      <td className="py-1 px-2 text-right text-gray-400">
+                      <td className="py-1 px-2 text-right text-fg-muted">
                         {Number.isFinite(l.down.days) ? l.down.days.toFixed(0) : "—"}
                       </td>
                       <td className="py-1 px-2 text-right font-medium" style={{ color: UP_COLOR }}>
                         {cv(l.up.corr)}
                       </td>
-                      <td className="py-1 px-2 text-right text-gray-400">{cv(l.up.nullMean)}</td>
+                      <td className="py-1 px-2 text-right text-fg-muted">{cv(l.up.nullMean)}</td>
                       <td
                         className={`py-1 px-2 text-right ${
-                          Number.isFinite(l.up.p) && l.up.p < 0.05 ? "text-blue-700 font-medium" : "text-gray-400"
+                          Number.isFinite(l.up.p) && l.up.p < 0.05 ? "text-blue-700 font-medium" : "text-fg-muted"
                         }`}
                       >
                         {pv(l.up.p)}
                       </td>
-                      <td className="py-1 px-2 text-right text-gray-400">
+                      <td className="py-1 px-2 text-right text-fg-muted">
                         {Number.isFinite(l.up.days) ? l.up.days.toFixed(0) : "—"}
                       </td>
                       <td className={`py-1 px-2 text-right ${sig ? "font-semibold" : ""}`}>
@@ -463,7 +463,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                       </td>
                       <td
                         className={`py-1 pl-2 text-right ${
-                          sig ? "text-amber-700 font-medium" : "text-gray-400"
+                          sig ? "text-amber-700 font-medium" : "text-fg-muted"
                         }`}
                       >
                         {pv(l.asymP)}
@@ -473,7 +473,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                 })}
               </tbody>
             </table>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-fg-muted mt-1">
               「日数」は有効ペアの平均条件付き日数（両銘柄が同時に閾値を超えた日）。
               {result.minObs}日未満のペアはその水準で除外しています。
               角括弧はヌルでの A の90%帯——<strong>実測 A がこの外に出ていれば非対称</strong>。
@@ -493,7 +493,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                     <strong className="text-base tabular-nums" style={{ color: DOWN_COLOR }}>
                       {ref.down.corr.toFixed(2)}
                     </strong>
-                    <span className="text-gray-400 tabular-nums">
+                    <span className="text-fg-muted tabular-nums">
                       {" "}／ 上側 ρ⁺ = {cv(ref.up.corr)} ／ 平時の無条件 ρ̄ = {cv(result.rhoAll)}
                     </span>
                   </span>
@@ -544,7 +544,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
               </div>
               <table className="w-full text-[11px] tabular-nums border-collapse">
                 <thead>
-                  <tr className="text-gray-400 text-left border-b border-gray-200">
+                  <tr className="text-fg-muted text-left border-b border-gray-200">
                     <th className="py-1 pr-2 font-medium">ペア</th>
                     <th className="py-1 px-2 font-medium text-right">無条件 ρ</th>
                     <th className="py-1 px-2 font-medium text-right">下側 ρ⁻</th>
@@ -561,7 +561,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                         <span className="font-medium">{p.a}</span>
                         <span className="text-gray-300"> × </span>
                         <span className="font-medium">{p.b}</span>
-                        <span className="text-gray-400 ml-1 hidden sm:inline">
+                        <span className="text-fg-muted ml-1 hidden sm:inline">
                           {names[p.a] && names[p.b] ? `${names[p.a]} / ${names[p.b]}` : ""}
                         </span>
                       </td>
@@ -573,12 +573,12 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                         {cv(p.up)}
                       </td>
                       <td className="py-1 px-2 text-right font-medium">{sv(p.asym)}</td>
-                      <td className="py-1 px-2 text-right text-gray-400">{pv(p.p)}</td>
+                      <td className="py-1 px-2 text-right text-fg-muted">{pv(p.p)}</td>
                       <td
                         className={`py-1 pl-2 text-right ${
                           Number.isFinite(p.q) && p.q < 0.1
                             ? "text-amber-700 font-medium"
-                            : "text-gray-400"
+                            : "text-fg-muted"
                         }`}
                       >
                         {pv(p.q)}
@@ -587,7 +587,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                   ))}
                 </tbody>
               </table>
-              <p className="text-[10px] text-gray-400 mt-1">
+              <p className="text-[10px] text-fg-muted mt-1">
                 {result.nPairs} ペアぶん検定を繰り返しているので、未補正の p を拾い読みすると
                 偶然 5% を切るペアが {(result.nPairs * 0.05).toFixed(1)} 個は出ます。そこで
                 <strong>Benjamini-Hochberg で補正した q 値</strong>を併記しました

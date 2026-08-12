@@ -69,7 +69,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && resp && !result && (
-        <div className="text-xs text-gray-400">集計できる立会日が不足しています。</div>
+        <div className="text-xs text-fg-muted">集計できる立会日が不足しています。</div>
       )}
 
       {result && (
@@ -79,7 +79,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="曜日" />
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             実線=平均・破線=中央値の日内累積リターン。▲=平均パスのピーク時刻／▽=ボトム時刻（利確・手仕舞いの目安）。
             右肩上がり＝日中も買われる、寄り直後にピーク→垂れる＝寄り天フェード。平均と中央値が大きく離れる曜日は少数の異常日が形を作っている。
             {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
@@ -101,7 +101,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
             </button>
             {showDist && (
               <>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-fg-muted">
                   各立会日を曜日色の●で、原系列（対象銘柄の日次終値ライン）上に直接プロット。ホイールでズーム・ドラッグでパン。
                   特定曜日の平均パスが一部期間のレジームに偏っていないかを確認できる。
                 </div>

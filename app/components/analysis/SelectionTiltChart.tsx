@@ -42,7 +42,7 @@ function Stat({
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -181,7 +181,7 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
           </div>
         )}
         {fetching && (
-          <span className="text-xs text-gray-400">取得中… {progress.done}/{progress.total}</span>
+          <span className="text-xs text-fg-muted">取得中… {progress.done}/{progress.total}</span>
         )}
       </div>
 
@@ -218,7 +218,7 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
       </div>
 
       {activeCount < 5 && (
-        <div className="py-8 text-center text-gray-400 text-sm">
+        <div className="py-8 text-center text-fg-muted text-sm">
           横断チルトには最低5銘柄が必要です（十分な履歴つき）。ユニバースを大型30などに切り替えてください。
         </div>
       )}
@@ -302,7 +302,7 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
                         {s.passes ? (
                           <span className="text-green-700 font-semibold">床超え</span>
                         ) : (
-                          <span className="text-gray-400">床未達</span>
+                          <span className="text-fg-muted">床未達</span>
                         )}
                       </td>
                     </tr>

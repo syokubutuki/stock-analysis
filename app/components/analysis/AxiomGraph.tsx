@@ -252,7 +252,7 @@ export default function AxiomGraph() {
             </div>
           </>
         ) : (
-          <span className="text-gray-400">
+          <span className="text-fg-muted">
             ノードにホバーすると導出経路だけが浮かび上がります（クリックで固定）。
             すべての系は最終的に公準4（会計恒等式）へ遡ります。
           </span>

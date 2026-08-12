@@ -184,7 +184,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && !result && (
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-fg-muted">
           連結できる立会日が不足しています（60分足を選ぶ／曜日の絞り込みを外す）。米国指数の日中足が取得できない場合もあります。
         </div>
       )}
@@ -320,7 +320,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">増分F（q={inc.q}）</div>
                     <div className="font-bold text-gray-800">{inc.f.toFixed(2)}</div>
-                    <div className="text-[10px] text-gray-400">p = {inc.p.toFixed(4)}</div>
+                    <div className="text-[10px] text-fg-muted">p = {inc.p.toFixed(4)}</div>
                   </div>
                 </div>
 
@@ -354,12 +354,12 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[10px] text-fg-muted">
                   {"係数は対数リターン単位（説明変数が1（=100%）動いたときの目的変数の変化）。標準誤差は等分散を仮定した通常のOLS。"}
                 </p>
               </>
             ) : (
-              <div className="text-xs text-gray-400">増分F検定には40日以上必要です。</div>
+              <div className="text-xs text-fg-muted">増分F検定には40日以上必要です。</div>
             )}
           </div>
         </>

@@ -191,7 +191,7 @@ function perfCells(p: PerfStat) {
 function diffCells(row: StrategyRow) {
   if (row.key === "bh") {
     return (
-      <td className="py-1 px-2 text-center text-gray-400" colSpan={5}>
+      <td className="py-1 px-2 text-center text-fg-muted" colSpan={5}>
         ベンチマーク
       </td>
     );
@@ -206,8 +206,8 @@ function diffCells(row: StrategyRow) {
       <td className="py-1 px-2 text-right text-gray-500 whitespace-nowrap">
         [{pct2(d.ciLo * 52)}, {pct2(d.ciHi * 52)}]
       </td>
-      <td className={`py-1 px-2 text-right ${sig ? "text-blue-700 font-medium" : "text-gray-400"}`}>{d.t.toFixed(2)}</td>
-      <td className={`py-1 px-2 text-right ${sig ? "text-blue-700 font-medium" : "text-gray-400"}`}>
+      <td className={`py-1 px-2 text-right ${sig ? "text-blue-700 font-medium" : "text-fg-muted"}`}>{d.t.toFixed(2)}</td>
+      <td className={`py-1 px-2 text-right ${sig ? "text-blue-700 font-medium" : "text-fg-muted"}`}>
         {d.p < 0.001 ? "<0.001" : d.p.toFixed(3)}
       </td>
       <td className="py-1 px-2 text-right text-gray-600">{d.cohensD.toFixed(3)}</td>
@@ -311,7 +311,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
         <h3 className="text-sm font-semibold text-gray-800">
           エントリー戦略 vs Buy&amp;Hold：違いは「週内のどこで建てるか」だけ
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           {r.nStocks}銘柄 / {r.nWeeks}週（{r.years.toFixed(1)}年）/ {r.from}〜{r.to} / 建玉{pct(r.exposure)}
         </span>
       </div>
@@ -363,7 +363,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
             value={benchTicker}
             onChange={(e) => setBenchTicker(e.target.value.trim())}
           />
-          {benchLoading && <span className="text-gray-400">取得中…</span>}
+          {benchLoading && <span className="text-fg-muted">取得中…</span>}
           {benchErr && <span className="text-amber-600">{benchErr}</span>}
         </label>
       </div>
@@ -421,7 +421,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
                 key={row.key}
                 className={`border-b border-gray-100 ${
                   row.key === "bh" ? "bg-gray-50" : row.key === "fixed" ? "bg-amber-50/60" : ""
-                } ${row.key === "best" || row.key === "worst" ? "text-gray-400" : ""}`}
+                } ${row.key === "best" || row.key === "worst" ? "text-fg-muted" : ""}`}
               >
                 <td className="py-1 pr-2">
                   <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ background: COLOR[row.key] }} />
@@ -436,7 +436,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
             ))}
           </tbody>
         </table>
-        <p className="mt-1 text-[10px] text-gray-400">
+        <p className="mt-1 text-[10px] text-fg-muted">
           年率差＝週次リターン差の年率換算（戦略 − Buy&amp;Hold）。95%CIはポートフォリオ週次差系列のブロック・ブートストラップ（800回）。
           t・pは<b>銘柄×週の対応差を同一週=1クラスタでクラスタ頑健化</b>したもの（横断相関を吸収）。効果量dは週次差の Cohen&apos;s d。
           {rnd.spread && (
@@ -496,7 +496,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
                 <td className="py-1 pr-2 font-semibold text-gray-800">合計（戦略の年率対数リターン）</td>
                 <td className="py-1 px-2 text-right font-semibold">{pct(a.total)}</td>
                 <td className="py-1 px-2 text-right text-gray-500">100%</td>
-                <td className="py-1 pl-2 text-gray-400">対数なので厳密に加法</td>
+                <td className="py-1 pl-2 text-fg-muted">対数なので厳密に加法</td>
               </tr>
             </tbody>
           </table>

@@ -389,7 +389,7 @@ function StatCard({
     <div className="p-2 bg-gray-50 rounded text-xs">
       <div className="text-gray-500">{label}</div>
       <div className={`font-bold ${c}`}>{value}</div>
-      {sub && <div className="text-gray-400">{sub}</div>}
+      {sub && <div className="text-fg-muted">{sub}</div>}
     </div>
   );
 }

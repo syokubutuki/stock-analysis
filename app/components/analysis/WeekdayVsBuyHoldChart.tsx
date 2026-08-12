@@ -210,7 +210,7 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
             </button>
           ))}
         </div>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           {meta.nWeeks}週 / {meta.years.toFixed(1)}年
         </span>
       </div>
@@ -477,7 +477,7 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
             </tr>
           </tbody>
         </table>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           戦略は市場滞在率が低い（週末は現金）ため、総リターンではなく<span className="font-medium">Sharpe（リスク調整後）</span>での比較が公平です。
         </p>
       </div>

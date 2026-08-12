@@ -348,7 +348,7 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
           />
           <span className="text-gray-700 font-medium w-12">{windowSize}日</span>
         </label>
-        <span className="text-gray-400">τ = {tau} (AMI自動選択)</span>
+        <span className="text-fg-muted">τ = {tau} (AMI自動選択)</span>
       </div>
 
       {/* Stats */}

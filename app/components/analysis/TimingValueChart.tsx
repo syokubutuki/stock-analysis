@@ -202,7 +202,7 @@ export default function TimingValueChart({ prices }: Props) {
             </button>
           ))}
         </div>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           評価窓 {result.evalStart} 〜 {result.evalEnd}（{result.nDays}日 / {result.years.toFixed(1)}年）
         </span>
       </div>
@@ -306,13 +306,13 @@ export default function TimingValueChart({ prices }: Props) {
                     <td className="text-right px-2 text-gray-500">{r.turnoverPerYear.toFixed(0)}</td>
                   </>
                 ) : (
-                  <td colSpan={7} className="text-right px-2 text-gray-400 text-xs">データ不足で未稼働（検定外）</td>
+                  <td colSpan={7} className="text-right px-2 text-fg-muted text-xs">データ不足で未稼働（検定外）</td>
                 )}
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           「未補正p」はそのルール単独で見た片側ブートストラップp値。一族から良いものを選んだ後では
           この p 値は使えません（総合判定の SPA p が正しい基準）。B&Hとの比較は同一評価窓・同一コスト。
         </p>

@@ -167,7 +167,7 @@ export default function CustomBucketChart({ prices, minBars = 250 }: Props) {
             {h}日
           </button>
         ))}
-        <span className="ml-auto text-gray-400">全標本 {result.totalN}日 / 基準平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%</span>
+        <span className="ml-auto text-fg-muted">全標本 {result.totalN}日 / 基準平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%</span>
       </div>
 
       {/* 現在バナー */}

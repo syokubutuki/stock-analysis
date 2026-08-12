@@ -150,7 +150,7 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">GPD形状 ξ</div>
           <div className="font-bold">{evt.shape.toFixed(3)}</div>
-          <div className="text-gray-400">{evt.interpretation}</div>
+          <div className="text-fg-muted">{evt.interpretation}</div>
         </div>
         <div className="p-2 bg-red-50 rounded">
           <div className="text-red-600">VaR 95%</div>
@@ -165,7 +165,7 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">超過尖度</div>
           <div className="font-bold">{cumulants.kurtosis.toFixed(2)}</div>
-          <div className="text-gray-400">{cumulants.isGaussian ? "正規分布的" : "非正規"}</div>
+          <div className="text-fg-muted">{cumulants.isGaussian ? "正規分布的" : "非正規"}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">テイル依存 (↓/↑)</div>
@@ -176,27 +176,27 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
       {/* High-order cumulants */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3 text-xs">
         <div className="p-1 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">κ₁ (平均)</div>
+          <div className="text-fg-muted">κ₁ (平均)</div>
           <div className="font-bold">{(cumulants.mean * 100).toFixed(4)}%</div>
         </div>
         <div className="p-1 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">κ₂ (分散)</div>
+          <div className="text-fg-muted">κ₂ (分散)</div>
           <div className="font-bold">{(cumulants.variance * 10000).toFixed(4)}</div>
         </div>
         <div className="p-1 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">κ₃ (歪度)</div>
+          <div className="text-fg-muted">κ₃ (歪度)</div>
           <div className="font-bold">{cumulants.skewness.toFixed(3)}</div>
         </div>
         <div className="p-1 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">κ₄ (尖度)</div>
+          <div className="text-fg-muted">κ₄ (尖度)</div>
           <div className="font-bold">{cumulants.kurtosis.toFixed(3)}</div>
         </div>
         <div className="p-1 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">κ₅</div>
+          <div className="text-fg-muted">κ₅</div>
           <div className="font-bold">{cumulants.c5.toFixed(3)}</div>
         </div>
         <div className="p-1 bg-gray-50 rounded text-center">
-          <div className="text-gray-400">κ₆</div>
+          <div className="text-fg-muted">κ₆</div>
           <div className="font-bold">{cumulants.c6.toFixed(3)}</div>
         </div>
       </div>

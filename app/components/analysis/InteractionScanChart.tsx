@@ -133,7 +133,7 @@ export default function InteractionScanChart({ prices }: Props) {
   }, [drawHeat]);
 
   if (prices.length < 120) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(120営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(120営業日以上必要)。</div>;
   }
 
   return (
@@ -211,20 +211,20 @@ export default function InteractionScanChart({ prices }: Props) {
                     onClick={() => { setPairX(c.axisX); setPairY(c.axisY); }}
                   >
                     <td className="py-1 px-1.5 whitespace-nowrap">
-                      <span className="text-gray-400">{c.axisXLabel}:</span> {c.labelX}
+                      <span className="text-fg-muted">{c.axisXLabel}:</span> {c.labelX}
                     </td>
                     <td className="px-1.5 whitespace-nowrap">
-                      <span className="text-gray-400">{c.axisYLabel}:</span> {c.labelY}
+                      <span className="text-fg-muted">{c.axisYLabel}:</span> {c.labelY}
                     </td>
                     <td className="text-right px-1 text-gray-500">{c.n}</td>
                     <td className={`text-right px-1 font-mono ${colorCls(c.meanFwd)}`}>{pct(c.meanFwd, 2)}</td>
-                    <td className="text-right px-1 font-mono text-gray-400">{pct(c.additive, 2)}</td>
+                    <td className="text-right px-1 font-mono text-fg-muted">{pct(c.additive, 2)}</td>
                     <td className={`text-right px-1 font-mono font-medium ${colorCls(c.interaction)}`}>{pct(c.interaction, 2)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{Math.round(c.winRate * 100)}%</td>
-                    <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-gray-400"}`}>{c.pAdj.toFixed(3)}{star(c.pAdj)}</td>
+                    <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{c.pAdj.toFixed(3)}{star(c.pAdj)}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600 whitespace-nowrap">
                       {c.ciLo !== null && c.ciHi !== null
-                        ? <span className={c.ciLo > 0 || c.ciHi < 0 ? "text-blue-600" : "text-gray-400"}>[{pct(c.ciLo, 2)}, {pct(c.ciHi, 2)}]</span>
+                        ? <span className={c.ciLo > 0 || c.ciHi < 0 ? "text-blue-600" : "text-fg-muted"}>[{pct(c.ciLo, 2)}, {pct(c.ciHi, 2)}]</span>
                         : <span className="text-gray-300">–</span>}
                     </td>
                     <td className="text-center px-1">{c.isNow ? <span className="text-blue-600 font-bold">●</span> : ""}</td>
@@ -234,7 +234,7 @@ export default function InteractionScanChart({ prices }: Props) {
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-[10px] text-fg-muted mt-1">
           行クリックでそのペアのヒートマップに切替。交互作用CIは|t|上位40セルのみ算出(移動ブロック・ブートストラップ600回)。CIが0をまたがない=相乗が頑健。
         </p>
       </div>
@@ -247,16 +247,16 @@ export default function InteractionScanChart({ prices }: Props) {
             <select className="border rounded px-1 py-0.5" value={activePair.x} onChange={(e) => setPairX(e.target.value as ScanAxis)}>
               {SCAN_AXES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
-            <span className="text-gray-400">×</span>
+            <span className="text-fg-muted">×</span>
             <select className="border rounded px-1 py-0.5" value={activePair.y} onChange={(e) => setPairY(e.target.value as ScanAxis)}>
               {SCAN_AXES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
-            <span className="text-gray-400">
+            <span className="text-fg-muted">
               ｜列={axisLabel(activePair.x)} / 行={axisLabel(activePair.y)}、全体平均 {pct(grid.baseline, 2)}
             </span>
           </div>
           <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={heatRef} /></div>
-          <p className="text-[10px] text-gray-400 mt-1">
+          <p className="text-[10px] text-fg-muted mt-1">
             緑=プラス/赤=マイナス、濃さ=絶対値。★=交互作用のp値(セルが加法予測から乖離)。青枠=現在の状態が属するセル。空白=N不足。
           </p>
         </div>

@@ -107,10 +107,10 @@ export default function EdgeBookChart({ prices }: Props) {
       : [...effectiveSelected, id]);
 
   if (prices.length < 300) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(300営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(300営業日以上必要)。</div>;
   }
   if (catalog.length < 2) {
-    return <div className="text-xs text-gray-400 p-3">合成できるエッジが足りません。</div>;
+    return <div className="text-xs text-fg-muted p-3">合成できるエッジが足りません。</div>;
   }
 
   const divGain = result.bookSharpe - Math.max(...result.legs.map((l) => l.sharpe), 0);
@@ -162,22 +162,22 @@ export default function EdgeBookChart({ prices }: Props) {
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">合成Sharpe(逆ボラ加重)</div>
               <div className={`text-sm font-bold font-mono ${result.bookSharpe > 0 ? "text-green-700" : "text-red-700"}`}>{num2(result.bookSharpe)}</div>
-              <div className="text-[10px] text-gray-400">単体最良 +{num2(divGain)} / 無相関上限 {num2(result.sumSharpeIfIndep)}</div>
+              <div className="text-[10px] text-fg-muted">単体最良 +{num2(divGain)} / 無相関上限 {num2(result.sumSharpeIfIndep)}</div>
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">分散比</div>
               <div className="text-sm font-bold font-mono text-gray-800">{num2(result.diversification)}×</div>
-              <div className="text-[10px] text-gray-400">{result.diversification > 1.2 ? "分散効果あり" : "ほぼ効かず"}</div>
+              <div className="text-[10px] text-fg-muted">{result.diversification > 1.2 ? "分散効果あり" : "ほぼ効かず"}</div>
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">平均相関 → テール相関</div>
               <div className="text-sm font-bold font-mono text-gray-800">{num2(result.avgCorr)} → <span className={result.tailCorr > result.avgCorr + 0.1 ? "text-red-700" : "text-gray-800"}>{num2(result.tailCorr)}</span></div>
-              <div className="text-[10px] text-gray-400">{result.tailCorr > result.avgCorr + 0.1 ? "危機時に相関上昇=分散消失" : "テールでも安定"}</div>
+              <div className="text-[10px] text-fg-muted">{result.tailCorr > result.avgCorr + 0.1 ? "危機時に相関上昇=分散消失" : "テールでも安定"}</div>
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">合成の年率 / 最大DD</div>
               <div className={`text-sm font-bold font-mono ${result.bookAnn > 0 ? "text-green-700" : "text-red-700"}`}>{pct(result.bookAnn)}</div>
-              <div className="text-[10px] text-gray-400">DD {pct(result.bookMaxDD)} / 日次CVaR5% {pct(result.bookCVaR5)}</div>
+              <div className="text-[10px] text-fg-muted">DD {pct(result.bookMaxDD)} / 日次CVaR5% {pct(result.bookCVaR5)}</div>
             </div>
           </div>
 
@@ -198,14 +198,14 @@ export default function EdgeBookChart({ prices }: Props) {
               <div className="rounded border border-gray-200 bg-white px-2.5 py-1.5">
                 <div className="text-[10px] text-gray-500">食い合い後の総容量</div>
                 <div className="text-sm font-bold font-mono text-amber-800">{fmtYen(result.kBookContended)}</div>
-                <div className="text-[10px] text-gray-400">競合係数 M/(1+φ(M−1)) = {result.contentionFactor.toFixed(2)}×（φ={result.contentionUsed.toFixed(2)}）</div>
+                <div className="text-[10px] text-fg-muted">競合係数 M/(1+φ(M−1)) = {result.contentionFactor.toFixed(2)}×（φ={result.contentionUsed.toFixed(2)}）</div>
               </div>
               <div className="rounded border border-gray-200 bg-white px-2.5 py-1.5">
                 <div className="text-[10px] text-gray-500">目減り</div>
                 <div className="text-sm font-bold font-mono text-red-700">
                   {result.kNaiveSum > 0 ? `−${((1 - result.kBookContended / result.kNaiveSum) * 100).toFixed(0)}%` : "—"}
                 </div>
-                <div className="text-[10px] text-gray-400">{result.contentionUsed > 0.5 ? "同時執行が多く食い合い大" : "執行が分散し食い合い小"}</div>
+                <div className="text-[10px] text-fg-muted">{result.contentionUsed > 0.5 ? "同時執行が多く食い合い大" : "執行が分散し食い合い小"}</div>
               </div>
             </div>
             {result.kNaiveSum <= 0 && (

@@ -217,7 +217,7 @@ export default function RealizedVolChart({ ticker }: Props) {
       <LoadingError loading={loading} error={error} />
 
       {!loading && !error && !ready && (
-        <div className="text-sm text-gray-400 py-6 text-center">この足ではサンプルが不足しています（HARは25営業日以上必要）。</div>
+        <div className="text-sm text-fg-muted py-6 text-center">この足ではサンプルが不足しています（HARは25営業日以上必要）。</div>
       )}
 
       {!loading && !error && ready && (

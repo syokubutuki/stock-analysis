@@ -164,7 +164,7 @@ export default function DMDChart({ prices, seriesMode }: Props) {
       )}
 
       {dmdResult.modes.length === 0 && (
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-fg-muted mt-2">
           データが不足しているため、DMDを計算できません（最低30点必要）。
         </p>
       )}

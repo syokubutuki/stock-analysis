@@ -37,7 +37,7 @@ export default function CandlestickPatternChart({ prices }: Props) {
               <tr key={p.name} className="border-b border-gray-100">
                 <td className="py-1 px-2">
                   <div className="font-medium text-gray-700">{p.nameJa}</div>
-                  <div className="text-gray-400 text-[10px]">{p.name}</div>
+                  <div className="text-fg-muted text-[10px]">{p.name}</div>
                 </td>
                 <td className="py-1 px-2 text-center font-mono">{p.stats.count}</td>
                 <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn1d >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -53,7 +53,7 @@ export default function CandlestickPatternChart({ prices }: Props) {
                   {(p.stats.winRate5d * 100).toFixed(0)}%
                 </td>
                 <td className="py-1 px-2 text-center font-mono text-gray-600">{p.stats.tStat.toFixed(2)}</td>
-                <td className={`py-1 px-2 text-center font-bold ${p.stats.significant ? "text-green-600" : "text-gray-400"}`}>
+                <td className={`py-1 px-2 text-center font-bold ${p.stats.significant ? "text-green-600" : "text-fg-muted"}`}>
                   {p.stats.significant ? "Yes" : "No"}
                 </td>
               </tr>

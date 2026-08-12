@@ -261,7 +261,7 @@ export default function TechnicalIndicators({ prices, period }: Props) {
             }`}>
               {(lastBB.percentB * 100).toFixed(1)}%
             </div>
-            <div className="text-gray-400">帯域幅: {(lastBB.bandwidth * 100).toFixed(1)}%</div>
+            <div className="text-fg-muted">帯域幅: {(lastBB.bandwidth * 100).toFixed(1)}%</div>
           </div>
         )}
       </div>

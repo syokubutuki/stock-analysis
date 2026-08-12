@@ -126,7 +126,7 @@ export default function VwapDeviationChart({ ticker }: Props) {
         <>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-xs text-gray-500">対象 {res.nDays} 営業日 / {resp?.interval} 足</div>
-            <span className="text-xs text-gray-400">｜先行 {res.horizonBars} バー:</span>
+            <span className="text-xs text-fg-muted">｜先行 {res.horizonBars} バー:</span>
             {HORIZONS.map((h) => (
               <button key={h} onClick={() => setHorizon(h)}
                 className={`px-2 py-0.5 text-xs rounded ${horizon === h ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>{h}</button>

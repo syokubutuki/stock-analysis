@@ -203,7 +203,7 @@ export default function ResampledFrontierChart({ data, window: win = 250 }: Prop
           ▶
         </span>
         <span className="font-semibold text-gray-800">Michaud リサンプリング(頑健フロンティア)</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           {result ? `(${result.tickers.length}銘柄 / ${result.nBoot}回 / ${result.nObs}本)` : ""}
         </span>
       </button>
@@ -239,7 +239,7 @@ export default function ResampledFrontierChart({ data, window: win = 250 }: Prop
           {err && <div className="text-xs text-red-500">{err}</div>}
 
           {!result ? (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-fg-muted">
               「リサンプリング実行」で、履歴をブートストラップして接点・最小分散を何度も解き直し、最適点の揺れ(信頼雲)と推定誤差に頑健な平均配分(Michaud)を求めます。
             </div>
           ) : (
@@ -286,7 +286,7 @@ export default function ResampledFrontierChart({ data, window: win = 250 }: Prop
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-fg-muted mt-1">
                   σ(ばらつき)が大きい銘柄ほど、そのウェイトは推定誤差に振られやすく<strong>信頼できない</strong>。σが小さい銘柄の配分ほど頑健。
                 </p>
               </div>

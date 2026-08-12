@@ -1047,7 +1047,7 @@ export default function PredictiveStrategyPanel({
             <input type="number" min={0.001} max={0.1} step={0.001} value={targetReturnThreshold}
               onChange={(e) => setTargetReturnThreshold(Number(e.target.value))}
               className="w-20 px-2 py-1.5 text-xs border border-gray-300 rounded text-center" />
-            <span className="text-xs text-gray-400 ml-1">({(targetReturnThreshold * 100).toFixed(1)}%)</span>
+            <span className="text-xs text-fg-muted ml-1">({(targetReturnThreshold * 100).toFixed(1)}%)</span>
           </div>
         )}
         <div>
@@ -1060,7 +1060,7 @@ export default function PredictiveStrategyPanel({
         </div>
       </div>
 
-      <div className="text-xs text-gray-400">
+      <div className="text-xs text-fg-muted">
         {TARGET_OPTIONS.find((o) => o.value === target)?.desc}
         {positionMode === "longOnly"
           ? " → 確率≧ロング閾値で買い、それ以外は現金保持"
@@ -1091,7 +1091,7 @@ export default function PredictiveStrategyPanel({
             </div>
           </div>
         </div>
-        <div className="text-[11px] text-gray-400">
+        <div className="text-[11px] text-fg-muted">
           予測対象期間は上の「開始日／終了日」で指定します。この区間を「予測窓 {testWindow}日」ずつに区切り、各区切りの直前
           {trainWindow}日（Embargo {embargo}日を除く）で学習する Walk-Forward 方式です。
         </div>
@@ -1128,11 +1128,11 @@ export default function PredictiveStrategyPanel({
                 <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                   <input type="checkbox" checked={enabled.has(f.id)} onChange={() => toggleFeature(f.id)}
                     className="rounded border-gray-300" />
-                  <span className={enabled.has(f.id) ? "text-gray-800" : "text-gray-400"}>{f.label}</span>
+                  <span className={enabled.has(f.id) ? "text-gray-800" : "text-fg-muted"}>{f.label}</span>
                 </label>
                 {enabled.has(f.id) && f.params.map((p) => (
                   <div key={p.name} className="flex items-center gap-1 ml-5 text-xs">
-                    <span className="text-gray-400 whitespace-nowrap">{p.label}:</span>
+                    <span className="text-fg-muted whitespace-nowrap">{p.label}:</span>
                     <input type="number" min={p.min} max={p.max} step={p.step}
                       value={paramMap[f.id]?.[p.name] ?? p.default}
                       onChange={(e) => updateParam(f.id, p.name, Number(e.target.value))}
@@ -1206,7 +1206,7 @@ export default function PredictiveStrategyPanel({
               </label>
               {standardize && (
                 <div className="flex items-center gap-1">
-                  <span className="text-gray-400">窓:</span>
+                  <span className="text-fg-muted">窓:</span>
                   <input type="number" min={20} max={1000} step={10} value={standardizeWindow}
                     onChange={(e) => setStandardizeWindow(Number(e.target.value))}
                     className="w-16 px-1 py-0.5 border border-gray-300 rounded text-center" />
@@ -1218,7 +1218,7 @@ export default function PredictiveStrategyPanel({
                 <span className="text-gray-700">ロング閾値を自動最適化</span>
               </label>
             </div>
-            <div className="text-gray-400">
+            <div className="text-fg-muted">
               Embargo = 学習終端とテスト開始の間に空ける日数（リーク防止）。較正/閾値最適化は学習窓の末尾{(validationFraction * 100).toFixed(0)}%を検証に使用。
             </div>
           </div>
@@ -1257,7 +1257,7 @@ export default function PredictiveStrategyPanel({
           )}
         </div>
         {positionMode === "longShort" && !isRunning && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-fg-muted">
             確率 ≧ {longThreshold.toFixed(2)} → ロング(買い)　|
             確率 ≦ {shortThreshold.toFixed(2)} → ショート(売り)　|
             中間 → 現金保持
@@ -1274,7 +1274,7 @@ export default function PredictiveStrategyPanel({
       {/* 結果 */}
       {!isRunning && result && (
         <div className="space-y-3">
-          <div className="text-[11px] text-gray-400">
+          <div className="text-[11px] text-fg-muted">
             日次の上昇/下落予測は、上の累積リターンチャート直下に同一時間軸で色分け表示しています。
           </div>
 
@@ -1324,7 +1324,7 @@ export default function PredictiveStrategyPanel({
       )}
 
       {result === null && !isRunning && (
-        <div className="text-xs text-gray-400">特徴量を選択し「学習実行」を押してください</div>
+        <div className="text-xs text-fg-muted">特徴量を選択し「学習実行」を押してください</div>
       )}
 
       {/* ── 未来予測 (アウトオブサンプル) ── */}
@@ -1378,7 +1378,7 @@ export default function PredictiveStrategyPanel({
                 <MetricCell label="上昇日平均 μ↑" value={"+" + (forecast.muUp * 100).toFixed(2) + "%"} color="text-green-600" />
                 <MetricCell label="下落日平均 μ↓" value={(forecast.muDown * 100).toFixed(2) + "%"} color="text-red-600" />
               </div>
-              <div className="text-[11px] text-gray-400">
+              <div className="text-[11px] text-fg-muted">
                 予測は確率を期待リターン（期待r = p·μ↑ + (1−p)·μ↓）に換算した中心シナリオです。
                 日が進むほど合成データを再帰利用するため不確実性が増し、コーン（±σ√h）が広がります。
                 価格パスは終値方向に対する予測なので、上の「予測対象」を<span className="font-medium">「終値上昇」</span>にすると最も整合します。
@@ -1388,7 +1388,7 @@ export default function PredictiveStrategyPanel({
         })()}
 
         {!forecast && !isForecasting && !forecastError && (
-          <div className="text-[11px] text-gray-400">
+          <div className="text-[11px] text-fg-muted">
             「未来{horizon}日を予測」を押すと、現在の特徴量・モデル設定・学習窓（{trainWindow}日）で未来の価格パスを推定します。
           </div>
         )}
@@ -1501,7 +1501,7 @@ function pct(v: number): string {
 function MetricCell({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="p-1.5 bg-white rounded border border-gray-100">
-      <div className="text-gray-400">{label}</div>
+      <div className="text-fg-muted">{label}</div>
       <div className={`font-mono font-medium ${color ?? ""}`}>{value}</div>
     </div>
   );

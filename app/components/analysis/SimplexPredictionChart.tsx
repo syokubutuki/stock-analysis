@@ -297,7 +297,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
         <div className={`p-2 rounded ${nlTest.isNonlinear ? "bg-purple-50" : "bg-gray-50"}`}>
           <div className={nlTest.isNonlinear ? "text-purple-600" : "text-gray-500"}>非線形性</div>
           <div className="font-bold">{nlTest.isNonlinear ? "非線形" : "線形"}</div>
-          <div className="text-gray-400">最適θ={nlTest.bestTheta}</div>
+          <div className="text-fg-muted">最適θ={nlTest.bestTheta}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">RMSE</div>
@@ -306,7 +306,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">パラメータ</div>
           <div className="font-bold text-xs">τ={tau} d={dim}</div>
-          <div className="text-gray-400">自動選択</div>
+          <div className="text-fg-muted">自動選択</div>
         </div>
       </div>
 

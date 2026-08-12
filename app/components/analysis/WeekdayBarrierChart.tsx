@@ -568,13 +568,13 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
 
       {error && <div className="bg-amber-50 text-amber-700 rounded-lg p-3 text-sm">{error}</div>}
       {loading && (
-        <div className="text-sm text-gray-400 py-4 text-center">
+        <div className="text-sm text-fg-muted py-4 text-center">
           {barsLoading ? "60分足を取得中..." : "格子 × サロゲート を計算中..."}
           {progress && ` ${progress.done}/${progress.total}`}
         </div>
       )}
       {!loading && main && !main.ok && (
-        <div className="text-xs text-gray-400">{main.reason}</div>
+        <div className="text-xs text-fg-muted">{main.reason}</div>
       )}
 
       <ViewTabs value={view} onChange={setView} views={VIEWS} />
@@ -599,22 +599,22 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">勝率 B/(A+B)</div>
               <div className="font-bold text-gray-800">{fmtPct(board.hitProbZeroMu, 1)}</div>
-              <div className="text-[10px] text-gray-400">μ込みの厳密解 {fmtPct(board.hitProbExact, 1)}</div>
+              <div className="text-[10px] text-fg-muted">μ込みの厳密解 {fmtPct(board.hitProbExact, 1)}</div>
             </div>
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">歪度 (A−B)/√(AB)</div>
               <div className={`font-bold ${board.skew >= 0 ? "text-green-600" : "text-red-600"}`}>{board.skew.toFixed(2)}</div>
-              <div className="text-[10px] text-gray-400">正=大勝ち小負け</div>
+              <div className="text-[10px] text-fg-muted">正=大勝ち小負け</div>
             </div>
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">期待滞在 AB·H</div>
               <div className="font-bold text-gray-800">{board.eTauH.toFixed(2)} 日</div>
-              <div className="text-[10px] text-gray-400">250日で {board.nTrades.toFixed(0)} 回転</div>
+              <div className="text-[10px] text-fg-muted">250日で {board.nTrades.toFixed(0)} 回転</div>
             </div>
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">1トレードのSD</div>
               <div className="font-bold text-gray-800">{main ? fmtPct(board.tradeSd, 2) : "—"}</div>
-              <div className="text-[10px] text-gray-400">√(AB)·σ√H{main ? "" : "（σの実測待ち）"}</div>
+              <div className="text-[10px] text-fg-muted">√(AB)·σ√H{main ? "" : "（σの実測待ち）"}</div>
             </div>
           </div>
 
@@ -719,7 +719,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                         {w.bestSig ? `A=${w.bestSig.A.toFixed(2)} / B=${w.bestSig.B.toFixed(2)}` : "—"}
                       </td>
                       <td className="text-center px-2">
-                        {w.bestSig ? (w.bestSig.interior ? <span className="text-amber-700 font-medium">内点</span> : <span className="text-gray-400">縁</span>) : "—"}
+                        {w.bestSig ? (w.bestSig.interior ? <span className="text-amber-700 font-medium">内点</span> : <span className="text-fg-muted">縁</span>) : "—"}
                       </td>
                     </tr>
                   ))}
@@ -742,7 +742,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
               )}
             </div>
           </div>
-        ) : <div className="text-xs text-gray-400">計算待ち。</div>
+        ) : <div className="text-xs text-fg-muted">計算待ち。</div>
       )}
 
       {/* ───────── 層2 逸脱 ───────── */}
@@ -760,7 +760,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                 <input type="range" min={0.25} max={2.5} step={0.25} value={refB}
                   onChange={(e) => setRefB(Number(e.target.value))} className="w-32" />
               </label>
-              <span className="text-gray-400">
+              <span className="text-fg-muted">
                 理論値: 到達確率 {fmtPct(refB / (refA + refB), 1)}／期待滞在 {(refA * refB).toFixed(2)}H
               </span>
             </div>
@@ -769,17 +769,17 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
               <div>
                 <div className="text-[11px] font-medium text-gray-700">到達確率 − B/(A+B)</div>
                 <div className="relative"><canvas ref={devPCanvas} /></div>
-                <div className="text-[10px] text-gray-400">正=平均回帰的／負=モメンタム的</div>
+                <div className="text-[10px] text-fg-muted">正=平均回帰的／負=モメンタム的</div>
               </div>
               <div>
                 <div className="text-[11px] font-medium text-gray-700">期待滞在 − min(AB, 1)</div>
                 <div className="relative"><canvas ref={devTCanvas} /></div>
-                <div className="text-[10px] text-gray-400">負=早く決着（ボラクラスタ）</div>
+                <div className="text-[10px] text-fg-muted">負=早く決着（ボラクラスタ）</div>
               </div>
               <div>
                 <div className="text-[11px] font-medium text-gray-700">オーバーシュート（σ単位）</div>
                 <div className="relative"><canvas ref={devOCanvas} /></div>
-                <div className="text-[10px] text-gray-400">正=ギャップで滑る（ジャンプ）</div>
+                <div className="text-[10px] text-fg-muted">正=ギャップで滑る（ジャンプ）</div>
               </div>
             </div>
 
@@ -863,7 +863,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-fg-muted">
                 {l2.overlapFactor > 1
                   ? `数日モードは窓が重なるため、SEを√H=${l2.overlapFactor.toFixed(2)}倍に膨らませて報告している（実効標本は n/H 相当）。`
                   : "日中モードは各日1本なので重なり補正なし。"}
@@ -871,7 +871,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
               </p>
             </div>
           </div>
-        ) : <div className="text-xs text-gray-400">計算待ち。</div>
+        ) : <div className="text-xs text-fg-muted">計算待ち。</div>
       )}
 
       {/* ───────── 層3 ヌル較正・OOS ───────── */}
@@ -892,7 +892,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">分散比F（σ正規化の効き）</div>
                     <div className="font-bold text-gray-800">{fmtPct(l3.surrogate.pctDispF, 0)} 点</div>
-                    <div className="text-[10px] text-gray-400">高い＝σ正規化で縮んだ（曜日差は不要）</div>
+                    <div className="text-[10px] text-fg-muted">高い＝σ正規化で縮んだ（曜日差は不要）</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">到達確率 Cochran Q</div>
@@ -903,7 +903,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                     <div className={`font-bold ${l3.surrogate.pctTauF > 0.95 ? "text-green-700" : "text-gray-800"}`}>
                       {fmtPct(l3.surrogate.pctTauF, 0)} 点
                     </div>
-                    <div className="text-[10px] text-gray-400">層2で唯一有意になりやすい指標</div>
+                    <div className="text-[10px] text-fg-muted">層2で唯一有意になりやすい指標</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -956,7 +956,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">ヌルで内点解が出た割合</div>
                     <div className="font-bold text-gray-800">{fmtPct(l3.brownian.interiorShare, 0)}</div>
-                    <div className="text-[10px] text-gray-400">実測: {l3.brownian.actualInterior ? "内点" : "縁"}</div>
+                    <div className="text-[10px] text-fg-muted">実測: {l3.brownian.actualInterior ? "内点" : "縁"}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">best期待値の分位点</div>
@@ -965,12 +965,12 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">ヌルの到達確率（中央値）</div>
                     <div className="font-bold text-gray-800">{fmtPct(l3.brownian.medPHat, 1)}</div>
-                    <div className="text-[10px] text-gray-400">理論 {fmtPct(l2.B / (l2.A + l2.B), 1)}</div>
+                    <div className="text-[10px] text-fg-muted">理論 {fmtPct(l2.B / (l2.A + l2.B), 1)}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">ヌルの滞在（中央値）</div>
                     <div className="font-bold text-gray-800">{l3.brownian.medTauH.toFixed(2)}H</div>
-                    <div className="text-[10px] text-gray-400">理論 min(AB,1)={Math.min(1, l2.A * l2.B).toFixed(2)}</div>
+                    <div className="text-[10px] text-fg-muted">理論 min(AB,1)={Math.min(1, l2.A * l2.B).toFixed(2)}</div>
                   </div>
                 </div>
                 <div className="relative"><canvas ref={nullBCanvas} /></div>
@@ -1045,11 +1045,11 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
               </div>
             )}
           </div>
-        ) : <div className="text-xs text-gray-400">計算待ち。</div>
+        ) : <div className="text-xs text-fg-muted">計算待ち。</div>
       )}
 
       {main?.ok && (
-        <p className="text-[11px] text-gray-400">
+        <p className="text-[11px] text-fg-muted">
           {mode === "intraday" ? "日中モード（60分足・寄りで建て引けで時間切り）" : `数日モード（日足・${hDays}営業日で時間切り・窓は重なる）`}
           ：経路 {main.n} 本（{main.from} 〜 {main.to}）、σ√H = {fmtPct(main.sigmaPerH, 2)}、
           実測 μ/H = {fmtSignedPct(main.muPerH, 3)}。

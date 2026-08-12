@@ -191,11 +191,11 @@ export default function MeanReversionChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-2 gap-2 mb-4">
         <div className="border rounded p-2">
           <div className="text-xs text-gray-500">Variance Ratio(q=5)</div>
-          <div className="font-mono text-sm">{result.vrRatio.toFixed(4)} <span className="text-xs text-gray-400">({vrLabel})</span></div>
+          <div className="font-mono text-sm">{result.vrRatio.toFixed(4)} <span className="text-xs text-fg-muted">({vrLabel})</span></div>
         </div>
         <div className="border rounded p-2">
           <div className="text-xs text-gray-500">Hurst指数 (R/S)</div>
-          <div className="font-mono text-sm">{result.hurst.toFixed(4)} <span className="text-xs text-gray-400">({hurstLabel})</span></div>
+          <div className="font-mono text-sm">{result.hurst.toFixed(4)} <span className="text-xs text-fg-muted">({hurstLabel})</span></div>
         </div>
       </div>
 
