@@ -71,6 +71,23 @@
 **未コミットがあると worktree から参照文書が見えない**（ラウンド1で実際に起きた）。
 下のスクリプトはその状態なら worktree を作らずに中断する。
 
+> ### ⚠ シェルを間違えないこと
+>
+> **この環境の既定ターミナルは PowerShell である。下の bash スクリプトを
+> PowerShell に貼ると `$dir` / `$br` が展開されず、`$dir` という名前のフォルダと
+> `$br` というブランチがリポジトリ内部に作られる**（2026-08-11 に実際に発生）。
+>
+> - **PowerShell を使うなら → 後述の「PowerShell 版」を使う**
+> - bash 版は Git Bash / WSL でのみ使う
+>
+> どちらで実行したか分からなくなったら `git worktree list` と `git branch` を確認し、
+> `$dir` や `$br` があれば下記で除去する:
+> ```
+> git worktree remove '$dir' --force; git worktree prune; git branch -D '$br'
+> ```
+
+### bash 版（Git Bash / WSL）
+
 ```bash
 cd C:/Users/hikar/next/stock-analysis
 
@@ -95,7 +112,38 @@ else
 fi
 ```
 
-**5/5 にならなければ投入しないこと。**
+### PowerShell 版（この環境の既定シェル）
+
+```powershell
+Set-Location C:\Users\hikar\next\stock-analysis
+
+if (git status --porcelain) {
+  Write-Host "中断: 未コミットの変更があります。worktree から見えないので先にコミットしてください。"
+  git status --short
+} else {
+  $pairs = @(
+    @{ Dir = '..\sa-s9';  Branch = 'feat/regression-tests' },
+    @{ Dir = '..\sa-s10'; Branch = 'feat/guide-migration' },
+    @{ Dir = '..\sa-s11'; Branch = 'feat/post-deploy-verify' }
+  )
+  foreach ($p in $pairs) {
+    git worktree add $p.Dir -b $p.Branch
+    if ($?) { Push-Location $p.Dir; npm install; Pop-Location }
+  }
+
+  Write-Host "`n完了。参照文書の存在を確認します:"
+  $docs = @(
+    'AGENTS.md', 'CLAUDE.md', 'NEXT_SESSION.md',
+    'docs/site-improvement-execution-plan.md', 'docs/site-improvement-round3.md'
+  )
+  foreach ($p in $pairs) {
+    $n = ($docs | Where-Object { Test-Path (Join-Path $p.Dir $_) }).Count
+    "  {0} : 5文書中 {1} 個" -f $p.Dir, $n
+  }
+}
+```
+
+**3本とも 5/5 にならなければ投入しないこと。**
 
 ---
 
@@ -344,6 +392,8 @@ docs/site-improvement-round3.md §0 の表にある。
 ---
 
 ## 4. マージと片付けの手順
+
+bash / PowerShell のどちらでもそのまま動く（変数展開を使っていないため）。
 
 ```bash
 # 1. 各 Codex セッションを閉じる（開いたままだと worktree 削除が失敗する）
