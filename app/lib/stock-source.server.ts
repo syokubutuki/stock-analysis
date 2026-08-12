@@ -39,6 +39,134 @@ export function normalizeStockTicker(ticker: string): string | null {
   return yahooSymbolFromTicker(ticker);
 }
 
+interface YahooFundRscPage {
+  isSuccess: boolean;
+  message?: string;
+  response?: YahooFundHistoryResponse["response"];
+}
+
+/**
+ * Yahoo!ファイナンスの投信履歴ページに埋め込まれたRSCのinitialDataを読む暫定経路。
+ * 履歴ページの内部構造に依存するため、通常のBFF経路とは分離し、形は
+ * app/lib/fixtures/yahoo-fund-history-rsc.json に固定している。
+ *
+ * Yahoo!全体でJWTが廃止されたという意味ではない。履歴ページの配信版によって
+ * 旧HTML -> JWT -> BFFの手順が成立しない場合だけ、この経路へ退避する。
+ */
+function parseYahooFundRscPage(source: string): YahooFundRscPage | null {
+  const chunks = Array.from(
+    source.matchAll(/self\.__next_f\.push\(\[1,("(?:\\.|[^"\\])*")\]\)\s*<\/script>/g),
+    (match) => {
+      try {
+        return JSON.parse(match[1]) as string;
+      } catch {
+        return "";
+      }
+    },
+  );
+  const payload = chunks.length > 0 ? chunks.join("") : source;
+  const keyIndex = payload.indexOf('"initialData":');
+  if (keyIndex < 0) return null;
+  const start = payload.indexOf("{", keyIndex);
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < payload.length; index += 1) {
+    const character = payload[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+    } else if (character === "{") {
+      depth += 1;
+    } else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          const data = JSON.parse(payload.slice(start, index + 1)) as YahooFundRscPage;
+          return typeof data.isSuccess === "boolean" ? data : null;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function fundHistoryUrl(
+  pageUrl: string,
+  fromDate: string,
+  toDate: string,
+  page: number,
+): string {
+  const params = new URLSearchParams({ fromDate, toDate, timeFrameId: "d", page: String(page) });
+  return `${pageUrl}?${params}`;
+}
+
+async function fetchFundDataFromRsc(
+  ticker: string,
+  fundName: string,
+  pageUrl: string,
+  fromDate: string,
+  toDate: string,
+  headers: Record<string, string>,
+): Promise<StockData> {
+  const fetchPage = async (page: number): Promise<YahooFundRscPage> => {
+    const response = await fetch(fundHistoryUrl(pageUrl, fromDate, toDate, page), {
+      headers: { ...headers, Accept: "text/x-component", RSC: "1" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new StockSourceError(`Failed to fetch data for ${ticker}`, response.status);
+    }
+    const data = parseYahooFundRscPage(await response.text());
+    if (!data?.isSuccess || !data.response) {
+      throw new StockSourceError(data?.message || "Fund RSC data source error", 502);
+    }
+    return data;
+  };
+
+  const first = await fetchPage(1);
+  const totalPage = first.response?.paging?.totalPage ?? 1;
+  if (totalPage < 1 || totalPage > 200) {
+    throw new StockSourceError("Unexpected fund history page count", 502);
+  }
+
+  const allHistories: YahooFundHistoryItem[] = [
+    ...(first.response?.historyTable?.items ?? []),
+  ];
+  // RSCはBFFより応答が大きい。暫定経路では同時取得数を抑えて配信元への負荷を限定する。
+  const concurrency = 2;
+  for (let start = 2; start <= totalPage; start += concurrency) {
+    const pages = Array.from(
+      { length: Math.min(concurrency, totalPage - start + 1) },
+      (_, index) => start + index,
+    );
+    const responses = await Promise.all(pages.map(fetchPage));
+    for (const response of responses) {
+      allHistories.push(...(response.response?.historyTable?.items ?? []));
+    }
+  }
+
+  const prices = allHistories
+    .map(yahooFundHistoryToPrice)
+    .filter((price): price is PricePoint => price !== null)
+    .sort((a, b) => a.time.localeCompare(b.time));
+  if (prices.length === 0) throw new StockSourceError(`No price data for ${ticker}`, 404);
+  return { ticker, name: fundName, currency: "JPY", prices };
+}
+
 async function fetchFundData(ticker: string, range: StockRange): Promise<StockData> {
   const now = new Date();
   const toDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -56,8 +184,11 @@ async function fetchFundData(ticker: string, range: StockRange): Promise<StockDa
   if (!pageRes.ok) throw new StockSourceError(`Failed to fetch data for ${ticker}`, pageRes.status);
   const html = await pageRes.text();
   const pageData = parseYahooFundPage(html);
-  if (!pageData) throw new StockSourceError("Failed to get fund authentication token", 502);
-  const fundName = pageData.name ?? ticker;
+  const titleName = html.match(/<title[^>]*>([^<]+?)【[^<]+】/)?.[1] ?? null;
+  const fundName = pageData?.name ?? titleName ?? ticker;
+  if (!pageData) {
+    return fetchFundDataFromRsc(ticker, fundName, pageUrl, fromDate, toDate, headers);
+  }
 
   const getSetCookie = (pageRes.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
   const setCookies = getSetCookie?.call(pageRes.headers)
