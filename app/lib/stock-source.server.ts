@@ -39,6 +39,37 @@ export function normalizeStockTicker(ticker: string): string | null {
   return yahooSymbolFromTicker(ticker);
 }
 
+/**
+ * 投信名は `<title>` から取ることがあり、そこはHTMLエスケープされている。
+ * 解かないと「eMAXIS Slim米国株式(S&amp;P500)」がそのまま画面に出る（03311187 で再現）。
+ * JSON由来の名前（priceBoard.name）は元からエスケープされていないので、通しても素通りする。
+ */
+function decodeHtmlEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  };
+  // 実体参照は入れ子で書かれることがある（&amp;lt; → &lt; → <）。&amp; を先に解くと
+  // 二重に解けてしまうため、1回の走査で置換し、繰り返さない。
+  return value.replace(
+    /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([a-zA-Z]+));/g,
+    (match, dec: string | undefined, hex: string | undefined, name: string | undefined) => {
+      // 範囲外のコードポイントで fromCodePoint が例外を投げると価格取得ごと落ちる。
+      // 名前の整形のために取得を失敗させる価値はないので、解けないものは原文のまま返す。
+      const codePoint = dec !== undefined ? Number(dec)
+        : hex !== undefined ? Number.parseInt(hex, 16)
+        : null;
+      if (codePoint !== null) {
+        return codePoint >= 0 && codePoint <= 0x10ffff
+          ? String.fromCodePoint(codePoint)
+          : match;
+      }
+      return name !== undefined && name.toLowerCase() in named
+        ? named[name.toLowerCase()]
+        : match;
+    },
+  );
+}
+
 interface YahooFundRscPage {
   isSuccess: boolean;
   message?: string;
@@ -185,7 +216,8 @@ async function fetchFundData(ticker: string, range: StockRange): Promise<StockDa
   const html = await pageRes.text();
   const pageData = parseYahooFundPage(html);
   const titleName = html.match(/<title[^>]*>([^<]+?)【[^<]+】/)?.[1] ?? null;
-  const fundName = pageData?.name ?? titleName ?? ticker;
+  // JWT経路・RSC経路の両方がこの1本の名前を使うので、解くのはここ1箇所でよい。
+  const fundName = decodeHtmlEntities(pageData?.name ?? titleName ?? ticker);
   if (!pageData) {
     return fetchFundDataFromRsc(ticker, fundName, pageUrl, fromDate, toDate, headers);
   }
