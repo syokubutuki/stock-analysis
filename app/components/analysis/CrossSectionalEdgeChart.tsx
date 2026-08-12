@@ -38,7 +38,7 @@ function Stat({ label, value, tone, sub }: { label: string; value: string; tone?
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -173,7 +173,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         {fetching && <span className="text-blue-600">取得中… {progress.done}/{progress.total}{progress.fromCache > 0 ? `（キャッシュ${progress.fromCache}）` : ""}</span>}
         {!fetching && uniMode !== "watchlist" && (
           <>
-            <span className="text-gray-400">{activeCount}銘柄 読込済</span>
+            <span className="text-fg-muted">{activeCount}銘柄 読込済</span>
             <button
               onClick={() => { forceRef.current = true; setRefreshNonce((n) => n + 1); }}
               className="px-2 py-0.5 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
@@ -185,7 +185,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         )}
       </div>
       {/* キャッシュ状況 */}
-      <div className="flex items-center gap-2 text-[10px] text-gray-400">
+      <div className="flex items-center gap-2 text-[10px] text-fg-muted">
         <span>
           価格キャッシュ(IndexedDB): {cache ? `${cache.count}銘柄` : "—"}
           {cache && cache.newestAt ? `・最終取得 ${new Date(cache.newestAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
@@ -283,7 +283,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
             <select className="border rounded px-1 py-0.5" value={marginKind} onChange={(e) => setMarginKind(e.target.value as MarginKind)}>
               {MARGIN_KIND_ORDER.map((k) => <option key={k} value={k}>{MARGIN_KIND_LABEL[k]}</option>)}
             </select>
-            <span className="text-gray-400">
+            <span className="text-fg-muted">
               買{(resolveMarginRate(marginKind).longRate * 100).toFixed(2)}%/貸株{(resolveMarginRate(marginKind).shortRate * 100).toFixed(2)}%
             </span>
           </label>
@@ -339,10 +339,10 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
           独立ベットは目減りします。
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-gray-700">
-          <div>横断相関 ρ_xs <b>{num2(result.rhoXs)}</b><div className="text-gray-400">1リバラ実効 {result.kEffPerRebalance.toFixed(1)}/{result.avgBreadth.toFixed(0)}銘柄</div></div>
-          <div>時間実効率 <b>{(result.temporalEff * 100).toFixed(0)}%</b><div className="text-gray-400">実効独立リバラ {result.essRebalances.toFixed(0)}/{result.nPeriods}</div></div>
-          <div>年間独立ベット <b>{result.breadthPerYearEff.toFixed(0)}</b><div className="text-gray-400">素朴 {result.breadthPerYear.toFixed(0)} から</div></div>
-          <div>理論IR <b className="text-gray-900">{num2(result.irTheoretical)}→{num2(result.irTheoreticalDiscounted)}</b><div className="text-gray-400">実現グロス {num2(result.sharpeRealizedGross)}</div></div>
+          <div>横断相関 ρ_xs <b>{num2(result.rhoXs)}</b><div className="text-fg-muted">1リバラ実効 {result.kEffPerRebalance.toFixed(1)}/{result.avgBreadth.toFixed(0)}銘柄</div></div>
+          <div>時間実効率 <b>{(result.temporalEff * 100).toFixed(0)}%</b><div className="text-fg-muted">実効独立リバラ {result.essRebalances.toFixed(0)}/{result.nPeriods}</div></div>
+          <div>年間独立ベット <b>{result.breadthPerYearEff.toFixed(0)}</b><div className="text-fg-muted">素朴 {result.breadthPerYear.toFixed(0)} から</div></div>
+          <div>理論IR <b className="text-gray-900">{num2(result.irTheoretical)}→{num2(result.irTheoreticalDiscounted)}</b><div className="text-fg-muted">実現グロス {num2(result.sharpeRealizedGross)}</div></div>
         </div>
         <p className="text-gray-500">
           ディスカウント後の理論IR {num2(result.irTheoreticalDiscounted)} が実現グロス {num2(result.sharpeRealizedGross)} に近いほど、
@@ -403,7 +403,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
             <tbody>
               {result.spans.map((sp) => (
                 <tr key={sp.ticker} className="border-b border-gray-100">
-                  <td className="py-1 px-1.5">{sp.name}<span className="text-gray-400 ml-1">{sp.ticker}</span></td>
+                  <td className="py-1 px-1.5">{sp.name}<span className="text-fg-muted ml-1">{sp.ticker}</span></td>
                   <td className="px-1.5 font-mono text-gray-600">{sp.from}</td>
                   <td className="px-1.5 font-mono text-gray-600">{sp.to}</td>
                   <td className="text-right px-1.5 font-mono">{sp.nBars}</td>

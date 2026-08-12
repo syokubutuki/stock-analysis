@@ -248,12 +248,12 @@ export default function DFAChart({ prices, seriesMode }: Props) {
           }`}>
             {dfa.hurstExponent.toFixed(3)}
           </div>
-          <div className="text-gray-400">{dfa.interpretation}</div>
+          <div className="text-fg-muted">{dfa.interpretation}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">MF-DFA スペクトル幅</div>
           <div className="font-mono font-medium text-sm">{mfdfa.width.toFixed(3)}</div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {mfdfa.width > 0.3 ? "マルチフラクタル性強" : "モノフラクタル寄り"}
           </div>
         </div>

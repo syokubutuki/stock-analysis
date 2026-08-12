@@ -543,7 +543,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
   }, [prices, effEnd, effWinLen, winMode, resizeTick, atomAnalysis, windowAnalysis, clockFixedRange, spectrumFixedRange, drawOverview, drawSpectrum, drawClock, drawAtomYear]);
 
   if (prices.length < 60) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(60営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(60営業日以上必要)。</div>;
   }
 
   const bl = windowAnalysis.bestLong;
@@ -582,11 +582,11 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           </div>
           <span className="text-gray-500">
             <span className="font-mono text-gray-700">{winStartDate}</span> 〜 <span className="font-mono text-gray-700">{winEndDate}</span>
-            <span className="text-gray-400">（{effWinLen.toLocaleString()}本 ≈{(effWinLen / 252).toFixed(1)}年 / {clockSample.totalDays.toLocaleString()}営業日）</span>
-            {isFullWindow && <span className="text-gray-400"> ・全期間</span>}
+            <span className="text-fg-muted">（{effWinLen.toLocaleString()}本 ≈{(effWinLen / 252).toFixed(1)}年 / {clockSample.totalDays.toLocaleString()}営業日）</span>
+            {isFullWindow && <span className="text-fg-muted"> ・全期間</span>}
           </span>
           {winStats && (
-            <span className="text-gray-400">
+            <span className="text-fg-muted">
               窓内 <span className={`font-mono ${colorCls(winStats.ret)}`}>{winStats.ret >= 0 ? "+" : ""}{(winStats.ret * 100).toFixed(1)}%</span>
               {" "}・年率σ <span className="font-mono text-gray-600">{(winStats.vol * 100).toFixed(1)}%</span>
             </span>
@@ -626,7 +626,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             onPointerCancel={onOverviewUp}
           />
         </div>
-        <p className="text-[10px] text-gray-400">
+        <p className="text-[10px] text-fg-muted">
           青い帯＝いま下のスペクトル／週内クロックが集計している期間（原系列の対数スケール）。
           {winMode === "rolling"
             ? "帯をドラッグすると窓ごと平行移動、帯の外をクリックするとその日を中心に移動します。"
@@ -645,7 +645,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
               className="w-full accent-blue-600"
               aria-label="窓長"
             />
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-fg-muted">
               スライダーで窓長を変更（右端は常に最新）。左に動かすほど新しい期間だけで集計し直します。曲線の形が期間で大きく変わる＝そのエッジは不安定。素片×年ヒートマップは全履歴のまま（年次推移を見るため）。
             </p>
           </>
@@ -672,7 +672,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
                 type="button"
                 onClick={() => { setPlaying(false); setWinEnd(prices.length); }}
                 disabled={barsAfter === 0}
-                className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${barsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+                className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${barsAfter === 0 ? "bg-gray-100 text-fg-muted" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}
               >最新へ</button>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
@@ -695,10 +695,10 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
                     style={{ width: `${prices.length > effWinLen ? ((effEnd - effWinLen) / (prices.length - effWinLen)) * 100 : 100}%` }}
                   />
                 </div>
-                <span className="font-mono text-gray-400 tabular-nums">{winEndDate}</span>
+                <span className="font-mono text-fg-muted tabular-nums">{winEndDate}</span>
               </div>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-fg-muted">
               固定した窓長（上のプリセット。<span className="font-medium">1M/2M</span> など短い窓ほど変化が細かく見えます）を保ったまま、<span className="font-medium">▶ 再生</span>で窓の位置を過去→最新へ自動スライドし、曜日リターン（スペクトル・週内クロック）の移り変わりをアニメーションで確認できます。スライダーを掴む／「最新へ」で一時停止（現在は最新から <span className="font-mono">{barsAfter.toLocaleString()}</span> 本前で終了）。素片×年ヒートマップは全履歴のまま。
             </p>
           </>
@@ -749,13 +749,13 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             </>
           )}
           {yFix === "envelope" && (
-            <span className="text-gray-400">
+            <span className="text-fg-muted">
               スペクトル ±{(yEnvelope.spectrum * 100).toFixed(3)}% ／ クロック ±{(yEnvelope.clock * 100).toFixed(3)}%
               （この窓長の全ローリング位置を包む）
             </span>
           )}
           {yFix !== "off" && (
-            <span className="text-gray-400">窓の位置・窓長を動かしても目盛が固定されるので、局面ごとの振幅の大小をそのまま比較できます。</span>
+            <span className="text-fg-muted">窓の位置・窓長を動かしても目盛が固定されるので、局面ごとの振幅の大小をそのまま比較できます。</span>
           )}
         </div>
       </div>
@@ -774,7 +774,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
       <div>
         <div className="text-xs text-gray-500 mb-1">
           週内クロック: 素片を時間順に積み上げた累積平均リターン(谷で買い・山で売り)
-          <span className="text-gray-400">
+          <span className="text-fg-muted">
             {" "}｜対象 {clockSample.totalDays.toLocaleString()} 営業日（各曜日 n={clockSample.minN}〜{clockSample.maxN} 週）から算出
           </span>
           {yFix !== "off" && <span className="text-blue-500">｜縦軸固定 ±{(clockFixedRange! * 100).toFixed(3)}%</span>}
@@ -807,7 +807,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
       <div>
         <div className="text-xs text-gray-500 mb-1">素片 × 年 ヒートマップ: 各素片の平均リターンの年次推移(エッジの持続/減衰)</div>
         <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={atomYearRef} /></div>
-        <p className="text-[10px] text-gray-400 mt-1">緑=プラス/赤=マイナス、濃さ=全セル最大絶対値に対する相対。横に同色が続く素片=持続的なエッジ。1年だけ極端=見かけ倒し。N&lt;2の年は灰色。</p>
+        <p className="text-[10px] text-fg-muted mt-1">緑=プラス/赤=マイナス、濃さ=全セル最大絶対値に対する相対。横に同色が続く素片=持続的なエッジ。1年だけ極端=見かけ倒し。N&lt;2の年は灰色。</p>
       </div>
 
       {/* ===== (B) 戦略ランキング ===== */}
@@ -838,7 +838,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           )}
         </div>
         {!rankingOpen && (
-          <p className="text-[10px] text-gray-400">上のタイトルをクリックすると全戦略のランキング表を表示します。</p>
+          <p className="text-[10px] text-fg-muted">上のタイトルをクリックすると全戦略のランキング表を表示します。</p>
         )}
         {rankingOpen && (<>
         <div className="overflow-x-auto">
@@ -868,12 +868,12 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
                     <td className={`text-right px-1 font-mono ${colorCls(s.annualized)}`}>{pct(s.annualized, 1)}</td>
                     <td className="text-right px-1 font-mono text-gray-700">{s.sharpe.toFixed(2)}</td>
                     <td className="text-right px-1 font-mono text-gray-700">{s.t.toFixed(2)}</td>
-                    <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-gray-400"}`}>{s.pAdj.toFixed(3)}{star(s.pAdj)}</td>
-                    <td className="text-right px-1 font-mono text-gray-600">{Math.round(s.yearsPositive * 100)}%<span className="text-gray-400">({s.nYears})</span></td>
+                    <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{s.pAdj.toFixed(3)}{star(s.pAdj)}</td>
+                    <td className="text-right px-1 font-mono text-gray-600">{Math.round(s.yearsPositive * 100)}%<span className="text-fg-muted">({s.nYears})</span></td>
                     <td className="text-center px-1">{s.halfAgree ? <span className="text-green-600">✓</span> : <span className="text-gray-300">–</span>}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600 whitespace-nowrap">
                       {s.ciLo !== null && s.ciHi !== null
-                        ? <span className={s.ciLo > 0 || s.ciHi < 0 ? "text-blue-600" : "text-gray-400"}>[{pct(s.ciLo, 2)}, {pct(s.ciHi, 2)}]</span>
+                        ? <span className={s.ciLo > 0 || s.ciHi < 0 ? "text-blue-600" : "text-fg-muted"}>[{pct(s.ciLo, 2)}, {pct(s.ciHi, 2)}]</span>
                         : <span className="text-gray-300">–</span>}
                     </td>
                   </tr>
@@ -882,7 +882,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-[10px] text-fg-muted mt-1">
           ブートCIは|t|上位40戦略のみ算出(移動ブロック・ブートストラップ800回)。CIが0をまたがない=平均が頑健に非ゼロ。
         </p>
         </>)}

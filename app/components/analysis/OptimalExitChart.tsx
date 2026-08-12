@@ -241,7 +241,7 @@ export default function OptimalExitChart({ prices }: Props) {
         <h3 className="text-sm font-semibold text-gray-800">
           状態依存の最適手仕舞い：月曜Open建玉後、いつ降りるか
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           ボラ単位の含み損益z×保有日を状態に、後退帰納法で停止方策を解く
         </span>
       </div>
@@ -330,7 +330,7 @@ export default function OptimalExitChart({ prices }: Props) {
             <canvas ref={canvasRef} />
           </div>
 
-          <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+          <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
             {result.nWeeks}週（{result.from}〜{result.to}）。z = 建値からの累積対数リターン ÷ 建玉時の日次σ。
             方策は全データ学習（可視化用）。Sharpe はトレード単位を年率化（×√52）。赤い帯（降りる）は多くの銘柄で
             「zが高く伸びきった後半日」に限られ、大半は緑（金曜まで継続）になります。

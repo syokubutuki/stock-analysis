@@ -208,7 +208,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
               <option key={`e${o.minute}`} value={o.minute}>{o.label}</option>
             ))}
           </select>
-          <span className="text-gray-400 ml-1">この時間帯で建て→手仕舞いした日次リターンを曜日別に集計</span>
+          <span className="text-fg-muted ml-1">この時間帯で建て→手仕舞いした日次リターンを曜日別に集計</span>
         </div>
       )}
 
@@ -283,7 +283,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
                   <option key={r.weekday} value={r.weekday}>{WD_NAMES[r.weekday]}曜（n={r.n}）</option>
                 ))}
               </select>
-              <span className="text-gray-400">この曜日の窓リターンを5分位ビンに分け、原系列のどこに位置するかを表示</span>
+              <span className="text-fg-muted">この曜日の窓リターンを5分位ビンに分け、原系列のどこに位置するかを表示</span>
             </div>
 
             {/* ビン凡例 */}
@@ -294,7 +294,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
                   <span className="text-gray-600">{BIN_LABELS[i]}リターン</span>
                 </span>
               ))}
-              <span className="text-gray-400">（灰=原系列の終値ライン／●=選択曜日の各日をビン色で。ドラッグでパン・ホイールでズーム）</span>
+              <span className="text-fg-muted">（灰=原系列の終値ライン／●=選択曜日の各日をビン色で。ドラッグでパン・ホイールでズーム）</span>
             </div>
 
             <div
@@ -345,12 +345,12 @@ export default function IntradayWindowChart({ ticker }: Props) {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-fg-muted">
                   重心=その分位に入った日の平均日付。時間分布の「集中」はビンが特定期間に固まっている（レジーム依存）サイン、「分散」は全期間に均等＝安定したエッジの可能性。
                 </p>
               </>
             ) : (
-              <p className="text-xs text-gray-400">この曜日・ウィンドウでは有効な約定日がありません。</p>
+              <p className="text-xs text-fg-muted">この曜日・ウィンドウでは有効な約定日がありません。</p>
             )}
             </>
             )}

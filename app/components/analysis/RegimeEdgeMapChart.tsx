@@ -59,7 +59,7 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
   }, [map, metric]);
 
   if (prices.length < 260) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(260営業日以上推奨)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(260営業日以上推奨)。</div>;
   }
 
   return (
@@ -113,15 +113,15 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
           <thead>
             <tr className="text-gray-500 border-b border-gray-200">
               <th className="text-left py-1 px-1.5">シグナル</th>
-              <th className="text-right px-1.5 text-gray-400" title="年間往復回数。高いほどコストに弱い">回転/年</th>
-              <th className="text-right px-1.5 text-gray-400">全体</th>
+              <th className="text-right px-1.5 text-fg-muted" title="年間往復回数。高いほどコストに弱い">回転/年</th>
+              <th className="text-right px-1.5 text-fg-muted">全体</th>
               {map.regimeOrder.map((r, j) => (
                 <th
                   key={r}
                   className={`text-right px-1.5 ${r === map.nowRegime ? "text-blue-600 font-semibold" : ""}`}
                 >
                   {r}
-                  <div className="text-[9px] text-gray-400 font-normal">n={map.regimeCounts[j]}</div>
+                  <div className="text-[9px] text-fg-muted font-normal">n={map.regimeCounts[j]}</div>
                 </th>
               ))}
             </tr>
@@ -131,10 +131,10 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
               <tr key={row.edge.id} className="border-b border-gray-100">
                 <td className="py-1 px-1.5 whitespace-nowrap">
                   <span className="text-gray-700">{row.edge.label}</span>
-                  <span className="text-gray-400 ml-1 text-[10px]">{row.edge.category}</span>
+                  <span className="text-fg-muted ml-1 text-[10px]">{row.edge.category}</span>
                 </td>
                 <td
-                  className={`text-right px-1.5 font-mono ${row.tripsPerYear >= 50 ? "text-amber-700" : "text-gray-400"}`}
+                  className={`text-right px-1.5 font-mono ${row.tripsPerYear >= 50 ? "text-amber-700" : "text-fg-muted"}`}
                   title={deduct ? `建玉日1日あたり −${(row.costPerDay * 100).toFixed(4)}% を控除` : undefined}
                 >
                   {row.tripsPerYear.toFixed(0)}
@@ -164,7 +164,7 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-gray-400">
+      <p className="text-[10px] text-fg-muted">
         緑=プラス/赤=マイナス、濃さ=絶対値。★=FDR補正後p値(**&lt;0.05)。青枠列=現在の局面。セルにマウスでn・勝率・p_adjを表示。
         「全体」列は参考(FDR非対象)。同じシグナルでも局面によって符号・強度が反転することに注目。
       </p>

@@ -269,7 +269,7 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
             ref={phaseCanvasRef}
             className="rounded border border-gray-100"
           />
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-fg-muted mt-1">
             半径=振幅, 角度=位相, 色=時間(青→赤), 赤点=最新
           </div>
         </div>
@@ -329,7 +329,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
     <div className="p-2 bg-gray-50 rounded text-xs">
       <div className="text-gray-500">{label}</div>
       <div className="font-bold text-gray-800">{value}</div>
-      {sub && <div className="text-gray-400">{sub}</div>}
+      {sub && <div className="text-fg-muted">{sub}</div>}
     </div>
   );
 }

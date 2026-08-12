@@ -78,7 +78,7 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
         </div>
       )}
 
-      <div className="text-[11px] text-gray-400">
+      <div className="text-[11px] text-fg-muted">
         検定したトレード型 {result.nTested} 種 / 最小取引数 {result.minTrades}。方向は平均の符号で自動選択（買い=ロング, 売り=ショート）。
       </div>
 

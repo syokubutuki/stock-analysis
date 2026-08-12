@@ -86,7 +86,7 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && resp && !result && (
-        <div className="text-xs text-gray-400">集計できる立会日が不足しています。</div>
+        <div className="text-xs text-fg-muted">集計できる立会日が不足しています。</div>
       )}
 
       {result && (
@@ -96,7 +96,7 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
           <div className="relative"><canvas ref={canvasRef} /></div>
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="月内位置" />
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             実線=平均・破線=中央値。▲=ピーク時刻／▽=ボトム時刻。月末群・月初群が中旬群と形が違えば、
             月替わりのフロー（月末のリバランス売買、月初の資金流入）が日内の値動きに現れているサイン。
             {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
@@ -119,7 +119,7 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
             {showDist && (
             <>
             <div className="text-xs text-gray-600">
-              <span className="text-gray-400">
+              <span className="text-fg-muted">
                 各立会日を月内位置の色（緑=月初/灰=中旬/赤=月末）の●で原系列（日次終値）上にプロット。
                 ホイールでズーム・ドラッグでパン。
               </span>

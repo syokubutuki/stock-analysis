@@ -170,7 +170,7 @@ export default function GarchVarChart({ prices }: Props) {
               <summary className="text-gray-500 cursor-pointer">統計的詳細</summary>
               <div className="mt-1 text-gray-600">
                 <div>Kupiec LR: <span className="font-mono">{result.kupiecTest95.statistic.toFixed(2)}</span></div>
-                <div>p値: <span className="font-mono">{result.kupiecTest95.pValue.toFixed(3)}</span> <span className="text-gray-400">(0.05以上で合格)</span></div>
+                <div>p値: <span className="font-mono">{result.kupiecTest95.pValue.toFixed(3)}</span> <span className="text-fg-muted">(0.05以上で合格)</span></div>
               </div>
             </details>
           </div>
@@ -194,7 +194,7 @@ export default function GarchVarChart({ prices }: Props) {
               <summary className="text-gray-500 cursor-pointer">統計的詳細</summary>
               <div className="mt-1 text-gray-600">
                 <div>Kupiec LR: <span className="font-mono">{result.kupiecTest99.statistic.toFixed(2)}</span></div>
-                <div>p値: <span className="font-mono">{result.kupiecTest99.pValue.toFixed(3)}</span> <span className="text-gray-400">(0.05以上で合格)</span></div>
+                <div>p値: <span className="font-mono">{result.kupiecTest99.pValue.toFixed(3)}</span> <span className="text-fg-muted">(0.05以上で合格)</span></div>
               </div>
             </details>
           </div>

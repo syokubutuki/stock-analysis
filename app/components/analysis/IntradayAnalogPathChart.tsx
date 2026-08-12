@@ -327,7 +327,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-fg-muted">
           候補日が不足しています（60分足を選ぶ／絞り込みを「米国のみ」「無条件」に緩める／リードインを短くする）。
         </div>
       )}
@@ -432,7 +432,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                   ))}
                 </tbody>
               </table>
-              <p className="text-[11px] text-gray-400 mt-2">
+              <p className="text-[11px] text-fg-muted mt-2">
                 {"距離は前日までのK日の形をz化して測った差(小さいほど似ている)。重みは距離カーネルで正規化した集計ウェイト。日付が特定の時期に固まっているなら、それは「似た形」ではなく「同じ相場局面」を選んでいる可能性が高い(近い日どうしは経路も似るため)。"}
               </p>
             </div>
@@ -485,14 +485,14 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">ヌル比較（IC）</div>
                     <div className="font-bold text-gray-800">p = {result.oos.icNullP.toFixed(3)}</div>
-                    <div className="text-[10px] text-gray-400">ヌル平均IC {result.oos.nullIcMean.toFixed(3)}</div>
+                    <div className="text-[10px] text-fg-muted">ヌル平均IC {result.oos.nullIcMean.toFixed(3)}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">損失差（セル − アナログ）</div>
                     <div className={`font-bold ${result.oos.lossMean > 0 ? "text-green-600" : "text-red-600"}`}>
                       {(result.oos.lossMean * 1e4).toFixed(2)}<span className="text-[10px] font-normal">×10⁻⁴</span>
                     </div>
-                    <div className="text-[10px] text-gray-400">p={result.oos.lossP.toFixed(3)}／CI[{(result.oos.lossLo * 1e4).toFixed(2)}, {(result.oos.lossHi * 1e4).toFixed(2)}]</div>
+                    <div className="text-[10px] text-fg-muted">p={result.oos.lossP.toFixed(3)}／CI[{(result.oos.lossLo * 1e4).toFixed(2)}, {(result.oos.lossHi * 1e4).toFixed(2)}]</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">検証期間</div>
@@ -507,7 +507,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="text-xs text-gray-400">OOS検証に必要な日数（有効な予測日20日以上）が足りません。60分足を選び、絞り込みを緩めてください。</div>
+              <div className="text-xs text-fg-muted">OOS検証に必要な日数（有効な予測日20日以上）が足りません。60分足を選び、絞り込みを緩めてください。</div>
             )
           )}
         </>

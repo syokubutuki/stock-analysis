@@ -99,8 +99,8 @@ const RevRow = ({ label, rev }: { label: string; rev: ReversalSplit }) => (
   <div className={`p-2 rounded border text-xs ${rev.reversed ? "border-purple-200 bg-purple-50" : "border-gray-200 bg-gray-50"}`}>
     <div className="text-gray-500">{label}{rev.reversed && <span className="ml-1 text-purple-700 font-bold">反転あり</span>}</div>
     <div className="flex gap-3 mt-0.5">
-      <span>前 <span className={`font-medium ${rev.preMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(rev.preMean)}</span> <span className="text-gray-400">p={rev.preP < 0.001 ? "<.001" : rev.preP.toFixed(3)}</span></span>
-      <span>後 <span className={`font-medium ${rev.postMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(rev.postMean)}</span> <span className="text-gray-400">p={rev.postP < 0.001 ? "<.001" : rev.postP.toFixed(3)}</span></span>
+      <span>前 <span className={`font-medium ${rev.preMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(rev.preMean)}</span> <span className="text-fg-muted">p={rev.preP < 0.001 ? "<.001" : rev.preP.toFixed(3)}</span></span>
+      <span>後 <span className={`font-medium ${rev.postMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(rev.postMean)}</span> <span className="text-fg-muted">p={rev.postP < 0.001 ? "<.001" : rev.postP.toFixed(3)}</span></span>
     </div>
   </div>
 );
@@ -144,7 +144,7 @@ export default function UsDigestionBoundaryChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {result && (
@@ -172,7 +172,7 @@ export default function UsDigestionBoundaryChart({ ticker }: Props) {
               <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5" style={{ backgroundColor: "#4338ca" }} /><span className="text-gray-600">生存率(まだ崩れていない割合)</span></span>
             </div>
             <div className="relative"><canvas ref={hzRef} /></div>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-fg-muted">
               ハザードが低い時間帯＝安全に持てる窓。生存率が急落する時刻より前に利確/手仕舞いするのが定石。
             </p>
           </div>

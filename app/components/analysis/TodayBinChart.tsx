@@ -329,7 +329,7 @@ function OccurrenceTable({ occ }: { occ: Occurrence[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-[11px]">
           <thead>
-            <tr className="text-gray-400 border-b border-gray-200">
+            <tr className="text-fg-muted border-b border-gray-200">
               <th className="text-left px-1.5 py-0.5">日付</th>
               <th className="text-right px-1.5">状態値</th>
               <th className="text-right px-1.5">→ 先行き</th>
@@ -367,7 +367,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
       <div className="overflow-x-auto">
         <table className="w-full text-[11px] text-center">
           <thead>
-            <tr className="text-gray-400">
+            <tr className="text-fg-muted">
               <th className="px-1 py-0.5 text-left font-normal"></th>
               {rows.map((r) => {
                 const isToday = r.dow === todayDow;
@@ -392,7 +392,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
               ))}
             </tr>
             <tr>
-              <td className="px-1 py-0.5 text-left text-gray-400">勝率</td>
+              <td className="px-1 py-0.5 text-left text-fg-muted">勝率</td>
               {rows.map((r) => (
                 <td key={r.dow} className={`px-1 py-0.5 tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""} ${r.n >= 3 ? "text-gray-600" : "text-gray-300"}`}>
                   {r.n >= 3 ? `${(r.winRate * 100).toFixed(0)}%` : "—"}
@@ -400,9 +400,9 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
               ))}
             </tr>
             <tr>
-              <td className="px-1 py-0.5 text-left text-gray-400">n</td>
+              <td className="px-1 py-0.5 text-left text-fg-muted">n</td>
               {rows.map((r) => (
-                <td key={r.dow} className={`px-1 py-0.5 tabular-nums text-gray-400 ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}>{r.n}</td>
+                <td key={r.dow} className={`px-1 py-0.5 tabular-nums text-fg-muted ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}>{r.n}</td>
               ))}
             </tr>
           </tbody>
@@ -507,7 +507,7 @@ export default function TodayBinChart({ prices }: Props) {
             ))}
           </div>
         </div>
-        <p className="text-[11px] text-gray-400 pl-[4.5rem] -mt-1">{stateDesc}</p>
+        <p className="text-[11px] text-fg-muted pl-[4.5rem] -mt-1">{stateDesc}</p>
         <div className="flex items-center gap-2 text-xs flex-wrap">
           <span className="text-gray-500 w-16">分割</span>
           {SCHEMES.map((s) => (
@@ -525,7 +525,7 @@ export default function TodayBinChart({ prices }: Props) {
       </div>
 
       {!res ? (
-        <p className="text-xs text-gray-400">標本が不足しています。</p>
+        <p className="text-xs text-fg-muted">標本が不足しています。</p>
       ) : (
         <>
           {/* ヘッドライン */}
@@ -611,7 +611,7 @@ export default function TodayBinChart({ prices }: Props) {
                 })}
               </tbody>
             </table>
-            <p className="text-[11px] text-gray-400 mt-1">行クリックでそのビンの先行き分布・発生日に切替（青枠=今日の該当ビン）。</p>
+            <p className="text-[11px] text-fg-muted mt-1">行クリックでそのビンの先行き分布・発生日に切替（青枠=今日の該当ビン）。</p>
           </div>
 
           {/* 選択ビンの曜日内訳＋発生日 */}

@@ -58,7 +58,7 @@ function Stat({
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -230,13 +230,13 @@ export default function ParticipationPremiumChart() {
             ))}
           </div>
         </label>
-        {loading && <span className="text-xs text-gray-400">取得中…</span>}
+        {loading && <span className="text-xs text-fg-muted">取得中…</span>}
       </div>
 
       {error && <div className="text-sm text-red-600">{error}</div>}
 
       {!result && !loading && !error && (
-        <div className="py-8 text-center text-gray-400 text-sm">
+        <div className="py-8 text-center text-fg-muted text-sm">
           データが不足しています（10年・日足が必要）。
         </div>
       )}

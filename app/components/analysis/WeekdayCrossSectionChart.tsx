@@ -87,7 +87,7 @@ export default function WeekdayCrossSectionChart({ tickers, pricesByTicker, name
         <h3 className="text-sm font-semibold text-gray-800">
           クロスセクション：銘柄×週プール（横断相関に正直な検出力）
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           {result.nTickers}銘柄 / のべ{result.nObsTotal.toLocaleString()}観測 / {result.from}〜{result.to}
         </span>
       </div>
@@ -172,7 +172,7 @@ export default function WeekdayCrossSectionChart({ tickers, pricesByTicker, name
             {result.weekend.perTicker.map((p) => (
               <span key={p.ticker} className="text-gray-600">
                 {p.name}: <b className={p.mean >= 0 ? "text-blue-700" : "text-red-700"}>{bp(p.mean)}</b>
-                <span className="text-gray-400"> (n={p.n})</span>
+                <span className="text-fg-muted"> (n={p.n})</span>
               </span>
             ))}
           </div>

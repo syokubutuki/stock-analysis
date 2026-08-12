@@ -680,7 +680,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
 
   if (Object.keys(data).length < 2) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-4 text-sm text-gray-400">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 text-sm text-fg-muted">
         効率的フロンティアの描画には2銘柄以上の取得が必要です。
       </div>
     );
@@ -693,7 +693,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
           ▶
         </span>
         <span className="font-semibold text-gray-800">効率的フロンティア・資本市場線(CAPM)</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           {result
             ? `(${result.tickers.length}銘柄 / ${result.nObs}本` +
               (result.lwShrinkage > 0 ? ` / LW δ=${result.lwShrinkage.toFixed(2)}` : "") +
@@ -707,7 +707,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       {open && (
         <div className="mt-4 space-y-4">
           {!result ? (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-fg-muted">
               共通営業日が不足しているか、共分散行列が特異です(銘柄が線形従属の可能性)。銘柄数や期間を見直してください。
             </div>
           ) : (
@@ -753,7 +753,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                     {p.label}
                   </button>
                 ))}
-                <span className="text-gray-400">
+                <span className="text-fg-muted">
                   ● 指数は「単独で持った場合」の位置。雲や接点より左上にあれば分散の余地あり。CML はこの Rf 点から接点(空売り無し)へ引いた線。
                 </span>
               </div>
@@ -787,7 +787,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                   />
                   <span>
                     μ を<strong>算術平均</strong>で最適化
-                    <span className="text-gray-400">（実験・既定オフ・CAPMパネルと共有）</span>
+                    <span className="text-fg-muted">（実験・既定オフ・CAPMパネルと共有）</span>
                   </span>
                 </label>
                 <span className="flex items-center gap-1.5">
@@ -847,7 +847,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                 {showShort && <LineLegend color="#059669" label="効率的フロンティア(空売り可)" />}
                 {showShort && <LineLegend color="#9ca3af" label="非効率枝" dashed />}
                 {showShort && <PointLegend shape="diamond" color="#2563eb" label="GMV(空売り可)" />}
-                <span className="text-gray-400">点群=ランダム配分(色=シャープ比 青低→緑→赤高)</span>
+                <span className="text-fg-muted">点群=ランダム配分(色=シャープ比 青低→緑→赤高)</span>
               </div>
 
               {/* G6: 等高線の読み方（フロンティアの右上端＝最良ではない） */}
@@ -1146,7 +1146,7 @@ function BaselineTable({
     <div className="overflow-x-auto">
       <table className="w-full text-[11px] tabular-nums">
         <thead>
-          <tr className="text-gray-400 text-left border-b border-gray-200">
+          <tr className="text-fg-muted text-left border-b border-gray-200">
             <th className="py-1 pr-2 font-medium">配分則</th>
             <th className="py-1 px-2 font-medium text-right">μ</th>
             <th className="py-1 px-2 font-medium text-right">σ</th>
@@ -1180,7 +1180,7 @@ function BaselineTable({
           })}
         </tbody>
       </table>
-      <p className="text-[10px] text-gray-400 mt-1">
+      <p className="text-[10px] text-fg-muted mt-1">
         在サンプル(過去)での位置。<strong>1/N は理論最適を実運用でしばしば上回る</strong>ため、真の優劣は下のアウトオブサンプル検証で確認を。有効銘柄数=分散が実質何銘柄に効いているか。
         <strong>Sharpe が最良の行と g が最良の行は一致しません</strong>——長期の資産の伸びを決めるのは g のほう(倍化年数 ln2/g)。
         <br />
@@ -1238,7 +1238,7 @@ function WeightTable({
 }) {
   if (!point) {
     return (
-      <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 text-xs text-gray-400">
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 text-xs text-fg-muted">
         <div className="flex items-center gap-1.5 font-medium text-gray-600">
           <ShapeGlyph shape={shape} color={color} />
           {title}
@@ -1257,7 +1257,7 @@ function WeightTable({
         <ShapeGlyph shape={shape} color={color} />
         {title}
       </div>
-      <div className="text-[10px] text-gray-400 mb-2">{subtitle}</div>
+      <div className="text-[10px] text-fg-muted mb-2">{subtitle}</div>
       <div className="flex gap-3 text-[11px] text-gray-600 mb-2 tabular-nums">
         <span>μ {(point.mu * 100).toFixed(1)}%</span>
         <span>σ {(point.sigma * 100).toFixed(1)}%</span>
@@ -1286,7 +1286,7 @@ function WeightTable({
           );
         })}
       </div>
-      <p className="text-[10px] text-gray-400 mt-2">赤=空売り(マイナス比率)。Rf={(riskFree * 100).toFixed(1)}%基準。</p>
+      <p className="text-[10px] text-fg-muted mt-2">赤=空売り(マイナス比率)。Rf={(riskFree * 100).toFixed(1)}%基準。</p>
     </div>
   );
 }

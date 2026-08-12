@@ -50,13 +50,13 @@ export default function StatePredictabilityChart({ prices }: Props) {
                     <span className="text-gray-600 tabular-nums">{(r.hitRate * 100).toFixed(0)}%</span>
                   </div>
                 </td>
-                <td className={`text-right px-2 font-medium ${Math.abs(r.ic) >= 0.1 ? (r.ic > 0 ? "text-green-600" : "text-red-600") : "text-gray-400"}`}>{r.ic.toFixed(3)}</td>
+                <td className={`text-right px-2 font-medium ${Math.abs(r.ic) >= 0.1 ? (r.ic > 0 ? "text-green-600" : "text-red-600") : "text-fg-muted"}`}>{r.ic.toFixed(3)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-gray-400">※予測子＝過去5日リターン、実現＝先5日リターン。IC＝両者の相関（+で順張り/モメンタムが効く、−で逆張りが効く）。</p>
+      <p className="text-[11px] text-fg-muted">※予測子＝過去5日リターン、実現＝先5日リターン。IC＝両者の相関（+で順張り/モメンタムが効く、−で逆張りが効く）。</p>
 
       <AnalysisGuide title="状態別予測可能性の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

@@ -189,7 +189,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
 
   if (aligned.tickers.length < 2) {
     return (
-      <div className="py-8 text-center text-gray-400 text-sm">
+      <div className="py-8 text-center text-fg-muted text-sm">
         共通日付で整列できる銘柄が2つ以上必要です（ウォッチリストに銘柄を追加してください）。
       </div>
     );
@@ -260,7 +260,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
           </span>
         </label>
 
-        <div className="text-[11px] text-gray-400 pb-1">
+        <div className="text-[11px] text-fg-muted pb-1">
           {effSource === "held"
             ? `建玉${decomp.nAssets}銘柄・評価額 ¥${Math.round(totalMV).toLocaleString()}`
             : `全${decomp.nAssets}銘柄を等ウェイト（仮の投下資金100万円で円換算）`}
@@ -289,7 +289,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
             <div className="text-3xl font-bold text-red-700 tabular-nums">
               {decomp.nEff.toFixed(1)} <span className="text-lg">銘柄ぶん</span>
             </div>
-            <div className="text-[10px] text-gray-400">実効銘柄数 N_eff</div>
+            <div className="text-[10px] text-fg-muted">実効銘柄数 N_eff</div>
           </div>
           <div>
             <div className="text-[10px] text-gray-500">
@@ -298,7 +298,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
             <div className="text-3xl font-bold text-red-700 tabular-nums">
               {decomp.taxMultiple.toFixed(1)} <span className="text-lg">倍</span>
             </div>
-            <div className="text-[10px] text-gray-400">ボラティリティ税の倍率 N / N_eff</div>
+            <div className="text-[10px] text-fg-muted">ボラティリティ税の倍率 N / N_eff</div>
           </div>
           <div>
             <div className="text-[10px] text-gray-500">2倍になるのが遅れる年数</div>
@@ -310,10 +310,10 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
               ) : isFinite(decomp.doublingYearsNoCorr) ? (
                 <span className="text-xl">永遠に来ない</span>
               ) : (
-                <span className="text-xl text-gray-400">—</span>
+                <span className="text-xl text-fg-muted">—</span>
               )}
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[10px] text-fg-muted">
               倍化年数 ln2/g の差（相関ゼロとの比較）
             </div>
           </div>
@@ -322,14 +322,14 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
             <div className="text-2xl font-bold text-gray-700 tabular-nums">
               {decomp.hiddenLev.toFixed(2)} <span className="text-base">倍</span>
             </div>
-            <div className="text-[10px] text-gray-400">隠れレバレッジ √(N/N_eff)</div>
+            <div className="text-[10px] text-fg-muted">隠れレバレッジ √(N/N_eff)</div>
           </div>
           <div>
             <div className="text-[10px] text-gray-500">銘柄どうしの「似かた」の平均</div>
             <div className="text-2xl font-bold text-gray-700 tabular-nums">
               {decomp.avgCorr.toFixed(2)}
             </div>
-            <div className="text-[10px] text-gray-400">平均相関 ρ</div>
+            <div className="text-[10px] text-fg-muted">平均相関 ρ</div>
           </div>
         </div>
 
@@ -525,9 +525,9 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
                     className={`border-b border-gray-100 ${r.isPeak ? "bg-amber-50" : ""}`}
                   >
                     <td className="py-1.5 px-2 whitespace-nowrap">
-                      <span className="text-gray-400">{i + 1}.</span>{" "}
+                      <span className="text-fg-muted">{i + 1}.</span>{" "}
                       <span className="text-gray-800">{r.ticker}</span>{" "}
-                      <span className="text-gray-400">{r.name}</span>
+                      <span className="text-fg-muted">{r.name}</span>
                     </td>
                     <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">
                       {isNaN(r.corrToPrev) ? "—" : r.corrToPrev.toFixed(2)}
@@ -645,19 +645,19 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
                   <th className="text-left py-1 px-2 font-medium"> </th>
                   <th className="text-right py-1 px-2 font-medium">
                     出発点：1銘柄に集中
-                    <div className="font-normal text-gray-400">
+                    <div className="font-normal text-fg-muted">
                       {manYen(capital)}を{splitAdd.soloTicker}だけに
                     </div>
                   </th>
                   <th className="text-right py-1 px-2 font-medium text-green-700">
                     A: 分割
-                    <div className="font-normal text-gray-400">
+                    <div className="font-normal text-fg-muted">
                       {manYen(capital)}を{splitAdd.n}分割
                     </div>
                   </th>
                   <th className="text-right py-1 px-2 font-medium text-red-700">
                     B: 追加
-                    <div className="font-normal text-gray-400">
+                    <div className="font-normal text-fg-muted">
                       各銘柄に{manYen(capital)}ずつ
                     </div>
                   </th>
@@ -668,7 +668,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
                   <td className="py-1.5 px-2 text-gray-600">総建玉</td>
                   <td className="py-1.5 px-2 text-right tabular-nums">100%</td>
                   <td className="py-1.5 px-2 text-right tabular-nums">
-                    100%<span className="text-gray-400">（不変）</span>
+                    100%<span className="text-fg-muted">（不変）</span>
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-red-700 font-semibold">
                     {(splitAdd.add.exposure * 100).toFixed(0)}%
@@ -681,7 +681,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums">
                     {pct(splitAdd.split.expected)}
-                    <span className="text-gray-400">（ほぼ不変）</span>
+                    <span className="text-fg-muted">（ほぼ不変）</span>
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-blue-700">
                     {pct(splitAdd.add.expected)}{" "}

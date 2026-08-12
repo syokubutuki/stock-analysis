@@ -181,7 +181,7 @@ export default function StrategyCharts({ features, sim, mode }: Props) {
   }, [features, sim, mode]);
 
   if (features.length < 2) {
-    return <div className="text-sm text-gray-400 py-8 text-center">特徴量を計算中、またはデータ不足です。</div>;
+    return <div className="text-sm text-fg-muted py-8 text-center">特徴量を計算中、またはデータ不足です。</div>;
   }
 
   return (

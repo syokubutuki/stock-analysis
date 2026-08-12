@@ -243,10 +243,10 @@ export default function UsBinEventStudyChart({ prices }: Props) {
         </label>
       </div>
 
-      {loading && <div className="text-sm text-gray-400 py-8 text-center">米国指数を取得中...</div>}
+      {loading && <div className="text-sm text-fg-muted py-8 text-center">米国指数を取得中...</div>}
       {error && <div className="bg-amber-50 text-amber-700 rounded-lg p-3 text-sm">{error}</div>}
       {!loading && !error && !result && (
-        <div className="text-xs text-gray-400">イベント日が不足しています（期間を広げる／ビンを粗くする）。</div>
+        <div className="text-xs text-fg-muted">イベント日が不足しています（期間を広げる／ビンを粗くする）。</div>
       )}
 
       {result && (
@@ -331,7 +331,7 @@ export default function UsBinEventStudyChart({ prices }: Props) {
         </>
       )}
 
-      <p className="text-xs text-gray-400 leading-relaxed">
+      <p className="text-xs text-fg-muted leading-relaxed">
         {"※ イベント窓(2K+1日)はイベント間隔より長いため窓どうしが重なる。CIは通常の標準誤差ではなくイベント列のブロック・ブートストラップで作っている（重なりが生む相関を保存するため）。それでも重なりの影響は完全には除けない。"}
       </p>
 

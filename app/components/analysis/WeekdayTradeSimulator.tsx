@@ -541,7 +541,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
       <div className="border border-emerald-100 rounded-lg p-3 bg-emerald-50/30">
         <div className="text-sm font-medium text-gray-700 mb-2">
           曜日トレード・シミュレータ
-          <span className="text-xs font-normal text-gray-400">（初期表示＝買+売を組合せた最大リターンの週内プラン。任意の曜日・注文タイミングで売買を編集でき、連結モードで複数レグを1本に繋いでB&Hと公平比較）</span>
+          <span className="text-xs font-normal text-fg-muted">（初期表示＝買+売を組合せた最大リターンの週内プラン。任意の曜日・注文タイミングで売買を編集でき、連結モードで複数レグを1本に繋いでB&Hと公平比較）</span>
         </div>
 
         {/* 評価方法 + 算出/学習期間 */}
@@ -570,10 +570,10 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
             )}
             <span className="text-gray-500">
               {isWF
-                ? <><span className="font-mono text-gray-700">{effFitLen.toLocaleString()}</span>本 ≈{(effFitLen / 252).toFixed(1)}年 を各週の学習に使用{isFullFit && <span className="text-gray-400"> ・全期間</span>}</>
+                ? <><span className="font-mono text-gray-700">{effFitLen.toLocaleString()}</span>本 ≈{(effFitLen / 252).toFixed(1)}年 を各週の学習に使用{isFullFit && <span className="text-fg-muted"> ・全期間</span>}</>
                 : <><span className="font-mono text-gray-700">{fitStartDate}</span> 〜 <span className="font-mono text-gray-700">{fitEndDate}</span>
-                    <span className="text-gray-400">（{effFitLen.toLocaleString()}本 ≈{(effFitLen / 252).toFixed(1)}年）</span>
-                    {isFullFit && <span className="text-gray-400"> ・全期間</span>}</>}
+                    <span className="text-fg-muted">（{effFitLen.toLocaleString()}本 ≈{(effFitLen / 252).toFixed(1)}年）</span>
+                    {isFullFit && <span className="text-fg-muted"> ・全期間</span>}</>}
             </span>
           </div>
 
@@ -600,9 +600,9 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                   onChange={(e) => setFitEnd(Number(e.target.value))}
                   className="w-full accent-emerald-600" aria-label="窓の位置(右端)" />
                 <button type="button" onClick={() => setFitEnd(prices.length)} disabled={fitBarsAfter === 0}
-                  className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${fitBarsAfter === 0 ? "bg-gray-100 text-gray-400" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>最新へ</button>
+                  className={`px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap ${fitBarsAfter === 0 ? "bg-gray-100 text-fg-muted" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>最新へ</button>
               </div>
-              <p className="text-[10px] text-gray-400">窓長を固定したまま、スライダーで<span className="font-medium">窓の位置</span>を過去↔最新へ動かします（現在は最新から <span className="font-mono">{fitBarsAfter.toLocaleString()}</span> 本前で終了）。同じ窓長で位置だけずらして、★最適プランがどの時期に現れ・消えたかを確認できます。</p>
+              <p className="text-[10px] text-fg-muted">窓長を固定したまま、スライダーで<span className="font-medium">窓の位置</span>を過去↔最新へ動かします（現在は最新から <span className="font-mono">{fitBarsAfter.toLocaleString()}</span> 本前で終了）。同じ窓長で位置だけずらして、★最適プランがどの時期に現れ・消えたかを確認できます。</p>
             </>
           ) : (
             <>
@@ -610,7 +610,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               <input type="range" min={60} max={prices.length} step={1} value={effFitLen}
                 onChange={(e) => { setFitLen(Number(e.target.value)); setFitEnd(prices.length); }}
                 className="w-full accent-emerald-600" aria-label={isWF ? "学習ルックバック窓長" : "窓長"} />
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-fg-muted">
                 {isWF
                   ? <>スライダーで<span className="font-medium">学習ルックバック窓長 L</span> を変更。各週この本数だけ遡って最適プランを組み直します。短い窓ほど直近の癖に素早く追随し、長い窓ほど安定します。</>
                   : <>スライダーで窓長を変更（右端は常に最新）。左に動かすほど新しい期間だけで★最適プランを組み直します。</>}
@@ -619,7 +619,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
           )}
 
           {/* 評価方法の説明 */}
-          <div className="border-t border-emerald-100 pt-1.5 text-[10px] text-gray-400">
+          <div className="border-t border-emerald-100 pt-1.5 text-[10px] text-fg-muted">
             {evalMode === "full" && (
               <>窓で選んだ<span className="font-medium">単一の最適プラン</span>を<span className="font-medium">全履歴</span>で評価（算出窓の外＝アウトオブサンプル）。過剰適合の頑健性チェック。
                 {specsTouched && <span className="text-amber-700"> ※現在は手動編集プランを評価中（算出期間は★最適プランの参考表示）。</span>}</>
@@ -639,7 +639,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
         {/* builder */}
         <div className="flex flex-wrap items-end gap-2 mb-2 text-[11px]">
           <div>
-            <div className="text-gray-400 mb-0.5">エントリー</div>
+            <div className="text-fg-muted mb-0.5">エントリー</div>
             <div className="flex gap-1">
               <select value={builder.entryDow} onChange={e => setBuilder(b => ({ ...b, entryDow: Number(e.target.value) }))} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
                 {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{DOW_LABELS[d]}</option>)}
@@ -652,7 +652,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
           </div>
           <div className="text-gray-400 pb-1">→</div>
           <div>
-            <div className="text-gray-400 mb-0.5">エグジット</div>
+            <div className="text-fg-muted mb-0.5">エグジット</div>
             <div className="flex gap-1">
               <select value={builder.exitDow} onChange={e => setBuilder(b => ({ ...b, exitDow: Number(e.target.value) }))} className="border border-gray-200 rounded px-1 py-0.5 bg-white">
                 {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{DOW_LABELS[d]}</option>)}
@@ -664,7 +664,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
             </div>
           </div>
           <div>
-            <div className="text-gray-400 mb-0.5">方向</div>
+            <div className="text-fg-muted mb-0.5">方向</div>
             <div className="flex gap-1">
               {(["long", "short"] as Side[]).map(sd => (
                 <button key={sd} onClick={() => setBuilder(b => ({ ...b, side: sd }))} className={`px-2 py-0.5 rounded transition-colors ${builder.side === sd ? (sd === "long" ? "bg-blue-600 text-white" : "bg-rose-600 text-white") : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>
@@ -699,7 +699,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               <button onClick={() => removeSpec(i)} className="text-gray-400 hover:text-gray-700 leading-none">×</button>
             </span>
           ))}
-          {specs.length === 0 && <span className="text-[11px] text-gray-400">戦略を「比較に追加」してください</span>}
+          {specs.length === 0 && <span className="text-[11px] text-fg-muted">戦略を「比較に追加」してください</span>}
           {specsTouched && (
             <button onClick={restoreOptimal} className="ml-1 px-2 py-0.5 text-[11px] rounded bg-amber-600 text-white hover:bg-amber-700" title="手動編集を破棄し、買+売の最大リターン組合せを再表示">★ 最適プランに戻す</button>
           )}
@@ -729,7 +729,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
             </button>
           </div>
 
-          {floorLoading && !floorOk && <div className="mt-1 text-gray-400">床を計算中…</div>}
+          {floorLoading && !floorOk && <div className="mt-1 text-fg-muted">床を計算中…</div>}
           {!floorLoading && !floorOk && (
             <div className="mt-1 text-gray-500">
               算出期間が短く床を測れません（12週以上必要）。窓長を広げてください。
@@ -787,7 +787,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               <span className="text-gray-400 text-[10px] w-3 inline-block">{showRanking ? "▼" : "▶"}</span>
               ロング戦略ランキング
             </button>
-            <span className="text-[11px] text-gray-400">全{longRanking.length}通り(注文4×曜日ペア25, 取引3未満は除外)を{RANK_METRIC_LABELS[rankMetric]}の高い順に</span>
+            <span className="text-[11px] text-fg-muted">全{longRanking.length}通り(注文4×曜日ペア25, 取引3未満は除外)を{RANK_METRIC_LABELS[rankMetric]}の高い順に</span>
             {showRanking && (
               <div className="flex flex-wrap gap-1 ml-auto">
                 {(Object.keys(RANK_METRIC_LABELS) as RankMetric[]).map(k => (
@@ -797,7 +797,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
             )}
           </div>
           {!showRanking ? null : longRanking.length === 0 ? (
-            <div className="text-[11px] text-gray-400 py-1">成立する戦略がありません(データ不足)。</div>
+            <div className="text-[11px] text-fg-muted py-1">成立する戦略がありません(データ不足)。</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
@@ -854,7 +854,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
           {planMode && (
             <>
               <div className="flex items-center gap-1">
-                <span className="text-gray-400">レグ間の隙間:</span>
+                <span className="text-fg-muted">レグ間の隙間:</span>
                 {(["cash", "hold"] as PlanGapFill[]).map(g => (
                   <button key={g} onClick={() => setGapFill(g)} className={`px-2 py-0.5 rounded transition-colors ${gapFill === g ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>
                     {g === "cash" ? "現金(ノーポジ)" : "ロング保有"}
@@ -880,7 +880,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               <span className="inline-block w-4 h-0.5" style={{ backgroundColor: s.color }} />{s.label}
             </span>
           ))}
-          <span className="text-[11px] text-gray-400 ml-auto">ホイールでズーム・ドラッグでパン。折れ線の各頂点＝1トレードの決済日。十字線で日付を確認できる。</span>
+          <span className="text-[11px] text-fg-muted ml-auto">ホイールでズーム・ドラッグでパン。折れ線の各頂点＝1トレードの決済日。十字線で日付を確認できる。</span>
         </div>
         <div ref={equityContainerRef} className="w-full rounded border border-gray-100 bg-white overflow-hidden" />
 
@@ -911,8 +911,8 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                     <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.annualized)}`}>{pct2(walkForward.annualized)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{walkForward.sharpe.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(walkForward.maxDD)}</td>
-                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
-                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(walkForward.exposure)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.exposure > 0 ? walkForward.totalReturn / walkForward.exposure : 0)}`}>{walkForward.exposure > 0 ? pct2(walkForward.totalReturn / walkForward.exposure) : "-"}</td>
                   </tr>
@@ -925,8 +925,8 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                     <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.annualized)}`}>{pct2(planResult.annualized)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{planResult.sharpe.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(planResult.maxDD)}</td>
-                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
-                    <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
+                    <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(planResult.exposure)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.exposure > 0 ? planResult.totalReturn / planResult.exposure : 0)}`}>{planResult.exposure > 0 ? pct2(planResult.totalReturn / planResult.exposure) : "-"}</td>
                   </tr>
@@ -947,13 +947,13 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                 ))}
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <td className="py-1 px-2 font-medium text-gray-500">バイ&ホールド</td>
-                  <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                  <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                   <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}>{pct2(bhMetrics.totalReturn)}</td>
                   <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.annualized)}`}>{pct2(bhMetrics.annualized)}</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">{bhMetrics.sharpe.toFixed(2)}</td>
                   <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(bhMetrics.maxDD)}</td>
-                  <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
-                  <td className="py-1 px-2 text-center font-mono text-gray-400">-</td>
+                  <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
+                  <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">100%</td>
                   <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}>{pct2(bhMetrics.totalReturn)}</td>
                 </tr>
@@ -988,11 +988,11 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
             <span className="text-xs text-gray-500">全組合せヒートマップ（注文タイミング4通り）</span>
             <span className="text-[11px] inline-flex items-center gap-1 rounded bg-gray-50 border border-gray-200 px-1.5 py-0.5">
               <span className="font-semibold text-blue-700">縦↓＝エントリー(建て)曜日</span>
-              <span className="text-gray-400">×</span>
+              <span className="text-fg-muted">×</span>
               <span className="font-semibold text-amber-700">横→＝エグジット(手仕舞い)曜日</span>
             </span>
             <span className="text-[11px] text-emerald-700">セルをクリックで{builder.side === "long" ? "ロング" : "ショート"}戦略を比較に追加</span>
-            {matrixMetric === "perDay" && <span className="text-[11px] text-gray-400">日当たりは bp(=0.01%)表示</span>}
+            {matrixMetric === "perDay" && <span className="text-[11px] text-fg-muted">日当たりは bp(=0.01%)表示</span>}
             <div className="flex gap-1 ml-auto">
               {([["perDay", "日当たり"], ["total", "総リターン"], ["sharpe", "Sharpe"], ["winRate", "勝率"]] as [MatrixMetric, string][]).map(([k, l]) => (
                 <button key={k} onClick={() => setMatrixMetric(k)} className={`px-2 py-0.5 text-[11px] rounded transition-colors ${matrixMetric === k ? "bg-emerald-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"}`}>{l}</button>
@@ -1026,7 +1026,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               </ul>
             </li>
           </ul>
-          <p className="text-[11px] text-gray-400">※ これは<span className="font-medium">過去データ上で</span>最大リターンになる後知恵の組合せ。多数スロットの符号を過去に最適化するため<span className="font-medium">過剰適合(オーバーフィット)</span>しやすく、将来もそのまま効く保証はない点に注意(下の注意点も参照)。</p>
+          <p className="text-[11px] text-fg-muted">※ これは<span className="font-medium">過去データ上で</span>最大リターンになる後知恵の組合せ。多数スロットの符号を過去に最適化するため<span className="font-medium">過剰適合(オーバーフィット)</span>しやすく、将来もそのまま効く保証はない点に注意(下の注意点も参照)。</p>
 
           <p className="font-medium text-gray-700 mt-3">連結モード（複数レグを週内で1本に繋ぐ）</p>
           <p>B&Hに累積で勝つには滞在率を上げる必要があります。連結モードは登録した戦略を<span className="font-medium">週内のレグ</span>とみなし、1本の資金ストリームに連結します。内部実装は<span className="font-medium">セグメント×ポジションベクトル方式</span>:</p>

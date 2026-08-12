@@ -196,10 +196,10 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
                 <span className="inline-flex items-center gap-1">
                   <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: b.color }} />
                   {b.label}
-                  <span className={isSel ? "text-gray-300" : "text-gray-400"}>(n={b.n})</span>
+                  <span className={isSel ? "text-gray-300" : "text-fg-muted"}>(n={b.n})</span>
                   {isToday && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今</span>}
                 </span>
-                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-gray-400"}`}>
+                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-fg-muted"}`}>
                   {fmtBinRange(b.rangeLo, b.rangeHi)}
                 </span>
               </button>
@@ -242,7 +242,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">該当する立会日が不足しています（絞り込みを緩めるか60分足を選択）。</div>
+        <div className="text-xs text-fg-muted">該当する立会日が不足しています（絞り込みを緩めるか60分足を選択）。</div>
       )}
 
       {result && selInfo && (
@@ -283,7 +283,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
           )}
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="曜日" />
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             選んだ前夜米国ビンに絞った上での曜日別パス。ビンを切り替えて、同じ曜日の形がビン間で反転・強弱するか（交互作用）を見る。
             例: 金曜は米大幅高なら継続・米大幅安ならフェード、など地合いの強さ依存の曜日癖を切り分ける。
             {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
@@ -305,7 +305,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
             </button>
             {showDist && (
               <>
-                <div className="text-xs text-gray-400">絞り込み後の各立会日を曜日色●で原系列上にプロット。ホイールでズーム・ドラッグでパン。</div>
+                <div className="text-xs text-fg-muted">絞り込み後の各立会日を曜日色●で原系列上にプロット。ホイールでズーム・ドラッグでパン。</div>
                 <PathLegend stats={result.bins} withN={false} />
                 <PathTimeline days={timelineDays} colorOf={colorOf} />
               </>

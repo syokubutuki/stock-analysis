@@ -67,7 +67,7 @@ export default function UsLeadLagChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {result && (
@@ -85,7 +85,7 @@ export default function UsLeadLagChart({ ticker }: Props) {
           </div>
 
           <div className="relative"><canvas ref={canvasRef} /></div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             限界相関が寄り(寄付〜寄り直後)で高く、その後0へ落ちるほど「米国は寄りで吸収」。日中まで正のままなら「米国順張りが日中も有効」。
             累積相関が寄付から伸びず横ばいなら、米国の影響は寄りギャップで完結している。
           </p>

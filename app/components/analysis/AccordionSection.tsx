@@ -50,7 +50,7 @@ export default function AccordionSection({
     <>
       {/* ツールバー: 一括開閉 */}
       <div className="flex flex-wrap items-center gap-2 bg-white rounded-lg border border-gray-200 px-3 py-2">
-        <span className="text-xs text-gray-400 mr-auto">
+        <span className="text-xs text-fg-muted mr-auto">
           {total}件
           {locked > 0 && (
             <span className="ml-2 text-amber-600">（うち {locked} 件は Pro）</span>

@@ -368,9 +368,9 @@ export default function MondayGapChart({ prices }: Props) {
         <div className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <CondSelect value={condKey} onChange={setCondKey} label="説明変数:" usMissing={usMissing} />
-            <span className="text-[11px] text-gray-400">{condDef(condKey)?.desc}</span>
+            <span className="text-[11px] text-fg-muted">{condDef(condKey)?.desc}</span>
           </div>
-          {!cond && <div className="text-xs text-gray-400">標本が不足しています(分割数を減らすか文脈フィルタを緩めてください)。</div>}
+          {!cond && <div className="text-xs text-fg-muted">標本が不足しています(分割数を減らすか文脈フィルタを緩めてください)。</div>}
           {cond && (
             <>
               <div className="text-[11px] text-gray-500">
@@ -424,12 +424,12 @@ export default function MondayGapChart({ prices }: Props) {
               ))}
             </div>
           </div>
-          {!heat && <div className="text-xs text-gray-400">標本が不足しています(分割数を減らすか文脈を緩めてください)。US系は前夜米国データが必要です。</div>}
+          {!heat && <div className="text-xs text-fg-muted">標本が不足しています(分割数を減らすか文脈を緩めてください)。US系は前夜米国データが必要です。</div>}
           {heat && (
             <>
               <div className="text-[11px] text-gray-500">セル値={heatMetric === "neg" ? "下寄り率(赤=高)" : isRate ? "窓埋め達成率" : "月曜目的変数の平均(緑=上/赤=下)"}・★=FDR有意・青枠=直近条件の該当セル。</div>
               <canvas ref={heatRef} />
-              <p className="text-[11px] text-gray-400">2要因の掛け合わせで初めて現れるエッジを見る。推奨: X=前夜米国／Y=金曜引けの勢い。米国を統制した上での金曜経路の効き(列内の縦の変化)に注目。</p>
+              <p className="text-[11px] text-fg-muted">2要因の掛け合わせで初めて現れるエッジを見る。推奨: X=前夜米国／Y=金曜引けの勢い。米国を統制した上での金曜経路の効き(列内の縦の変化)に注目。</p>
             </>
           )}
         </div>
@@ -439,7 +439,7 @@ export default function MondayGapChart({ prices }: Props) {
       {view === "scatter" && (
         <div className="space-y-3">
           <CondSelect value={condKey} onChange={setCondKey} label="説明変数(X):" usMissing={usMissing} />
-          {!scatter && <div className="text-xs text-gray-400">標本が不足しています。</div>}
+          {!scatter && <div className="text-xs text-fg-muted">標本が不足しています。</div>}
           {scatter && (
             <>
               <div className="text-[11px] text-gray-500">
@@ -447,7 +447,7 @@ export default function MondayGapChart({ prices }: Props) {
                 {scatter.reg && <> 回帰: y={pctText(scatter.reg.alpha, 2)}{scatter.reg.beta >= 0 ? " + " : " − "}{Math.abs(scatter.reg.beta).toFixed(3)}·x｜r={scatter.reg.corr.toFixed(3)}・β p={scatter.reg.pBeta < 0.001 ? "<.001" : scatter.reg.pBeta.toFixed(3)}・βの95%CI [{scatter.betaCI.lo.toFixed(3)}, {scatter.betaCI.hi.toFixed(3)}]</>}
               </div>
               <canvas ref={scatRef} />
-              <p className="text-[11px] text-gray-400">傾きβが負なら「その変数が高いほど月曜は下げやすい」。前夜米国の色分けで、同じXでも米国次第で上下が割れる(交絡)かを目視できる。</p>
+              <p className="text-[11px] text-fg-muted">傾きβが負なら「その変数が高いほど月曜は下げやすい」。前夜米国の色分けで、同じXでも米国次第で上下が割れる(交絡)かを目視できる。</p>
             </>
           )}
         </div>
@@ -456,12 +456,12 @@ export default function MondayGapChart({ prices }: Props) {
       {/* ④ 木金ベクトル */}
       {view === "quiver" && (
         <div className="space-y-3">
-          {!quiver && <div className="text-xs text-gray-400">標本が不足しています。</div>}
+          {!quiver && <div className="text-xs text-fg-muted">標本が不足しています。</div>}
           {quiver && (
             <>
               <div className="text-[11px] text-gray-500">位置=(木曜リターン, 金曜リターン)、色/大きさ={td.label}(緑=上/赤=下、大きいほど強い)。前週末2日の値動きベクトルがどの象限のとき月曜が下げるかを見る。</div>
               <canvas ref={quivRef} />
-              <p className="text-[11px] text-gray-400">例: 「木↓金↓(左下)」に赤(下寄り)が集まれば、下落継続後の月曜は窓を開けて下げやすい。「木↓金↑(左上)」でリバウンド後の月曜が反落するか等、経路の形と月曜の関係を象限で読む。</p>
+              <p className="text-[11px] text-fg-muted">例: 「木↓金↓(左下)」に赤(下寄り)が集まれば、下落継続後の月曜は窓を開けて下げやすい。「木↓金↑(左上)」でリバウンド後の月曜が反落するか等、経路の形と月曜の関係を象限で読む。</p>
             </>
           )}
         </div>
@@ -471,7 +471,7 @@ export default function MondayGapChart({ prices }: Props) {
       {view === "driver" && (
         <div className="space-y-3">
           <div className="text-[11px] text-gray-500">各説明変数と{td.label}の相関(棒)を強い順に。★=FDR有意。黒縦棒=前夜米国を統制した偏相関(米国という交絡を除いても残る効きか)。</div>
-          {drivers.length === 0 ? <div className="text-xs text-gray-400">標本が不足しています。</div> : (
+          {drivers.length === 0 ? <div className="text-xs text-fg-muted">標本が不足しています。</div> : (
             <>
               <canvas ref={drivRef} />
               <div className="overflow-x-auto">
@@ -480,7 +480,7 @@ export default function MondayGapChart({ prices }: Props) {
                   <tbody>
                     {drivers.map((r) => (
                       <tr key={r.key} className="border-b border-gray-100">
-                        <td className="py-1 px-2">{r.label}{r.needsUs && <span className="text-gray-400"> (米)</span>}</td>
+                        <td className="py-1 px-2">{r.label}{r.needsUs && <span className="text-fg-muted"> (米)</span>}</td>
                         <td className="text-right px-2 tabular-nums">{r.n}</td>
                         <td className={`text-right px-2 tabular-nums font-medium ${r.corr >= 0 ? "text-green-700" : "text-red-700"}`}>{r.corr.toFixed(3)}</td>
                         <td className="text-right px-2 tabular-nums text-gray-600">{r.partialCorr === null ? "—" : r.partialCorr.toFixed(3)}</td>

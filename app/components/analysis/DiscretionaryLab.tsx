@@ -33,7 +33,7 @@ import AnalysisGuide from "./AnalysisGuide";
 const DiscretionaryChart = dynamic(() => import("./DiscretionaryChart"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[400px] bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400">
+    <div className="w-full h-[400px] bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-fg-muted">
       チャート読み込み中...
     </div>
   ),
@@ -321,7 +321,7 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
             ))}
           </div>
         )}
-        {loadInfo && <p className="text-[11px] text-gray-400 mt-2">{loadInfo}</p>}
+        {loadInfo && <p className="text-[11px] text-fg-muted mt-2">{loadInfo}</p>}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -349,14 +349,14 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
             selectedDate={selectedDate}
             onDateClick={handleDateClick}
           />
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-fg-muted">
             チャートをクリックして日付を選択 → 右の売買ボタンで取引。灰=株価(右軸)、青=放置、橙=あなた(左軸)。
           </p>
           {/* 売買履歴 */}
           {state.trades.length > 0 && (
             <div className="bg-white rounded-lg border border-gray-200 p-3 max-h-48 overflow-auto">
               <table className="w-full text-xs">
-                <thead className="text-gray-400">
+                <thead className="text-fg-muted">
                   <tr>
                     <th className="text-left">日付</th>
                     <th className="text-left">売買</th>
@@ -392,7 +392,7 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
               <h3 className="font-bold">売買パネル</h3>
               <button
                 onClick={handleReset}
-                className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 rounded px-2 py-1"
+                className="text-xs text-fg-muted hover:text-red-500 border border-gray-200 rounded px-2 py-1"
               >
                 取引クリア
               </button>
@@ -407,7 +407,7 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
                 </span>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-lg p-2 text-sm text-gray-400">
+              <div className="bg-gray-50 rounded-lg p-2 text-sm text-fg-muted">
                 チャートをクリックして日付を選択
               </div>
             )}
@@ -511,7 +511,7 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
               </div>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-xl p-4 text-center text-gray-400 text-sm">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 text-center text-fg-muted text-sm">
               売買を行うとBuy &amp; Holdとの比較が表示されます
             </div>
           )}

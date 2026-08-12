@@ -149,7 +149,7 @@ export default function RegimeTechnicalChart({ prices }: Props) {
       <h3 className="font-bold text-gray-800">レジーム別テクニカル指標有効性</h3>
 
       {results.length === 0 ? (
-        <div className="text-sm text-gray-400">データが不足しています (最低60日必要)</div>
+        <div className="text-sm text-fg-muted">データが不足しています (最低60日必要)</div>
       ) : (
         <>
           {/* レジーム概要カード */}
@@ -198,9 +198,9 @@ export default function RegimeTechnicalChart({ prices }: Props) {
                   <th className="py-1 px-2"></th>
                   {results.map((_, i) => (
                     <React.Fragment key={i}>
-                      <th className="py-1 px-1 text-center text-gray-400 font-normal">回数</th>
-                      <th className="py-1 px-1 text-center text-gray-400 font-normal">勝率</th>
-                      <th className="py-1 px-1 text-center text-gray-400 font-normal">平均5日R</th>
+                      <th className="py-1 px-1 text-center text-fg-muted font-normal">回数</th>
+                      <th className="py-1 px-1 text-center text-fg-muted font-normal">勝率</th>
+                      <th className="py-1 px-1 text-center text-fg-muted font-normal">平均5日R</th>
                     </React.Fragment>
                   ))}
                 </tr>

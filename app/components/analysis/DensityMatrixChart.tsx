@@ -351,7 +351,7 @@ export default function DensityMatrixChart({ prices }: Props) {
           <table className="text-xs w-full border-collapse">
             <thead>
               <tr>
-                <th className="p-1 text-left text-gray-400">From \ To</th>
+                <th className="p-1 text-left text-fg-muted">From \ To</th>
                 {result.regimes.map((r) => (
                   <th
                     key={r.id}
@@ -396,9 +396,9 @@ export default function DensityMatrixChart({ prices }: Props) {
           <table className="text-xs w-full border-collapse">
             <thead>
               <tr>
-                <th className="p-1 text-left text-gray-400">レジーム</th>
-                <th className="p-1 text-right text-gray-400">年率リターン</th>
-                <th className="p-1 text-right text-gray-400">年率Vol</th>
+                <th className="p-1 text-left text-fg-muted">レジーム</th>
+                <th className="p-1 text-right text-fg-muted">年率リターン</th>
+                <th className="p-1 text-right text-fg-muted">年率Vol</th>
               </tr>
             </thead>
             <tbody>

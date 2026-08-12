@@ -326,7 +326,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
               style={{ backgroundColor: e.color }}
             />
             {e.label}
-            {e.loading && <span className="text-gray-400 ml-1">...</span>}
+            {e.loading && <span className="text-fg-muted ml-1">...</span>}
             {e.error && <span className="text-red-400 ml-1">!</span>}
             <button
               onClick={() => handleRemove(e.ticker)}
@@ -383,7 +383,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
           onChange={(e) => setRangeFrom(e.target.value)}
           className="px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-400"
         />
-        <span className="text-gray-400">〜</span>
+        <span className="text-fg-muted">〜</span>
         <input
           type="date"
           value={rangeTo}
@@ -401,14 +401,14 @@ export default function BenchmarkChart({ prices, period }: Props) {
           </button>
         )}
         {rangeFrom && rangeTo && (
-          <span className="text-gray-400">
+          <span className="text-fg-muted">
             ({rangedPrices.length}営業日)
           </span>
         )}
       </div>
 
       {anyLoading && (
-        <div className="text-sm text-gray-400 py-6 text-center">
+        <div className="text-sm text-fg-muted py-6 text-center">
           データ取得中...
         </div>
       )}
@@ -515,7 +515,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
       )}
 
       {computed.length === 0 && !anyLoading && entries.length > 0 && entries.every(e => !e.loading && !e.prices) && (
-        <div className="text-sm text-gray-400 py-6 text-center">
+        <div className="text-sm text-fg-muted py-6 text-center">
           比較データがありません
         </div>
       )}

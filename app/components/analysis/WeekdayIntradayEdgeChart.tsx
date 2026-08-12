@@ -180,14 +180,14 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
             </button>
           ))}
         </div>
-        <span className="text-gray-400">
+        <span className="text-fg-muted">
           次に売買する立会（推定）: <span className="font-medium text-indigo-600">{WD_KANJI[nextWd]}曜</span>
         </span>
       </div>
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && resp && !result && (
-        <div className="text-xs text-gray-400">集計できる立会日が不足しています。</div>
+        <div className="text-xs text-fg-muted">集計できる立会日が不足しています。</div>
       )}
 
       {result && (
@@ -237,7 +237,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                           <td className="px-2"><StatBadge n={b.n} p={b.pAdj} significant={b.pAdj < 0.05} minN={12} /></td>
                         </>
                       ) : (
-                        <td colSpan={6} className="px-2 text-gray-400">標本不足</td>
+                        <td colSpan={6} className="px-2 text-fg-muted">標本不足</td>
                       )}
                     </tr>
                   );
@@ -245,7 +245,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             各曜日について、日内の全（買い建て時刻→手仕舞い時刻）の組合せをロングで総当たりし、最も
             {rankBy === "t" ? "t値" : "平均リターン"}の大きいウィンドウを表示。行クリックで下の詳細を切替。
             有意性は全曜日×全ウィンドウ {result.nTested} 通りをFDR補正した後のp値。
@@ -290,13 +290,13 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                   最良ウィンドウの累積リターン（％・暦時間軸、ホイールでズーム／ドラッグでパン）
                 </div>
                 <div ref={eqContainerRef} className="w-full rounded border border-gray-100" />
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-fg-muted">
                   累積が右肩上がりで一定なら、その曜日・時間帯のロングエッジは全期間で安定。一部期間だけで
                   稼いで横ばいなら、その時期のレジームが作った見かけのエッジの可能性。
                 </p>
               </>
             ) : (
-              <p className="text-xs text-gray-400">この曜日は有効なウィンドウがありません。</p>
+              <p className="text-xs text-fg-muted">この曜日は有効なウィンドウがありません。</p>
             )}
           </div>
         </>

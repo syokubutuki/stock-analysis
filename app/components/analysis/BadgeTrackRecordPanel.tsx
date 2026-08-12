@@ -54,7 +54,7 @@ export default function BadgeTrackRecordPanel({ result, running, progress, onRun
         <td className="px-2 py-1.5 whitespace-nowrap">
           <span className={`font-medium ${LABEL_COLOR[meta.color] ?? "text-gray-700"}`}>{meta.label}</span>
         </td>
-        <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{n5}</td>
+        <td className="px-2 py-1.5 text-right tabular-nums text-fg-muted">{n5}</td>
         {result.evalHorizons.map((h) => {
           const s = stats.find((x) => x.horizon === h);
           const m = s?.median ?? 0;
@@ -89,7 +89,7 @@ export default function BadgeTrackRecordPanel({ result, running, progress, onRun
           ▶
         </span>
         <span className="font-semibold text-gray-800">判定の実績(バックテスト)</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           シグナル点灯後の前方リターン分布（{HORIZON_CONFIG[horizon].label}・横断プール）
         </span>
       </button>
@@ -105,12 +105,12 @@ export default function BadgeTrackRecordPanel({ result, running, progress, onRun
               {running ? "計算中…" : result ? "再計算" : "実績を計算"}
             </button>
             {running && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-fg-muted">
                 {progress.done}/{progress.total} 銘柄(数十秒かかります)
               </span>
             )}
             {result && !running && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-fg-muted">
                 {result.nStocks}銘柄 / {result.totalEvals.toLocaleString()}評価点 / {result.from}〜{result.to}
               </span>
             )}
@@ -146,7 +146,7 @@ export default function BadgeTrackRecordPanel({ result, running, progress, onRun
                     {SIGNAL_EVENTS.map(eventRow)}
                     <tr className="border-t-2 border-gray-200 text-gray-500">
                       <td className="px-2 py-1.5 whitespace-nowrap">ベースレート(無条件)</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
+                      <td className="px-2 py-1.5 text-right tabular-nums text-fg-muted">
                         {stat5(result.baseRate)?.n ?? 0}
                       </td>
                       {result.evalHorizons.map((h) => {
@@ -158,20 +158,20 @@ export default function BadgeTrackRecordPanel({ result, running, progress, onRun
                           </td>
                         );
                       })}
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
+                      <td className="px-2 py-1.5 text-right tabular-nums text-fg-muted">
                         {((stat5(result.baseRate)?.pDown ?? 0) * 100).toFixed(0)}%
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-fg-muted">
                 各セルは前方リターンの中央値(%)。ホバーで地合い比・四分位・標本数。色: 赤=下落 / 緑=上昇。
               </p>
             </>
           ) : (
             !running && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-fg-muted">
                 「実績を計算」を押すと、各シグナルが過去に点灯した後のリターンを集計します。
               </p>
             )

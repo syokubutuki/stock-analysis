@@ -75,7 +75,7 @@ function PathCell({ p, H, scale }: { p: OosPredPoint; H: number; scale: number }
       <div className="flex items-center justify-between text-[10px] tabular-nums">
         <span className="text-blue-600">予{pct(p.yhat)}</span>
         <span className={p.yact >= 0 ? "text-green-700 font-medium" : "text-red-600 font-medium"}>実{pct(p.yact)}</span>
-        <span className="text-gray-400">被{covTot ? `${Math.round((covHit / covTot) * 100)}%` : "—"}</span>
+        <span className="text-fg-muted">被{covTot ? `${Math.round((covHit / covTot) * 100)}%` : "—"}</span>
       </div>
     </div>
   );
@@ -144,7 +144,7 @@ export default function AsOfAnalogReplayChart({ prices, ticker }: Props) {
   }, [shown]);
 
   if (prices.length < 300) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています（300営業日以上必要）。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています（300営業日以上必要）。</div>;
   }
 
   return (
@@ -269,7 +269,7 @@ export default function AsOfAnalogReplayChart({ prices, ticker }: Props) {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
               {shown.map((p) => <PathCell key={p.date} p={p} H={oos.H} scale={scale} />)}
             </div>
-            {shown.length === 0 && <div className="text-xs text-gray-400">再現できた週末がありません。</div>}
+            {shown.length === 0 && <div className="text-xs text-fg-muted">再現できた週末がありません。</div>}
           </div>
         </>
       )}

@@ -274,7 +274,7 @@ export default function SessionGapChart({ prices }: Props) {
                     <td className="text-right px-2">{(c.win * 100).toFixed(0)}%</td>
                     <td className="text-right px-2 text-gray-500">{fmtPct(c.ciLo)}〜{fmtPct(c.ciHi)}</td>
                     <td className="text-right px-2 text-gray-500">{(c.stable * 100).toFixed(0)}%</td>
-                    <td className={`text-right pl-2 ${c.significant ? "font-bold text-blue-700" : "text-gray-400"}`}>{c.pVsNormal.toFixed(3)}{c.significant ? " ★" : ""}</td>
+                    <td className={`text-right pl-2 ${c.significant ? "font-bold text-blue-700" : "text-fg-muted"}`}>{c.pVsNormal.toFixed(3)}{c.significant ? " ★" : ""}</td>
                   </tr>
                 ))}
               </tbody>

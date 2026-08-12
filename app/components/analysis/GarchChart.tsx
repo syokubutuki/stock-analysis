@@ -220,7 +220,7 @@ export default function GarchChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">非対称性</div>
           <div className="font-bold">{leverage.asymmetryCoeff.toFixed(3)}</div>
-          <div className="text-gray-400">{leverage.asymmetryCoeff > 1.1 ? "レバレッジ効果あり" : "対称的"}</div>
+          <div className="text-fg-muted">{leverage.asymmetryCoeff > 1.1 ? "レバレッジ効果あり" : "対称的"}</div>
         </div>
       </div>
 
@@ -230,7 +230,7 @@ export default function GarchChart({ prices, seriesMode }: Props) {
       <div className="mt-3 flex flex-col sm:flex-row gap-3 items-start">
         <div>
           <canvas ref={leverageCanvasRef} className="rounded border border-gray-100" />
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-fg-muted mt-1">
             非対称性: 負リターン後vol {(leverage.negativeVolMean * 100).toFixed(3)}%
             / 正リターン後vol {(leverage.positiveVolMean * 100).toFixed(3)}%
           </div>

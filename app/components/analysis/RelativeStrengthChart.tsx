@@ -134,7 +134,7 @@ export default function RelativeStrengthChart({ prices }: Props) {
         ))}
       </div>
 
-      {loading && <div className="text-xs text-gray-400">ベンチマーク読み込み中...</div>}
+      {loading && <div className="text-xs text-fg-muted">ベンチマーク読み込み中...</div>}
       {error && <div className="text-xs text-red-500">{error}</div>}
 
       {result && (

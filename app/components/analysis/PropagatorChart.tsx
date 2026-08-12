@@ -200,7 +200,7 @@ export default function PropagatorChart({ prices }: Props) {
 
   if (result.bins.length === 0) {
     return (
-      <div className="text-xs text-gray-400 py-4">
+      <div className="text-xs text-fg-muted py-4">
         データが不足しています（30日以上必要）
       </div>
     );
@@ -230,11 +230,11 @@ export default function PropagatorChart({ prices }: Props) {
                 {med >= 0 ? "+" : ""}
                 {med.toFixed(2)}%
               </div>
-              <div className="text-[9px] text-gray-400">
+              <div className="text-[9px] text-fg-muted">
                 {p5.toFixed(1)}% ~ {p95 >= 0 ? "+" : ""}
                 {p95.toFixed(1)}%
               </div>
-              <div className="text-[9px] text-gray-400 mt-0.5">
+              <div className="text-[9px] text-fg-muted mt-0.5">
                 {lastPrice > 0
                   ? `${(lastPrice * (1 + med / 100)).toFixed(0)}円`
                   : ""}

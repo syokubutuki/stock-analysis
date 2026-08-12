@@ -86,21 +86,21 @@ export default function InformationStorageChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Active Info Storage</div>
           <div className="font-mono font-medium text-sm text-purple-600">{ais.toFixed(4)}</div>
-          <div className="text-gray-400">過去→現在の自己情報</div>
+          <div className="text-fg-muted">過去→現在の自己情報</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Predictability</div>
           <div className={`font-mono font-medium text-sm ${pred > 0.3 ? "text-green-600" : ""}`}>
             {pred.toFixed(3)}
           </div>
-          <div className="text-gray-400">{predInterp}</div>
+          <div className="text-fg-muted">{predInterp}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Info Ratio (短期/長期)</div>
           <div className={`font-mono font-medium text-sm ${infoRatio > 1.5 ? "text-orange-600" : infoRatio < 0.7 ? "text-blue-600" : ""}`}>
             {infoRatio.toFixed(3)}
           </div>
-          <div className="text-gray-400">{infoRatio > 1.5 ? "短期ノイズ支配" : infoRatio < 0.7 ? "長期構造あり" : "バランス"}</div>
+          <div className="text-fg-muted">{infoRatio > 1.5 ? "短期ノイズ支配" : infoRatio < 0.7 ? "長期構造あり" : "バランス"}</div>
         </div>
       </div>
 

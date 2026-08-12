@@ -96,7 +96,7 @@ export default function WalkForwardChart({ prices }: Props) {
   }, [result]);
 
   if (prices.length < 400) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(400営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(400営業日以上必要)。</div>;
   }
 
   return (
@@ -142,7 +142,7 @@ export default function WalkForwardChart({ prices }: Props) {
       </div>
 
       {!result ? (
-        <div className="text-xs text-gray-400">この設定では有効なフォールドを構成できません(フォールド数を減らすか期間を延ばしてください)。</div>
+        <div className="text-xs text-fg-muted">この設定では有効なフォールドを構成できません(フォールド数を減らすか期間を延ばしてください)。</div>
       ) : (
         <>
           {/* 頭出し指標 */}
@@ -188,7 +188,7 @@ export default function WalkForwardChart({ prices }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-gray-400">
+          <p className="text-[10px] text-fg-muted">
             OOS順位=そのフォールドのOOSで、選抜シグナルがカタログ中どれだけ上位か(100%=最良)。IS選抜が毎回OOSでも上位なら頑健、下位に沈むなら過剰最適化。
           </p>
         </>

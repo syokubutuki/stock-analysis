@@ -107,7 +107,7 @@ export default function AttenuationBetaChart({ prices }: Props) {
       </div>
 
       {loading && (
-        <div className="text-xs text-gray-400">ベンチマーク読み込み中...</div>
+        <div className="text-xs text-fg-muted">ベンチマーク読み込み中...</div>
       )}
       {error && <div className="text-xs text-red-500">{error}</div>}
 
@@ -119,21 +119,21 @@ export default function AttenuationBetaChart({ prices }: Props) {
               <div className="font-mono font-medium text-base">
                 {res.betaOLS.toFixed(3)}
               </div>
-              <div className="text-[10px] text-gray-400">ノイズで縮小</div>
+              <div className="text-[10px] text-fg-muted">ノイズで縮小</div>
             </div>
             <div className="p-2 rounded border border-emerald-200 bg-emerald-50">
               <div className="text-gray-500">補正β (Dimson)</div>
               <div className="font-mono font-medium text-base text-emerald-700">
                 {res.betaDimson.toFixed(3)}
               </div>
-              <div className="text-[10px] text-gray-400">真の市場感応度</div>
+              <div className="text-[10px] text-fg-muted">真の市場感応度</div>
             </div>
             <div className="p-2 rounded border border-amber-200 bg-amber-50">
               <div className="text-gray-500">信頼性比 λ</div>
               <div className="font-mono font-medium text-base text-amber-700">
                 {res.reliability.toFixed(2)}
               </div>
-              <div className="text-[10px] text-gray-400">
+              <div className="text-[10px] text-fg-muted">
                 取りこぼし {(res.attenuation * 100).toFixed(0)}%
               </div>
             </div>
@@ -142,7 +142,7 @@ export default function AttenuationBetaChart({ prices }: Props) {
               <div className="font-mono font-medium">
                 {res.corr.toFixed(2)} / {res.rSquared.toFixed(2)}
               </div>
-              <div className="text-[10px] text-gray-400">n={res.n}</div>
+              <div className="text-[10px] text-fg-muted">n={res.n}</div>
             </div>
           </div>
 
@@ -207,7 +207,7 @@ export default function AttenuationBetaChart({ prices }: Props) {
                 {res.residualBeta >= 0 ? "+" : ""}
                 {res.residualBeta.toFixed(3)}
               </div>
-              <div className="text-[10px] text-gray-400">
+              <div className="text-[10px] text-fg-muted">
                 市場中立のつもりが残る方向性
               </div>
             </div>

@@ -307,14 +307,14 @@ export default function ConditionalForwardChart({
             {h}日
           </button>
         ))}
-        <span className="ml-auto text-gray-400">全標本 {result.totalN}日 / 基準平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%</span>
+        <span className="ml-auto text-fg-muted">全標本 {result.totalN}日 / 基準平均 {fmtPct(result.baselineMean)}・勝率 {(result.baselineWin * 100).toFixed(0)}%</span>
       </div>
 
       {/* 判定指標の推移（なぜその状態かを可視化） */}
       {indicator ? (
         <div className="relative"><canvas ref={indRef} /></div>
       ) : (
-        <p className="text-[11px] text-gray-400">この軸（{axes.find((a) => a.value === axis)?.label}）は数値指標として表示できないため、推移グラフは省略します。</p>
+        <p className="text-[11px] text-fg-muted">この軸（{axes.find((a) => a.value === axis)?.label}）は数値指標として表示できないため、推移グラフは省略します。</p>
       )}
 
       {/* 現在バナー */}

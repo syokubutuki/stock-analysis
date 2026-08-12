@@ -302,7 +302,7 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
             <div className="flex justify-center">
               <canvas ref={lyapCanvasRef} className="rounded border border-gray-100" />
             </div>
-            <div className="mt-1 text-[10px] text-gray-400 text-center">
+            <div className="mt-1 text-[10px] text-fg-muted text-center">
               実線: 近傍軌道の対数発散 / 破線: 線形フィット(傾き = {"\u03BB"})
             </div>
           </div>

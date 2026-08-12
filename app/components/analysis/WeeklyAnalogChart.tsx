@@ -463,7 +463,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                   >
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[b] }} />
                     {label}
-                    <span className={`text-[10px] ${isSel ? "text-gray-300" : "text-gray-400"}`}>n={result.binCounts[b]}</span>
+                    <span className={`text-[10px] ${isSel ? "text-gray-300" : "text-fg-muted"}`}>n={result.binCounts[b]}</span>
                     {isQuery && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今週</span>}
                   </button>
                 );
@@ -473,7 +473,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
         </div>
       )}
 
-      {usLoading && <div className="text-xs text-gray-400">米国指数を取得中…</div>}
+      {usLoading && <div className="text-xs text-fg-muted">米国指数を取得中…</div>}
       {usError && <div className="text-xs text-red-500">{usError}</div>}
 
       {result ? (
@@ -519,7 +519,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
           <div className="relative"><canvas ref={canvasRef} /></div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-400">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-fg-muted">
             <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#0f172a" }} /> 今週の経路(縦バー=日中高安)</span>
             <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#2563eb" }} /> その後の終値中央値</span>
             <span><span className="inline-block w-4 h-0.5 align-middle border-t border-dashed" style={{ borderColor: "#16a34a" }} /> 高値到達中央(MFE)</span>
@@ -538,10 +538,10 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
               </label>
               {showIntraday && (
                 <>
-                  {intraLoading && <div className="text-xs text-gray-400">日中足を取得中…</div>}
+                  {intraLoading && <div className="text-xs text-fg-muted">日中足を取得中…</div>}
                   {intraError && <div className="text-xs text-red-500">{intraError}</div>}
                   {intraWeek && <div className="relative"><canvas ref={intraCanvasRef} /></div>}
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-[10px] text-fg-muted">
                     日足では1日=1点に潰れる今週の値動きを、日中足で拡大表示（縦点線=日境界）。上のアナログ(過去局面)は日足のまま——
                     日中足は取得期間が短く(60分足≈2年)、何年も前のアナログ週は日中では再現できないため。
                   </p>
@@ -568,7 +568,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                   <tr key={`${s.source}-${s.endIndex}`}
                     onClick={() => setHighlight(highlight === s.endIndex ? null : s.endIndex)}
                     className={`border-b border-gray-100 cursor-pointer ${highlight === s.endIndex ? "bg-amber-50" : "hover:bg-gray-50"}`}>
-                    <td className="py-1 px-2 text-gray-700 tabular-nums">{s.source && <span className="text-[9px] text-gray-400 mr-1">{s.source}</span>}{s.startTime} 〜 {s.endTime}</td>
+                    <td className="py-1 px-2 text-gray-700 tabular-nums">{s.source && <span className="text-[9px] text-fg-muted mr-1">{s.source}</span>}{s.startTime} 〜 {s.endTime}</td>
                     <td className="text-right px-2">
                       {s.usBin !== null
                         ? <span className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[s.usBin] }} />{result.binMetaObj.labels[s.usBin]}</span>
@@ -585,7 +585,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
           </div>
         </>
       ) : (
-        !usLoading && <div className="text-xs text-gray-400">
+        !usLoading && <div className="text-xs text-fg-muted">
           該当する過去局面が不足しています。窓 L を短く・先行き H を短く、ビンを粗く（陰陽/3分位）、または「似た形で絞る」に切り替えてください。
         </div>
       )}

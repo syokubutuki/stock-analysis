@@ -113,21 +113,21 @@ export default function NoiseCorrectedVolChart({ prices }: Props) {
             <div className="font-mono font-medium text-base">
               {res.currentNaive.toFixed(1)}%
             </div>
-            <div className="text-[10px] text-gray-400">ノイズで過大</div>
+            <div className="text-[10px] text-fg-muted">ノイズで過大</div>
           </div>
           <div className="p-2 rounded border border-teal-200 bg-teal-50">
             <div className="text-gray-500">補正ボラ(年率)</div>
             <div className="font-mono font-medium text-base text-teal-700">
               {res.currentCorrected.toFixed(1)}%
             </div>
-            <div className="text-[10px] text-gray-400">真の値動き</div>
+            <div className="text-[10px] text-fg-muted">真の値動き</div>
           </div>
           <div className="p-2 rounded border border-amber-200 bg-amber-50">
             <div className="text-gray-500">現在のノイズ割合</div>
             <div className="font-mono font-medium text-base text-amber-700">
               {res.currentNoiseShare.toFixed(0)}%
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[10px] text-fg-muted">
               平均 {res.avgNoiseShare.toFixed(0)}%
             </div>
           </div>
@@ -137,7 +137,7 @@ export default function NoiseCorrectedVolChart({ prices }: Props) {
               {res.sizingAdjustPct >= 0 ? "+" : ""}
               {res.sizingAdjustPct.toFixed(0)}%
             </div>
-            <div className="text-[10px] text-gray-400">vol目標の建玉</div>
+            <div className="text-[10px] text-fg-muted">vol目標の建玉</div>
           </div>
         </div>
       )}

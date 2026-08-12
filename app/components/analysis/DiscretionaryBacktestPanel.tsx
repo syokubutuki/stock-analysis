@@ -17,7 +17,7 @@ import AnalysisGuide from "./AnalysisGuide";
 const DiscretionaryChart = dynamic(() => import("./DiscretionaryChart"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[360px] bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400">
+    <div className="w-full h-[360px] bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-fg-muted">
       チャート読み込み中...
     </div>
   ),
@@ -130,7 +130,7 @@ export default function DiscretionaryBacktestPanel({
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h2 className="font-bold text-gray-900 mb-1">裁量基準の期間適用バックテスト</h2>
-        <p className="text-sm text-gray-400 py-4">
+        <p className="text-sm text-fg-muted py-4">
           買いと売りの両方を最低1回ずつ打つと、基準をルール化して任意期間に適用できます。
         </p>
       </div>
@@ -160,7 +160,7 @@ export default function DiscretionaryBacktestPanel({
                 className={`text-xs px-2 py-1 rounded border transition-colors ${
                   on
                     ? "bg-indigo-50 border-indigo-300 text-indigo-700"
-                    : "bg-gray-50 border-gray-200 text-gray-400"
+                    : "bg-gray-50 border-gray-200 text-fg-muted"
                 }`}
                 title={d.description}
               >
@@ -285,14 +285,14 @@ export default function DiscretionaryBacktestPanel({
           </div>
         </>
       ) : (
-        <p className="text-sm text-gray-400 py-4">
+        <p className="text-sm text-fg-muted py-4">
           {availableFeatures.length === 0
             ? "買い・売り両方の基準が揃う特徴量がありません。売買回数を増やしてください。"
             : "適用条件を設定してください。"}
         </p>
       )}
 
-      <p className="text-[11px] text-gray-400">
+      <p className="text-[11px] text-fg-muted">
         ※ 手数料{(costRate * 100).toFixed(2)}%・全力売買・端株なしで計算 (通貨: {currency})。
       </p>
 

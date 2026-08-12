@@ -153,7 +153,7 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
           </label>
         )}
         {auto && (
-          <span className="text-gray-400">選択次数 p = {fit.order}</span>
+          <span className="text-fg-muted">選択次数 p = {fit.order}</span>
         )}
       </div>
 
@@ -188,7 +188,7 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div>
           <canvas ref={canvasRef} className="rounded border border-gray-100" />
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-fg-muted mt-1">
             破線=単位円(定常境界), ×=極, 色=単位円への近さ(青→赤), 横=実部, 縦=虚部
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
               <tbody>
                 {fit.poles.map((p, i) => (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2 text-gray-400">{i + 1}</td>
+                    <td className="py-1 pr-2 text-fg-muted">{i + 1}</td>
                     <td className="text-right py-1 px-2 font-medium text-gray-800">
                       {p.modulus.toFixed(3)}
                     </td>
@@ -299,7 +299,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
     <div className="p-2 bg-gray-50 rounded text-xs">
       <div className="text-gray-500">{label}</div>
       <div className="font-bold text-gray-800">{value}</div>
-      {sub && <div className="text-gray-400">{sub}</div>}
+      {sub && <div className="text-fg-muted">{sub}</div>}
     </div>
   );
 }

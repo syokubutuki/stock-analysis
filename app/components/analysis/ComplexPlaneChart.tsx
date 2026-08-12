@@ -207,7 +207,7 @@ export default function ComplexPlaneChart({ prices, seriesMode }: Props) {
           </label>
         )}
         {method === "analytic" && (
-          <span className="text-gray-400">パラメータなし — Hilbert変換による解析信号</span>
+          <span className="text-fg-muted">パラメータなし — Hilbert変換による解析信号</span>
         )}
       </div>
 
@@ -227,7 +227,7 @@ export default function ComplexPlaneChart({ prices, seriesMode }: Props) {
       <div className="flex flex-col sm:flex-row gap-4 items-start">
         <div>
           <canvas ref={canvasRef} className="rounded border border-gray-100" />
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-fg-muted mt-1">
             横軸=実部, 縦軸=虚部, 色=時間(青→赤), 緑点=始点, 赤点=最新
           </div>
         </div>
@@ -325,7 +325,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
     <div className="p-2 bg-gray-50 rounded text-xs">
       <div className="text-gray-500">{label}</div>
       <div className="font-bold text-gray-800">{value}</div>
-      {sub && <div className="text-gray-400">{sub}</div>}
+      {sub && <div className="text-fg-muted">{sub}</div>}
     </div>
   );
 }

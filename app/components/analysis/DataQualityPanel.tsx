@@ -116,7 +116,7 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
         />
         <Badge tone="neutral" label={`点検済 ${checkedCount} 系列`} />
         {benchTargets === null && (
-          <span className="text-gray-400 self-center">
+          <span className="text-fg-muted self-center">
             ※ 現在は分析対象のみ点検。破損していた 1306.T のような
             <span className="font-medium">ベンチマーク</span>は上のボタンで点検
           </span>
@@ -185,7 +185,7 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
 
       {/* 取得できなかった系列 */}
       {all.filter((t) => t.error).length > 0 && (
-        <p className="mt-3 text-xs text-gray-400">
+        <p className="mt-3 text-xs text-fg-muted">
           {`点検できなかった系列: ${all.filter((t) => t.error).map((t) => `${t.ticker}(${t.error})`).join(", ")}`}
         </p>
       )}
@@ -297,7 +297,7 @@ function GlitchDetail({ glitch, prices }: { glitch: PriceGlitch; prices: PricePo
           {`倍率 ${factorLabel} → 価格を ${factorLabel} で割り戻し、出来高に ${factorLabel} を掛けて復元`}
         </span>
       </p>
-      <p className="text-xs text-gray-400 mt-0.5">
+      <p className="text-xs text-fg-muted mt-0.5">
         {`正常な水準の基準: ${glitch.anchorBefore}（直前）と ${glitch.anchorAfter}（復帰日）`}
       </p>
 
@@ -325,7 +325,7 @@ function GlitchDetail({ glitch, prices }: { glitch: PriceGlitch; prices: PricePo
       </table>
 
       <div ref={containerRef} className="mt-2 w-full" />
-      <p className="text-xs text-gray-400 mt-1">
+      <p className="text-xs text-fg-muted mt-1">
         赤＝配信値のまま（破損日で崖のように落ち、翌日に跳ね返る）／緑＝修復後（水準が連続する）。
         赤の往復2点だけで日次分散が跳ね上がり、回帰の分母 Var(M) を膨らませて β をゼロに潰す。
       </p>

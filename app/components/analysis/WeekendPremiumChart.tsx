@@ -131,7 +131,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
         <h3 className="text-sm font-semibold text-gray-800">
           週末プレミアム μ_w：週末保有の有無によるリターン差
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           日次を 日中／平日夜間／週末ギャップ に分解し、週末ギャップの正体を測る
         </span>
       </div>
@@ -189,7 +189,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
                   {v.retPerVarWeekend.toFixed(2)}
                 </b>
               </span>
-              <span className="text-gray-400">
+              <span className="text-fg-muted">
                 {v.retPerVarWeekend < v.retPerVarWeekday ? "＜" : "≥"}
               </span>
               <span>
@@ -204,7 +204,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
                 {v.skipImprovesSharpe ? "（飛ばす方向）" : "（持つ方向）"}
               </span>
             </div>
-            <p className="mt-1 text-[10px] text-gray-400">
+            <p className="mt-1 text-[10px] text-fg-muted">
               左辺 &lt; 右辺なら、週末ギャップを外して週内に資金を集中した方が理論上シャープが上がります。ただし上のCIが実際に有意かどうかを最終判断にしてください。
             </p>
           </div>
@@ -264,7 +264,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
                       <td className="py-1 px-2 text-right text-gray-600">{b.t.toFixed(2)}</td>
                       <td
                         className={`py-1 px-2 text-right font-medium ${
-                          b.pOneSided < 0.05 ? "text-blue-700" : "text-gray-400"
+                          b.pOneSided < 0.05 ? "text-blue-700" : "text-fg-muted"
                         }`}
                       >
                         {b.pOneSided.toFixed(3)}
@@ -279,7 +279,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
                 })}
               </tbody>
             </table>
-            <p className="mt-2 text-[10px] text-gray-400 leading-relaxed">
+            <p className="mt-2 text-[10px] text-fg-muted leading-relaxed">
               {result.nDays}本 / {result.nWeeks}週（{result.from}〜{result.to}）。μ・σは1回あたりの単純リターン、bp=0.01%。
               「ドリフト寄与」は3区間の対数リターン和（=バイ&ホールドの対数リターン）に占める各区間の割合で、合計100%。
               年率・Sharpe は各区間を毎回複利したときの年率換算。<b>μ/σ²</b> は分散1単位あたりリターンで、判定式の主役です。

@@ -99,7 +99,7 @@ export default function UsEventTimeChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && progress.length === 0 && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {progress.length > 0 && (
@@ -111,7 +111,7 @@ export default function UsEventTimeChart({ ticker }: Props) {
 
           <div className="text-xs text-gray-500">日中進捗(夜間ギャップの倍数 ×gap)× 到達後→引けの前向きリターン</div>
           <div className="relative"><canvas ref={canvasRef} /></div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             緑=到達後まだ同方向に伸びる / 赤=到達後は逆行。青破線=1.0×gap(ギャップ相当)。基準を未来の引け値でなく前夜ギャップにしたので、選抜に先読みが入らない。
           </p>
 
@@ -120,7 +120,7 @@ export default function UsEventTimeChart({ ticker }: Props) {
               <div className="text-xs text-gray-500">消化速度で層別した後場(正午→引け)の向き付けリターン</div>
               <SpeedBar g={speed.fast} maxAbs={speedMaxAbs} />
               <SpeedBar g={speed.slow} maxAbs={speedMaxAbs} />
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-fg-muted">
                 速い日=ギャップ半分への到達が早い、遅い日=遅い。分類は到達時刻(過去)のみで決め、後場リターンは前向き測定。遅い日の後場が有意にプラスなら「寄りで進みきらない日を選んで日中順張り」が有効。
               </p>
             </div>

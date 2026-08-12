@@ -278,7 +278,7 @@ export default function PhaseClockChart({ prices, seriesMode }: Props) {
       <div className="flex flex-col sm:flex-row gap-4 items-start">
         <div>
           <canvas ref={canvasRef} className="rounded border border-gray-100" />
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-fg-muted mt-1">
             12時=位相0°(直近のサイクル天井基準), 時計回りに位相が進む / 青い針=現在 / 黒枠=統計的に有意
           </div>
         </div>
@@ -397,7 +397,7 @@ function StatCard({
         )}
       </div>
       <div className={`font-bold ${valueColor}`}>{value}</div>
-      {sub && <div className="text-gray-400">{sub}</div>}
+      {sub && <div className="text-fg-muted">{sub}</div>}
     </div>
   );
 }

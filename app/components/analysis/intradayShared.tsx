@@ -86,7 +86,7 @@ export function ViewTabs<T extends string>({
 export function LoadingError({ loading, error }: { loading: boolean; error: string | null }) {
   return (
     <>
-      {loading && <div className="text-sm text-gray-400 py-8 text-center">日中足を取得中...</div>}
+      {loading && <div className="text-sm text-fg-muted py-8 text-center">日中足を取得中...</div>}
       {error && <div className="bg-amber-50 text-amber-700 rounded-lg p-3 text-sm">{error}</div>}
     </>
   );
@@ -122,7 +122,7 @@ export function drawTimeAxisLabels(
 // 注意書き（遅延・サンプル）共通フッタ。
 export function IntradayCaveat({ extra }: { extra?: string }) {
   return (
-    <p className="text-xs text-gray-400 leading-relaxed">
+    <p className="text-xs text-fg-muted leading-relaxed">
       {"※ Yahoo日中足は約15分遅延・取得期間に上限あり（5/15/30分足≈60日、60分足≈2年）。サンプルが薄いため有意性とともに参考程度に。"}
       {extra ? ` ${extra}` : ""}
     </p>

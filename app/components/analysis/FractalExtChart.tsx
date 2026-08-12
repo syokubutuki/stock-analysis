@@ -71,7 +71,7 @@ export default function FractalExtChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">R/S Hurst指数</div>
           <div className="font-bold">{rs.hurst.toFixed(3)}</div>
-          <div className="text-gray-400">{rs.interpretation}</div>
+          <div className="text-fg-muted">{rs.interpretation}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Cross-Hurst</div>
@@ -80,7 +80,7 @@ export default function FractalExtChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">相関次元 D₂</div>
           <div className="font-bold">{corrDim.dimension.toFixed(3)}</div>
-          <div className="text-gray-400">{corrDim.dimension < 3 ? "低次元構造あり" : "高次元 (ノイズ的)"}</div>
+          <div className="text-fg-muted">{corrDim.dimension < 3 ? "低次元構造あり" : "高次元 (ノイズ的)"}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">95%CI (R/S)</div>

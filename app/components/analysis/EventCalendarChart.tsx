@@ -138,7 +138,7 @@ export default function EventCalendarChart({ prices }: Props) {
         <h3 className="text-sm font-semibold text-gray-800">
           イベントカレンダー条件付け：FOMC・CPI・雇用統計・日銀・SQ の先行きリターン
         </h3>
-        <span className="text-[10px] text-gray-400">曜日という代理変数ではなく、実イベント日で層別</span>
+        <span className="text-[10px] text-fg-muted">曜日という代理変数ではなく、実イベント日で層別</span>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
@@ -186,7 +186,7 @@ export default function EventCalendarChart({ prices }: Props) {
           <label key={e.id} className="flex items-center gap-1 text-gray-600">
             <input type="checkbox" checked={selected.includes(e.id)} onChange={() => toggle(e.id)} />
             {e.label.split("（")[0]}
-            <span className="text-[9px] text-gray-400">[{EVENT_PROVENANCE[e.id]}]</span>
+            <span className="text-[9px] text-fg-muted">[{EVENT_PROVENANCE[e.id]}]</span>
           </label>
         ))}
       </div>
@@ -242,7 +242,7 @@ export default function EventCalendarChart({ prices }: Props) {
                       </td>
                       <td
                         className={`py-1 pl-2 text-right font-medium ${
-                          b.significant ? "text-green-700" : "text-gray-400"
+                          b.significant ? "text-green-700" : "text-fg-muted"
                         }`}
                       >
                         {b.p.toFixed(3)}

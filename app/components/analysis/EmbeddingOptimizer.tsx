@@ -271,7 +271,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">AMI(0)</div>
           <div className="font-bold">{amiResult.ami[0]?.toFixed(3) ?? "—"}</div>
-          <div className="text-gray-400">初期相互情報量</div>
+          <div className="text-fg-muted">初期相互情報量</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">FNN(d*)</div>
@@ -280,7 +280,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
               ? `${(fnnResult.fnnRatio[fnnResult.optimalDim - 1] * 100).toFixed(1)}%`
               : "—"}
           </div>
-          <div className="text-gray-400">最適次元でのFNN率</div>
+          <div className="text-fg-muted">最適次元でのFNN率</div>
         </div>
       </div>
 

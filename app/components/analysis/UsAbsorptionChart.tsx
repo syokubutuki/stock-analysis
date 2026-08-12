@@ -85,7 +85,7 @@ export default function UsAbsorptionChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {result && (
@@ -98,7 +98,7 @@ export default function UsAbsorptionChart({ ticker }: Props) {
           </div>
 
           <div className="relative"><canvas ref={canvasRef} /></div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             縦軸=当日全体(前日終値→引け)を100%とした実現割合 f(t)。青破線＝寄付(ギャップ)時点。
             100%線を超えて垂れる形＝寄りの行き過ぎ→戻し、下から100%へ近づく形＝日中の継続吸収。
           </p>
@@ -133,7 +133,7 @@ export default function UsAbsorptionChart({ ticker }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-fg-muted">
             後場反転率=前場(寄り→正午)と後場(正午→引け)の符号が反対だった割合。50%より有意に高い＝後場は前場を打ち消しやすい（利確・逆張り検討）、低い＝トレンド継続。
           </p>
         </>

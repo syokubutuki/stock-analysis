@@ -201,7 +201,7 @@ export default function WeeklyPhaseSyncChart() {
               <span className="font-bold text-gray-700">{syncLevel}</span>
               <span className="text-gray-600">秩序変数 r = <b>{result.orderParameter.toFixed(3)}</b></span>
               <span className="text-gray-600">振幅加重 r_w = {result.weightedOrder.toFixed(3)}</span>
-              <span className="text-gray-400 text-xs">{result.items.length}銘柄</span>
+              <span className="text-fg-muted text-xs">{result.items.length}銘柄</span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
               r≈1: 全銘柄が同じ曜日にピーク=市場共通の週次クロック。r≈0: バラバラ=個別要因が支配的。

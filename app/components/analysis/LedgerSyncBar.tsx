@@ -102,7 +102,7 @@ export default function LedgerSyncBar({ source, reason, ownerId, onReload, busy 
                 </button>
               </>
             ) : (
-              <span className="text-gray-400">サーバー未接続のため発行されていません</span>
+              <span className="text-fg-muted">サーバー未接続のため発行されていません</span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -121,7 +121,7 @@ export default function LedgerSyncBar({ source, reason, ownerId, onReload, busy 
               引き継ぐ
             </button>
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             引き継ぐと、この端末に紐づいていた台帳は画面から見えなくなります（サーバー上の記録は消えません。元のキーを入れれば戻せます）。
           </div>
           {msg && <div className="text-blue-700">{msg}</div>}

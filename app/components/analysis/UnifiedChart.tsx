@@ -693,7 +693,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
       {/* 検索中: フラットな結果一覧 */}
       {q ? (
         searchResults.length === 0 ? (
-          <p className="text-[11px] text-gray-400 px-1 py-2">該当なし</p>
+          <p className="text-[11px] text-fg-muted px-1 py-2">該当なし</p>
         ) : (
           <div className="flex flex-wrap gap-0.5">
             {searchResults.map((s) => {
@@ -724,7 +724,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
               onClick={() => toggleGroup(group.id)}
               className="flex items-center gap-1 w-full text-left py-0.5 px-1 rounded hover:bg-gray-100/80 font-medium text-gray-700"
             >
-              <span className="text-[10px] text-gray-400 w-3">
+              <span className="text-[10px] text-fg-muted w-3">
                 {isExpanded ? "▼" : "▶"}
               </span>
               <span>{group.label}</span>
@@ -858,7 +858,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
       {/* Mobile: crosshair legend below chart */}
       {isMobile && legendEntries.length > 0 && (
         <div className="bg-gray-50 rounded-b border-x border-b border-gray-200 px-2 py-1 text-xs flex items-center gap-2 -mt-[1px] pointer-events-none">
-          <span className="text-gray-400">{legendTime}</span>
+          <span className="text-fg-muted">{legendTime}</span>
           {legendEntries.map((e) => (
             <span key={e.label} className="font-mono text-gray-700">
               {e.values}

@@ -516,7 +516,7 @@ export default function HighLowTimingChart({ ticker }: Props) {
         ))}
       </div>
 
-      {loading && <div className="text-sm text-gray-400 py-8 text-center">日中足を取得中...</div>}
+      {loading && <div className="text-sm text-fg-muted py-8 text-center">日中足を取得中...</div>}
       {error && <div className="bg-amber-50 text-amber-700 rounded-lg p-3 text-sm">{error}</div>}
 
       {analysis && !loading && (
@@ -690,9 +690,9 @@ export default function HighLowTimingChart({ ticker }: Props) {
                       <tr key={p.key} className="border-b border-gray-100">
                         <td className="py-1">
                           <div className="font-medium text-gray-800">{p.label}</div>
-                          <div className="text-gray-400">{p.desc}</div>
+                          <div className="text-fg-muted">{p.desc}</div>
                         </td>
-                        <td className="text-right">{pct(p.share)}<br /><span className="text-gray-400">{p.count}日</span></td>
+                        <td className="text-right">{pct(p.share)}<br /><span className="text-fg-muted">{p.count}日</span></td>
                         <td className={`text-right ${p.avgDayRet >= 0 ? "text-green-600" : "text-red-600"}`}>{signedPct(p.avgDayRet)}</td>
                         <td className={`text-right ${p.avgNextRet >= 0 ? "text-green-600" : "text-red-600"}`}>{signedPct(p.avgNextRet)}</td>
                         <td className={`text-right ${p.winRateNext > 0.52 ? "text-green-600" : p.winRateNext < 0.48 ? "text-red-600" : "text-gray-600"}`}>{pct(p.winRateNext)}</td>
@@ -701,7 +701,7 @@ export default function HighLowTimingChart({ ticker }: Props) {
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-gray-400">{"当日R=寄り→引け、翌日R=翌日の終値→終値。翌日Rと勝率は各類型がどれだけ翌日方向を示唆するかを表す（n少の類型は参考程度）。"}</p>
+              <p className="text-xs text-fg-muted">{"当日R=寄り→引け、翌日R=翌日の終値→終値。翌日Rと勝率は各類型がどれだけ翌日方向を示唆するかを表す（n少の類型は参考程度）。"}</p>
             </div>
           )}
 
@@ -728,7 +728,7 @@ export default function HighLowTimingChart({ ticker }: Props) {
               <Bar label={`OR下抜け後 引けも下で終了（追随）`} value={analysis.breakout.downFollowThrough} note={`n=${analysis.breakout.downBreakDays}`} color="#ef4444" />
               <Bar label="前日高値タッチ→引けも超で維持" value={analysis.breakout.prevHighHoldShare} note={`タッチ率 ${pct(analysis.breakout.prevHighTouchShare)}`} color="#22c55e" />
               <Bar label="前日安値タッチ→引けも割れで維持" value={analysis.breakout.prevLowHoldShare} note={`タッチ率 ${pct(analysis.breakout.prevLowTouchShare)}`} color="#ef4444" />
-              <p className="text-xs text-gray-400">{"追随率が高いほどブレイクは「本物」（順張り有利）、低いほど「だまし」が多い（逆張り・ブレイク後の戻り狙いが有利）。"}</p>
+              <p className="text-xs text-fg-muted">{"追随率が高いほどブレイクは「本物」（順張り有利）、低いほど「だまし」が多い（逆張り・ブレイク後の戻り狙いが有利）。"}</p>
             </div>
           )}
         </>
@@ -802,7 +802,7 @@ function Bar({ label, value, note, color = "#3b82f6" }: { label: string; value: 
     <div className="text-xs">
       <div className="flex justify-between mb-0.5">
         <span className="text-gray-600">{label}</span>
-        <span className="font-bold text-gray-800">{pct(value)}{note ? <span className="text-gray-400 font-normal ml-1">{note}</span> : null}</span>
+        <span className="font-bold text-gray-800">{pct(value)}{note ? <span className="text-fg-muted font-normal ml-1">{note}</span> : null}</span>
       </div>
       <div className="h-2 bg-gray-100 rounded overflow-hidden">
         <div className="h-full rounded" style={{ width: `${Math.min(100, value * 100)}%`, backgroundColor: color }} />

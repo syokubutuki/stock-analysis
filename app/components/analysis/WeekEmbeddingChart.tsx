@@ -236,7 +236,7 @@ export default function WeekEmbeddingChart({ prices }: Props) {
       {cur && (
         <div className="text-[11px] text-gray-600 bg-blue-50 border border-blue-100 rounded px-2 py-1">
           今週（進行中・{cur.elapsed}日経過）: {cur.path.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`).join(" → ")}
-          <span className="text-gray-400">（完了後にアトラスへ点として着地します）</span>
+          <span className="text-fg-muted">（完了後にアトラスへ点として着地します）</span>
         </div>
       )}
 

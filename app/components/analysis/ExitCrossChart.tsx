@@ -107,7 +107,7 @@ function dayRow(c: DayCell, best: boolean) {
       </td>
       <td className="py-1 px-2 text-right font-medium text-gray-900">{bp(c.mean)}</td>
       <td className="py-1 px-2 text-right text-gray-500">±{bp(c.se)}</td>
-      <td className={`py-1 px-2 text-right font-medium ${Math.abs(c.t) >= 1.96 ? "text-blue-700" : "text-gray-400"}`}>
+      <td className={`py-1 px-2 text-right font-medium ${Math.abs(c.t) >= 1.96 ? "text-blue-700" : "text-fg-muted"}`}>
         {c.t.toFixed(2)}
       </td>
       <td className="py-1 px-2 text-right text-gray-700">{c.sharpe.toFixed(2)}</td>
@@ -158,7 +158,7 @@ export default function ExitCrossChart({ tickers, pricesByTicker, names }: Props
         <h3 className="text-sm font-semibold text-gray-800">
           曜日固定エグジット 横断：月曜Open建玉 → 週内どこで降りるのが最良か
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           {result.nTickers}銘柄プール / 同一週=1クラスタのクラスタ頑健SE / {result.from}〜{result.to}
         </span>
       </div>
@@ -230,7 +230,7 @@ export default function ExitCrossChart({ tickers, pricesByTicker, names }: Props
             </tr>
           </tbody>
         </table>
-        <p className="mt-1 text-[10px] text-gray-400">
+        <p className="mt-1 text-[10px] text-fg-muted">
           μ・SEは銘柄×週プールの平均リターンとクラスタ頑健SE（同一週=1クラスタ）。t≥1.96で有意。
           のべ {result.byDay[0]?.nObs.toLocaleString()} 観測 → 実効標本 nEff ≈ {Math.round(best.nEff).toLocaleString()}（横断相関で目減り）。
           Sharpeはプール週次の年率換算（記述用）。
@@ -246,7 +246,7 @@ export default function ExitCrossChart({ tickers, pricesByTicker, names }: Props
           {[1, 2, 3, 4, 5].map((d) => (
             <span key={d} className="inline-flex items-center gap-1 rounded bg-gray-50 border border-gray-200 px-1.5 py-0.5">
               <b className="text-gray-700">{exitDayLabel(d)}</b>
-              <span className="text-gray-400">×{dist.get(d) ?? 0}</span>
+              <span className="text-fg-muted">×{dist.get(d) ?? 0}</span>
             </span>
           ))}
         </div>
@@ -256,7 +256,7 @@ export default function ExitCrossChart({ tickers, pricesByTicker, names }: Props
             {result.perTicker.map((p) => (
               <span key={p.ticker} className="text-gray-600">
                 {p.name}: <b>{exitDayLabel(p.bestDay)}</b>{" "}
-                <span className="text-gray-400">
+                <span className="text-fg-muted">
                   (Sh {p.bestSharpe.toFixed(2)} / 金曜 {p.holdSharpe.toFixed(2)})
                 </span>
               </span>

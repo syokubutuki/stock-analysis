@@ -34,7 +34,7 @@ export default function RiskRatiosChart({ prices }: Props) {
           <div key={c.label} className={`p-2 rounded border ${c.good ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"}`}>
             <div className="text-gray-500">{c.label}</div>
             <div className="font-mono font-bold text-gray-800">{c.value}</div>
-            <div className="text-[10px] text-gray-400 leading-tight">{c.hint}</div>
+            <div className="text-[10px] text-fg-muted leading-tight">{c.hint}</div>
           </div>
         ))}
       </div>

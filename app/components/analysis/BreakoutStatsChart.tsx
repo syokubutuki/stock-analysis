@@ -82,7 +82,7 @@ export default function BreakoutStatsChart({ prices }: Props) {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-gray-400">※「方向調整」: 下抜けは下落で当たりのため符号反転。プラス＝ブレイク方向に動いた。引け維持率＝日中ブレイクが引けでも維持された割合（高いほどだましが少ない）。</p>
+      <p className="text-[11px] text-fg-muted">※「方向調整」: 下抜けは下落で当たりのため符号反転。プラス＝ブレイク方向に動いた。引け維持率＝日中ブレイクが引けでも維持された割合（高いほどだましが少ない）。</p>
 
       {/* ブレイク追随戦略を B&H と比較（往復回数を実測してコストを実額控除） */}
       <div className="pt-2 border-t border-gray-100 space-y-2">

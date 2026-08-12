@@ -604,7 +604,7 @@ export default function CorrelationDragChart({
             <span className="text-xs font-semibold text-gray-700">
               あなたのウォッチリスト {measured.n} 銘柄の実測
             </span>
-            <span className="text-[11px] text-gray-400 tabular-nums">
+            <span className="text-[11px] text-fg-muted tabular-nums">
               {measured.periods}日 / {HORIZON_CONFIG[horizon].label}
             </span>
             {followsMeasured ? (
@@ -631,12 +631,12 @@ export default function CorrelationDragChart({
                 平時 ρ ={" "}
                 <strong className="text-gray-900">{measured.rhoCalm.toFixed(2)}</strong>
                 {rhoCI?.ok && (
-                  <span className="text-gray-400">
+                  <span className="text-fg-muted">
                     {" "}
                     [{rhoCI.calmLo.toFixed(2)}, {rhoCI.calmHi.toFixed(2)}]
                   </span>
                 )}
-                <span className="text-gray-400"> （{measured.nCalmDays}日）</span>
+                <span className="text-fg-muted"> （{measured.nCalmDays}日）</span>
               </span>
             )}
             <span>
@@ -647,12 +647,12 @@ export default function CorrelationDragChart({
                 危機時 ρ ={" "}
                 <strong className="text-red-700">{rhoStressMeasured.toFixed(2)}</strong>
                 {rhoCI?.ok && (
-                  <span className="text-gray-400">
+                  <span className="text-fg-muted">
                     {" "}
                     [{rhoCI.stressLo.toFixed(2)}, {rhoCI.stressHi.toFixed(2)}]
                   </span>
                 )}
-                <span className="text-gray-400"> （{measured.nStressDays}日）</span>
+                <span className="text-fg-muted"> （{measured.nStressDays}日）</span>
               </span>
             )}
             <span className="text-gray-500">
@@ -705,7 +705,7 @@ export default function CorrelationDragChart({
                       ? "0 を跨がない（5%水準でも有意）"
                       : "0 を跨がないが弱い（5%水準では非有意）"}
                 </span>
-                <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-400">
+                <span className="ml-auto flex items-center gap-1 text-[10px] text-fg-muted">
                   ブロック長
                   {BLOCK_LENS.map((L) => (
                     <button
@@ -770,12 +770,12 @@ export default function CorrelationDragChart({
             </div>
           )}
           {ciLoading && rhoStressMeasured != null && (
-            <p className="mt-1 text-[11px] text-gray-400">
+            <p className="mt-1 text-[11px] text-fg-muted">
               Δρ の信頼区間を計算中…（ブロック・ブートストラップ400回。別スレッドで走ります）
             </p>
           )}
           {rhoCI != null && !rhoCI.ok && rhoStressMeasured != null && (
-            <p className="mt-1 text-[11px] text-gray-400">
+            <p className="mt-1 text-[11px] text-fg-muted">
               Δρ の信頼区間は算出できませんでした（{rhoCI.reason}）。
             </p>
           )}
@@ -793,7 +793,7 @@ export default function CorrelationDragChart({
               {showProfile && (
                 <div className="mt-2">
                   {profileLoading || !profile ? (
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-fg-muted">
                       {PROFILE_WINDOWS.length}通りの窓でブートストラップ中…（別スレッドで走ります）
                     </p>
                   ) : (
@@ -829,7 +829,7 @@ export default function CorrelationDragChart({
                       <div className="mt-1 overflow-x-auto">
                         <table className="w-full text-[11px] tabular-nums border-collapse">
                           <thead>
-                            <tr className="text-gray-400 text-left border-b border-gray-200">
+                            <tr className="text-fg-muted text-left border-b border-gray-200">
                               <th className="py-1 pr-2 font-medium">期間</th>
                               <th className="py-1 px-2 font-medium text-right">平時 ρ</th>
                               <th className="py-1 px-2 font-medium text-right">危機時 ρ</th>
@@ -845,7 +845,7 @@ export default function CorrelationDragChart({
                                 <td className="py-1 pr-2 text-gray-700">
                                   {p.periods}日
                                   {p.periods < p.requested && (
-                                    <span className="text-gray-400">（{p.requested}日要求）</span>
+                                    <span className="text-fg-muted">（{p.requested}日要求）</span>
                                   )}
                                 </td>
                                 <td className="py-1 px-2 text-right text-gray-500">
@@ -871,7 +871,7 @@ export default function CorrelationDragChart({
                                     ? `${p.ci.delta >= 0 ? "+" : "−"}${Math.abs(p.ci.delta).toFixed(3)}`
                                     : "—"}
                                 </td>
-                                <td className="py-1 px-2 text-right text-gray-400">
+                                <td className="py-1 px-2 text-right text-fg-muted">
                                   {p.ci.ok
                                     ? `[${p.ci.deltaLo.toFixed(2)}, ${p.ci.deltaHi.toFixed(2)}]`
                                     : "—"}
@@ -908,7 +908,7 @@ export default function CorrelationDragChart({
             <span>
               等ウェイト ={" "}
               <strong className="text-gray-900">{measured.nEffEmpirical.toFixed(2)}</strong>
-              <span className="text-gray-400">
+              <span className="text-fg-muted">
                 {" "}（実測 R も等相関近似 N/(1+(N−1)ρ̄) も同値）
               </span>
             </span>
@@ -922,10 +922,10 @@ export default function CorrelationDragChart({
               >
                 あなたの建玉ウェイト ={" "}
                 <strong>{measured.nEffHeld.toFixed(2)}</strong>
-                <span className="text-gray-400"> （{measured.nHeld}銘柄の時価構成比）</span>
+                <span className="text-fg-muted"> （{measured.nHeld}銘柄の時価構成比）</span>
               </span>
             ) : (
-              <span className="text-gray-400">
+              <span className="text-fg-muted">
                 建玉ウェイト版は保有2銘柄以上（株数入力あり）で表示
               </span>
             )}
@@ -1165,7 +1165,7 @@ export default function CorrelationDragChart({
           <div className="absolute top-1 right-2 text-right pointer-events-none rounded bg-[#fafafa]/85 px-1.5 py-0.5">
             <div className="text-[10px] text-gray-500">実質銘柄数</div>
             <div className="text-xl font-bold tabular-nums text-gray-800">
-              <span className="text-gray-400">{nAssets.toFixed(1)}</span>
+              <span className="text-fg-muted">{nAssets.toFixed(1)}</span>
               <span className="text-gray-400 text-sm"> → </span>
               <span
                 className={
@@ -1357,7 +1357,7 @@ export default function CorrelationDragChart({
                       style={{ background: r.color }}
                     />
                     <span className="tabular-nums">{r.rho.toFixed(2)}</span>{" "}
-                    <span className="text-gray-400 font-normal">{r.note}</span>
+                    <span className="text-fg-muted font-normal">{r.note}</span>
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums">{ne.toFixed(1)}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">
@@ -1384,7 +1384,7 @@ export default function CorrelationDragChart({
 
       {/* 前提（μ・σ・N）。実測が使えている項目には「実測」バッジを出す。 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 border-t border-gray-100 pt-3">
-        <span className="text-gray-400">{measured ? "前提（ρ・N・σ は実測）" : "前提（合成データ）"}</span>
+        <span className="text-fg-muted">{measured ? "前提（ρ・N・σ は実測）" : "前提（合成データ）"}</span>
         <label className="flex items-center gap-1">
           銘柄数 N
           {measured && (
@@ -1451,7 +1451,7 @@ export default function CorrelationDragChart({
           />
           %
         </label>
-        <span className="text-gray-400">
+        <span className="text-fg-muted">
           いずれも年率。
           {measured
             ? "ρ・N・σ はウォッチリストの実測値、μ だけが仮定です。手で変えると「手動」に切り替わり、上の「実測値に戻す」で戻せます。"

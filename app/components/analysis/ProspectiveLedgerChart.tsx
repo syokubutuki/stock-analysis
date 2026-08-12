@@ -165,7 +165,7 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
   };
 
   if (prices.length < 300) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(300営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(300営業日以上必要)。</div>;
   }
 
   return (
@@ -195,7 +195,7 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
       </div>
 
       {entries.length === 0 ? (
-        <div className="text-xs text-gray-400 p-3 bg-gray-50 rounded">
+        <div className="text-xs text-fg-muted p-3 bg-gray-50 rounded">
           台帳は空です。エッジを凍結すると、ここに行が追加され、以後アプリを開くたびに「凍結後の新データだけ」で成績が更新されていきます。
         </div>
       ) : (
@@ -242,7 +242,7 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
                         </td>
                       </>
                     ) : (
-                      <td colSpan={5} className="px-1.5 text-gray-400">{mine ? "評価不能(エッジ定義が変更された可能性)" : "この銘柄を検索すると採点されます"}</td>
+                      <td colSpan={5} className="px-1.5 text-fg-muted">{mine ? "評価不能(エッジ定義が変更された可能性)" : "この銘柄を検索すると採点されます"}</td>
                     )}
                     <td className="text-right px-1">
                       <button

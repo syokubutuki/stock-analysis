@@ -87,7 +87,7 @@ export default function SignalIntradayChart({ ticker }: Props) {
       <LoadingError loading={loading} error={error} />
 
       {!loading && !error && !res && (
-        <div className="text-sm text-gray-400 py-6 text-center">この足ではシグナル日が不足しています（60分足を推奨）。</div>
+        <div className="text-sm text-fg-muted py-6 text-center">この足ではシグナル日が不足しています（60分足を推奨）。</div>
       )}
 
       {!loading && !error && res && (

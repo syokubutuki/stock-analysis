@@ -126,12 +126,12 @@ export default function IntradayRangeChart({ prices, period }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">平均レンジ</div>
           <div className="font-mono font-medium">{pct(stats.meanRange)}%</div>
-          <div className="text-gray-400">中央値: {pct(stats.medianRange)}%</div>
+          <div className="text-fg-muted">中央値: {pct(stats.medianRange)}%</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">標準偏差</div>
           <div className="font-mono font-medium">{pct(stats.stdRange)}%</div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             最大: {pct(stats.maxRange)}%
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function IntradayRangeChart({ prices, period }: Props) {
           <div className={`font-mono font-medium ${stats.rangeAutocorr > 0.3 ? "text-orange-600" : ""}`}>
             {stats.rangeAutocorr.toFixed(3)}
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {stats.rangeAutocorr > 0.3
               ? "強いクラスタリング"
               : stats.rangeAutocorr > 0.1
@@ -153,7 +153,7 @@ export default function IntradayRangeChart({ prices, period }: Props) {
           <div className={`font-mono font-medium ${Math.abs(stats.rangeVolumeCorr) > 0.3 ? "text-blue-600" : ""}`}>
             {stats.rangeVolumeCorr.toFixed(3)}
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {stats.rangeVolumeCorr > 0.3
               ? "正の相関 (出来高↑→レンジ↑)"
               : stats.rangeVolumeCorr < -0.3

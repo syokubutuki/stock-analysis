@@ -71,7 +71,7 @@ export default function InvestorBiasCoach({ prices }: Props) {
           この銘柄のデータで裏づけるバイアス
         </div>
         {evidence.length === 0 ? (
-          <div className="text-xs text-gray-400">データ不足（60営業日以上が必要）</div>
+          <div className="text-xs text-fg-muted">データ不足（60営業日以上が必要）</div>
         ) : (
           <div className="space-y-2">
             {evidence.map((e, i) => (
@@ -107,7 +107,7 @@ export default function InvestorBiasCoach({ prices }: Props) {
           いまの局面で注意すべきこと
         </div>
         {!coach.metrics.enoughData ? (
-          <div className="text-xs text-gray-400">データ不足（60営業日以上が必要）</div>
+          <div className="text-xs text-fg-muted">データ不足（60営業日以上が必要）</div>
         ) : (
           <div className="space-y-2">
             {coach.signals.map((s, i) => {
@@ -158,7 +158,7 @@ export default function InvestorBiasCoach({ prices }: Props) {
                   setChecked((prev) => ({ ...prev, [c.id]: e.target.checked }))
                 }
               />
-              <span className={checked[c.id] ? "line-through text-gray-400" : ""}>
+              <span className={checked[c.id] ? "line-through text-fg-muted" : ""}>
                 {c.text}
               </span>
             </label>
@@ -198,7 +198,7 @@ export default function InvestorBiasCoach({ prices }: Props) {
                 </button>
                 {open && (
                   <div className="px-2.5 pb-2.5 text-xs space-y-1.5 bg-gray-50">
-                    <div className="text-[10px] text-gray-400">{b.en}</div>
+                    <div className="text-[10px] text-fg-muted">{b.en}</div>
                     <div>
                       <span className="text-gray-500">症状：</span>
                       <span className="text-gray-700">{b.symptom}</span>

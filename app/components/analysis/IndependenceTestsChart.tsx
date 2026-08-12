@@ -100,7 +100,7 @@ export default function IndependenceTestsChart({ prices, seriesMode }: Props) {
             </table>
           </div>
         ) : (
-          <div className="text-xs text-gray-400 p-2">データが不足しています (最低50データポイント必要)</div>
+          <div className="text-xs text-fg-muted p-2">データが不足しています (最低50データポイント必要)</div>
         )}
       </div>
 

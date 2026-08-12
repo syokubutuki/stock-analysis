@@ -168,19 +168,19 @@ export default function ConditionalEntropyChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">H(Price|Volume)</div>
           <div className="font-mono font-medium text-sm text-purple-600">{condEnt.toFixed(3)}</div>
-          <div className="text-gray-400">出来高を知った後の不確実性</div>
+          <div className="text-fg-muted">出来高を知った後の不確実性</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">過剰エントロピー</div>
           <div className="font-mono font-medium text-sm text-cyan-600">{excess.toFixed(3)}</div>
-          <div className="text-gray-400">過去-未来の相互情報量</div>
+          <div className="text-fg-muted">過去-未来の相互情報量</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">漸近率 h∞</div>
           <div className="font-mono font-medium text-sm">
             {rates.length > 0 ? rates[rates.length - 1].rate.toFixed(3) : "N/A"}
           </div>
-          <div className="text-gray-400">最長ブロックでの率</div>
+          <div className="text-fg-muted">最長ブロックでの率</div>
         </div>
       </div>
 

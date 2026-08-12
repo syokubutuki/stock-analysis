@@ -180,7 +180,7 @@ export default function EdgeDecayChart({ prices }: Props) {
   }, [result, cusumH]);
 
   if (prices.length < 400) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(400営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(400営業日以上必要)。</div>;
   }
 
   const stateBadge = result
@@ -223,7 +223,7 @@ export default function EdgeDecayChart({ prices }: Props) {
       </div>
 
       {!result ? (
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-fg-muted">
           この設定では監視を構成できません。IS期間の平均が負(そもそも発見期間にエッジが無い)か、取引数が不足しています。
           別のエッジを選ぶか、IS割合を変えてください。
         </div>

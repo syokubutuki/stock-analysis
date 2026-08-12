@@ -67,7 +67,7 @@ function CriteriaTable({
         <span className="text-xs text-gray-500">{count}回の取引から</span>
       </div>
       {count === 0 ? (
-        <p className="text-sm text-gray-400 py-4">
+        <p className="text-sm text-fg-muted py-4">
           チャート上で{title.includes("買") ? "買い" : "売り"}を打つと基準が表示されます
         </p>
       ) : (
@@ -82,11 +82,11 @@ function CriteriaTable({
                   </span>
                   <span className="font-mono font-medium text-gray-900">
                     {fmt(s.mean, s.unit)}
-                    <span className="text-gray-400 font-normal"> ±{fmt(s.std, "")}</span>
+                    <span className="text-fg-muted font-normal"> ±{fmt(s.std, "")}</span>
                   </span>
                 </div>
                 <DistributionBar stat={s} accent={accent} />
-                <div className="flex justify-between text-[11px] text-gray-400 mt-0.5">
+                <div className="flex justify-between text-[11px] text-fg-muted mt-0.5">
                   <span>
                     範囲 {fmt(s.min, "")}〜{fmt(s.max, s.unit)}
                   </span>
@@ -118,7 +118,7 @@ export default function DiscretionaryCriteriaPanel({ criteria }: Props) {
         <CriteriaTable title="買いの基準" stats={criteria.buy} count={criteria.buyCount} accent="#16a34a" />
         <CriteriaTable title="売りの基準" stats={criteria.sell} count={criteria.sellCount} accent="#dc2626" />
       </div>
-      <p className="text-[11px] text-gray-400 mt-3">
+      <p className="text-[11px] text-fg-muted mt-3">
         ※ これは過去の売買傾向の「記述」であり、将来の利益を保証するものではありません。
       </p>
 

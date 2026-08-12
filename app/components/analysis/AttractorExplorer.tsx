@@ -409,7 +409,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
       </div>
 
       {/* Operation hint */}
-      <div className="mt-1 text-center text-[10px] text-gray-400">
+      <div className="mt-1 text-center text-[10px] text-fg-muted">
         {dim === 3 ? "左ドラッグ: 回転 / 右ドラッグ: 移動 / ホイール: ズーム" : "ドラッグ: 移動 / ホイール: ズーム"}
       </div>
 
@@ -427,21 +427,21 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
             リセット
           </button>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-gray-400">速度 x{speed}</span>
+            <span className="text-[10px] text-fg-muted">速度 x{speed}</span>
             <input type="range" min={0.1} max={8} step={0.1} value={speed}
               onChange={e => setSpeed(Number(e.target.value))} className="w-20 accent-blue-600" />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-gray-400">尾長 {trailLen}</span>
+            <span className="text-[10px] text-fg-muted">尾長 {trailLen}</span>
             <input type="range" min={10} max={300} step={10} value={trailLen}
               onChange={e => setTrailLen(Number(e.target.value))} className="w-20 accent-blue-600" />
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-400 w-20 shrink-0">{normalized[scrubValue]?.time ?? "---"}</span>
+          <span className="text-[10px] text-fg-muted w-20 shrink-0">{normalized[scrubValue]?.time ?? "---"}</span>
           <input type="range" min={0} max={Math.max(0, normalized.length - 1)} value={scrubValue}
             onChange={e => handleScrub(Number(e.target.value))} className="flex-1 accent-blue-600" />
-          <span className="text-[10px] text-gray-400 w-20 text-right shrink-0">{normalized[normalized.length - 1]?.time ?? "---"}</span>
+          <span className="text-[10px] text-fg-muted w-20 text-right shrink-0">{normalized[normalized.length - 1]?.time ?? "---"}</span>
         </div>
       </div>
 

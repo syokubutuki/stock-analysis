@@ -54,10 +54,10 @@ export default function EdgePowerChart({ prices }: Props) {
   );
 
   if (prices.length < 300) {
-    return <div className="text-xs text-gray-400 p-3">データが不足しています(300営業日以上必要)。</div>;
+    return <div className="text-xs text-fg-muted p-3">データが不足しています(300営業日以上必要)。</div>;
   }
   if (!result.ok) {
-    return <div className="text-xs text-gray-400 p-3">{result.reason ?? "計算できません。"}</div>;
+    return <div className="text-xs text-fg-muted p-3">{result.reason ?? "計算できません。"}</div>;
   }
 
   const nProvable = result.rows.filter((r) => r.verdict === "provable-now").length;
@@ -127,11 +127,11 @@ export default function EdgePowerChart({ prices }: Props) {
                 </td>
                 <td className="text-right px-1 font-mono">{r.muBp.toFixed(1)}bp</td>
                 <td className="text-right px-1 font-mono">{r.srAnnual.toFixed(2)}</td>
-                <td className={`text-right px-1 font-mono ${r.t >= tStar ? "text-green-700 font-bold" : r.t >= 2 ? "text-gray-700" : "text-gray-400"}`}>{r.t.toFixed(1)}</td>
+                <td className={`text-right px-1 font-mono ${r.t >= tStar ? "text-green-700 font-bold" : r.t >= 2 ? "text-gray-700" : "text-fg-muted"}`}>{r.t.toFixed(1)}</td>
                 <td className="text-right px-1 font-mono text-gray-500">{r.mdeBp.toFixed(1)}bp</td>
                 <td className="text-right px-1.5 font-mono text-gray-600">{fmtYears(r.yearsReqTStar)}</td>
                 <td className={`text-right px-1.5 font-mono ${isFinite(r.breadthReqTStar) ? "text-gray-600" : "text-red-500"}`}>{fmtBreadth(r.breadthReqTStar)}</td>
-                <td className={`text-right px-1.5 font-mono ${r.powerAtTarget >= 0.8 ? "text-green-700" : "text-gray-400"}`}>{(r.powerAtTarget * 100).toFixed(0)}%</td>
+                <td className={`text-right px-1.5 font-mono ${r.powerAtTarget >= 0.8 ? "text-green-700" : "text-fg-muted"}`}>{(r.powerAtTarget * 100).toFixed(0)}%</td>
                 <td className="text-center px-1.5">
                   <span className={`inline-block rounded border px-1 py-0.5 text-[10px] ${VERDICT_STYLE[r.verdict]}`}>{VERDICT_LABEL[r.verdict]}</span>
                 </td>
@@ -139,7 +139,7 @@ export default function EdgePowerChart({ prices }: Props) {
             ))}
           </tbody>
         </table>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-[10px] text-fg-muted mt-1">
           MDE=最小検出可能効果(このnで検出力80%になる最小の真エッジ)。μ&lt;MDEなら「見えなくて当然」。
           年数は同じエッジ頻度で標本を伸ばす場合、銘柄は同期間を横断プールする場合(相関ρで目減り)。
         </p>
@@ -179,7 +179,7 @@ export default function EdgePowerChart({ prices }: Props) {
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-[10px] text-fg-muted mt-1">
           青=現実的なブレッドスで到達 / 橙=多数銘柄が必要 / 赤(∞)=横断相関の天井を超え、銘柄をいくら足しても不能。
           これが「本当に小さいエッジは棲息域(クロスセクション)でしか捕まえられない」ことの定量的な根拠です。
         </p>

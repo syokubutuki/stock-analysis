@@ -65,7 +65,7 @@ export default function GapClassificationChart({ prices }: Props) {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-gray-400">※「継続/逆行」は窓方向に符号を合わせた成績。プラス＝窓方向に動いた（上窓なら上昇）。</p>
+      <p className="text-[11px] text-fg-muted">※「継続/逆行」は窓方向に符号を合わせた成績。プラス＝窓方向に動いた（上窓なら上昇）。</p>
 
       <AnalysisGuide title="窓の分類と窓埋めの詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

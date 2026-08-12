@@ -454,7 +454,7 @@ export default function CCMChart({ prices }: Props) {
                     return (
                       <td key={c.key} className="py-1 px-2 text-right text-gray-700">
                         <span className="font-medium">{trial.meanRho.toFixed(3)}</span>
-                        <span className="text-gray-400 ml-1">
+                        <span className="text-fg-muted ml-1">
                           [{trial.trialRhos.map((r) => r.toFixed(2)).join(", ")}]
                         </span>
                       </td>

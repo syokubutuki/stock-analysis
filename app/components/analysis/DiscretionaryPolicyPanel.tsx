@@ -11,7 +11,7 @@ import AnalysisGuide from "./AnalysisGuide";
 const DiscretionaryChart = dynamic(() => import("./DiscretionaryChart"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[360px] bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400">
+    <div className="w-full h-[360px] bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center text-fg-muted">
       チャート読み込み中...
     </div>
   ),
@@ -100,13 +100,13 @@ export default function DiscretionaryPolicyPanel({
       </div>
 
       {!canRun && (
-        <p className="text-sm text-gray-400 py-2">
+        <p className="text-sm text-fg-muted py-2">
           買いと売りを最低1回ずつ打つと学習できます。
         </p>
       )}
 
       {ran && !result && (
-        <p className="text-sm text-gray-400 py-2">
+        <p className="text-sm text-fg-muted py-2">
           学習に十分なサンプル (特徴が揃う30日以上) がありません。
         </p>
       )}
@@ -121,7 +121,7 @@ export default function DiscretionaryPolicyPanel({
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs text-gray-500 mb-1">OOS AUC</div>
               <div className="text-lg font-bold text-gray-800">{result.oosAuc.toFixed(3)}</div>
-              <div className="text-[10px] text-gray-400">0.5=ランダム</div>
+              <div className="text-[10px] text-fg-muted">0.5=ランダム</div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs text-gray-500 mb-1">ロング状態の割合</div>
@@ -193,7 +193,7 @@ export default function DiscretionaryPolicyPanel({
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-fg-muted">
                 ※ 手数料{(costRate * 100).toFixed(2)}%・全力売買 (通貨: {currency})。学習期間 (序盤) は予測なしのため現金保有。
               </p>
             </>

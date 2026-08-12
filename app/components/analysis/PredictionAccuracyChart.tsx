@@ -67,7 +67,7 @@ export default function PredictionAccuracyChart({ prices }: Props) {
           <div key={item.label} className="p-2 bg-gray-50 rounded border border-gray-200">
             <div className="text-gray-500">{item.label}</div>
             <div className="font-mono font-bold text-lg" style={{ color: item.color }}>{(item.value * 100).toFixed(1)}%</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">{item.desc}</div>
+            <div className="text-[10px] text-fg-muted mt-0.5">{item.desc}</div>
           </div>
         ))}
       </div>

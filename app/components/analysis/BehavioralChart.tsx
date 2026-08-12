@@ -102,7 +102,7 @@ export default function BehavioralChart({ prices }: Props) {
             </tbody>
           </table>
         ) : (
-          <div className="text-xs text-gray-400">データ不足</div>
+          <div className="text-xs text-fg-muted">データ不足</div>
         )}
         <div className="text-xs text-gray-600 mt-1">{mom.interpretation}</div>
       </div>

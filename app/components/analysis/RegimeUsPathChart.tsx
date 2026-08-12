@@ -180,7 +180,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています（累積日数Kを小さくするか60分足を選択）。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています（累積日数Kを小さくするか60分足を選択）。</div>
       )}
 
       {result && selected && (
@@ -241,7 +241,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
                   <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: result.usBinColors[b] }} />
                   <span className="text-gray-600">
                     {label}
-                    <span className="text-gray-400">（{fmtBinRange(binLo(b), binHi(b))}）</span>
+                    <span className="text-fg-muted">（{fmtBinRange(binLo(b), binHi(b))}）</span>
                     {isToday && <span className="text-indigo-600 font-bold">◀今</span>}
                   </span>
                 </span>
@@ -293,7 +293,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-fg-muted">
               値が大きい基調ほど「前夜米国の方向が翌日日中に強く伝わる」。基調で値が符号反転/大小変化すれば、米国の効き方が地合い依存＝交互作用の実体。
             </p>
           </div>
@@ -306,13 +306,13 @@ export default function RegimeUsPathChart({ ticker }: Props) {
                 <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: selected.color }} />
                 <span className="font-medium text-gray-700">{selected.label}</span>
               </span>
-              <span className="text-gray-400">（n={selected.n}）— この基調の日を前夜{usLabel}ビンで分け、寄り基準の日内累積パスを描く。</span>
+              <span className="text-fg-muted">（n={selected.n}）— この基調の日を前夜{usLabel}ビンで分け、寄り基準の日内累積パスを描く。</span>
             </div>
             <PathLegend stats={selected.usStats} />
             <PathEvolutionControls stats={selected.usStats} evo={evo} />
             <div className="relative"><canvas ref={canvasRef} /></div>
             {(evo.showEras || evo.showSpaghetti) && (
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-fg-muted">
                 {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}
                 {evo.showSpaghetti && "個別日は最新ほど濃く太い。枠外に出た日はクリップされる（縦軸は平均基準のため）。"}
               </p>
@@ -336,7 +336,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
             {showDist && (
             <>
             <div className="text-xs text-gray-600">
-              <span className="text-gray-400">各立会日を所属基調の色●で原系列上にプロット。特定基調が一部期間に固まっていないか（見かけのエッジ）を確認。ホイールでズーム・ドラッグでパン。</span>
+              <span className="text-fg-muted">各立会日を所属基調の色●で原系列上にプロット。特定基調が一部期間に固まっていないか（見かけのエッジ）を確認。ホイールでズーム・ドラッグでパン。</span>
             </div>
             <div className="flex items-center gap-3 flex-wrap text-[11px]">
               {result.buckets.filter((b) => b.n > 0).map((b) => (

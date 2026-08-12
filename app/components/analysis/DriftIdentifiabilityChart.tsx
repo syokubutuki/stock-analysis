@@ -43,7 +43,7 @@ function Stat({
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -260,7 +260,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
               className="px-2 py-1.5 bg-gray-700 text-white rounded text-xs hover:bg-gray-600">読込</button>
           </div>
         )}
-        {fetching && <span className="text-xs text-gray-400">取得中… {progress.done}/{progress.total}</span>}
+        {fetching && <span className="text-xs text-fg-muted">取得中… {progress.done}/{progress.total}</span>}
       </div>
 
       {/* パラメータ */}
@@ -316,7 +316,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
       </div>
 
       {activeCount < 3 && (
-        <div className="py-8 text-center text-gray-400 text-sm">
+        <div className="py-8 text-center text-fg-muted text-sm">
           識別限界の測定には最低3銘柄が必要です。ユニバースを大型30などに切り替えてください。
         </div>
       )}
@@ -407,7 +407,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                     >
                       <td className="text-left py-1 pr-2 font-medium text-gray-700">
                         {activeNames[r.ticker] ?? r.ticker}
-                        <span className="ml-1 text-[10px] text-gray-400">{r.ticker}</span>
+                        <span className="ml-1 text-[10px] text-fg-muted">{r.ticker}</span>
                       </td>
                       <td className="text-right px-2 tabular-nums font-semibold">{pct(r.muLog)}</td>
                       <td className="text-right px-2 tabular-nums text-gray-500">{pctAbs(r.sigma)}</td>
@@ -419,7 +419,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                         {pct(r.excessMu)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(r.tExcess)}</td>
-                      <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-600" : "text-gray-400"}`}>
+                      <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-600" : "text-fg-muted"}`}>
                         {r.qExcess.toFixed(3)}
                       </td>
                       <td className="text-right px-2 tabular-nums text-amber-700">{yearsFmt(r.requiredYearsObserved)}</td>
@@ -428,13 +428,13 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                       </td>
                       <td className="text-right px-2 tabular-nums text-gray-500">
                         {r.rankLo}–{r.rankHi}
-                        <span className="ml-1 text-[10px] text-gray-400">({(r.pRankTop * 100).toFixed(0)}%)</span>
+                        <span className="ml-1 text-[10px] text-fg-muted">({(r.pRankTop * 100).toFixed(0)}%)</span>
                       </td>
                       <td className="text-center px-2">
                         {r.identifiable ? (
                           <span className="text-green-700 font-semibold">識別可</span>
                         ) : (
-                          <span className="text-gray-400">誤差内</span>
+                          <span className="text-fg-muted">誤差内</span>
                         )}
                       </td>
                     </tr>
@@ -480,7 +480,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
           <div>
             <div className="text-xs font-semibold text-gray-700 mb-1.5">
               ③ Merton の非対称性 ── データを細かくしても μ の精度は1ミリも上がらない
-              <span className="ml-2 font-normal text-gray-400">
+              <span className="ml-2 font-normal text-fg-muted">
                 対象: {freqTicker === "__MKT__" ? "市場（等加重）" : (activeNames[freqTicker] ?? freqTicker)}
               </span>
               <button

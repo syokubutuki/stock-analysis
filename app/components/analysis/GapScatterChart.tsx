@@ -197,7 +197,7 @@ export default function GapScatterChart({ prices, period }: Props) {
           <div className={`font-mono font-medium ${regression.slope < 0 ? "text-orange-600" : "text-green-600"}`}>
             {regression.slope.toFixed(4)}
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {regression.slope < -0.1
               ? "強い反転傾向"
               : regression.slope < 0
@@ -210,7 +210,7 @@ export default function GapScatterChart({ prices, period }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">決定係数 (R²)</div>
           <div className="font-mono font-medium">{regression.r2.toFixed(4)}</div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {regression.r2 > 0.1 ? "有意な関係あり" : "弱い関係"}
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function GapScatterChart({ prices, period }: Props) {
               ? ((quadrants[1].ratio + quadrants[3].ratio) * 100).toFixed(1)
               : 0}%
           </div>
-          <div className="text-gray-400">ギャップ方向と逆に動いた日の割合</div>
+          <div className="text-fg-muted">ギャップ方向と逆に動いた日の割合</div>
         </div>
       </div>
 

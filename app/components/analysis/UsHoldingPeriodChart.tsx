@@ -158,7 +158,7 @@ export default function UsHoldingPeriodChart({ ticker }: Props) {
       )}
 
       {!loading && !error && data && rows.length < 5 && (
-        <div className="text-xs text-gray-400">この米国ビンは標本が不足しています（別ビン/粗い足を選択）。</div>
+        <div className="text-xs text-fg-muted">この米国ビンは標本が不足しています（別ビン/粗い足を選択）。</div>
       )}
 
       {holding.length > 0 && (

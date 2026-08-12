@@ -485,7 +485,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             名義書換料（55円/単位）
           </label>
         </div>
-        <span className="text-[11px] text-gray-400">
+        <span className="text-[11px] text-fg-muted">
           レバ1×＝現物相当（買いは金利0、売りは貸株料のみ）。NISAは信用不可。手数料はゼロコース＝0円前提。
           諸経費は基準株価{refPrice > 0 ? ` ${Math.round(refPrice).toLocaleString()}円` : ""}で建玉notional比に換算（事務管理費は建玉1か月経過ごと、週内手仕舞いなら実質0）。逆日歩は変動のため未計上。
         </span>
@@ -547,7 +547,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             <Stat label="差の平均" value={pct(rolling.meanEdge)} sub="戦略 − NISA" color={cls(rolling.meanEdge)} />
             <Stat label="差の5–95%" value={`${pct(rolling.p5)} 〜 ${pct(rolling.p95)}`} sub="ばらつき" />
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-fg-muted">
             単年は誤差が大きいため、10年履歴を1年窓でずらして分布を見るのが頑健です。分布が全体的に0より左（赤側）なら、税・コストを踏まえると
             この戦略はNISA持ち切りに負けやすいことを意味します。
           </p>
@@ -604,10 +604,10 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             )}
             <div className="flex justify-between"><span className="text-gray-500">支払税</span><span className="text-rose-500">−{(cmp.strategy.taxPaid * 100).toFixed(2)}%</span></div>
             <div className="flex justify-between border-t border-gray-100 pt-1"><span className="text-gray-500">→ 税引後リターン（この全期間）</span><span className={`font-medium ${cls(cmp.strategy.afterTaxReturn)}`}>{pct(cmp.strategy.afterTaxReturn)}</span></div>
-            <p className="text-[11px] text-gray-400">キャリーは持ち越し日数比例（金→月の週末は3日分）。事務管理費は建玉が満1か月を跨ぐごとに課金（週内手仕舞いは0）。逆日歩（品貸料）は制度信用の売りで変動——未計上のため実際はさらに不利になり得ます。</p>
+            <p className="text-[11px] text-fg-muted">キャリーは持ち越し日数比例（金→月の週末は3日分）。事務管理費は建玉が満1か月を跨ぐごとに課金（週内手仕舞いは0）。逆日歩（品貸料）は制度信用の売りで変動——未計上のため実際はさらに不利になり得ます。</p>
           </div>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-fg-muted">
             レバkで期待リターンは概ねk倍に伸びますが、ボラ・最大DD・追証/破産確率も比例〜非線形に拡大し、キャリーコストも増えます。
             k*は「期待値でNISAに並ぶ点」であって「合理的な点」ではありません。追証・破産確率とMaxDDを見て、リスクに見合うかを判断してください。
           </p>
@@ -633,7 +633,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           <div className="flex justify-between"><span className="text-gray-500">NISA運用（枠内 {yen(yenRes.quotaUsed)}{yenRes.overflow > 0 ? ` + 超過 ${yen(yenRes.overflow)} は課税BH` : ""}）</span><span className="font-medium text-emerald-700">{yen(yenRes.nisaTotalYen)}</span></div>
           <div className="flex justify-between"><span className="text-gray-500">現物 曜日戦略（全額）</span><span className="font-medium text-blue-700">{yen(yenRes.strategyFinalYen)}</span></div>
           <div className="flex justify-between border-t border-gray-100 pt-1"><span className="text-gray-500">差（戦略 − NISA運用）</span><span className={`font-bold ${cls(yenRes.strategyFinalYen - yenRes.nisaTotalYen)}`}>{yen(yenRes.strategyFinalYen - yenRes.nisaTotalYen)}</span></div>
-          {yenRes.overflow > 0 && <p className="text-xs text-gray-400">NISA枠を超えた分は課税口座でのバイ&ホールド（清算時課税）として計上しています。</p>}
+          {yenRes.overflow > 0 && <p className="text-xs text-fg-muted">NISA枠を超えた分は課税口座でのバイ&ホールド（清算時課税）として計上しています。</p>}
         </div>
       )}
 
@@ -741,7 +741,7 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
     <div className="rounded-lg border border-gray-200 p-2">
       <div className="text-xs text-gray-500">{label}</div>
       <div className={`text-lg font-bold ${color ?? "text-gray-800"}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }

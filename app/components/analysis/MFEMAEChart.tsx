@@ -178,21 +178,21 @@ export default function MFEMAEChart({ prices, period }: Props) {
           <div className="font-mono font-medium text-green-600">
             +{pct(stats.avgMFE)}%
           </div>
-          <div className="text-gray-400">中央値: +{pct(stats.medianMFE)}%</div>
+          <div className="text-fg-muted">中央値: +{pct(stats.medianMFE)}%</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">平均MAE</div>
           <div className="font-mono font-medium text-red-600">
             -{pct(stats.avgMAE)}%
           </div>
-          <div className="text-gray-400">中央値: -{pct(stats.medianMAE)}%</div>
+          <div className="text-fg-muted">中央値: -{pct(stats.medianMAE)}%</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">MFE/MAE比</div>
           <div className={`font-mono font-medium ${stats.riskReward >= 1 ? "text-green-600" : "text-red-600"}`}>
             {stats.riskReward.toFixed(2)}
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {stats.riskReward >= 1 ? "上方向優勢" : "下方向優勢"}
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
           <div className="font-mono font-medium">
             {pct1(stats.winRate)}% / {pct1(stats.avgMFECapture)}%
           </div>
-          <div className="text-gray-400">MFE↔MAE相関: {stats.correlation.toFixed(2)}</div>
+          <div className="text-fg-muted">MFE↔MAE相関: {stats.correlation.toFixed(2)}</div>
         </div>
       </div>
 

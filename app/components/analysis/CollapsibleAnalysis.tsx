@@ -132,7 +132,7 @@ export default function CollapsibleAnalysis({
             {title}
           </span>
           {subtitle && (
-            <span className="block text-xs text-gray-400 truncate">
+            <span className="block text-xs text-fg-muted truncate">
               {subtitle}
             </span>
           )}

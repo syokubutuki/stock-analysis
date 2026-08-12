@@ -234,7 +234,7 @@ export default function NullCalibrationChart({ prices }: Props) {
         <h3 className="text-sm font-semibold text-gray-800">
           ヌル較正：曜日最適化の「偽発見の床」
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           真のエッジがゼロでも出てしまう成績を測り、実測がそれを超えているかを判定する
         </span>
       </div>
@@ -331,7 +331,7 @@ export default function NullCalibrationChart({ prices }: Props) {
         </label>
       </div>
 
-      <p className="mt-2 text-[10px] text-gray-400 leading-relaxed">{NULL_MODE_DESC[mode]}</p>
+      <p className="mt-2 text-[10px] text-fg-muted leading-relaxed">{NULL_MODE_DESC[mode]}</p>
 
       {/* 判定: 曜日構造の有無は F で判断する */}
       {result?.ok && fi && fo && tr && (
@@ -376,7 +376,7 @@ export default function NullCalibrationChart({ prices }: Props) {
       )}
 
       {loading && (
-        <div className="mt-3 text-xs text-gray-400">
+        <div className="mt-3 text-xs text-fg-muted">
           計算中…{progress ? ` ${progress.done} / ${progress.total}` : ""}
         </div>
       )}
@@ -432,7 +432,7 @@ export default function NullCalibrationChart({ prices }: Props) {
                         </td>
                         <td
                           className={`py-1 pl-2 text-right font-medium ${
-                            g === "structure" && s.pValue < 0.05 ? "text-green-700" : "text-gray-400"
+                            g === "structure" && s.pValue < 0.05 ? "text-green-700" : "text-fg-muted"
                           }`}
                         >
                           {s.pValue.toFixed(3)}
@@ -444,7 +444,7 @@ export default function NullCalibrationChart({ prices }: Props) {
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-[10px] text-gray-400 leading-relaxed">
+          <p className="mt-2 text-[10px] text-fg-muted leading-relaxed">
             {result.nDays}本 / {result.nWeeks}週 / サロゲート{result.nIter}回。p値は片側モンテカルロ
             p =（ヌルが実測以上になった回数 + 1）/（反復数 + 1）。全指標「大きいほど良い／大きいほど構造あり」に符号を揃えてあります（最大DDは負値なので0に近いほど大）。
             F はリターン系列から直接計算するため<b>評価方式には依存しません</b>（全期間最適／ウォークフォワードで同じ値になります）。

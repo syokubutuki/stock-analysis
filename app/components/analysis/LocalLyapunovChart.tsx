@@ -189,7 +189,7 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">レジーム転換数</div>
           <div className="font-bold">{lyapResult.regimeChanges.length}</div>
-          <div className="text-gray-400">λ符号変化</div>
+          <div className="text-fg-muted">λ符号変化</div>
         </div>
       </div>
 
@@ -204,7 +204,7 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
           />
           <span className="text-gray-700 font-medium w-10">{windowSize}日</span>
         </label>
-        <span className="text-gray-400">τ = {tau} (AMI自動選択)</span>
+        <span className="text-fg-muted">τ = {tau} (AMI自動選択)</span>
       </div>
 
       {/* Charts */}

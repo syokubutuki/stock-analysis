@@ -182,7 +182,7 @@ export default function TpSlOptimizerChart({ prices }: Props) {
         </div>
       </div>
 
-      {loading && <div className="text-xs text-gray-400">計算中...（Web Worker）</div>}
+      {loading && <div className="text-xs text-fg-muted">計算中...（Web Worker）</div>}
 
       {result?.best && (
         <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">

@@ -69,7 +69,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
 
   if (corr.tickers.length < 2) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-4 text-sm text-gray-400">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 text-sm text-fg-muted">
         ポートフォリオ関係性分析には2銘柄以上の取得が必要です。
       </div>
     );
@@ -88,7 +88,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
           ▶
         </span>
         <span className="font-semibold text-gray-800">ポートフォリオ関係性・合算リスク</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           ({HORIZON_CONFIG[horizon].label}窓 / 相関{corr.tickers.length}銘柄
           {risk.ok ? ` / 建玉${risk.components.length}銘柄` : ""})
         </span>
@@ -127,7 +127,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
               <Card label="評価額合計" value={yen(risk.totalMarketValue)} />
             </div>
           ) : (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-fg-muted">
               建玉(保有・株数)を入力すると、合算VaR・リスク寄与・集中度を表示します。相関行列は下に表示中。
             </div>
           )}
@@ -145,7 +145,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                     <div key={c.ticker} className="flex items-center gap-2 text-xs">
                       <span className="w-28 shrink-0 truncate text-gray-700">
                         {c.ticker}
-                        <span className="text-gray-400 ml-1">{names[c.ticker]}</span>
+                        <span className="text-fg-muted ml-1">{names[c.ticker]}</span>
                       </span>
                       <div className="flex-1 bg-gray-100 rounded h-4 relative overflow-hidden">
                         <div
@@ -160,7 +160,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                   );
                 })}
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">
+              <p className="text-[10px] text-fg-muted mt-1">
                 赤=構成比以上にリスクを抱える銘柄(ボラ高 or 他銘柄と高相関)。
               </p>
             </div>
@@ -229,7 +229,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                 ▶
               </span>
               危機時相関(DCC・動的条件付き相関)
-              {!dccOpen && <span className="text-xs text-gray-400 font-normal">クリックで計算</span>}
+              {!dccOpen && <span className="text-xs text-fg-muted font-normal">クリックで計算</span>}
             </button>
 
             {dccOpen && (
@@ -295,7 +295,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                         </p>
                       ) : (
                         !dcc.stress.ok && (
-                          <p className="text-[10px] text-gray-400 mt-2">
+                          <p className="text-[10px] text-fg-muted mt-2">
                             危機シナリオは算出できません({dcc.stress.reason})。60日の助走を取ったうえで
                             高ボラ局面を十分な日数集める必要があるため、短い分析窓(デイトレ)では表示されません。
                           </p>
@@ -305,7 +305,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                   )}
 
                   {!dcc.now.ok && (
-                    <p className="text-xs text-gray-400">建玉(株数)を入力するとストレスVaR比較を表示します。</p>
+                    <p className="text-xs text-fg-muted">建玉(株数)を入力するとストレスVaR比較を表示します。</p>
                   )}
 
                   <AnalysisGuide title="DCC・危機時相関の詳細理論">
@@ -375,7 +375,7 @@ export default function PortfolioRiskPanel({ data, watchlist, horizon }: Props) 
                   </AnalysisGuide>
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-gray-400">
+                <p className="mt-3 text-xs text-fg-muted">
                   DCC計算には2銘柄以上・各50本以上のリターンが必要です。
                 </p>
               )
@@ -455,7 +455,7 @@ function Card({
     <div className="bg-gray-50 rounded-lg border border-gray-200 p-2.5">
       <div className="text-[10px] text-gray-500">{label}</div>
       <div className={`text-base font-bold ${color || "text-gray-800"}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+      {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
 }
@@ -486,7 +486,7 @@ function ScenarioCard({
       <div className={`text-base font-bold ${danger ? "text-red-600" : "text-gray-800"}`}>
         {risk?.ok ? `${risk.var95Pct.toFixed(2)}%` : "—"}
       </div>
-      {risk?.ok && <div className="text-[10px] text-gray-400">{yen((risk.var95Pct / 100) * totalMV)}</div>}
+      {risk?.ok && <div className="text-[10px] text-fg-muted">{yen((risk.var95Pct / 100) * totalMV)}</div>}
     </div>
   );
 }

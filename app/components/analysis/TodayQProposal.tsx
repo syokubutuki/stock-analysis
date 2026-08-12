@@ -159,7 +159,7 @@ export default function TodayQProposal() {
             </button>
           ))}
         </div>
-        {loading && <span className="text-xs text-gray-400">計算中…</span>}
+        {loading && <span className="text-xs text-fg-muted">計算中…</span>}
         {error && <span className="text-xs text-rose-500">{error}</span>}
       </div>
 

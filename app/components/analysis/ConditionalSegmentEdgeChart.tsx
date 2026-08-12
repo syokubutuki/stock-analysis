@@ -151,7 +151,7 @@ export default function ConditionalSegmentEdgeChart({ prices }: Props) {
         ))}
       </div>
 
-      <div className="text-[11px] text-gray-400">
+      <div className="text-[11px] text-fg-muted">
         条件は「前日終値時点で確定する状態」で構成（＝当日の寄り前に判断可能）。全標本 {result.totalN}日 / 基準: 日中 {fmtPct(result.baseIntraday)}・夜間 {fmtPct(result.baseOvernight)}。
       </div>
 

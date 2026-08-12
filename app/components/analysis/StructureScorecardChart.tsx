@@ -70,7 +70,7 @@ export default function StructureScorecardChart({ prices }: Props) {
   const scores = useMemo(() => computeStructureScorecard(prices), [prices]);
 
   if (scores.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">データが不足しています (最低30日必要)</div>;
+    return <div className="text-sm text-fg-muted p-4">データが不足しています (最低30日必要)</div>;
   }
 
   // 総合判定の生成

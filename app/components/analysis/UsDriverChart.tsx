@@ -62,9 +62,9 @@ export default function UsDriverChart({ ticker }: Props) {
       </div>
 
       <LoadingError loading={il} error={ie} />
-      {usLoading && <div className="text-xs text-gray-400">米国指数を取得中...</div>}
+      {usLoading && <div className="text-xs text-fg-muted">米国指数を取得中...</div>}
       {!il && !ie && days && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {result && (
@@ -82,7 +82,7 @@ export default function UsDriverChart({ ticker }: Props) {
                   />
                 </div>
                 <span className="w-24 text-right font-mono text-gray-600">R² {s.r2Full.toFixed(3)}</span>
-                <span className="w-16 text-right font-mono text-gray-400">相関 {s.corrFull.toFixed(2)}</span>
+                <span className="w-16 text-right font-mono text-fg-muted">相関 {s.corrFull.toFixed(2)}</span>
               </div>
             ))}
           </div>
@@ -151,7 +151,7 @@ export default function UsDriverChart({ ticker }: Props) {
                   <div className="p-2 rounded border border-amber-200 bg-amber-50">
                     <div className="text-gray-500">逆符号日→米国方向へ修正</div>
                     <div className="font-mono font-medium text-base text-amber-700">{fmtPct0(divergence.followUsRate)}</div>
-                    <div className="text-[10px] text-gray-400">日中が米国符号だった割合</div>
+                    <div className="text-[10px] text-fg-muted">日中が米国符号だった割合</div>
                   </div>
                   <div className="p-2 rounded border border-gray-200 bg-gray-50 flex items-center">
                     <StatBadge n={divergence.divergeN} p={divergence.pDiverge} significant={divergence.pDiverge < 0.05} />
@@ -169,7 +169,7 @@ export default function UsDriverChart({ ticker }: Props) {
                 </div>
               </>
             ) : (
-              <p className="text-xs text-gray-400">逆符号(乖離)日が少なく分析できません。</p>
+              <p className="text-xs text-fg-muted">逆符号(乖離)日が少なく分析できません。</p>
             )}
           </div>
         </>

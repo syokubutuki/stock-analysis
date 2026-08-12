@@ -82,7 +82,7 @@ export default function BenchmarkDCCChart({ prices, ticker = "銘柄" }: Props) 
           ))}
         </div>
       </div>
-      {loading && <div className="text-xs text-gray-400">ベンチマーク読み込み中...</div>}
+      {loading && <div className="text-xs text-fg-muted">ベンチマーク読み込み中...</div>}
       {error && <div className="text-xs text-red-500">{error}</div>}
 
       {dcc && (

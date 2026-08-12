@@ -79,7 +79,7 @@ export default function FeedbackForm() {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <div className="flex items-center justify-between mt-1">
-          <span className={`text-xs ${tooLong ? "text-red-500" : "text-gray-400"}`}>
+          <span className={`text-xs ${tooLong ? "text-red-500" : "text-fg-muted"}`}>
             {comment.length} / {MAX_LEN} 文字
           </span>
           {status === "error" && (
@@ -101,7 +101,7 @@ export default function FeedbackForm() {
         </Link>
       </div>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-fg-muted">
         ※ 入力内容は機能改善の目的にのみ利用します。個人を特定する情報の入力は不要です。
       </p>
     </form>

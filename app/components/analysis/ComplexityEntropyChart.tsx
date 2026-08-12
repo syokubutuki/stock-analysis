@@ -170,17 +170,17 @@ export default function ComplexityEntropyChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Lempel-Ziv (正規化)</div>
           <div className="font-mono font-medium text-sm">{lz.toFixed(3)}</div>
-          <div className="text-gray-400">{lz < 0.5 ? "低複雑度(構造的)" : lz > 0.8 ? "高複雑度(ランダム)" : "中程度"}</div>
+          <div className="text-fg-muted">{lz < 0.5 ? "低複雑度(構造的)" : lz > 0.8 ? "高複雑度(ランダム)" : "中程度"}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Kolmogorov近似</div>
           <div className="font-mono font-medium text-sm">{kolm.toFixed(3)}</div>
-          <div className="text-gray-400">圧縮比 (低い=構造的)</div>
+          <div className="text-fg-muted">圧縮比 (低い=構造的)</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Statistical Complexity</div>
           <div className="font-mono font-medium text-sm text-purple-600">{sc.toFixed(4)}</div>
-          <div className="text-gray-400">JSD×PE</div>
+          <div className="text-fg-muted">JSD×PE</div>
         </div>
       </div>
 

@@ -117,7 +117,7 @@ export default function CrossCorrelogramChart({ prices }: Props) {
           <div className="font-mono font-medium">
             Lag {maxCCF.lag} ({maxCCF.value.toFixed(4)})
           </div>
-          <div className="text-gray-400">
+          <div className="text-fg-muted">
             {maxCCF.lag < 0 ? "日中→夜間の影響" : maxCCF.lag > 0 ? "夜間→日中の影響" : "同時"}
           </div>
         </div>

@@ -194,7 +194,7 @@ export default function DrawdownChart({ prices, period }: Props) {
       {/* 株価 vs 高値更新線 */}
       <div className="mb-2 text-xs text-gray-500 font-medium">
         <span className="text-gray-800">株価</span> vs{" "}
-        <span className="text-gray-400">高値更新線 (Running Peak)</span>
+        <span className="text-fg-muted">高値更新線 (Running Peak)</span>
       </div>
       <div ref={uwChartRef} className="w-full rounded border border-gray-100 mb-4" />
 

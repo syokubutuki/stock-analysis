@@ -186,7 +186,7 @@ export default function PeriodicPhaseAttractorChart({ prices, seriesMode }: Prop
             <span>位相0</span>
             <div className="w-32 h-2 rounded" style={{ background: "linear-gradient(to right, hsl(0,70%,50%), hsl(120,70%,50%), hsl(240,70%,50%), hsl(359,70%,50%))" }} />
             <span>位相{result.period - 1}</span>
-            <span className="text-gray-400">(大きい点=位相重心 / 破線=巡回パス)</span>
+            <span className="text-fg-muted">(大きい点=位相重心 / 破線=巡回パス)</span>
           </div>
 
           <AnalysisGuide title="一般周期 位相アトラクタの詳細理論">

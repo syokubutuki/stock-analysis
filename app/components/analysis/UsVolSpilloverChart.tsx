@@ -95,7 +95,7 @@ export default function UsVolSpilloverChart({ ticker }: Props) {
 
       <LoadingError loading={loading} error={error} />
       {!loading && !error && data && !result && (
-        <div className="text-xs text-gray-400">整合できた標本が不足しています。</div>
+        <div className="text-xs text-fg-muted">整合できた標本が不足しています。</div>
       )}
 
       {result && (
@@ -104,13 +104,13 @@ export default function UsVolSpilloverChart({ ticker }: Props) {
             <div className="p-2 rounded border border-red-200 bg-red-50">
               <div className="text-gray-500">実現ボラ 感応 β</div>
               <div className="font-mono font-medium text-base">{result.volReg.beta.toFixed(2)}</div>
-              <div className="text-[10px] text-gray-400">相関 {result.volReg.corr.toFixed(2)} / R² {result.volReg.r2.toFixed(2)}</div>
+              <div className="text-[10px] text-fg-muted">相関 {result.volReg.corr.toFixed(2)} / R² {result.volReg.r2.toFixed(2)}</div>
               <div className="mt-0.5"><StatBadge n={result.volReg.n} p={result.volReg.pBeta} significant={result.volReg.pBeta < 0.05} /></div>
             </div>
             <div className="p-2 rounded border border-amber-200 bg-amber-50">
               <div className="text-gray-500">高安レンジ 感応 β</div>
               <div className="font-mono font-medium text-base">{result.rangeReg.beta.toFixed(2)}</div>
-              <div className="text-[10px] text-gray-400">相関 {result.rangeReg.corr.toFixed(2)} / R² {result.rangeReg.r2.toFixed(2)}</div>
+              <div className="text-[10px] text-fg-muted">相関 {result.rangeReg.corr.toFixed(2)} / R² {result.rangeReg.r2.toFixed(2)}</div>
               <div className="mt-0.5"><StatBadge n={result.rangeReg.n} p={result.rangeReg.pBeta} significant={result.rangeReg.pBeta < 0.05} /></div>
             </div>
           </div>
@@ -136,7 +136,7 @@ export default function UsVolSpilloverChart({ ticker }: Props) {
               ))}
             </div>
             <div className="relative"><canvas ref={pathRef} /></div>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-fg-muted">
               赤(米国大変動)の線が寄り直後に高く盛り上がるほど、荒れた米国の翌日は「寄り集中型」のボラ。
               終日高止まりなら終日荒れる。
             </p>

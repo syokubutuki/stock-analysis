@@ -547,7 +547,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
         <h3 className="text-sm font-semibold text-gray-800">
           曜日 × 前夜米国：交互作用の解剖（日足・フル標本）
         </h3>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-fg-muted">
           米国の「伝わり方」が曜日で違うかを、ビンではなく連続回帰で判定する
         </span>
       </div>
@@ -646,7 +646,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
         </label>
       </div>
 
-      <p className="mt-2 text-[10px] text-gray-400 leading-relaxed">
+      <p className="mt-2 text-[10px] text-fg-muted leading-relaxed">
         {tm.desc}
       </p>
 
@@ -656,7 +656,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
         </div>
       )}
       {loading && (
-        <div className="mt-3 text-xs text-gray-400">
+        <div className="mt-3 text-xs text-fg-muted">
           計算中…{progress ? ` ${progress.done} / ${progress.total}` : ""}
         </div>
       )}
@@ -765,7 +765,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                         >
                           {num(d.beta)}
                         </td>
-                        <td className="py-1 px-2 text-right text-gray-400">{num(d.betaSe)}</td>
+                        <td className="py-1 px-2 text-right text-fg-muted">{num(d.betaSe)}</td>
                         <td className="py-1 px-2 text-right text-gray-500">
                           [{num(d.betaLo)}, {num(d.betaHi)}]
                         </td>
@@ -779,7 +779,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                         </td>
                         <td
                           className={`py-1 px-2 text-right ${
-                            d.meanHours > 40 ? "text-blue-700 font-medium" : "text-gray-400"
+                            d.meanHours > 40 ? "text-blue-700 font-medium" : "text-fg-muted"
                           }`}
                         >
                           {d.meanHours.toFixed(0)}h
@@ -791,7 +791,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                   })}
                 </tbody>
               </table>
-              <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+              <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
                 {target === "over" ? (
                   <>
                     <b>引→翌寄 時間</b>が金曜だけ大きいのが要点です（当日引け→翌営業日寄りの平均
@@ -842,18 +842,18 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                       <td className="py-1 pr-2 text-gray-700">{dn(d.dow)}</td>
                       <td className="py-1 px-2 text-right text-gray-900">
                         {num(d.betaUp)}
-                        <span className="text-gray-400"> ±{num(1.96 * d.betaUpSe)}</span>
+                        <span className="text-fg-muted"> ±{num(1.96 * d.betaUpSe)}</span>
                       </td>
                       <td className="py-1 px-2 text-right text-gray-900">
                         {num(d.betaDn)}
-                        <span className="text-gray-400"> ±{num(1.96 * d.betaDnSe)}</span>
+                        <span className="text-fg-muted"> ±{num(1.96 * d.betaDnSe)}</span>
                       </td>
                       <td className="py-1 px-2 text-right text-gray-700">
                         {num(d.betaUp - d.betaDn)}
                       </td>
                       <td
                         className={`py-1 pl-2 text-right font-medium ${
-                          d.asymP < 0.05 ? "text-amber-700" : "text-gray-400"
+                          d.asymP < 0.05 ? "text-amber-700" : "text-fg-muted"
                         }`}
                       >
                         {pStr(d.asymP)}
@@ -862,7 +862,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                   ))}
                 </tbody>
               </table>
-              <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+              <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
                 <b>β⁺ の曜日均一性</b>: Q = {num(main.homBetaUp.q)}、置換 p ={" "}
                 {pStr(main.homBetaUp.pPerm)} / Wald p = {pStr(main.homBetaUp.pWald)}。{" "}
                 <b>β⁻ の曜日均一性</b>: Q = {num(main.homBetaDn.q)}、置換 p ={" "}
@@ -922,7 +922,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                     {binLabels.map((l, b) => (
                       <th key={b} className="py-1 px-1 font-medium text-center">
                         <div>{l}</div>
-                        <div className="text-[9px] text-gray-400 font-normal">
+                        <div className="text-[9px] text-fg-muted font-normal">
                           全曜日平均 {bp(main.binMeans[b])}
                         </div>
                       </th>
@@ -978,7 +978,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                   ))}
                 </tbody>
               </table>
-              <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+              <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
                 <span className="text-green-700">★</span>＝maxT 補正後も有意（セル
                 {main.cells.filter((c) => c.n >= 10).length}個で FWER 5%）、
                 <span className="text-amber-600">†</span>
@@ -1026,7 +1026,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                         <tr key={`${c.dow}-${c.bin}`} className="border-b border-gray-100">
                           <td className="py-1 pr-2 text-gray-700">
                             {dn(c.dow)} × {isOver ? "当夜" : "前夜"}米国 {binLabels[c.bin]}
-                            <span className="text-gray-400">
+                            <span className="text-fg-muted">
                               {" "}
                               → {tm.short}を{c.mean >= 0 ? "買" : "売"}
                             </span>
@@ -1041,7 +1041,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                           </td>
                           <td
                             className={`py-1 px-2 text-right font-medium ${
-                              net > 0 ? "text-green-700" : "text-gray-400"
+                              net > 0 ? "text-green-700" : "text-fg-muted"
                             }`}
                           >
                             {bp(net)}
@@ -1051,14 +1051,14 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                           </td>
                           <td
                             className={`py-1 px-2 text-right ${
-                              annual > 0 ? "text-gray-800" : "text-gray-400"
+                              annual > 0 ? "text-gray-800" : "text-fg-muted"
                             }`}
                           >
                             {(annual * 100).toFixed(1)}%
                           </td>
                           <td
                             className={`py-1 pl-2 text-right ${
-                              c.pAdj < 0.05 ? "text-green-700 font-medium" : "text-gray-400"
+                              c.pAdj < 0.05 ? "text-green-700 font-medium" : "text-fg-muted"
                             }`}
                           >
                             {c.pAdj.toFixed(3)}
@@ -1068,7 +1068,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                     })}
                 </tbody>
               </table>
-              <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+              <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
                 方向は平均の符号に合わせた片側建玉として計算しています（コスト後＝|平均|−往復コスト）。
                 <b>補正 p が 0.05 を超えている行に資金を置いてはいけません</b>
                 。年率寄与が魅力的に見えても、それは
@@ -1134,14 +1134,14 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                           className={`py-1 px-2 text-right font-medium ${
                             o.homBeta.pPerm < 0.05 && o.homBeta.pWald < 0.05
                               ? "text-green-700"
-                              : "text-gray-400"
+                              : "text-fg-muted"
                           }`}
                         >
                           {pStr(o.homBeta.pPerm)} / {pStr(o.homBeta.pWald)}
                         </td>
                         <td
                           className={`py-1 px-2 text-right ${
-                            o.fIntP < 0.05 ? "text-green-700 font-medium" : "text-gray-400"
+                            o.fIntP < 0.05 ? "text-green-700 font-medium" : "text-fg-muted"
                           }`}
                         >
                           {num(o.fInt)}（{pStr(o.fIntP)}）
@@ -1156,7 +1156,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                   })}
                 </tbody>
               </table>
-              <ul className="mt-1 text-[10px] text-gray-400 leading-relaxed list-disc pl-4 space-y-0.5">
+              <ul className="mt-1 text-[10px] text-fg-muted leading-relaxed list-disc pl-4 space-y-0.5">
                 {[...result.robust].map((o) => (
                   <li key={o.filter}>
                     <b>{FILTER_LABEL[o.filter]}</b>：{FILTER_WHY[o.filter]}
@@ -1217,7 +1217,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                         <span style={{ color: DOW_COLOR[d - 1] }}>{dn(d)}</span>
                       </span>
                     ))}
-                    <span className="flex items-center gap-1 text-gray-400">
+                    <span className="flex items-center gap-1 text-fg-muted">
                       <span className="inline-block w-3 h-0.5 bg-gray-400" />
                       共通β
                     </span>
@@ -1278,7 +1278,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                             {[0, 1, 2, 3, 4].map((d) => (
                               <td key={d} className="py-1 px-2 text-right text-gray-900">
                                 {num(row.b[d])}
-                                <span className="text-gray-400"> ±{num(1.96 * row.se[d])}</span>
+                                <span className="text-fg-muted"> ±{num(1.96 * row.se[d])}</span>
                               </td>
                             ))}
                           </tr>
@@ -1301,7 +1301,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                                 }`}
                               >
                                 {num(diff)}
-                                <span className="text-gray-400"> ({num(z)}SE)</span>
+                                <span className="text-fg-muted"> ({num(z)}SE)</span>
                               </td>
                             );
                           })}
@@ -1367,7 +1367,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                             </td>
                             <td
                               className={`py-1 pl-2 text-right ${
-                                yb.pWald < 0.05 ? "text-green-700 font-medium" : "text-gray-400"
+                                yb.pWald < 0.05 ? "text-green-700 font-medium" : "text-fg-muted"
                               }`}
                             >
                               {num(yb.q)}（{pStr(yb.pWald)}）
@@ -1376,7 +1376,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                         ))}
                       </tbody>
                     </table>
-                    <p className="mt-1 text-[10px] text-gray-400 leading-relaxed">
+                    <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">
                       年別の Q は 1年ぶん（各曜日 約50本）しかないので、
                       <b>個別の年の p 値は検出力がほぼありません</b>
                       。ここで見るべきは有意性ではなく<b>符号と順位の安定性</b>です。
@@ -1395,7 +1395,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
             )}
           </section>
 
-          <p className="mt-4 text-[10px] text-gray-400 leading-relaxed">
+          <p className="mt-4 text-[10px] text-fg-muted leading-relaxed">
             {result.nDays}日 / {result.nWeeks}週 / 置換{main ? result.params.nIter : 0}回 × 4標本。
             ドライバ＝{US_DRIVERS.find((d) => d.ticker === usTicker)?.label ?? usTicker}
             （国内営業日ごとに「その日の寄り付きより厳密に前の、最後の米国セッション」の終値騰落率）。

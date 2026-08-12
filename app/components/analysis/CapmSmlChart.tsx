@@ -220,7 +220,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
           ▶
         </span>
         <span className="font-semibold text-gray-800">証券市場線(SML)・β・Jensenのα(CAPM)</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-fg-muted">
           {result ? `(対 ${result.benchName} / ${result.assets.length}銘柄 / ${result.nObs}本)` : ""}
         </span>
       </button>
@@ -265,10 +265,10 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
               />
               <span>
                 μ・α を<strong>算術平均</strong>で計算
-                <span className="text-gray-400">（実験・既定オフ・フロンティアと共有）</span>
+                <span className="text-fg-muted">（実験・既定オフ・フロンティアと共有）</span>
               </span>
             </label>
-            {bench.loading && <span className="text-gray-400">指数取得中…</span>}
+            {bench.loading && <span className="text-fg-muted">指数取得中…</span>}
           </div>
 
           {isUsBench && (
@@ -279,7 +279,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
           )}
 
           {!result ? (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-fg-muted">
               {bench.error
                 ? `指数の取得に失敗しました(${bench.error})。`
                 : "共通営業日が不足しています。銘柄数・期間・ベンチマークを見直してください。"}
@@ -313,7 +313,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] tabular-nums">
                   <thead>
-                    <tr className="text-gray-400 text-left border-b border-gray-200">
+                    <tr className="text-fg-muted text-left border-b border-gray-200">
                       <th className="py-1 pr-2 font-medium">銘柄</th>
                       <th className="py-1 px-2 font-medium text-right">β</th>
                       <th className="py-1 px-2 font-medium text-right">α(年率)</th>
@@ -338,7 +338,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                           >
                             <td className="py-1 pr-2 text-gray-700">
                               <span className="font-medium">{a.ticker}</span>
-                              <span className="text-gray-400 ml-1 hidden sm:inline truncate">{names[a.ticker]}</span>
+                              <span className="text-fg-muted ml-1 hidden sm:inline truncate">{names[a.ticker]}</span>
                             </td>
                             <td className="py-1 px-2 text-right text-gray-700">{a.beta.toFixed(2)}</td>
                             <td className={`py-1 px-2 text-right ${a.alphaAnnual >= 0 ? "text-emerald-600" : "text-red-600"}`}>
@@ -346,7 +346,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                               {(a.alphaAnnual * 100).toFixed(1)}%
                             </td>
                             <td className="py-1 px-2 text-right text-gray-600">{(a.mu * 100).toFixed(1)}%</td>
-                            <td className="py-1 px-2 text-right text-gray-400">{(a.capmExpected * 100).toFixed(1)}%</td>
+                            <td className="py-1 px-2 text-right text-fg-muted">{(a.capmExpected * 100).toFixed(1)}%</td>
                             <td className="py-1 px-2 text-right text-gray-500">{a.corr.toFixed(2)}</td>
                             <td className="py-1 px-2 text-right text-gray-500">
                               {isFinite(a.treynor) ? (a.treynor * 100).toFixed(1) : "—"}
@@ -365,13 +365,13 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                         {(result.portfolioAlphaAnnual * 100).toFixed(1)}%
                       </td>
                       <td className="py-1 px-2 text-right">{(result.portfolioMu * 100).toFixed(1)}%</td>
-                      <td className="py-1 px-2 text-right text-gray-400" colSpan={4}></td>
+                      <td className="py-1 px-2 text-right text-fg-muted" colSpan={4}></td>
                     </tr>
                   </tbody>
                 </table>
                 {/* μ の定義を明記する。詳細は docs/portfolio-analysis-open-issues.md §1.7 */}
                 {result.muMode === "log" ? (
-                  <p className="text-[10px] text-gray-400 mt-1">
+                  <p className="text-[10px] text-fg-muted mt-1">
                     「実現μ」「α」は<strong>対数リターンの平均×252</strong>から計算しています（＝実現した幾何平均に相当）。
                     単純リターンの算術平均より各銘柄 σᵢ²/2 だけ低いため、
                     <strong>高ボラ銘柄の α はその分だけ控えめに出ます</strong>（σ=35%で約 6pp、σ=60%で約 19pp の水準差。

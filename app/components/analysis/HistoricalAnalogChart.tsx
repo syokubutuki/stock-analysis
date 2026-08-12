@@ -118,7 +118,7 @@ export default function HistoricalAnalogChart({ prices }: Props) {
           （上昇 {result.upCount}件 / 下落 {result.downCount}件）。
         </div>
       ) : (
-        <div className="text-xs text-gray-400">データ不足（期間を長くしてください）</div>
+        <div className="text-xs text-fg-muted">データ不足（期間を長くしてください）</div>
       )}
 
       <div className="relative"><canvas ref={canvasRef} /></div>
