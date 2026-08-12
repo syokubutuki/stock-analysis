@@ -1,0 +1,19 @@
+{
+  "description": "Yahoo!ファイナンス投信履歴ページのRSC initialDataを縮約し、認証情報を除去したfixture。JWTを取得できない配信版で使う暫定フォールバックの形を固定する。",
+  "observedAt": "2026-08-12",
+  "sourceUrl": "https://finance.yahoo.co.jp/quote/0331418A/history",
+  "networkObservation": {
+    "browserHistoryEndpoint": "/bff-quote/v1/ajax/funds/history",
+    "requiredForBff": [
+      "x-jwt-token",
+      "Cookie"
+    ],
+    "refererRequiredInObservation": false,
+    "rscFallback": "履歴ページへfromDate、toDate、timeFrameId=d、pageを指定し、Accept: text/x-componentとRSC: 1で取得するとinitialData.response.historyTableが返る"
+  },
+  "stability": "BFFとRSCはいずれもYahoo!ファイナンス画面内部の非公開契約。RSCパースはJWTを取得できない配信版に限る壊れやすい暫定経路。",
+  "rateLimit": "公開された投信履歴APIのレート制限は確認できなかったため、RSC暫定経路は同時取得数を2に制限する。",
+  "termsReview": "Yahoo!ファイナンスの注記事項とLINEヤフー共通利用規約を確認したが、投信履歴BFF/RSCを第三者が利用するための公開API契約は確認できなかった。",
+  "page1": "32:[\"$\",\"$L40\",null,{\"code\":\"0331418A\",\"initialData\":{\"isSuccess\":true,\"response\":{\"historyTable\":{\"items\":[{\"date\":\"2026/8/10\",\"price\":\"38,395\",\"priceChange\":\"+93\",\"netAssetsBalance\":\"13,459,603\",\"priceChangeMove\":\"rising\"}],\"hasNext\":true},\"paging\":{\"page\":1,\"size\":20,\"totalPage\":2,\"totalSize\":21,\"hasNext\":true}}}}]",
+  "page2": "32:[\"$\",\"$L40\",null,{\"code\":\"0331418A\",\"initialData\":{\"isSuccess\":true,\"response\":{\"historyTable\":{\"items\":[{\"date\":\"2026/7/10\",\"price\":\"38,334\",\"priceChange\":\"+173\",\"netAssetsBalance\":\"13,083,052\",\"priceChangeMove\":\"rising\"}],\"hasNext\":false},\"paging\":{\"page\":2,\"size\":20,\"totalPage\":2,\"totalSize\":21,\"hasNext\":false}}}}]"
+}
