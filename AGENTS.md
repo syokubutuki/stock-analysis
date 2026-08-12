@@ -25,7 +25,18 @@ TypeScript、React 関数コンポーネント、2 スペースインデント�
 
 ## Testing Guidelines
 
-最低限 `npm run lint` と `npm run build` を通します。チャートや操作を変更した場合は、デスクトップと狭い画面で対象フローをブラウザ確認し、読み込み中・空・エラー状態、リサイズ、後始末、ズーム／パン、データ品質表示も確認してください。
+最低限 `npm run lint`、`npm test`、`npm run build` を通します。3 つは CI（`.github/workflows/ci.yml`）でも自動実行されます。チャートや操作を変更した場合は、デスクトップと狭い画面で対象フローをブラウザ確認し、読み込み中・空・エラー状態、リサイズ、後始末、ズーム／パン、データ品質表示も確認してください。
+
+数値計算の自動テストは `app/lib/__tests__/` にあります。ランナーは Node 標準の `node:test`、TypeScript は `tsx` で読み込みます（追加の依存はありません）。
+
+**方式は黄金値（golden value）です。** 数式の正しさを証明するのではなく、固定フィクスチャに対する出力を記録して意図しない変化を検知します。したがって計算を意図的に変えたときはテストが落ちるのが正常で、変更が正しいと判断したうえで黄金値を録り直してください。
+
+- フィクスチャは `app/lib/__tests__/fixtures/price-fixtures.json`（生成物・手で編集しない）。再生成は `npm run test:fixtures`。生成器は `app/lib/__tests__/tools/generate-fixtures.ts` にあり、`1306.T` のスケール破損（OHLC が 1/10・出来高が 10 倍・2 営業日で復帰）と、修復してはいけない対照群（`^TNX` 型・`^VIX` 型）を持ちます。
+- テストは Yahoo Finance を直接叩きません。フィクスチャは合成系列です。
+- 乱数を使う関数は `helpers/rng.ts` の `withSeededRandom()` で `Math.random` を mulberry32 に差し替えてから呼びます。
+- β・σ・シャープの物差しは `helpers/golden.ts` に**独立実装**しています。実装側のヘルパーを流用すると、実装が壊れたときテストも同じ向きに壊れて検知できません。
+- 全関数は網羅しません。壊れたときの影響が大きいもの（`price-sanity.ts`・`stats-significance.ts`・`strategy-vs-benchmark.ts`・`series-mode.ts`、および配信ペイロードの丸め）に絞っています。分析を追加するたびにテストを書く必要はありませんが、**複数パネルから参照される共通関数を新設・変更したときは追加してください。**
+- `price-sanity.ts` の修復判定を変えるときは、`app/lib/__tests__/price-sanity.test.ts` の事故ケースと対照群が両方通ることを確認してください。片方だけ通す変更は、破損の見逃しか正しいデータの書き換えのどちらかを意味します。
 
 ## Commit & Pull Request Guidelines
 
