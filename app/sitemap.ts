@@ -8,8 +8,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: SITE_ORIGIN, lastModified: now, changeFrequency: "weekly", priority: 1 },
     { url: `${SITE_ORIGIN}/guide`, lastModified: now, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE_ORIGIN}/axioms`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${SITE_ORIGIN}/portfolio`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${SITE_ORIGIN}/strategy`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
   ];
 
   const guides: MetadataRoute.Sitemap = ANALYSIS_GUIDES.map((guide) => ({

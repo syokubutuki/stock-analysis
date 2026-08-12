@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     url: SITE_ORIGIN,
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "株価構造分析",
     description:
       "市場の隠れた構造をデータから抽出する分析ツール。",
