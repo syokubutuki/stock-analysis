@@ -7,11 +7,12 @@ import {
   type PriceSanityReport,
 } from "./price-sanity";
 import { fetchStockSource, type StockRange } from "./stock-source.server";
-import type { StockData } from "./types";
+import type { PricePoint, StockData } from "./types";
 
 const STOCK_CACHE_SCHEMA_VERSION = 1;
 const STOCK_CACHE_FRESH_MS = 8 * 60 * 60 * 1000;
 const STOCK_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const PRICE_SIGNIFICANT_DIGITS = 8;
 
 interface StockCacheEntry {
   data: StockData;
@@ -19,6 +20,17 @@ interface StockCacheEntry {
 }
 
 const inFlight = new Map<string, Promise<StockData>>();
+
+/** 修復判定後の配信用価格だけを、価格水準によらない有効桁数で縮める。 */
+function roundPricePayload(prices: PricePoint[]): PricePoint[] {
+  return prices.map((price) => ({
+    ...price,
+    open: Number(price.open.toPrecision(PRICE_SIGNIFICANT_DIGITS)),
+    high: Number(price.high.toPrecision(PRICE_SIGNIFICANT_DIGITS)),
+    low: Number(price.low.toPrecision(PRICE_SIGNIFICANT_DIGITS)),
+    close: Number(price.close.toPrecision(PRICE_SIGNIFICANT_DIGITS)),
+  }));
+}
 
 function logSanity(ticker: string, report: PriceSanityReport): void {
   for (const glitch of report.repaired) {
@@ -54,7 +66,11 @@ async function fetchAndRepair(ticker: string, range: StockRange): Promise<StockD
   const data = await fetchStockSource(ticker, range);
   const fixed = repairPriceGlitches(data.prices);
   logSanity(ticker, fixed.report);
-  return { ...data, prices: fixed.prices, dataQuality: fixed.report };
+  return {
+    ...data,
+    prices: roundPricePayload(fixed.prices),
+    dataQuality: fixed.report,
+  };
 }
 
 async function readRuntimeCache(key: string): Promise<StockCacheEntry | null> {

@@ -58,13 +58,13 @@ import type { PricePoint } from "./types";
  */
 
 /**
- * サニタイザの版。**判定ロジックや閾値を変えたら必ず上げる**。
+ * サニタイザの版。**判定ロジック・閾値・配信表現を変えたら必ず上げる**。
  *
  * 価格は IndexedDB に8時間キャッシュされる（app/lib/price-cache.ts）。修復を入れても
  * 古い版で保存された破損データがキャッシュに残っていると、利用者の画面は直らない。
  * キャッシュ側でこの版を突き合わせ、版が違うエントリは TTL 内でも無効として捨てる。
  */
-export const SANITIZER_VERSION = 2;
+export const SANITIZER_VERSION = 3;
 
 /** データ破損とみなす1日あたり対数リターンの下限（|log r| > これ）。±35%。 */
 const JUMP_THRESHOLD = 0.3;
