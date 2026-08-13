@@ -13,7 +13,7 @@
 | セッション | 項目 | 結果 |
 |---|---|---|
 | S1 | B1 待機リスト / B2 Pro訴求 | 完了。`/api/waitlist` + Postgres。JS無効でも動く progressive enhancement |
-| S2 | Q1 数値書式 / U3 セレクタ / U4 品質パネル位置 / A1(部分) | 完了。`app/lib/format.ts` 新設 |
+| S2 | Q1 数値書式 / U3 セレクタ / U4 品質パネル位置 / A1(部分) | 完了。`app/lib/format.ts` 新設。**ただし U4 は基本節の1画面しか直っておらず、2026-08-14 に `233da2f` で全節ぶんを是正**（親文書 §11 FU17） |
 | S3 | Q2 フォント / Q3 トークン / R3a OG / R4 sitemap | 完了。システムフォント採用（転送量増ゼロ） |
 | S4 | M1 CI / P3 負荷調査 | 完了。GitHub Actions 稼働。P3 は下記の重要な結論を出した |
 
