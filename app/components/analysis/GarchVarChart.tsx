@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeGarchVar } from "../../lib/simulation";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props { prices: PricePoint[]; }
 
@@ -201,66 +201,9 @@ export default function GarchVarChart({ prices }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="GARCH VaR予測の詳細解説">
-        <p className="font-medium text-gray-700">1. VaRとは</p>
-        <p>VaR（Value at Risk）は「明日、最悪どれくらい損するか？」を数値で示す指標です。例えば「95% VaR = -2%」とは、「100日のうち95日はこの水準より損しない（＝5日だけこれ以上の損失がありうる）」という意味です。</p>
-        <p className="mt-1">天気予報の降水確率に例えると分かりやすいでしょう。「降水確率5%」と言われたら傘を持たない人が多いように、「95%の確率でこの損失額以内に収まる」と言われたらその範囲は許容できるという感覚です。VaRは「その許容ラインがどこにあるか」を教えてくれます。</p>
-
-        <p className="font-medium text-gray-700 mt-3">2. GARCHモデルの仕組み</p>
-        <p>株価のボラティリティ（値動きの激しさ）は一定ではなく、大きく動いた日の翌日はまた大きく動きやすい性質があります。GARCHモデルはこの「ボラティリティの連鎖」を捉えるモデルです。</p>
-        <p className="mt-1">海の波に例えると、嵐の後の海はしばらく荒れ続け、徐々に凪いでいきます。GARCHモデルはこの「波の減衰」を数式で表現します。</p>
-        <p className="mt-1 font-mono text-xs bg-gray-50 p-2 rounded">{"σ²_t = ω + α × r²_{t-1} + β × σ²_{t-1}"}</p>
-        <ul className="list-disc pl-4 space-y-1 mt-1">
-          <li><strong>σ²_t</strong>: 今日の予測ボラティリティ（波の大きさ）</li>
-          <li><strong>ω</strong>: ベースとなる最低限のボラティリティ（凪の日でもゼロにはならない）</li>
-          <li><strong>α × r²_t-1</strong>: 昨日の実際のショック（急な波）の影響。αが大きいほど急変に敏感</li>
-          <li><strong>β × σ²_t-1</strong>: 昨日までのボラティリティの持続。βが大きいほど荒れが長引く</li>
-          <li><strong>α + β &lt; 1</strong> であれば、ボラティリティはいずれ平常水準に戻る（定常条件）</li>
-        </ul>
-        <p className="mt-1">こうして求めた日々のボラティリティ σ_t に正規分布の分位点（95%なら -1.645、99%なら -2.326）を掛けてVaRを算出します。</p>
-
-        <p className="font-medium text-gray-700 mt-3">3. 用語の定義</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>VaR（バリュー・アット・リスク）</strong>: 一定の確率で起こりうる最大損失額。リスク管理の基本指標</li>
-          <li><strong>条件付きボラティリティ</strong>: 直近の市場状況を加味して推定した「今日のボラティリティ」。過去の固定値ではなく日々変動する</li>
-          <li><strong>バックテスト</strong>: 過去のデータで予測モデルの精度を検証すること。「予測がどれだけ当たっていたか」を事後的に確認する</li>
-          <li><strong>Kupiecテスト</strong>: VaRの「限界超過回数」が統計的に妥当かを検定する手法。超過が多すぎても少なすぎても不合格になる</li>
-          <li><strong>限界超過（違反）</strong>: 実際のリターンがVaR線を下回った日。つまりVaRの予測を超える損失が発生した日</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">4. チャートの読み方</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>灰色の小さな点</strong>: 各日の実際のリターン（日次騰落率）。0%より上はプラス、下はマイナス</li>
-          <li><strong>黄色の実線（95%損失限界）</strong>: 「20日に1日くらいしかこの線を下回らないはず」の水準</li>
-          <li><strong>赤い破線（99%損失限界）</strong>: 「100日に1日くらいしかこの線を下回らないはず」の水準。より極端な損失の限界</li>
-          <li><strong>赤い大きな点（限界超過）</strong>: 実際に95%損失限界を突破した日。この点が多すぎるとモデルの信頼性に問題がある</li>
-          <li>VaR線が下に広がっている時期はモデルが「ボラティリティが高い（＝リスクが大きい）」と判断している期間</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">5. 結果の解釈</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>バックテスト合格</strong>: VaRの予測精度が統計的に妥当。モデルがリスクを適切に見積もれている</li>
-          <li><strong>バックテスト不合格（超過が多い）</strong>: VaRがリスクを過小評価。実際は想定以上に損失が発生しやすい。株価にファットテール（極端な値動きが正規分布より頻繁に起きる性質）がある可能性</li>
-          <li><strong>バックテスト不合格（超過が少ない）</strong>: VaRが保守的すぎる。必要以上にリスクを大きく見積もっており、投資機会を逃している可能性</li>
-          <li><strong>赤い点が固まって出現</strong>: ボラティリティの急変にモデルが追いつけていない。構造変化やショック時に注意が必要</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>ポジションサイジング</strong>: VaRが大きい（線が下に広い）時期は、許容損失額に合わせてポジションを縮小する判断材料になる</li>
-          <li><strong>ストップロス設定</strong>: 99% VaR水準を参考にストップロスを設定すると、通常の変動では引っかからない程度の「安全マージン」を持てる</li>
-          <li><strong>VaR線の拡大時</strong>: ボラティリティ上昇局面では新規エントリーを控え、既存ポジションのヘッジ強化を検討する</li>
-          <li><strong>バックテスト不合格時</strong>: モデルの信頼度が低いため、VaRの数値を額面通り信じず、より保守的なリスク管理を行う</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>正規分布の仮定</strong>: 実際の株価リターンは正規分布より裾が厚い（ファットテール）ことが多く、VaRを超える損失が想定より頻繁に起きる場合がある</li>
-          <li><strong>構造変化への弱さ</strong>: リーマンショックやコロナショックのような市場構造の急変には、過去のデータに基づくモデルでは対応が遅れる</li>
-          <li><strong>VaR ≠ 最大損失</strong>: VaRはあくまで「この確率で収まる範囲」であり、VaRを超えた場合にどれだけ損するか（Expected Shortfall）は別の指標が必要</li>
-          <li><strong>単一銘柄のみ</strong>: ポートフォリオ全体のリスクは、銘柄間の相関を考慮した別の計算が必要</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/garch-var と二重管理になる。 */}
+      <GuideEntryPanel slug="garch-var" title="GARCH VaR予測の詳細解説" />
     </div>
   );
 }

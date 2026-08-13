@@ -9,7 +9,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { computeRiskMetrics, rollingRiskMetrics } from "../../lib/risk-metrics";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 
@@ -230,33 +230,9 @@ export default function RiskMetricsPanel({ prices, period }: Props) {
       </div>
       <div ref={chartRef} className="w-full rounded border border-gray-100" />
 
-      <AnalysisGuide title="リスク指標の読み方">
-        <p>
-          <span className="font-medium">シャープレシオ:</span>{" "}
-          (リターン - 無リスク金利) / ボラティリティ。リスク1単位あたりのリターン。
-          1以上で良好、2以上で優秀。負の値はリスクに見合わないリターン。
-        </p>
-        <p>
-          <span className="font-medium">ソルティノレシオ:</span>{" "}
-          シャープレシオの改良版。下落リスク（下方偏差）のみを考慮。
-          上昇方向のボラティリティはリスクとみなさないため、より実態に即した評価。
-        </p>
-        <p>
-          <span className="font-medium">VaR (Value at Risk):</span>{" "}
-          指定した信頼水準での最大損失額。VaR 95%=-2%なら「20日に1日は2%以上下落する可能性がある」。
-          ヒストリカルシミュレーション法で計算。
-        </p>
-        <p>
-          <span className="font-medium">CVaR (Conditional VaR / Expected Shortfall):</span>{" "}
-          VaRを超える損失が発生した場合の平均損失。VaRより保守的なリスク指標。
-          テイルリスクの大きさを測定する。
-        </p>
-        <p>
-          <span className="font-medium">プロフィットファクター:</span>{" "}
-          総利益 / 総損失。1以上なら利益が損失を上回る。
-          1.5以上が望ましいとされる。
-        </p>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/risk-metrics と二重管理になる。 */}
+      <GuideEntryPanel slug="risk-metrics" title="リスク指標の読み方" />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { analyzeStreaks, type StreakAnalysis } from "../../lib/crash-surge-streak";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -544,59 +544,9 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
         </div>
       )}
 
-      <AnalysisGuide title="連続暴落・暴騰ラン分析の詳細理論">
-        <p className="font-medium text-gray-700">1. 何を分析しているか</p>
-        <p>
-          株価が前日終値比で連続して下落（または上昇）する区間を1つの「ラン」として扱い、
-          その<strong>連続日数</strong>・<strong>累積変動率</strong>・<strong>その後の値動き</strong>の傾向を可視化します。
-          「暴落のあとに反発しやすいのか、さらに下げるのか」「暴騰は続くのか息切れするのか」という、
-          連続的な急変動の後の挙動（短期リバーサル vs モメンタム）を統計的に把握するのが目的です。
-        </p>
-
-        <p className="font-medium text-gray-700 mt-3">2. 用語とラン抽出</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>日次リターン</strong> r_t = close_t / close_(t-1) − 1。</li>
-          <li><strong>下落ラン</strong>: r_t &lt; 0 が連続する最大区間。<strong>上昇ラン</strong>: r_t &gt; 0 が連続する最大区間。</li>
-          <li><strong>連続日数（ラン長）</strong>: その区間に含まれる営業日数。</li>
-          <li><strong>累積率（暴落率/暴騰率）</strong>: ラン直前の終値 close_(start−1) からラン終了日終値までの累積リターン<br />
-            {"cumReturn = close_end / close_(start-1) − 1"}</li>
-          <li><strong>閾値</strong>: |累積率| ≥ 閾値 のランだけを「暴落／暴騰」イベントとして全グラフで採用します（スライダーで調整）。閾値0%なら全ランが対象。</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">3. 各グラフの読み方</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>① 時系列分布</strong>: 横軸=日付（共通時間軸）。上向き棒=暴騰ラン、下向き棒=暴落ランで、棒の高さが連続日数、色の濃さが累積率の大きさ。棒が密集する時期＝急変動クラスター（暴落・暴騰が集中する局面）。</li>
-          <li><strong>② 連続日数ヒストグラム</strong>: ラン長の発生頻度。通常は1〜2日が大半で、右肩下がり（指数的減衰）。裾が厚い（長い連続が多い）ほどトレンドが粘る銘柄。</li>
-          <li><strong>③ 累積率の分布</strong>: 0を中心に左が暴落率、右が暴騰率。左右の裾の広がりで「下落の急峻さ vs 上昇の急峻さ」の非対称性が分かる（株は一般に下落側の裾が重い）。</li>
-          <li><strong>④ 累積率の平均推移</strong>: 横軸=ラン内の経過日数。連続n日目まで到達したランの平均累積率。1日あたりどれだけ加速/減速して下げ（上げ）続けるか。傾きが急なら「連続で大きく動く」性質。</li>
-          <li><strong>⑤ ラン終了後N日の値動き</strong>: 横軸=ラン終了日からの経過営業日数（共通時間軸・共通スケール）。暴落後・暴騰後それぞれをCloseベース（終了日終値起点）とOpenベース（翌営業日始値起点）で重ね描き。薄い帯は±1標準偏差。</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">4. 後続値動きの計算式</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>Closeベース</strong>（ラン終了日の引けで仕掛けた場合）: 経過日数 d に対し<br />{"R_close(d) = close_(e+d) / close_e − 1   （e=ラン終了日, d=0..N）"}</li>
-          <li><strong>Openベース</strong>（翌営業日の寄り付きで仕掛けた場合）: <br />{"R_open(d) = open_(e+d) / open_(e+1) − 1   （d=1..N）"}</li>
-          <li>全イベントについて各 d の平均・中央値・勝率・標準偏差を集計。Close と Open の差は寄り付きギャップ（オーバーナイトの飛び）の効果を表します。</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>⑤で暴落後Closeが右肩上がり → 短期リバーサル（押し目買い）が機能。どの経過日で反発が最大化するかでエグジット日数を設計。</li>
-          <li>暴落後でもマイナスが続く → ナンピンは危険、下落継続（トレンドフォロー側）が有利。</li>
-          <li>暴騰後Closeがプラス継続 → モメンタムの順張り余地。マイナスなら高値掴み・利益確定が定石。</li>
-          <li>CloseとOpenの乖離が大きい → 寄り付きで大きくギャップする銘柄。引け仕掛けと寄り仕掛けで成績が変わるため執行タイミングを使い分ける。</li>
-          <li>②④で長い連続が多く傾きが急 → 連続急変動の「滝」が起きやすい。逆張りのタイミングを遅らせる根拠になる。</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>サンプル数が少ない（特に高い閾値や長い連続日数）と平均値の信頼性は低下します。件数表示とσ帯の広さを必ず確認してください。</li>
-          <li>後続リターンは起点の異なるイベントを重ね合わせた平均であり、個別の値動きの分散は大きい（σ帯が広い＝ばらつき大）。</li>
-          <li>取引コスト・スリッページ・配当・流動性は考慮していません。短期ほどコストの影響が大きくなります。</li>
-          <li>過去の傾向は市場レジーム（低ボラ/高ボラ局面）に依存し、将来の再現を保証しません。</li>
-          <li>連続性は「前日終値比」で定義しているため、寄り付きギャップで日中は上げても前日終値割れなら下落ランに含まれます。</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/crash-surge-streak と二重管理になる。 */}
+      <GuideEntryPanel slug="crash-surge-streak" title="連続暴落・暴騰ラン分析の詳細理論" />
     </div>
   );
 }

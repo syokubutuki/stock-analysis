@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeProfile } from "../../lib/cross-analysis";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -205,33 +205,9 @@ export default function VolumeProfileChart({ prices }: Props) {
         );
       })()}
 
-      <AnalysisGuide title="出来高プロファイル分析の詳細理論">
-        <p className="font-medium text-gray-700">1. 出来高プロファイルとは</p>
-        <p>出来高プロファイル (Volume Profile) は、価格帯別の累積出来高を横向きヒストグラムで表示する分析手法です。通常の出来高チャートが「いつ」取引されたかを示すのに対し、出来高プロファイルは「いくらで」取引されたかを示します。</p>
-
-        <p className="font-medium text-gray-700 mt-3">2. 主要概念</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>POC (Point of Control)</strong>: 最も出来高が集中した価格帯。最も「合意された」価格であり、強い引力を持つ。価格がPOCから離れると、POCに引き戻される傾向がある。</li>
-          <li><strong>バリューエリア (VA)</strong>: 全出来高の70%が取引された価格範囲。統計的に、翌日も70%の確率でバリューエリア内に留まるとされる (Value Area Rule)。</li>
-          <li><strong>VAH (Value Area High)</strong>: バリューエリアの上限。この上に価格が抜けると、出来高が薄い領域に入り急騰しやすい。</li>
-          <li><strong>VAL (Value Area Low)</strong>: バリューエリアの下限。この下に価格が抜けると、サポートが弱く急落しやすい。</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">3. 出来高の分配方法</p>
-        <p>日足データでは、各日のOHLCから日中の価格レンジを推定します。各日の出来高は、その日のHigh-Lowの範囲内の各価格ビンに均等に分配されます。Close &gt; Openの日は買い出来高（緑）、Close &lt; Openの日は売り出来高（赤）として分類されます。</p>
-
-        <p className="font-medium text-gray-700 mt-3">4. バリューエリアの計算</p>
-        <p>POCのビンから出発し、上下に隣接するビンの出来高を比較しながら、累積出来高が全体の70%に達するまでバリューエリアを拡張します。各ステップでは、上側と下側でより出来高の多い方を先に追加します。</p>
-
-        <p className="font-medium text-gray-700 mt-3">5. トレード戦略への応用</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>出来高の集中する価格帯（High Volume Node, HVN）は支持/抵抗線として機能する</li>
-          <li>出来高の少ない価格帯（Low Volume Node, LVN）では価格が素早く通過する傾向がある</li>
-          <li>バリューエリア内でのレンジトレード: VAHで売り、VALで買い</li>
-          <li>VAH/VALのブレイクアウト: 出来高の薄い領域に入るとモメンタムが加速</li>
-          <li>POCへの回帰: 価格がPOCから大きく離れた後、POCに回帰する傾向を利用</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/volume-profile と二重管理になる。 */}
+      <GuideEntryPanel slug="volume-profile" title="出来高プロファイル分析の詳細理論" />
     </div>
   );
 }
