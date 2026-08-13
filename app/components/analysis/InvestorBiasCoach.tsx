@@ -12,7 +12,7 @@ import {
   type BiasCard,
   type Tone,
 } from "../../lib/behavioral-coach";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -219,71 +219,9 @@ export default function InvestorBiasCoach({ prices }: Props) {
         </div>
       </div>
 
-      <AnalysisGuide title="投資家バイアス・コーチの使い方と根拠">
-        <p className="font-medium text-gray-700">1. この分析の狙い</p>
-        <p>
-          モメンタムやアンカリングといった「市場に現れる統計的規則性」とは別に、
-          その裏側にある「投資家自身の認知バイアス（判断の癖）」を扱います。
-          分析結果を眺めて終わりにせず、実際の売買行動を変えるための橋渡しが目的です。
-        </p>
-
-        <p className="font-medium text-gray-700 mt-3">2. 「この銘柄のデータで裏づけるバイアス」の算出</p>
-        <p>
-          既存計算と結びつく4つのバイアスを、この銘柄の実数値で定量化・判定します。
-        </p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>
-            <span className="font-medium">アンカリング</span>：52週高値比率が高値近辺(&gt;90%)と低水準(≤70%)のときの翌月平均リターンを比較。
-            近辺の方が高ければ過小反応（アンカリング効果あり）、逆なら平均回帰型と判定。
-          </li>
-          <li>
-            <span className="font-medium">モメンタム/リバーサル</span>：短期(20日)と長期(120日)のWML(勝者−敗者)とt値から、
-            順張り・逆張りのどちらが有意かを判定。
-          </li>
-          <li>
-            <span className="font-medium">ディスポジション効果のコスト</span>：過去120日の勝者/敗者に分け、
-            それぞれの翌20日平均リターンを計算。勝者を早売りして放棄する分・敗者を保有して被る分を金額感で提示。
-          </li>
-          <li>
-            <span className="font-medium">損失回避</span>：日次の上昇日/下落日の平均と、下方/上方ボラティリティ比から下方の非対称性を測定。
-            損失回避係数λ≈2.25を掛けて「下落の痛みが上昇の喜びの何倍か」を提示。
-          </li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">3. 「いまの局面で注意すべきこと」の算出</p>
-        <p>
-          既存の行動ファイナンス指標（52週高値比率・モメンタム）に加え、直近ピークからのドローダウン、
-          直近20/60営業日リターンを計算し、以下のルールで該当するバイアス警告を表示します。
-        </p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>52週高値比率 ≥ 90% → アンカリング／早すぎる利確</li>
-          <li>高値比率 ≤ 75% またはドローダウン ≥ 20% → 塩漬け・ナンピン（ディスポジション／サンクコスト）</li>
-          <li>直近20日 ≤ −8% → 狼狽売り・過剰反応（リセンシー）</li>
-          <li>直近20日 ≥ +10% → 自信過剰・ハウスマネー効果</li>
-          <li>モメンタム構造に応じて代表性／確証バイアスを喚起</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">4. チェックリストの意味</p>
-        <p>
-          売買の直前に自問することで、感情的な即断（システム1）を、
-          ルールに基づく熟慮（システム2）へ切り替える「事前コミットメント」の道具です。
-          チェック状態はこの画面内の一時的なもので、保存はされません。
-        </p>
-
-        <p className="font-medium text-gray-700 mt-3">5. 投資判断への活用</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>エントリー前にチェックリストを一巡し、未確認項目があれば見送る</li>
-          <li>警告に該当する局面では、成行での衝動的な売買を避け事前ルールに従う</li>
-          <li>自分が繰り返しがちなバイアスをカードで復習し、対策を仕組み化する</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">6. 注意点・限界</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>警告のしきい値は経験則であり、売買シグナルそのものではない</li>
-          <li>バイアスの有無や強さは個人差が大きい。自己観察と併用すること</li>
-          <li>「バイアスを知る」ことと「行動を変える」ことは別。仕組み（自動損切り等）で補うのが有効</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/investor-bias と二重管理になる。 */}
+      <GuideEntryPanel slug="investor-bias" title="投資家バイアス・コーチの使い方と根拠" />
     </div>
   );
 }
