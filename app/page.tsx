@@ -1331,6 +1331,12 @@ export default function AnalysisPage() {
   // 破損点検は「どこをどう直したか」の詳細（表＋修復前後チャート）。
   // 報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
   // 問題がある場合はサマリーより先に、問題がなければサマリーの後に開示する。
+  //
+  // 配置は「基本」節の1か所だけにする。以前は全18節の共通ヘッダ部に置いていたため、
+  // どの節へ切り替えてもその節の分析本体の手前に点検パネルが挟まり、破損ゼロの銘柄でも
+  // 毎回最上段を占めていた。CLAUDE.md の「手を入れたことは画面に開示する」規約は、
+  // 全ページ共通の DataQualityNotice バナー（破損・疑いがあるときだけ描画）が担保する。
+  // バナーからは他節にいても onOpenPanel でこのパネルへ戻れる。
   const dataQualityPanel = data ? (
     <CollapsibleAnalysis
       id="data-quality"
@@ -1475,7 +1481,10 @@ export default function AnalysisPage() {
           </div>
         )}
 
-        <DataQualityNotice report={data?.dataQuality} />
+        <DataQualityNotice
+          report={data?.dataQuality}
+          onOpenPanel={() => navigateToSection("basic", "data-quality")}
+        />
 
         {data && filteredPrices.length > 0 && (
           <>
@@ -1492,9 +1501,11 @@ export default function AnalysisPage() {
             </div>
 
             <div className="flex flex-col gap-4">
-              <div className={hasDataQualityIssues ? "order-1" : "order-2"}>
-                {dataQualityPanel}
-              </div>
+              {activeSection === "basic" && (
+                <div className={hasDataQualityIssues ? "order-1" : "order-2"}>
+                  {dataQualityPanel}
+                </div>
+              )}
 
               {/* サマリー */}
               <div

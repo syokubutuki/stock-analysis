@@ -8,8 +8,18 @@ import { describeSanityReport, PriceSanityReport } from "../../lib/price-sanity"
  * サニタイズは `/api/stock` で自動的に走るため、黙っていれば利用者は自分が見ている数値が
  * 書き換えられたデータに基づくことを知れない。分析アプリとして**データに手を入れたことは
  * 必ず画面に出す**。修復も疑いも無い平常時は何も描かない（null を返す）。
+ *
+ * 詳細パネル（DataQualityPanel）は「基本」節の1か所にしか無い。全節共通の開示は
+ * このバナーが担うので、他の節から詳細を見たい人のために `onOpenPanel` で導線を出す。
  */
-export default function DataQualityNotice({ report }: { report?: PriceSanityReport }) {
+export default function DataQualityNotice({
+  report,
+  onOpenPanel,
+}: {
+  report?: PriceSanityReport;
+  /** 詳細パネルへジャンプする（「基本」節へ切り替えて開く）。省略時は文言のみ。 */
+  onOpenPanel?: () => void;
+}) {
   const message = describeSanityReport(report);
   if (!message || !report) return null;
   const repairedOnly = report.suspects.length === 0;
@@ -23,9 +33,19 @@ export default function DataQualityNotice({ report }: { report?: PriceSanityRepo
     >
       <span className="font-medium">データ品質: </span>
       {message}
-      <span className="ml-1 opacity-80">
-        （修復した日の配信値・修復値と修復前後のチャートは「価格データの破損点検」パネルで確認できます）
-      </span>
+      {onOpenPanel ? (
+        <button
+          type="button"
+          onClick={onOpenPanel}
+          className="ml-1 underline underline-offset-2 font-medium hover:no-underline"
+        >
+          修復した日の配信値・修復値と修復前後のチャートを見る（「基本」節の「価格データの破損点検」）
+        </button>
+      ) : (
+        <span className="ml-1 opacity-80">
+          （修復した日の配信値・修復値と修復前後のチャートは「基本」節の「価格データの破損点検」パネルで確認できます）
+        </span>
+      )}
     </div>
   );
 }
