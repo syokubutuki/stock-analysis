@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeBreakoutStats, donchianPositions } from "../../lib/breakout-stats";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 
@@ -129,29 +129,9 @@ export default function BreakoutStatsChart({ prices }: Props) {
         />
       </div>
 
-      <AnalysisGuide title="ブレイクアウト統計の詳細理論">
-        <p className="font-medium text-gray-700">1. 何を見ているか</p>
-        <p>{"高値/安値のブレイクに『追随して順張りすべきか、だましとして逆張りすべきか』を、過去の全ブレイクから検証する。ドンチャン・チャネル（N日高安）と前日高安の2種で見る。"}</p>
-        <p className="font-medium text-gray-700 mt-3">2. 定義</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>ドンチャン・ブレイク</strong>: 当日高値が過去N日(20/55)の最高値を超える（上抜け）／安値が最安値を割る（下抜け）。タートルズの古典。</li>
-          <li><strong>引け維持率</strong>: 日中でブレイクした日のうち、引けでもブレイク水準を保った割合。高い＝だましが少なく本物。</li>
-          <li><strong>方向調整N日先</strong>: ブレイク方向に符号を合わせた先行きリターン（プラス＝追随成功）。</li>
-        </ul>
-        <p className="font-medium text-gray-700 mt-3">3. 投資判断への活用</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>引け維持率が高く方向調整リターンがプラス＝<strong>ブレイク順張りが有効</strong>。引けでの追随エントリー。</li>
-          <li>維持率が低い＝だましが多い。ブレイク逆張り（フェード）や、引け確定を待つ方が良い。</li>
-          <li>20日と55日で挙動が違えば、短期ブレイクと中期ブレイクで戦略を分ける。</li>
-        </ul>
-        <p className="font-medium text-gray-700 mt-3">4. 注意点・限界</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>日足ベースのため日中のブレイク→戻りの経路は分からない（時刻分析は別途）。</li>
-          <li>トレンド相場ではブレイク順張り、レンジ相場では逆張りが有利になりやすく、環境依存。</li>
-          <li>上の「ブレイク追随戦略 vs B&H」パネルで取引コストを実額控除できる。ブレイク戦略は往復が多いので、回転率とコスト後の超過リターンを必ず確認すること（表の方向調整リターンはコスト前）。</li>
-          <li>戦略パネルの建玉は「ブレイク日の引けで建て、N日保有、重複は保有延長」という単純規則。ストップやトレーリングは入れていないので、実運用の出口規則とは別物。</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/breakout-stats と二重管理になる。 */}
+      <GuideEntryPanel slug="breakout-stats" title="ブレイクアウト統計の詳細理論" />
     </div>
   );
 }

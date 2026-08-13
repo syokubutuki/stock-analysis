@@ -14,7 +14,7 @@ import {
   computeCandleStats,
   rollingCandleStats,
 } from "../../lib/candle-structure";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 
@@ -187,29 +187,9 @@ export default function CandleStructureChart({ prices, period }: Props) {
       </div>
       <div ref={posChartRef} className="w-full rounded border border-gray-100" />
 
-      <AnalysisGuide title="ローソク足構造の読み方">
-        <p>
-          <span className="font-medium">実体率:</span>{" "}
-          |close-open| / (high-low)。大きいほど方向性が明確。70%超は大陽線/大陰線、10%未満は十字線。
-        </p>
-        <p>
-          <span className="font-medium">上ヒゲ率 / 下ヒゲ率:</span>{" "}
-          上ヒゲが長いほど上値での売り圧力が強く、下ヒゲが長いほど下値での買い支えが強い。
-        </p>
-        <p>
-          <span className="font-medium">終値位置:</span>{" "}
-          (close-low)/(high-low)。1に近いほど高値引け、0に近いほど安値引け。
-          20日MAが50%を大きく上回る場合は買い圧力が優勢、下回る場合は売り圧力が優勢。
-        </p>
-        <p>
-          <span className="font-medium">大陽線/大陰線:</span>{" "}
-          実体率70%超の足。トレンドの勢いを示す。連続する場合は強いモメンタム。
-        </p>
-        <p>
-          <span className="font-medium">十字線:</span>{" "}
-          実体率10%未満。売り買いが拮抗しており、トレンド転換の兆候となることがある。
-        </p>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/candle-structure と二重管理になる。 */}
+      <GuideEntryPanel slug="candle-structure" title="ローソク足構造の読み方" />
     </div>
   );
 }

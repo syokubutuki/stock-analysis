@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeStructureScorecard, type StructureScore } from "../../lib/cross-analysis";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -127,30 +127,9 @@ export default function StructureScorecardChart({ prices }: Props) {
         </ul>
       </div>
 
-      <AnalysisGuide title="構造スコアカードの詳細理論">
-        <p className="font-medium text-gray-700">1. 各指標の意味</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>年率リターン</strong>: 日次対数リターンの平均 x 252。トレンドの方向と強さを示す。</li>
-          <li><strong>年率ボラティリティ</strong>: 日次リターンの標準偏差 x sqrt(252)。リスク水準を示す。20%以下は低ボラ、40%超は高ボラ。</li>
-          <li><strong>Jarque-Bera検定</strong>: {"JB = (n/6)(S² + K²/4) でS=歪度、K=超過尖度。χ²(2)分布で検定。正規分布からの乖離を測定。"}</li>
-          <li><strong>ACF(1)</strong>: {"1次自己相関。|ACF(1)| > 1.96/√n で有意。正=モメンタム、負=ミーンリバージョン、ゼロ近傍=効率的市場。"}</li>
-          <li><strong>{"ACF(r², lag1)"}</strong>: 二乗リターンの自己相関。ボラティリティクラスタリング（ARCH効果）の検出。正の値が大きいほどボラティリティが持続する。</li>
-          <li><strong>Hurst指数 (R/S法)</strong>: {"H > 0.5: トレンド持続性（長期記憶）、H ≈ 0.5: ランダムウォーク、H < 0.5: 反持続性（ミーンリバージョン）。R/S = (max(累積偏差) - min(累積偏差)) / σ を異なるブロックサイズで計算し、log-log回帰でHを推定。"}</li>
-          <li><strong>最大ドローダウン</strong>: 累積リターンのピークからの最大下落幅。過去の最悪シナリオを示す。</li>
-          <li><strong>シャープレシオ</strong>: (年率リターン) / (年率ボラティリティ)。リスク1単位当たりのリターン。1超で優秀、0.5超で良好。</li>
-        </ul>
-
-        <p className="font-medium text-gray-700 mt-3">2. スコアバーの読み方</p>
-        <p>中央が0（中立）、右が正のスコア、左が負のスコアを示します。色は判定結果を表し、緑=良好、赤=警告、オレンジ=注意、青=特徴的（方向性あり）、灰=中立です。</p>
-
-        <p className="font-medium text-gray-700 mt-3">3. 実務への示唆</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>ACF(1)が有意 + Hurst {">"} 0.6 → トレンドフォロー戦略が有効な可能性</li>
-          <li>ACF(r²)が高い → ボラティリティ予測モデル（GARCH等）が有効</li>
-          <li>JB棄却 + 高尖度 → ファットテールリスクに注意。VaRは過小評価の恐れ</li>
-          <li>シャープレシオが負 → 当該期間のバイ&ホールドは不適。別戦略を検討</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/structure-scorecard と二重管理になる。 */}
+      <GuideEntryPanel slug="structure-scorecard" title="構造スコアカードの詳細理論" />
     </div>
   );
 }

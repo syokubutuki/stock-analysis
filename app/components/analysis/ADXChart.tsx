@@ -12,7 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { computeADX, judgeADX } from "../../lib/adx";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -216,36 +216,9 @@ export default function ADXChart({ prices, period }: Props) {
         </span>
       </div>
 
-      <AnalysisGuide title="ADXの読み方">
-        <p>
-          <span className="font-medium">ADX (Average Directional Index):</span>{" "}
-          ワイルダーが考案したトレンドの強さを示す指標です。方向は示さず、トレンドの強弱のみを表します。
-          ADX &gt; 25 で強いトレンド、20〜25 で弱いトレンド、20 未満はレンジ相場と判断します。
-        </p>
-        <p>
-          <span className="font-medium">+DI / -DI (方向性指標):</span>{" "}
-          +DI は上昇方向のトレンドの強さ、-DI は下降方向の強さを示します。
-          +DI が -DI を上回っている間は上昇トレンド優勢、下回れば下降トレンド優勢です。
-        </p>
-        <p>
-          <span className="font-medium">ゴールデンクロス / デッドクロス:</span>{" "}
-          +DI が -DI を下から上にクロスすれば買いシグナル、上から下にクロスすれば売りシグナルとされます。
-          ただし ADX が 20 以上の局面でのクロスほど信頼性が高まります。
-        </p>
-        <p>
-          <span className="font-medium">Wilder&apos;s Smoothing:</span>{" "}
-          True Range・+DM・-DM をワイルダーの平滑化（EMAの一種、α=1/period）で平滑化してから
-          +DI、-DI を算出し、さらにその差の比率 DX を平滑化して ADX を求めます。デフォルト期間は 14 日です。
-        </p>
-        <p>
-          <span className="font-medium">活用方法:</span>
-        </p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>ADX が上昇中 → トレンドが強まっている。トレンドフォロー戦略が有効。</li>
-          <li>ADX が低下中 → トレンドが弱まっている。逆張りやレンジ戦略を検討。</li>
-          <li>ADX が低水準から急騰し始めたら、新しいトレンド発生の兆候。</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/adx と二重管理になる。 */}
+      <GuideEntryPanel slug="adx" title="ADXの読み方" />
     </div>
   );
 }

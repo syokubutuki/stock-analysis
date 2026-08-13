@@ -10,7 +10,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { analyzeVolume, detectVolumeSurges, type VolumeSurge } from "../../lib/volume-analysis";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 
@@ -158,19 +158,9 @@ export default function VolumeAnalysis({ prices, period }: Props) {
         </span>
       </div>
 
-      <AnalysisGuide title="出来高分析の読み方">
-        <p><span className="font-medium">出来高(Volume)とは:</span> 一定期間に取引された株数です。価格が「何が起きたか」を示すのに対し、出来高は「どれだけの参加者がその動きに関与したか」を示します。</p>
-        <p><span className="font-medium">20日移動平均線(オレンジ線):</span> 出来高の直近20営業日の平均です。これを基準に、当日の出来高が「普段より多いか少ないか」を判断します。</p>
-        <p><span className="font-medium">出来高急増(2倍以上)の意味:</span></p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><span className="font-medium">上昇+出来高急増:</span> 機関投資家の大口買い、または重要なレジスタンスのブレイクアウト。トレンド転換や加速のシグナルになりやすい。</li>
-          <li><span className="font-medium">下落+出来高急増:</span> パニック売りまたは機関の大口売り。ただし「セリングクライマックス」(売りの最終段階)で底打ちのシグナルになることも。</li>
-          <li><span className="font-medium">横ばい+出来高急増:</span> 買いと売りが拮抗。大きな動きの前兆である可能性。</li>
-        </ul>
-        <p><span className="font-medium">出来高が低い状態が続く場合:</span> 市場参加者の関心が薄い。この状態からの出来高急増は、新たなトレンドの始まりを示唆することが多い。</p>
-        <p><span className="font-medium">価格と出来高の乖離(ダイバージェンス):</span> 価格は上昇しているのに出来高が減少している場合、上昇トレンドの勢いが弱まっている可能性があります。逆に価格下落中に出来高が減少していれば、売り圧力が弱まっているサインです。</p>
-        <p><span className="font-medium">倍率の目安:</span> 2倍以上は「注目すべき」、3倍以上は「異常値」、5倍以上は「何らかの重大イベント」を示唆します。</p>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/volume-analysis と二重管理になる。 */}
+      <GuideEntryPanel slug="volume-analysis" title="出来高分析の読み方" />
     </div>
   );
 }

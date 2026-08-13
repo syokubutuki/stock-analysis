@@ -9,7 +9,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { extraTechnical } from "../../lib/extra-technical";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -125,38 +125,9 @@ export default function ExtraTechnicalChart({ prices }: Props) {
       <div className="text-xs text-gray-500 mb-1 mt-3">Williams %R</div>
       <div ref={wrRef} />
 
-      <AnalysisGuide title="追加テクニカル指標の詳細理論">
-        <p className="font-medium text-gray-700">1. Parabolic SAR</p>
-        <p>
-          Wilder(1978)が考案。トレンドの方向と反転タイミングを示すストップ&リバースシステム。
-          {"SAR_{t+1} = SAR_t + AF × (EP - SAR_t)"}
-          <br />
-          AF: 加速因子(0.02開始、最大0.2)、EP: 極値(トレンド中の最高/最低値)
-        </p>
-
-        <p className="font-medium text-gray-700 mt-3">2. CCI (Commodity Channel Index)</p>
-        <p>
-          Lambert(1980)。TP（典型価格）のSMAからの乖離を標準化。
-          {"CCI = (TP - SMA(TP,20)) / (0.015 × MAD)"}
-          <br />
-          +100超=買われすぎ、-100未満=売られすぎ。
-        </p>
-
-        <p className="font-medium text-gray-700 mt-3">3. Williams %R</p>
-        <p>
-          Williams(1979)。直近N日の高値・安値に対する現在値の位置。
-          {"%R = (HH - Close) / (HH - LL) × (-100)"}
-          <br />
-          -20超=買われすぎ、-80未満=売られすぎ。ストキャスティクスの逆バージョン。
-        </p>
-
-        <p className="font-medium text-gray-700 mt-3">4. 投資判断への活用</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>SAR: トレーリングストップの位置として使用</li>
-          <li>CCI/WR: オシレーター系。RSIと組み合わせてダイバージェンスを確認</li>
-          <li>3指標が同方向 → シグナルの信頼性が高い</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/extra-technical と二重管理になる。 */}
+      <GuideEntryPanel slug="extra-technical" title="追加テクニカル指標の詳細理論" />
     </div>
   );
 }

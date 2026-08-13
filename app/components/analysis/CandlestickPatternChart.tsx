@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { detectCandlestickPatterns, type CandlestickPattern } from "../../lib/candlestick-patterns";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props { prices: PricePoint[]; }
 
@@ -105,28 +105,9 @@ export default function CandlestickPatternChart({ prices }: Props) {
         <p>{"t値 = mean(return) / (std(return) / √n)。|t| > 1.96 (5%水準) で有意と判定。有意なパターンは過去データにおいて統計的に意味のある予測力を持っていた可能性があります。ただし、サンプル数が少ない場合は信頼性が低いため注意。"}</p>
       </div>
 
-      <AnalysisGuide title="ローソク足パターン認識の詳細理論">
-        <p className="font-medium text-gray-700">1. 検出パターン一覧</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>ドジ (Doji)</strong>: {"始値≈終値（実体が日中レンジの10%以下）。買い方と売り方の均衡。転換のシグナル。"}</li>
-          <li><strong>ハンマー (Hammer)</strong>: 小さな実体が上部、下ヒゲが実体の2倍以上。下落トレンドでの底打ちシグナル。</li>
-          <li><strong>流れ星 (Shooting Star)</strong>: 小さな実体が下部、上ヒゲが実体の2倍以上。上昇トレンドでの天井シグナル。</li>
-          <li><strong>包み足 (Engulfing)</strong>: 当日の実体が前日の実体を完全に包み込む。強い転換シグナル。</li>
-          <li><strong>はらみ足 (Harami)</strong>: 当日の実体が前日の実体に完全に収まる。トレンド弱化のシグナル。</li>
-          <li><strong>明けの明星 (Morning Star)</strong>: 大陰線→小実体（ギャップダウン）→大陽線の3本組。底打ちの強い転換シグナル。</li>
-          <li><strong>宵の明星 (Evening Star)</strong>: 大陽線→小実体（ギャップアップ）→大陰線の3本組。天井の強い転換シグナル。</li>
-          <li><strong>赤三兵 (Three White Soldiers)</strong>: 3本連続の陽線、各足が前の足より高く引ける。強い上昇トレンド。</li>
-          <li><strong>黒三兵 (Three Black Crows)</strong>: 3本連続の陰線、各足が前の足より低く引ける。強い下落トレンド。</li>
-        </ul>
-        <p className="font-medium text-gray-700 mt-3">2. 有効性の検定</p>
-        <p>{"各パターン検出後の1日および5日のフォワードリターンを計算し、t検定で帰無仮説「平均リターン=0」を検定します。t = x̄/(s/√n)、|t|>1.96で5%有意。"}</p>
-        <p className="font-medium text-gray-700 mt-3">3. 注意点</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>パターン認識は主観的な要素がある。閾値の設定で検出数が大きく変わる。</li>
-          <li>多重検定問題: 10パターンを同時に検定すると、偶然有意になるリスクがある。Bonferroni補正を考慮すべき。</li>
-          <li>市場環境（レジーム）によってパターンの有効性は変化する。</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/candlestick-patterns と二重管理になる。 */}
+      <GuideEntryPanel slug="candlestick-patterns" title="ローソク足パターン認識の詳細理論" />
     </div>
   );
 }

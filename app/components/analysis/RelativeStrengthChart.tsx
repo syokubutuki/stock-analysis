@@ -4,7 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import { computeRelativeStrength } from "../../lib/relative-strength";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -155,30 +155,9 @@ export default function RelativeStrengthChart({ prices }: Props) {
         <div ref={momRef} className="w-full rounded border border-gray-100" />
       </div>
 
-      <AnalysisGuide title="相対力・RSモメンタムの詳細理論">
-        <p className="font-medium text-gray-700">1. 何を見ているか</p>
-        <p>
-          {"銘柄の値動きを“市場（ベンチマーク指数）”で割って、市場に勝っているか負けているかを見る。絶対リターンが同じでも、市場全体が上げている中での上昇か、下げ相場での健闘かで意味は全く違う。相対力はその文脈を与える。"}
-        </p>
-        <p className="font-medium text-gray-700 mt-3">2. 数式</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li><strong>相対力（RSライン）</strong>: ratio_t = C_銘柄 / C_ベンチ。初日を100に正規化。</li>
-          <li><strong>RSモメンタム</strong>: (ratio_t / ratio_t−w − 1)×100（w日変化率）。</li>
-          <li><strong>RS新高値</strong>: ratio_t が過去最高を更新。価格より先に相対力が新高値を取ると先行性のサイン。</li>
-        </ul>
-        <p className="font-medium text-gray-700 mt-3">3. 結果の読み方・投資判断</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>RSラインが<strong>右肩上がり＝アウトパフォーム</strong>。買い候補の選別、保有継続の根拠に。</li>
-          <li>RSモメンタムの<strong>ゼロクロス</strong>＝市場に対する優位の転換点。マイナス転換で乗り換え検討。</li>
-          <li>下げ相場でRSが上向き＝ディフェンシブに強い。地合い悪化局面の逃げ場銘柄。</li>
-        </ul>
-        <p className="font-medium text-gray-700 mt-3">4. 注意点・限界</p>
-        <ul className="list-disc pl-4 space-y-1">
-          <li>ベンチマークの選択で結論が変わる。日本株なら日経/TOPIX、米株ならS&P500等、適切な比較対象を選ぶ。</li>
-          <li>相対力が強くても絶対値が下落していれば含み損にはなる（相対と絶対は別物）。</li>
-          <li>取引時間・通貨が異なる指数との比較は、時差・為替の影響に注意。</li>
-        </ul>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/relative-strength と二重管理になる。 */}
+      <GuideEntryPanel slug="relative-strength" title="相対力・RSモメンタムの詳細理論" />
     </div>
   );
 }

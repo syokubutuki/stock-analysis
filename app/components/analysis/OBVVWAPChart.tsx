@@ -16,7 +16,7 @@ import {
 } from "../../lib/obv-vwap";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -225,25 +225,9 @@ export default function OBVVWAPChart({ prices, period }: Props) {
       </div>
 
       {/* Analysis Guide */}
-      <AnalysisGuide title="OBV・VWAPの見方">
-        <p>
-          <span className="font-semibold">OBV (On-Balance Volume)</span>
-          は出来高の累積で、価格トレンドの裏付けを確認する指標です。
-          価格上昇時に出来高が増加していれば、トレンドの信頼性が高いと判断できます。
-        </p>
-        <p>
-          <span className="font-semibold">VWAP (出来高加重平均価格)</span>
-          は出来高加重平均価格で、機関投資家が売買コストの基準として参照します。
-          価格がVWAPを上回っている場合は強気、下回っている場合は弱気の目安となります。
-        </p>
-        <p>
-          <span className="font-semibold">ダイバージェンス</span>
-          とは価格とOBVの乖離のことです。
-          価格が高値を更新してもOBVが低下している場合(弱気ダイバージェンス)や、
-          価格が安値を更新してもOBVが上昇している場合(強気ダイバージェンス)は、
-          トレンド転換の兆候として注目されます。
-        </p>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/obv-vwap と二重管理になる。 */}
+      <GuideEntryPanel slug="obv-vwap" title="OBV・VWAPの見方" />
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { computeStochastics, detectStochSignals } from "../../lib/stochastics";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -243,34 +243,9 @@ export default function StochasticsChart({ prices, period }: Props) {
       {/* Lower chart: stochastics */}
       <div ref={lowerRef} className="w-full rounded border border-gray-100" />
 
-      <AnalysisGuide title="ストキャスティクスの読み方">
-        <p>
-          <span className="font-medium">%K と %D:</span>{" "}
-          %K は直近N日間の高値・安値レンジに対する現在終値の相対位置を0〜100で表します。
-          %D は%Kの移動平均で、シグナル線として機能します。
-          Fast Stochastic は%Kと%Dのペア、Slow Stochastic はFast%Dをさらに平滑化したものです。
-        </p>
-        <p>
-          <span className="font-medium">買われすぎ・売られすぎ:</span>{" "}
-          Slow%Kが80以上のゾーンは「買われすぎ」を示し、売り転換の可能性に注意します。
-          20以下のゾーンは「売られすぎ」を示し、買い転換のチャンスを示唆します。
-          ただし強いトレンド相場では長期間極端なゾーンに留まることがあります。
-        </p>
-        <p>
-          <span className="font-medium">ゴールデンクロス・デッドクロス:</span>{" "}
-          Slow%KがSlow%Dを下から上抜ける「ゴールデンクロス」は買いシグナル、
-          特に売られすぎゾーン(20以下)での発生は信頼性が高いとされます。
-          逆にSlow%KがSlow%Dを上から下抜ける「デッドクロス」は売りシグナルで、
-          買われすぎゾーン(80以上)での発生に注目します。
-        </p>
-        <p>
-          <span className="font-medium">ダイバージェンス:</span>{" "}
-          価格が新高値を更新しているのに%Kが前回高値を下回る「弱気ダイバージェンス」は
-          上昇トレンドの勢いが失われているサインです。
-          逆に価格が新安値を更新しても%Kが前回安値を上回る「強気ダイバージェンス」は
-          下落トレンドの勢いの減退を示し、反発の可能性を示唆します。
-        </p>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/stochastics と二重管理になる。 */}
+      <GuideEntryPanel slug="stochastics" title="ストキャスティクスの読み方" />
     </div>
   );
 }

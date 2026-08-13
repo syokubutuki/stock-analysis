@@ -17,7 +17,7 @@ import {
 } from "../../lib/technical-indicators";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
-import AnalysisGuide from "./AnalysisGuide";
+import GuideEntryPanel from "./GuideEntryPanel";
 
 interface Props {
   prices: PricePoint[];
@@ -268,31 +268,9 @@ export default function TechnicalIndicators({ prices, period }: Props) {
 
       <div ref={chartRef} className="w-full rounded border border-gray-100" />
 
-      <AnalysisGuide title="テクニカル指標の読み方">
-        <p>
-          <span className="font-medium">RSI (Relative Strength Index):</span>{" "}
-          直近14日間の値上がり幅と値下がり幅の比率から算出。0〜100の値を取り、
-          70以上で「買われすぎ」、30以下で「売られすぎ」と判断。
-          ただし強いトレンドでは長期間70以上/30以下に滞在することがある。
-        </p>
-        <p>
-          <span className="font-medium">MACD:</span>{" "}
-          短期EMA(12日)と長期EMA(26日)の差。シグナル線はMACDの9日EMA。
-          MACD線がシグナル線を上抜ける「ゴールデンクロス」は買いシグナル、
-          下抜ける「デッドクロス」は売りシグナル。ヒストグラムの増減でモメンタムの変化を確認。
-        </p>
-        <p>
-          <span className="font-medium">ボリンジャーバンド:</span>{" "}
-          SMA(20日)±2σの価格帯。統計的に約95%の確率でバンド内に収まるとされる。
-          バンド幅が狭まる「スクイーズ」はブレイクアウトの前兆。
-          %Bは現在価格がバンド内のどの位置にあるかを示す（0%=下限, 100%=上限）。
-        </p>
-        <p>
-          <span className="font-medium">シグナル判定:</span>{" "}
-          上部に表示されるBUY/SELLシグナルは単純な条件判定に基づくものであり、
-          必ずしもエントリーポイントを意味しません。他の分析と組み合わせてご判断ください。
-        </p>
-      </AnalysisGuide>
+      {/* 解説本文は app/lib/analysis-guides.ts の唯一のソースから描く。
+          ここに散文を書き戻すと /guide/technical-indicators と二重管理になる。 */}
+      <GuideEntryPanel slug="technical-indicators" title="テクニカル指標の読み方" />
     </div>
   );
 }
