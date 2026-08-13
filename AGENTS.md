@@ -2,14 +2,16 @@
 
 ## Project Structure & Module Organization
 
-本リポジトリは Next.js 16 App Router アプリです。画面と Route Handler は `app/`、分析 UI は `app/components/analysis/`、計算ロジックは `app/lib/`、取得・状態管理は `app/hooks/`、外部サービスとの境界は `app/api/` に置きます。Web Worker は `*.worker.ts`、設計・統計仕様は `docs/` に配置します。専用のテストディレクトリと自動テストランナーは現状ありません。
+本リポジトリは Next.js 16 App Router アプリです。画面と Route Handler は `app/`、分析 UI は `app/components/analysis/`、計算ロジックは `app/lib/`、取得・状態管理は `app/hooks/`、外部サービスとの境界は `app/api/` に置きます。Web Worker は `*.worker.ts`、設計・統計仕様は `docs/` に配置します。数値計算の自動テストは `app/lib/__tests__/`（テスト本体・`helpers/`・`fixtures/`・`tools/`）に置きます。
 
 ## Build, Test, and Development Commands
 
 - `npm run dev`: ローカル開発サーバーを起動します。
 - `npm run lint`: Next.js 設定の ESLint を実行します。
+- `npm test`: 数値計算の回帰テスト（`app/lib/__tests__/`）を実行します。PR 前に必ず実行してください。
 - `npm run build`: 型検査を含む本番ビルドを作成します。PR 前に必ず実行してください。
 - `npm run start`: 作成済みの本番ビルドを起動します。
+- `npm run test:fixtures`: テスト用フィクスチャを再生成します（生成器を変えたときだけ）。
 
 ## Coding Style & Naming Conventions
 
