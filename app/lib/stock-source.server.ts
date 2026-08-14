@@ -219,68 +219,80 @@ async function fetchFundData(ticker: string, range: StockRange): Promise<StockDa
   // JWT経路・RSC経路の両方がこの1本の名前を使うので、解くのはここ1箇所でよい。
   const fundName = decodeHtmlEntities(pageData?.name ?? titleName ?? ticker);
   if (!pageData) {
+    console.warn(
+      `[stock-source] fund JWT unavailable; falling back to RSC ticker=${ticker} range=${range}`,
+    );
     return fetchFundDataFromRsc(ticker, fundName, pageUrl, fromDate, toDate, headers);
   }
 
-  const getSetCookie = (pageRes.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
-  const setCookies = getSetCookie?.call(pageRes.headers)
-    ?? [pageRes.headers.get("set-cookie") ?? ""];
-  const cookie = setCookies
-    .flatMap((value) => value.split(/,(?=\s*[^;,=\s]+=)/))
-    .map((value) => value.split(";", 1)[0].trim())
-    .filter(Boolean)
-    .join("; ");
-  if (!cookie) throw new StockSourceError("Failed to establish fund data session", 502);
+  try {
+    const getSetCookie = (pageRes.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+    const setCookies = getSetCookie?.call(pageRes.headers)
+      ?? [pageRes.headers.get("set-cookie") ?? ""];
+    const cookie = setCookies
+      .flatMap((value) => value.split(/,(?=\s*[^;,=\s]+=)/))
+      .map((value) => value.split(";", 1)[0].trim())
+      .filter(Boolean)
+      .join("; ");
+    if (!cookie) throw new StockSourceError("Failed to establish fund data session", 502);
 
-  const bffHeaders = {
-    ...headers,
-    Accept: "application/json",
-    Cookie: cookie,
-    Referer: pageUrl,
-    "x-jwt-token": pageData.jwtToken,
-  };
-  const fetchHistoryPage = async (page: number): Promise<YahooFundHistoryResponse> => {
-    const params = new URLSearchParams({
-      code: ticker,
-      fromDate,
-      toDate,
-      timeFrameId: "d",
-      page: String(page),
-    });
-    const apiUrl = `https://finance.yahoo.co.jp/bff-quote/v1/ajax/funds/history?${params}`;
-    const response = await fetch(apiUrl, { headers: bffHeaders, cache: "no-store" });
-    if (!response.ok) throw new StockSourceError(`Failed to fetch data for ${ticker}`, response.status);
-    const data = await response.json() as YahooFundHistoryResponse;
-    if (!data.isSuccess || !data.response) {
-      throw new StockSourceError(data.message || "Fund data source error", 502);
+    const bffHeaders = {
+      ...headers,
+      Accept: "application/json",
+      Cookie: cookie,
+      Referer: pageUrl,
+      "x-jwt-token": pageData.jwtToken,
+    };
+    const fetchHistoryPage = async (page: number): Promise<YahooFundHistoryResponse> => {
+      const params = new URLSearchParams({
+        code: ticker,
+        fromDate,
+        toDate,
+        timeFrameId: "d",
+        page: String(page),
+      });
+      const apiUrl = `https://finance.yahoo.co.jp/bff-quote/v1/ajax/funds/history?${params}`;
+      const response = await fetch(apiUrl, { headers: bffHeaders, cache: "no-store" });
+      if (!response.ok) throw new StockSourceError(`Failed to fetch data for ${ticker}`, response.status);
+      const data = await response.json() as YahooFundHistoryResponse;
+      if (!data.isSuccess || !data.response) {
+        throw new StockSourceError(data.message || "Fund data source error", 502);
+      }
+      return data;
+    };
+
+    const first = await fetchHistoryPage(1);
+    const firstItems = first.response?.historyTable?.items ?? [];
+    const totalPage = first.response?.paging?.totalPage ?? 1;
+    if (totalPage < 1 || totalPage > 200) {
+      throw new StockSourceError("Unexpected fund history page count", 502);
     }
-    return data;
-  };
 
-  const first = await fetchHistoryPage(1);
-  const firstItems = first.response?.historyTable?.items ?? [];
-  const totalPage = first.response?.paging?.totalPage ?? 1;
-  if (totalPage < 1 || totalPage > 200) {
-    throw new StockSourceError("Unexpected fund history page count", 502);
-  }
-
-  const allHistories: YahooFundHistoryItem[] = [...firstItems];
-  const concurrency = 4;
-  for (let start = 2; start <= totalPage; start += concurrency) {
-    const pages = Array.from(
-      { length: Math.min(concurrency, totalPage - start + 1) },
-      (_, index) => start + index,
+    const allHistories: YahooFundHistoryItem[] = [...firstItems];
+    const concurrency = 4;
+    for (let start = 2; start <= totalPage; start += concurrency) {
+      const pages = Array.from(
+        { length: Math.min(concurrency, totalPage - start + 1) },
+        (_, index) => start + index,
+      );
+      const responses = await Promise.all(pages.map(fetchHistoryPage));
+      for (const response of responses) {
+        allHistories.push(...(response.response?.historyTable?.items ?? []));
+      }
+    }
+    const prices = allHistories
+      .map(yahooFundHistoryToPrice)
+      .filter((price): price is PricePoint => price !== null)
+      .sort((a, b) => a.time.localeCompare(b.time));
+    if (prices.length === 0) throw new StockSourceError(`No price data for ${ticker}`, 404);
+    return { ticker, name: fundName, currency: "JPY", prices };
+  } catch (error) {
+    console.warn(
+      `[stock-source] fund BFF failed; falling back to RSC ticker=${ticker} range=${range}`,
+      error,
     );
-    const responses = await Promise.all(pages.map(fetchHistoryPage));
-    for (const response of responses) {
-      allHistories.push(...(response.response?.historyTable?.items ?? []));
-    }
+    return fetchFundDataFromRsc(ticker, fundName, pageUrl, fromDate, toDate, headers);
   }
-  const prices = allHistories
-    .map(yahooFundHistoryToPrice)
-    .filter((price): price is PricePoint => price !== null)
-    .sort((a, b) => a.time.localeCompare(b.time));
-  return { ticker, name: fundName, currency: "JPY", prices };
 }
 
 async function fetchChartData(ticker: string, range: StockRange): Promise<StockData> {
