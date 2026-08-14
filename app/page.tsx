@@ -16,6 +16,8 @@ import DataQualityNotice from "./components/analysis/DataQualityNotice";
 import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
 import { formatSummaryPrice } from "./lib/format";
 import { SeriesMode } from "./lib/series-mode";
+import { sectionForPanel } from "./lib/panel-sections";
+import { OPEN_PANEL_EVENT, type OpenPanelDetail } from "./lib/panel-nav";
 import { recordTicker } from "./lib/test-ledger";
 
 const DiffSeriesChart = dynamic(
@@ -1279,7 +1281,13 @@ export default function AnalysisPage() {
       // localStorage 利用不可（プライベートモード等）の場合は無視
     }
 
-    const nextSection = SECTION_KEYS.has(urlSection as SectionKey)
+    // `panel` は所属セクションが決まっているので、`sec` より優先する。
+    // 両者が食い違う共有URL（節をまたぐジャンプの後にコピーされた等）では、以前は
+    // 指定された節にそのパネルが無く、60フレーム探して無言で諦めていた。
+    const panelSection = urlPanel ? sectionForPanel(urlPanel) : null;
+    const nextSection = SECTION_KEYS.has(panelSection as SectionKey)
+      ? (panelSection as SectionKey)
+      : SECTION_KEYS.has(urlSection as SectionKey)
       ? urlSection
       : SECTION_KEYS.has(savedSection as SectionKey) ? savedSection : "basic";
     const nextMode = SERIES_MODES.has(urlMode as SeriesMode)
@@ -1435,6 +1443,22 @@ export default function AnalysisPage() {
     requestAnimationFrame(tick);
   }, [activeSection]);
 
+  // 別の分析からの「このパネルを開いて」（openAnalysisPanel）が節をまたぐ場合を受ける。
+  // CollapsibleAnalysis 側の購読はマウント済みのパネルにしか届かないため、他の節の
+  // パネルを指すと誰も応答せず**無言で何も起きない**。ここで節を切り替えて拾う。
+  // 同じ節なら CollapsibleAnalysis が処理するので何もしない（二重スクロールを避ける）。
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<OpenPanelDetail>).detail;
+      if (!detail?.id) return;
+      const target = sectionForPanel(detail.id);
+      if (!target || target === activeSection || !SECTION_KEYS.has(target as SectionKey)) return;
+      navigateToSection(target, detail.id);
+    };
+    window.addEventListener(OPEN_PANEL_EVENT, onOpen as EventListener);
+    return () => window.removeEventListener(OPEN_PANEL_EVENT, onOpen as EventListener);
+  }, [activeSection, navigateToSection]);
+
   const hasDataQualityIssues =
     (data?.dataQuality?.repaired.length ?? 0) > 0 ||
     (data?.dataQuality?.suspects.length ?? 0) > 0;
@@ -1452,7 +1476,7 @@ export default function AnalysisPage() {
   // 報告は10年の全期間に対するものなので、表示期間ではなく allPrices を渡す。
   // 問題がある場合はサマリーより先に、問題がなければサマリーの後に開示する。
   //
-  // 配置は「基本」節の1か所だけにする。以前は全18節の共通ヘッダ部に置いていたため、
+  // 配置は「基本」節の1か所だけにする。以前は全セクションの共通ヘッダ部に置いていたため、
   // どの節へ切り替えてもその節の分析本体の手前に点検パネルが挟まり、破損ゼロの銘柄でも
   // 毎回最上段を占めていた。CLAUDE.md の「手を入れたことは画面に開示する」規約は、
   // 全ページ共通の DataQualityNotice バナー（破損・疑いがあるときだけ描画）が担保する。
