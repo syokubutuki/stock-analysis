@@ -417,3 +417,4 @@ git branch -d feat/ticker-route feat/fund-display
 | 日付 | 内容 |
 |---|---|
 | 2026-08-12 | 初版。ラウンド3（S9〜S11）のマージ完了を受けて作成 |
+| 2026-08-15 | **S12・S13 完了・main へマージ済み。本書の役目は終了。** 結果と次の手順は `docs/site-improvement-round5.md` §0〜§5 を参照 |
