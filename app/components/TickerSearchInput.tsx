@@ -115,6 +115,8 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
     setOpen(false);
     setSuggestions([]);
     setHighlight(-1);
+    // 現在のカタログは全件trueだが、検索APIが将来「検索可能・価格未対応」の
+    // 銘柄を返せる契約を保つため、防御的な表示としてこの分岐を残す。
     if (!suggestion.priceSupported) {
       setUnsupportedMessage(`${suggestion.name}の価格取得は現在調整中です。`);
       return;
