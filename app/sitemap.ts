@@ -1,6 +1,7 @@
 import { MetadataRoute } from "next";
 import { ANALYSIS_GUIDES } from "./lib/analysis-guides";
 import { SITE_ORIGIN } from "./lib/site-url";
+import { TICKER_PAGE_INSTRUMENTS } from "./lib/ticker-pages";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -17,5 +18,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...guides];
+  const tickerPages: MetadataRoute.Sitemap = TICKER_PAGE_INSTRUMENTS.map((instrument) => ({
+    url: `${SITE_ORIGIN}/t/${instrument.ticker}`,
+    lastModified: now,
+    changeFrequency: "daily",
+    priority: 0.8,
+  }));
+
+  return [...staticPages, ...guides, ...tickerPages];
 }
