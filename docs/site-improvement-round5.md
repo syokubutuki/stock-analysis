@@ -110,11 +110,6 @@ S13 が `AccordionSection` に `AnalysisAvailabilityContext` を入れたので�
 > `$dir` / `$br` が展開されず、リポジトリ内部に不正な worktree が作られる（2026-08-11 に発生）。
 > 誤作成したら: `git worktree remove '$dir' --force; git worktree prune; git branch -D '$br'`
 
-> ### ⚠ 片付け残りを先に消すこと
-> `C:\Users\hikar\next\sa-s10` が **git から切り離された空き殻として残っている**
-> （`.git` ファイルが無く `git worktree list` にも出ない、ラウンド3の残骸）。
-> 新しい worktree を作る前に `Remove-Item -Recurse -Force C:\Users\hikar\next\sa-s10` で消すこと。
-
 ### PowerShell 版（この環境の既定シェル）
 
 ```powershell
