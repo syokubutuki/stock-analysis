@@ -17,6 +17,10 @@ import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
 import { formatSummaryPrice } from "./lib/format";
 import { SeriesMode } from "./lib/series-mode";
 import { sectionForPanel } from "./lib/panel-sections";
+import {
+  CLOSE_ONLY_CAUTION_PANEL_IDS,
+  CLOSE_ONLY_UNAVAILABLE_PANEL_IDS,
+} from "./lib/panel-data-requirements";
 import { OPEN_PANEL_EVENT, type OpenPanelDetail } from "./lib/panel-nav";
 import { recordTicker } from "./lib/test-ledger";
 
@@ -1099,114 +1103,10 @@ const SECTIONS: { key: SectionKey; label: string; method: string; description: s
   { key: "quantum", label: "値動きの癖を見る（上級）", method: "量子力学的", description: "プロパゲータ・経路積分・DMD・デコヒーレンス・市場時間・密度行列" },
 ];
 
-// 投信の基準価額系列（OHLCがすべて同値・出来高0）では、計算できても市場内の
-// 値動きや売買量として解釈できないパネル。IDはURL・localStorage互換のため維持し、
-// AccordionSection側で分析本体をマウントせず理由を表示する。
-const CLOSE_ONLY_UNAVAILABLE_PANEL_IDS = new Set([
-  "basic-volume",
-  "basic-rvol",
-  "basic-vol-indicators",
-  "basic-signed-volume",
-  "basic-volume-profile",
-  "basic-volume-profile-ext",
-  "basic-volume-return",
-  "basic-volume-lead",
-  "basic-gap",
-  "tech-obvvwap",
-  "tech-vw",
-  "sa-ohlc",
-  "ohlc-pattern",
-  "ohlc-pattern-edge",
-  "ohlc-candle-run",
-  "ohlc-wick",
-  "ohlc-intra-path",
-  "ohlc-close-position",
-  "ohlc-true-range",
-  "ohlc-mfemae",
-  "ohlc-tpsl",
-  "sa-ohlc-gap",
-  "ohlc-gap-class",
-  "sa-ohlc-range",
-  "ohlc-range-vol",
-  "ohlc-ohlc-vol",
-  "sa-ohlc-micro",
-  "risk-forecast-range",
-  "risk-spread",
-  "transform-overnight",
-  "transform-exec-scan",
-  "transform-weekday-decomp",
-  "dist-crosscorr",
-  "vol-range-cone",
-  "vol-range-contract",
-  "sa-frequency-coherence",
-  "cond-segment-edge",
-  "edge-capacity",
-  "cal-weekday-barrier",
-  "cal-candle-season",
-  "cal-monday-gap",
-  "cal-weekend-premium",
-  "cal-weekday-intra-path",
-  "cal-tom-path",
-  "cal-weekday-us-path",
-  "cal-today-vs-expected",
-  "cal-intraday-analog",
-  "cal-us-jp-linked",
-  "cal-regime-us-path",
-  "cal-weekday-intra-edge",
-  "cal-sector-basket",
-  "cal-highlow-timing",
-  "cal-exec-timing",
-  "cal-edge-discount",
-  "cal-sliced-exec",
-  "cal-intra-window",
-  "cal-intra-profile",
-  "cal-vwap-dev",
-  "cal-intra-regime",
-  "cal-intra-excursion",
-  "cal-realized-vol",
-  "cal-gap-intra",
-  "cal-signal-intra",
-  "cal-signal-exec",
-  "cal-us-driver",
-  "cal-us-beta",
-  "cal-us-path",
-  "cal-us-absorption",
-  "cal-us-leadlag",
-  "cal-us-vol",
-  "cal-us-timing",
-  "cal-us-holding",
-  "cal-us-digestion",
-  "cal-us-eventtime",
-]);
-
-// 終値ベースの結果は有効だが、同じパネル内に出来高・日中/夜間など解釈不能な
-// サブ分析を含むもの。分析本体は残し、冒頭で参照範囲を明示する。
-const CLOSE_ONLY_CAUTION_PANEL_IDS = new Set([
-  "dist-lag",
-  "dist-inforatio",
-  "ent-conditional",
-  "ent-multiscale",
-  "ent-rolling-te",
-  "ent-symbolic",
-  "frac-ext",
-  "sa-causal",
-  "causal-ccm",
-  "tail-main",
-  "cal-null-anatomy",
-  "cal-weekday-us-interaction",
-  "cal-weekday-edge",
-  "cal-weekday-sim",
-  "cal-timing-value",
-  "cal-weekday-vs-bh",
-  "cal-optimal-exit",
-  "cal-nisa-vs-taxable",
-  "cal-weekclock",
-  "cal-session-gap",
-  "cal-weekly-analog",
-  "cal-weekday-cond",
-  "sim-regime-cluster",
-  "quantum-markettime",
-]);
+// 投信の基準価額系列（OHLCがすべて同値・出来高0）で解釈できないパネルの台帳は
+// app/lib/panel-data-requirements.ts にある。ここに直接書くと、新しいパネルを
+// 足したときの分類漏れを検出できない（fail-open）。同ファイルの3分類が page.tsx の
+// 全IDを覆っていることを __tests__/page-wiring.test.ts が検査する。
 
 // 入力系列(seriesMode)を実際に消費するセクション。これ以外のセクション
 // (基礎・テクニカル・OHLC・リスク・カレンダー)はチャートが OHLC ベースで

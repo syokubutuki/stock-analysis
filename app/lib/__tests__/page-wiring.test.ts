@@ -11,9 +11,12 @@
 //  ② SERIES_AWARE_SECTIONS（系列セレクタの有効/無効）
 //     宣言と実態がずれても、セレクタが効かない／出ないだけで例外は起きない。
 //
-// どちらも「新しい分析を足したときに、台帳側の更新を忘れる」形で壊れる。
-// FU22（投信の非対応パネル台帳が page.tsx にハードコード）と同じ fail-open の構造で、
-// M3（レジストリ化）が入るまでは人間の注意力だけが担保になっている。ここを自動化する。
+//  ③ 終値だけの系列（投信）で解釈できるかの分類（panel-data-requirements.ts）
+//     分類を忘れたパネルは**通常表示に落ちる**ので、投信で無意味な数字が出る。
+//     出るのは数字であって例外ではないため、見ている人にも壊れて見えない（FU22）。
+//
+// どれも「新しい分析を足したときに、台帳側の更新を忘れる」形で壊れる。
+// M3（レジストリ化）が入るまでは人間の注意力だけが担保だったところを、ここで自動化する。
 //
 // 失敗したときは、テストを緩めるのではなく **表と page.tsx のどちらが正しいかを判断**すること。
 
@@ -23,6 +26,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { sectionForPanel } from "../panel-sections";
+import {
+  CLOSE_ONLY_CAUTION_PANEL_IDS,
+  CLOSE_ONLY_SAFE_PANEL_IDS,
+  CLOSE_ONLY_UNAVAILABLE_PANEL_IDS,
+  classifyPanelForCloseOnly,
+} from "../panel-data-requirements";
 
 const PAGE_PATH = fileURLToPath(new URL("../../page.tsx", import.meta.url));
 const SOURCE = readFileSync(PAGE_PATH, "utf8");
@@ -92,6 +101,54 @@ describe("パネルID → セクションの解決（共有URL `?panel=` が正�
     assert.equal(sectionForPanel("pf-corr-drag"), null);
     assert.equal(sectionForPanel("no-such-panel"), null);
     assert.equal(sectionForPanel(""), null);
+  });
+});
+
+describe("終値だけの系列での分類（FU17/FU22: 投信で無意味な結果を出さない）", () => {
+  const LEDGERS = [
+    ["UNAVAILABLE", CLOSE_ONLY_UNAVAILABLE_PANEL_IDS],
+    ["CAUTION", CLOSE_ONLY_CAUTION_PANEL_IDS],
+    ["SAFE", CLOSE_ONLY_SAFE_PANEL_IDS],
+  ] as const;
+
+  test("page.tsx の全パネルが3分類のいずれかに属する（分類漏れを落とす）", () => {
+    // ここが本題。新しいパネルを足すと、分類するまでこのテストが落ちる。
+    // 落ちたら panel-data-requirements.ts の3つのうち妥当なものへIDを足すこと。
+    // 出来高・OHLC内訳・日中/夜間そのものが対象なら UNAVAILABLE、
+    // 一部のサブ分析だけがそうなら CAUTION、終値だけで成立するなら SAFE。
+    const unclassified = panels
+      .filter((p) => classifyPanelForCloseOnly(p.id) === null)
+      .map((p) => `page.tsx:${p.line} ${p.id}（${p.section} 節）`);
+    assert.deepEqual(unclassified, [], `未分類のパネルがある:\n${unclassified.join("\n")}`);
+  });
+
+  test("3分類に重複が無い（1つのIDが2つの扱いを持たない）", () => {
+    const overlaps: string[] = [];
+    for (let i = 0; i < LEDGERS.length; i += 1) {
+      for (let j = i + 1; j < LEDGERS.length; j += 1) {
+        for (const id of LEDGERS[i][1]) {
+          if (LEDGERS[j][1].has(id)) overlaps.push(`${id}: ${LEDGERS[i][0]} と ${LEDGERS[j][0]}`);
+        }
+      }
+    }
+    assert.deepEqual(overlaps, [], `分類が重複している:\n${overlaps.join("\n")}`);
+  });
+
+  test("台帳のIDがすべて page.tsx に実在する（改名・削除で腐るのを検知）", () => {
+    // 分類漏れとは逆向きの腐り方。IDを改名すると台帳側だけが古い名前を持ち続け、
+    // そのパネルは投信で無防備になる（改名先が未分類なら上のテストが拾う）。
+    const live = new Set(panels.map((p) => p.id));
+    const dead = LEDGERS.flatMap(([name, ids]) =>
+      [...ids].filter((id) => !live.has(id)).map((id) => `${name}: ${id}`),
+    );
+    assert.deepEqual(dead, [], `page.tsx に無いIDが台帳に残っている:\n${dead.join("\n")}`);
+  });
+
+  test("UNAVAILABLE と CAUTION が空になっていない（台帳ごと消える退行を止める）", () => {
+    // 空の Set を渡しても画面は普通に動いてしまう。FU17 の対処が丸ごと消えても
+    // 気づけないので、件数の下限だけ置く。
+    assert.ok(CLOSE_ONLY_UNAVAILABLE_PANEL_IDS.size > 50);
+    assert.ok(CLOSE_ONLY_CAUTION_PANEL_IDS.size > 10);
   });
 });
 
