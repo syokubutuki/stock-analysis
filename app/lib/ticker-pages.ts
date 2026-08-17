@@ -37,13 +37,37 @@ export function getTickerPageInstrument(value: string): Instrument | undefined {
 }
 
 /**
- * 1年の日足終値から、銘柄ページに掲載する実測サマリーを計算する。
+ * `YYYY-MM-DD` の1年前を、同じ書式の文字列として返す。
+ *
+ * `Date` を経由しないのはタイムゾーンで日がずれるのを避けるため。うるう日の
+ * `2024-02-29` は `2023-02-29`（実在しない日）になるが、**窓の境界としては正しく働く**。
+ * ISO日付は辞書順が時系列順なので、`2023-02-28 < 2023-02-29 < 2023-03-01` の
+ * 比較結果は実在の有無に依らない。
+ */
+function oneYearBefore(isoDate: string): string {
+  const [year, rest] = [isoDate.slice(0, 4), isoDate.slice(4)];
+  return `${Number(year) - 1}${rest}`;
+}
+
+/**
+ * 日足終値から、銘柄ページに掲載する直近1年の実測サマリーを計算する。
  * ボラティリティは日次対数リターンの標本標準偏差を √252 倍する。
+ *
+ * **10年の系列を渡してよい**（というより渡すことを想定している）。
+ * 銘柄ページが `range=1y` で取ると、アプリ本体・`/api/stock` が使う `10y` と
+ * 別のキャッシュキーになり、誰も温めない専用エントリになってしまうため
+ * （`stock-data.server.ts` の `cacheKey()` は range を含む）。
+ * 取得は `10y` に寄せ、期間の切り出しはここで行う。
  */
 export function buildTickerPageSummary(prices: PricePoint[]): TickerPageSummary | null {
-  const valid = prices.filter(
+  const usable = prices.filter(
     (price) => Number.isFinite(price.close) && price.close > 0,
   );
+  if (usable.length < 2) return null;
+
+  const cutoff = oneYearBefore(usable[usable.length - 1].time);
+  const valid = usable.filter((price) => price.time >= cutoff);
+  // 上場から1年未満の銘柄は窓に2点そろわない。呼び出し側が「取得できなかった」扱いにする。
   if (valid.length < 2) return null;
 
   const first = valid[0];

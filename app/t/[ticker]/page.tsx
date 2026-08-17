@@ -18,10 +18,21 @@ type Props = { params: Promise<{ ticker: string }> };
 // stock-source.server.ts は上流取得を no-store にしているため、このページはリクエスト時に
 // SSRする。価格そのものの fresh 8時間・stale 7日は getStockData の共有キャッシュが担う。
 export const dynamic = "force-dynamic";
-export const dynamicParams = false;
 
-const loadStockData = cache((symbol: string) => getStockData(symbol, "1y"));
+// generateStaticParams に無い値もページ本体で受ける。false にすると Next が
+// **ページ実行前に** 404 を返すため、下の Yahoo記法(7203.T)・小文字(aapl)を
+// canonical へ 308 で寄せる分岐が一度も走らない（2026-08-15 に実測）。
+// 未知のコードは getTickerPageInstrument() → notFound() が受けるので防御は変わらない。
+export const dynamicParams = true;
 
+// 取得は 10年に寄せる。1年で取ると、アプリ本体・/api/stock・全ベンチマークが使う
+// range=10y と別のキャッシュキーになり、通常アクセスで温まらない専用エントリになる
+// （stock-data.server.ts の cacheKey() は range を含む）。掲載する直近1年は
+// buildTickerPageSummary() が切り出す。
+const loadStockData = cache((symbol: string) => getStockData(symbol, "10y"));
+
+// force-dynamic 下では事前生成には使われない。公開対象の宣言として残してある
+// （将来 ISR に寄せるならここが起点になる）。
 export function generateStaticParams() {
   return TICKER_PAGE_INSTRUMENTS.map(({ ticker }) => ({ ticker }));
 }
