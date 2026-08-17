@@ -52,7 +52,7 @@ description: 新しい分析（チャート／パネル）をこのアプリに�
 6. **投資判断への活用** — 建玉をどう変えるのかまで踏み込む
 7. **注意点・限界** — 何を仮定していて、いつ壊れるか
 
-## 4. `app/page.tsx` に配線する（4か所）
+## 4. `app/page.tsx` に配線する（5か所）
 
 ```tsx
 // (a) 動的 import。SSR無効・プレースホルダ必須（~240行目付近の並びに追加）
@@ -71,8 +71,14 @@ const FooChart = dynamic(
 - **`id`** は `<セクション略号>-<名前>`（`cal-` / `pf-` / `sim-` …）。
   この id が `CollapsibleAnalysis` の localStorage キー `sa:open:<id>` と
   DOM の `#panel-<id>` になる。**後から変えると利用者の開閉状態が失われる**
-- (c) 新セクションを足すなら `SECTIONS`（1071行目）
-- (d) `seriesMode` を実際に消費するなら `SERIES_AWARE_SECTIONS`（1101行目）にキーを追加
+- (c) 新セクションを足すなら `SECTIONS`
+- (d) `seriesMode` を実際に消費するなら `SERIES_AWARE_SECTIONS` にキーを追加
+- (e) **`app/lib/panel-data-requirements.ts` の3分類のどれかに id を足す**。
+  投信は全バーで `open==high==low==close` かつ `volume==0` なので、
+  出来高・OHLC内訳・日中/夜間そのものが対象なら `UNAVAILABLE`（本体をマウントせず理由を出す）、
+  パネル内の一部のサブ分析だけがそうなら `CAUTION`（注意書きを冒頭に出す）、
+  終値だけで成立するなら `SAFE`。**分類しないと `npm test` が落ちる**
+  （`__tests__/page-wiring.test.ts` が `page.tsx` の全IDを突合する）
 
 ## 5. 確認
 
