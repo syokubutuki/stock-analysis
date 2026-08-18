@@ -5,6 +5,7 @@ import { PortfolioData } from "../../hooks/usePortfolioData";
 import { alignReturns } from "../../lib/portfolio-risk";
 import { michaudResample, ResampleResult } from "../../lib/frontier-resample";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -116,7 +117,7 @@ export default function ResampledFrontierChart({ data, window: win = 250 }: Prop
     const sx = (v: number) => PAD.left + ((v - bounds.xMin) / (bounds.xMax - bounds.xMin)) * plotW;
     const sy = (v: number) => PAD.top + (1 - (v - bounds.yMin) / (bounds.yMax - bounds.yMin)) * plotH;
 
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";

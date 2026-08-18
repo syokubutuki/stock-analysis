@@ -7,6 +7,7 @@ import {
   StateKind,
 } from "../../lib/potential-landscape";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -54,7 +55,7 @@ export default function PotentialLandscapeChart({ prices }: Props) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
     if (!land) {
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "12px sans-serif";
       ctx.fillText("データが不足しています", 16, 24);
       return;

@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { buildStateFn, twoFactorForward, STATE_AXES, StateAxis } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -68,7 +69,7 @@ export default function TwoFactorHeatmapChart({ prices }: Props) {
         ctx.fillRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
         ctx.fillStyle = "#1f2937"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(`${c.meanFwd >= 0 ? "+" : ""}${(c.meanFwd * 100).toFixed(1)}%`, x + cellW / 2, y + cellH / 2);
-        ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+        ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
         ctx.fillText(`n=${c.n}`, x + cellW / 2, y + cellH / 2 + 11);
         if (xl === result.nowX && yl === result.nowY) {
           ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 2.5; ctx.strokeRect(x + 1.5, y + 1.5, cellW - 3, cellH - 3);

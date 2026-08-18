@@ -12,6 +12,7 @@ import {
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -46,7 +47,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
     [result]
   );
   const colorOf = useCallback(
-    (key: string) => result?.bins.find((b) => String(b.weekday) === key)?.color ?? "#9ca3af",
+    (key: string) => result?.bins.find((b) => String(b.weekday) === key)?.color ?? CHART_COLORS.neutral,
     [result]
   );
 

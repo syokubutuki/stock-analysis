@@ -21,6 +21,7 @@ import { dayCumPath, assignBins, binEdges, binMeta, binOfValue, BinScheme, mulbe
 import { PathGroup, PathStat, PairDiff, buildPathStats, pairwiseEndDiffs } from "./intraday-path-core";
 import { zShape } from "./weekly-analog";
 import { mean, studentTwoSidedP, fSurvival } from "./stats-significance";
+import { CHART_COLORS } from "./chart-colors";
 
 // ───────────────────────── 米国セッションの経路と形の特徴量 ─────────────────────────
 
@@ -117,7 +118,7 @@ export interface LinkGroup {
   desc: string; // 群の特徴(終値・終盤の平均)
 }
 
-const SHAPE_COLORS = ["#dc2626", "#9ca3af", "#16a34a"];
+const SHAPE_COLORS = ["#dc2626", CHART_COLORS.neutral, "#16a34a"];
 
 // k-means(k=3)でz化した米国経路をクラスタリングする。初期値は「終盤の勢い」の分位で決め、
 // 乱数依存を最小化する(同じデータなら同じ層別になるようにする)。

@@ -18,6 +18,7 @@ import {
   conditionalByBin, heatmap2D, scatterData, quiverData, driverRanking,
   CondResult, HeatResult, ScatterResult, QuiverResult, DriverRow,
 } from "../../lib/monday-gap";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -106,7 +107,7 @@ function drawCondBars(ctx: CanvasRenderingContext2D, w: number, h: number, res: 
     if (res.nowBin === b.idx) { ctx.fillStyle = "#1d4ed8"; ctx.fillText("◀今", cx, padT + 8); }
   });
   // y軸ラベル
-  ctx.textAlign = "right"; ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif";
+  ctx.textAlign = "right"; ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif";
   ctx.fillText(isRate ? "上昇率" : "平均", padL - 6, padT + 8);
 }
 
@@ -178,7 +179,7 @@ function drawScatter(ctx: CanvasRenderingContext2D, w: number, h: number, res: S
     ctx.fillStyle = "#b45309"; ctx.font = "9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("今", X(nowX), padT + 8);
   }
   // 軸目盛
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
   const fx = (v: number) => (xIsPct ? pctText(v, 1) : v.toFixed(2));
   ctx.fillText(fx(xr[0]), padL + 14, h - padB + 12); ctx.fillText(fx(xr[1]), w - padR - 14, h - padB + 12);
   ctx.textAlign = "right";
@@ -204,7 +205,7 @@ function drawQuiver(ctx: CanvasRenderingContext2D, w: number, h: number, res: Qu
     ctx.beginPath(); ctx.arc(X(p.thu), Y(p.fri), r, 0, Math.PI * 2); ctx.fill();
   }
   // 象限ラベル
-  ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
   ctx.fillText("木↑ 金↑", X(m * 0.6), Y(m * 0.9));
   ctx.fillText("木↓ 金↑", X(-m * 0.6), Y(m * 0.9));
   ctx.fillText("木↑ 金↓", X(m * 0.6), Y(-m * 0.85));

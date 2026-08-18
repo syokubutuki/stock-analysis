@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { simulateFBM } from "../../lib/fbm";
 import { computeDFA } from "../../lib/fractal";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -164,7 +165,7 @@ export default function FBMChart({ prices }: Props) {
     const toY = (v: number) => pad.top + (1 - (v - minLY) / (maxLY - minLY || 1)) * plotH;
 
     // Theoretical line
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -190,7 +191,7 @@ export default function FBMChart({ prices }: Props) {
     ctx.textAlign = "left";
     ctx.fillStyle = "#059669";
     ctx.fillText("実測MSD", pad.left + 5, pad.top + 12);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText("理論値", pad.left + 65, pad.top + 12);
   }, [result, hurst]);
 

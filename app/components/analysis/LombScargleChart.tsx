@@ -7,6 +7,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeLombScargle } from "../../lib/lomb-scargle";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -68,7 +69,7 @@ export default function LombScargleChart({ prices, seriesMode }: Props) {
           time: Math.round(p.period) as unknown as Time,
           position: "aboveBar" as const,
           shape: "circle" as const,
-          color: p.fap < 0.01 ? "#dc2626" : p.fap < 0.05 ? "#f59e0b" : "#9ca3af",
+          color: p.fap < 0.01 ? "#dc2626" : p.fap < 0.05 ? "#f59e0b" : CHART_COLORS.neutral,
           text: `${Math.round(p.period)}d`,
           size: 1.5,
         }));

@@ -17,6 +17,7 @@ import {
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -115,7 +116,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
       .map((d) => ({ date: d.date, close: d.close, key: String(d.weekday) }));
   }, [prep]);
   const colorOf = useCallback(
-    (key: string) => pathResult?.bins.find((b) => String(b.weekday) === key)?.color ?? "#9ca3af",
+    (key: string) => pathResult?.bins.find((b) => String(b.weekday) === key)?.color ?? CHART_COLORS.neutral,
     [pathResult]
   );
 

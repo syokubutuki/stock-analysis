@@ -12,6 +12,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStrategyPanel";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -232,7 +233,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
 
     // バイ&ホールド (灰色・破線)
     const bhSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 2,
       lineStyle: 2,
       priceFormat: { type: "custom", formatter: (v: number) => (v).toFixed(2) + "%" },

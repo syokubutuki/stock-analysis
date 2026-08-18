@@ -32,6 +32,7 @@ import {
   type VarianceConcentration,
 } from "../../lib/growth-drag";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -1046,7 +1047,7 @@ function drawTwoFaces(
     ctx.fillStyle = "#374151";
     ctx.fillText(title, cx, 14);
     ctx.font = "10px sans-serif";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(sub, cx, 26);
 
     const total = slices.reduce((s, x) => s + Math.max(x.v, 0), 0) || 1;
@@ -1182,7 +1183,7 @@ function drawWaterfall(canvas: HTMLCanvasElement, d: DragDecomp, capital: number
   const afterSolo = d.expected - d.soloDrag;
   const segments = [
     { from: 0, to: d.expected, label: "期待リターン（見かけ）", value: d.expected, color: "#3b82f6", strong: false },
-    { from: d.expected, to: afterSolo, label: "単独ドラッグ（分散しても残る分）", value: -d.soloDrag, color: "#9ca3af", strong: false },
+    { from: d.expected, to: afterSolo, label: "単独ドラッグ（分散しても残る分）", value: -d.soloDrag, color: CHART_COLORS.neutral, strong: false },
     { from: afterSolo, to: d.growth, label: "相関ドラッグ（相関を無視した代償）", value: -d.corrDrag, color: "#dc2626", strong: true },
     { from: 0, to: d.growth, label: "実際に増える速さ（幾何成長率）", value: d.growth, color: "#16a34a", strong: true },
   ];
@@ -1203,7 +1204,7 @@ function drawWaterfall(canvas: HTMLCanvasElement, d: DragDecomp, capital: number
 
   // ゼロ線
   const zx = xOf(0);
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(zx, padT);
@@ -1243,7 +1244,7 @@ function drawWaterfall(canvas: HTMLCanvasElement, d: DragDecomp, capital: number
     ctx.fillStyle = s.value >= 0 ? "#111827" : "#b91c1c";
     ctx.font = "bold 13px ui-monospace, monospace";
     ctx.fillText(`${s.value >= 0 ? "+" : "−"}${(Math.abs(s.value) * 100).toFixed(1)}%`, padL - 10, yTop + 12);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     const yen = s.value * capital;
     ctx.fillText(
@@ -1274,7 +1275,7 @@ function drawWaterfall(canvas: HTMLCanvasElement, d: DragDecomp, capital: number
   // 目盛り
   ctx.textAlign = "center";
   ctx.font = "10px sans-serif";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.strokeStyle = "#e5e7eb";
   const ticks = 5;
   for (let i = 0; i <= ticks; i++) {
@@ -1287,6 +1288,6 @@ function drawWaterfall(canvas: HTMLCanvasElement, d: DragDecomp, capital: number
     ctx.fillText(`${(v * 100).toFixed(0)}%`, x, padT + rows * rowH + 16);
   }
   ctx.textAlign = "left";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText("年率リターン", padL, height - 4);
 }

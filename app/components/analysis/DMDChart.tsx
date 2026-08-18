@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeDMD } from "../../lib/dmd";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -52,7 +53,7 @@ export default function DMDChart({ prices, seriesMode }: Props) {
 
     // Original series (gray)
     const origSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "原系列",
     });

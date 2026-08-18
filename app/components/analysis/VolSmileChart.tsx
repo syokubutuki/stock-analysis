@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { estimateVolSmile } from "../../lib/vol-smile";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -72,7 +73,7 @@ export default function VolSmileChart({ prices }: Props) {
     }
 
     // ATM vertical line
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();

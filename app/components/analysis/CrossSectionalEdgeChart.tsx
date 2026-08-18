@@ -19,6 +19,7 @@ import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import { clearCache, cacheStats, type CacheStats } from "../../lib/price-cache";
 import { MARGIN_KIND_ORDER, MARGIN_KIND_LABEL, resolveMarginRate, type MarginKind } from "../../lib/rakuten-margin";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -143,7 +144,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
     if (!chart || !result.ok) return;
     for (const s of seriesRef.current) chart.removeSeries(s);
     seriesRef.current = [];
-    const gross = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, title: "グロス", priceLineVisible: false });
+    const gross = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "グロス", priceLineVisible: false });
     gross.setData(result.equity.map((e) => ({ time: e.time as Time, value: e.gross })));
     const net = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "ネット", priceLineVisible: false });
     net.setData(result.equity.map((e) => ({ time: e.time as Time, value: e.net })));

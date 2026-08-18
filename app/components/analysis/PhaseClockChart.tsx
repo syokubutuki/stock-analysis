@@ -10,6 +10,7 @@ import {
 } from "../../lib/phase-clock";
 import { conditionalForwardReturns } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -147,12 +148,12 @@ export default function PhaseClockChart({ prices, seriesMode }: Props) {
     // 外周リング
     ctx.beginPath();
     ctx.arc(cx, cy, R, 0, 2 * Math.PI);
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.axis;
     ctx.lineWidth = 1;
     ctx.stroke();
 
     // 12/3/6/9時の目盛りラベル
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";

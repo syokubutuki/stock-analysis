@@ -24,6 +24,7 @@ import {
   type TimingValueResult,
 } from "../../lib/timing-value";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -117,7 +118,7 @@ export default function TimingValueChart({ prices }: Props) {
     seriesRef.current = [];
 
     const bhs = chart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
+      color: CHART_COLORS.neutral, lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
     });
     bhs.setData(result.equity.map((e) => ({ time: e.time as Time, value: e.bh })));
     seriesRef.current.push(bhs);

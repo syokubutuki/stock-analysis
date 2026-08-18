@@ -63,6 +63,7 @@ import { priceVolumeCoherenceSeries } from "./wavelet-coherence";
 import { rollingTransferEntropy, rollingMutualInformation } from "./information-flow";
 import { rollingKaplanYorke } from "./lyapunov-spectrum";
 import { extraTechnical } from "./extra-technical";
+import { CHART_COLORS } from "./chart-colors";
 
 // ---- Types ----
 
@@ -459,7 +460,7 @@ export const SERIES: SeriesDef[] = [
     id: "bb_upper",
     label: "BB上限",
     group: "band",
-    color: "#94a3b8",
+    color: CHART_COLORS.neutral,
     scaleId: "price",
     type: "line",
     lineStyle: 2,
@@ -478,7 +479,7 @@ export const SERIES: SeriesDef[] = [
     id: "bb_lower",
     label: "BB下限",
     group: "band",
-    color: "#94a3b8",
+    color: CHART_COLORS.neutral,
     scaleId: "price",
     type: "line",
     lineStyle: 2,
@@ -519,7 +520,7 @@ export const SERIES: SeriesDef[] = [
     id: "volume",
     label: "出来高",
     group: "volume",
-    color: "#9ca3af",
+    color: CHART_COLORS.neutral,
     scaleId: "volume",
     type: "histogram",
     compute: (p) => {
@@ -659,7 +660,7 @@ export const SERIES: SeriesDef[] = [
     id: "macd_hist",
     label: "Histogram",
     group: "macd",
-    color: "#9ca3af",
+    color: CHART_COLORS.neutral,
     scaleId: "macd",
     type: "histogram",
     colorFn: upDown,
@@ -960,7 +961,7 @@ export const SERIES: SeriesDef[] = [
     id: "peak",
     label: "ピーク価格",
     group: "risk",
-    color: "#9ca3af",
+    color: CHART_COLORS.neutral,
     scaleId: "price",
     type: "line",
     lineStyle: 2,
@@ -1557,7 +1558,7 @@ export const SERIES: SeriesDef[] = [
     id: "ssa_noise",
     label: "SSAノイズ",
     group: "decomp",
-    color: "#9ca3af",
+    color: CHART_COLORS.neutral,
     scaleId: "ssa_osc",
     type: "line",
     compute: (p) => {

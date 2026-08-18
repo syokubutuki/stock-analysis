@@ -14,6 +14,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
 
@@ -61,7 +62,7 @@ function drawHeatmap(ctx: CanvasRenderingContext2D, W: number, H: number, res: S
       // 値・n
       ctx.fillStyle = "#374151"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(fmtSignedPct(c.meanPct / 100), x + cw / 2, y + ch / 2 - 1);
-      ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
       ctx.fillText(`n=${c.n}`, x + cw / 2, y + ch / 2 + 11);
       // 有意セルに枠
       if (c.significant) { ctx.strokeStyle = "#16a34a"; ctx.lineWidth = 1; ctx.strokeRect(x + 1, y + 1, cw - 2, ch - 2); }
@@ -89,7 +90,7 @@ function drawPath(ctx: CanvasRenderingContext2D, W: number, H: number, res: Sign
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("シグナル翌日の経路（寄り比%・細線=個別/太線=平均）", ml, mt - 8);
   // ゼロ線
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]); ctx.beginPath();
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]); ctx.beginPath();
   ctx.moveTo(ml, ys(0)); ctx.lineTo(ml + plotW, ys(0)); ctx.stroke(); ctx.setLineDash([]);
 
   ctx.strokeStyle = "rgba(59,130,246,0.18)"; ctx.lineWidth = 1;
@@ -102,7 +103,7 @@ function drawPath(ctx: CanvasRenderingContext2D, W: number, H: number, res: Sign
   for (let i = 0; i < n; i++) { const x = xs(i), y = ys(res.avgPathPct[i]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
   ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
   [0, Math.floor(n / 2), n - 1].forEach((i) => ctx.fillText(res.binLabels[i] ?? "", xs(i), mt + plotH + 12));
 }
 

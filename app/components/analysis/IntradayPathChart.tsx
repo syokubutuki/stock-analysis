@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeIntradayPath } from "../../lib/ohlc-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -52,7 +53,7 @@ export default function IntradayPathChart({ prices }: Props) {
       // Pattern name
       ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
       ctx.fillText(p.name, ml - 8, y + rowH * 0.45);
-      ctx.font = "9px sans-serif"; ctx.fillStyle = "#9ca3af";
+      ctx.font = "9px sans-serif"; ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText(p.description, ml - 8, y + rowH * 0.7);
 
       // Stats
@@ -61,7 +62,7 @@ export default function IntradayPathChart({ prices }: Props) {
       ctx.fillText(statsText, ml + barW + 8, y + rowH * 0.48);
 
       // Win rate indicator
-      const wrColor = p.winRate > 0.52 ? "#22c55e" : p.winRate < 0.48 ? "#ef4444" : "#9ca3af";
+      const wrColor = p.winRate > 0.52 ? "#22c55e" : p.winRate < 0.48 ? "#ef4444" : CHART_COLORS.neutral;
       ctx.fillStyle = wrColor;
       ctx.beginPath(); ctx.arc(ml + barW + 4, y + rowH * 0.42, 3, 0, Math.PI * 2); ctx.fill();
     }

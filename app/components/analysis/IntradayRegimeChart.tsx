@@ -11,6 +11,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -21,7 +22,7 @@ const VIEWS: { value: View; label: string }[] = [
   { value: "session", label: "前場→後場" },
 ];
 
-const LABEL_COLOR: Record<RegimeLabel, string> = { up: "#16a34a", down: "#dc2626", range: "#9ca3af" };
+const LABEL_COLOR: Record<RegimeLabel, string> = { up: "#16a34a", down: "#dc2626", range: CHART_COLORS.neutral };
 const LABEL_NAME: Record<RegimeLabel, string> = { up: "強トレンド上", down: "強トレンド下", range: "レンジ" };
 
 function drawRegime(ctx: CanvasRenderingContext2D, W: number, H: number, r: RegimeResult) {
@@ -34,7 +35,7 @@ function drawRegime(ctx: CanvasRenderingContext2D, W: number, H: number, r: Regi
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("日別の効率比ER（色=レジーム, 破線=閾値）", ml, mt - 12);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText("1.0", ml - 4, mt + 9); ctx.fillText("0", ml - 4, mt + plotH);
 
   // 閾値線
@@ -68,9 +69,9 @@ function drawAnalog(ctx: CanvasRenderingContext2D, W: number, H: number, a: Anal
 
   // 0ライン・cutoff線
   const y0 = ys(0);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(vmax.toFixed(2), ml - 4, mt + 9); ctx.fillText(vmin.toFixed(2), ml - 4, mt + plotH);
   const xc = xs(a.cutoffBars - 1);
   ctx.strokeStyle = "#c7d2fe"; ctx.setLineDash([3, 3]);
@@ -79,7 +80,7 @@ function drawAnalog(ctx: CanvasRenderingContext2D, W: number, H: number, a: Anal
   ctx.save(); ctx.beginPath(); ctx.rect(ml, mt, plotW, plotH); ctx.clip();
   // 近傍の続き（細線）
   for (const nb of a.neighbors) {
-    ctx.strokeStyle = "#94a3b855"; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.strokeStyle = `${CHART_COLORS.axis}55`; ctx.lineWidth = 1; ctx.beginPath();
     for (let i = 0; i < nb.fullPath.length; i++) { const x = xs(i), y = ys(nb.fullPath[i]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.stroke();
   }

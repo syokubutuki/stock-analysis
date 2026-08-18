@@ -7,6 +7,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { countRoundTrips } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -77,9 +78,9 @@ export default function WeekdayDecompChart({ prices }: Props) {
     ctx.fillText(mode === "mean" ? "曜日別 平均リターン（夜間/日中）" : "曜日別 累積リターン（夜間/日中）", ml, 14);
     const maxAbs = Math.max(1e-9, ...rows.flatMap((r) => [Math.abs(getOn(r)), Math.abs(getId(r))]));
     const zeroY = mt + plotH / 2;
-    ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
     ctx.beginPath(); ctx.moveTo(ml, zeroY); ctx.lineTo(ml + plotW, zeroY); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(`${(maxAbs * 100).toFixed(mode === "mean" ? 2 : 0)}%`, ml - 4, mt + 8);
     ctx.fillText(`-${(maxAbs * 100).toFixed(mode === "mean" ? 2 : 0)}%`, ml - 4, mt + plotH);
     const slot = plotW / rows.length;
@@ -97,7 +98,7 @@ export default function WeekdayDecompChart({ prices }: Props) {
       }
       ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(r.label, x0 + barW + 2, mt + plotH + 14);
-      ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
       ctx.fillText(`n=${r.n}`, x0 + barW + 2, mt + plotH + 25);
     });
     ctx.textAlign = "left"; ctx.font = "9px sans-serif";

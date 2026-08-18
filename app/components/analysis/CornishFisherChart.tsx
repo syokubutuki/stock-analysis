@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeCornishFisherVaR, computeOmegaRatio } from "../../lib/cornish-fisher";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -78,7 +79,7 @@ export default function CornishFisherChart({ prices }: Props) {
 
     // τ=0 vertical line
     if (minT < 0 && maxT > 0) {
-      ctx.strokeStyle = "#94a3b8";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();

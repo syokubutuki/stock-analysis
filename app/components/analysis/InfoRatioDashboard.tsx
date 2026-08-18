@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeInfoRatio } from "../../lib/predictability";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; seriesMode?: string; }
 
@@ -43,7 +44,7 @@ export default function InfoRatioDashboard({ prices }: Props) {
       const barW = (item.mi / maxMI) * plotW * 0.85;
 
       // Rank color
-      const rankColor = i < 3 ? "#ef4444" : i < 5 ? "#f59e0b" : "#94a3b8";
+      const rankColor = i < 3 ? "#ef4444" : i < 5 ? "#f59e0b" : CHART_COLORS.neutral;
 
       // Bar
       ctx.fillStyle = rankColor + "88";

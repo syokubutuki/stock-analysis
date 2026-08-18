@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeLead } from "../../lib/volume-price-dynamics";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -76,7 +77,7 @@ export default function VolumeLeadChart({ prices }: Props) {
     }
 
     // Y labels
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let v = -maxAbs; v <= maxAbs; v += maxAbs / 2) {
       ctx.fillText(v.toFixed(2), ml - 4, yFrom(v) + 3);
     }

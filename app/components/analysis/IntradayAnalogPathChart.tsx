@@ -25,6 +25,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -45,7 +46,7 @@ const K_OPTS = [5, 10, 20, 40];
 
 const C_ANALOG = "#2563eb"; // 近傍(アナログ)
 const C_CELL = "#64748b"; // 条件セル平均
-const C_UNCOND = "#94a3b8"; // 無条件平均
+const C_UNCOND = CHART_COLORS.neutral; // 無条件平均
 const C_TODAY = "#111827"; // 今日の実測
 
 // ───────────────────────── ① 連続パスの重ね描き ─────────────────────────
@@ -67,7 +68,7 @@ function drawOverlay(
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
@@ -161,7 +162,7 @@ function drawNullHist(
   ctx.fillStyle = C_ANALOG; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`実測IC ${actual.toFixed(3)}`, Math.min(ml + plotW - 30, Math.max(ml + 30, X(actual))), mt + 9);
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
   ctx.textAlign = "left"; ctx.fillText(lo.toFixed(2), ml, H - 6);
   ctx.textAlign = "right"; ctx.fillText(hi.toFixed(2), ml + plotW, H - 6);
   ctx.textAlign = "center"; ctx.fillText("ランダムk本ヌルのIC分布", ml + plotW / 2, H - 6);

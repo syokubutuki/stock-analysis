@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { fitHAR } from "../../lib/har-model";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -26,7 +27,7 @@ export default function HARChart({ prices }: Props) {
       timeScale: { timeVisible: false },
     });
     apiRef.current = chart;
-    const actual = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, title: "実現ボラ(実績)" });
+    const actual = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "実現ボラ(実績)" });
     actual.setData(res.fitted.map((p) => ({ time: p.time as Time, value: p.actual })));
     const fit = chart.addSeries(LineSeries, { color: "#dc2626", lineWidth: 2, title: "HAR予測" });
     fit.setData(res.fitted.map((p) => ({ time: p.time as Time, value: p.fitted })));

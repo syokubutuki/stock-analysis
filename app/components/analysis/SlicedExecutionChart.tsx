@@ -8,6 +8,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -35,10 +36,10 @@ function drawFrontier(ctx: CanvasRenderingContext2D, W: number, H: number, res: 
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("平均フィル品質(↑良) × タイミングリスク(→大)", ml, mt - 12);
   // q=0 線
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, ys(0)); ctx.lineTo(ml + plotW, ys(0)); ctx.stroke(); ctx.setLineDash([]);
   // 軸ラベル
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${qAbs.toFixed(3)}%`, ml - 4, mt + 9);
   ctx.fillText(`-${qAbs.toFixed(3)}%`, ml - 4, mt + plotH);
   ctx.textAlign = "center";
@@ -64,7 +65,7 @@ function drawBars(ctx: CanvasRenderingContext2D, W: number, H: number, res: Slic
   const zeroX = ml + plotW / 2;
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("手法別 平均フィル品質（VWAP比・CI）", ml - 72, 14);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(zeroX, mt); ctx.lineTo(zeroX, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
 
   ms.forEach((m, i) => {

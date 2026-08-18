@@ -17,6 +17,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -105,7 +106,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
     );
 
     const obvMASeries = obvChart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "OBV MA20",
     });

@@ -18,6 +18,7 @@ import { OosResult, OosCatalog, OosSetting, OosPathScore } from "../../lib/weekl
 import { AnalogMode, DistMetric, WindowAlign, WeightMode } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -81,7 +82,7 @@ function drawScatter(ctx: CanvasRenderingContext2D, width: number, height: numbe
   ctx.fillText("予測 ŷ（アナログ中央値）→", ml + plotW / 2, mt + plotH + 22);
   ctx.save(); ctx.translate(12, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
   ctx.fillText("実測 y（H日先）→", 0, 0); ctx.restore();
-  ctx.textAlign = "right"; ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif";
+  ctx.textAlign = "right"; ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif";
   ctx.fillText(`+${(my * 100).toFixed(0)}%`, ml - 4, mt + 8);
   ctx.fillText(`-${(my * 100).toFixed(0)}%`, ml - 4, mt + plotH);
 }
@@ -118,7 +119,7 @@ function drawCoverage(ctx: CanvasRenderingContext2D, width: number, height: numb
   const H = ps.H;
   const yOf = (v: number) => mt + plotH - v * plotH; // 0..1
   // 名目50%
-  ctx.strokeStyle = "#94a3b8"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(ml, yOf(0.5)); ctx.lineTo(ml + plotW, yOf(0.5)); ctx.stroke(); ctx.setLineDash([]);
   const bw = plotW / H;
   for (let m = 1; m <= H; m++) {
@@ -148,7 +149,7 @@ function drawCoverage(ctx: CanvasRenderingContext2D, width: number, height: numb
   ctx.stroke();
   ctx.fillStyle = "#0f766e"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
   ctx.fillText(`帯幅 最大${(wMax * 100).toFixed(1)}%`, ml + plotW + 4, mt + 8);
-  ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "right";
   ctx.fillText("100%", ml - 4, mt + 8);
   ctx.fillText("50%", ml - 4, yOf(0.5) + 3);
   ctx.fillText("0%", ml - 4, mt + plotH);
@@ -170,7 +171,7 @@ function drawExtremes(ctx: CanvasRenderingContext2D, width: number, height: numb
   const xOf = (v: number) => ml + ((v + mx) / (2 * mx)) * plotW;
   const yOf = (v: number) => mt + plotH - ((v + mx) / (2 * mx)) * plotH;
   // 45°線(完全較正)
-  ctx.strokeStyle = "#94a3b8"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(xOf(-mx), yOf(-mx)); ctx.lineTo(xOf(mx), yOf(mx)); ctx.stroke(); ctx.setLineDash([]);
   // 軸
   ctx.strokeStyle = "#e5e7eb";

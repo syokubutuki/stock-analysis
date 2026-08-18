@@ -22,6 +22,7 @@ import {
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -75,10 +76,10 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number) => void
 
 const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 
-const BIN_COLORS = ["#dc2626", "#ea580c", "#9ca3af", "#0891b2", "#16a34a"];
+const BIN_COLORS = ["#dc2626", "#ea580c", CHART_COLORS.neutral, "#0891b2", "#16a34a"];
 function binColor(idx: number, total: number): string {
   if (total <= 1) return "#2563eb";
-  const palette = total === 2 ? ["#dc2626", "#16a34a"] : total === 3 ? ["#dc2626", "#9ca3af", "#16a34a"] : BIN_COLORS;
+  const palette = total === 2 ? ["#dc2626", "#16a34a"] : total === 3 ? ["#dc2626", CHART_COLORS.neutral, "#16a34a"] : BIN_COLORS;
   return palette[Math.min(idx, palette.length - 1)];
 }
 
@@ -145,14 +146,14 @@ function drawPaths(
     ctx.fillText("週末", bx, mt + 8);
   }
   const zeroY = yAt(0);
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([3, 3]);
   ctx.beginPath();
   ctx.moveTo(ml, zeroY);
   ctx.lineTo(ml + plotW, zeroY);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   ctx.fillText(fmtPct(yHi), ml - 6, mt + 8);

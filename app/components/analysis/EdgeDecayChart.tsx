@@ -17,6 +17,7 @@ import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
 import { buildEdgeCatalog } from "../../lib/edge-trades";
 import { computeDecay, DEFAULT_DECAY_PARAMS, type DecayResult } from "../../lib/edge-decay";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -94,7 +95,7 @@ export default function EdgeDecayChart({ prices }: Props) {
     const eq = baseChart(eqRef.current, 240, false);
     const lr = baseChart(lrRef.current, 160, false);
     const cu = baseChart(cuRef.current, 160, true);
-    const eqIS = eq.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, title: "IS(発見期間)", lineStyle: LineStyle.Dotted });
+    const eqIS = eq.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, title: "IS(発見期間)", lineStyle: LineStyle.Dotted });
     const eqOOS = eq.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "OOS(監視期間)" });
     const lrS = lr.addSeries(LineSeries, { color: "#7c3aed", lineWidth: 2, title: "SPRT logLR" });
     const cuS = cu.addSeries(LineSeries, { color: "#d97706", lineWidth: 2, title: "CUSUM" });

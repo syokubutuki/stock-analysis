@@ -12,6 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { rollingRQA, type RollingRQAResult } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -58,7 +59,7 @@ export default function RollingRQAChart({ prices, seriesMode }: Props) {
       title: "LAM (層状性)",
     });
     const rrSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "RR (再帰率)",
     });

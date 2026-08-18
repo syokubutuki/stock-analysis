@@ -47,6 +47,7 @@ import type {
   NullCalibWorkerResponse,
 } from "../../lib/null-calibration.worker";
 import { openAnalysisPanel } from "../../lib/panel-nav";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -392,7 +393,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
       let tx = gridLeft + (gridW - (twEntry + twArrow + twExit)) / 2;
       const titleY = subTop + 13;
       ctx.fillStyle = AXIS_ENTRY_COLOR; ctx.fillText(entryTxt, tx, titleY); tx += twEntry;
-      ctx.fillStyle = "#9ca3af"; ctx.fillText(arrowTxt, tx, titleY); tx += twArrow;
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(arrowTxt, tx, titleY); tx += twArrow;
       ctx.fillStyle = AXIS_EXIT_COLOR; ctx.fillText(exitTxt, tx, titleY);
 
       ctx.fillStyle = AXIS_EXIT_COLOR; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
@@ -441,7 +442,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
     ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     let lx = 2; const ly = totalH - 3;
     ctx.fillStyle = AXIS_ENTRY_COLOR; ctx.fillText("縦↓=エントリー(建て)曜日", lx, ly); lx += ctx.measureText("縦↓=エントリー(建て)曜日").width + 8;
-    ctx.fillStyle = "#9ca3af"; ctx.fillText("/", lx, ly); lx += ctx.measureText("/").width + 8;
+    ctx.fillStyle = CHART_COLORS.ink; ctx.fillText("/", lx, ly); lx += ctx.measureText("/").width + 8;
     ctx.fillStyle = AXIS_EXIT_COLOR; ctx.fillText("横→=エグジット(手仕舞い)曜日", lx, ly);
   }, []);
 
@@ -498,7 +499,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
 
     if (bhEquity.length >= 2) {
       const bhs = chart.addSeries(LineSeries, {
-        color: "#9ca3af", lineWidth: 1, title: "B&H",
+        color: CHART_COLORS.neutral, lineWidth: 1, title: "B&H",
         priceLineVisible: false, lastValueVisible: false,
       });
       bhs.setData(toEquityRows(bhEquity));
@@ -873,7 +874,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
         {/* equity curve（ズーム/パン可能な lightweight-charts） */}
         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
           <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
-            <span className="inline-block w-4 h-0.5" style={{ backgroundColor: "#9ca3af" }} />バイ&ホールド
+            <span className="inline-block w-4 h-0.5" style={{ backgroundColor: CHART_COLORS.neutral }} />バイ&ホールド
           </span>
           {equitySeriesData.strategies.map((s, i) => (
             <span key={i} className="inline-flex items-center gap-1 text-[11px]" style={{ color: s.color }}>

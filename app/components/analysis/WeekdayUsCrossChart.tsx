@@ -22,6 +22,7 @@ import { UsDriverButtons, BinSchemeButtons, intervalToMin } from "./usSpilloverS
 import { IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import { NameColMode, NAME_COL_W, useNameColMode, nameColStyle, NameColHeader } from "./crossTableShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -1441,7 +1442,7 @@ function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
       <title>{title}</title>
       {/* 寄り基準の0ライン(実位置) */}
       <line x1={padX} y1={zeroY} x2={W - padX} y2={zeroY} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="2 2" />
-      <path d={area} fill="#94a3b8" opacity={0.18} />
+      <path d={area} fill={CHART_COLORS.reference} opacity={0.18} />
       <path d={line} fill="none" stroke="#334155" strokeWidth={1.4} />
       {/* 高値時刻・中央: 上端▽ + 縦ガイド(緑) */}
       <line x1={highX} y1={padTop - 2} x2={highX} y2={H - padBot} stroke={SP_GREEN} strokeWidth={0.7} strokeDasharray="1.5 1.5" opacity={0.5} />
@@ -1453,7 +1454,7 @@ function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
       <circle cx={peakX} cy={peakY} r={2.7} fill={SP_GREEN} stroke="#fff" strokeWidth={0.8} />
       <circle cx={trX} cy={trY} r={2.7} fill={SP_RED} stroke="#fff" strokeWidth={0.8} />
       {/* 山谷の振幅(cross-cellの大きさ比較用) */}
-      <text x={padX} y={7} fontSize={7.5} fill="#9ca3af" style={{ fontVariantNumeric: "tabular-nums" }}>{amplPct}</text>
+      <text x={padX} y={7} fontSize={7.5} fill={CHART_COLORS.ink} style={{ fontVariantNumeric: "tabular-nums" }}>{amplPct}</text>
     </svg>
   );
 }

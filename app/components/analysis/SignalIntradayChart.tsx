@@ -10,6 +10,7 @@ import {
   drawTimeAxisLabels,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -31,14 +32,14 @@ function drawPaths(ctx: CanvasRenderingContext2D, W: number, H: number, r: Signa
   ctx.fillText("シグナル翌日の日中経路（細=各日 / 太=平均, 始値比%）", ml, mt - 12);
 
   const y0 = ys(0);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(vmax.toFixed(2), ml - 4, mt + 9); ctx.fillText(vmin.toFixed(2), ml - 4, mt + plotH);
 
   ctx.save(); ctx.beginPath(); ctx.rect(ml, mt, plotW, plotH); ctx.clip();
   for (const p of r.paths) {
-    ctx.strokeStyle = "#94a3b844"; ctx.lineWidth = 0.8; ctx.beginPath();
+    ctx.strokeStyle = `${CHART_COLORS.axis}44`; ctx.lineWidth = 0.8; ctx.beginPath();
     for (let i = 0; i < p.length; i++) { const x = xs(i), y = ys(p[i]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.stroke();
   }

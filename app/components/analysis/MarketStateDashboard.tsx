@@ -17,6 +17,7 @@ import {
   type MarketRegime,
 } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -27,7 +28,7 @@ const REGIME_COLORS: Record<MarketRegime, string> = {
   uptrend: "#22c55e",
   downtrend: "#ef4444",
   high_volatility: "#f59e0b",
-  low_volatility: "#94a3b8",
+  low_volatility: CHART_COLORS.neutral,
   accelerating: "#3b82f6",
   decelerating: "#f97316",
 };
@@ -93,13 +94,13 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
       times.map((t, i) => ({
         time: t as Time,
         value: 1,
-        color: (REGIME_COLORS[marketState.regimes[i]] || "#94a3b8") + "30",
+        color: (REGIME_COLORS[marketState.regimes[i]] || CHART_COLORS.neutral) + "30",
       }))
     );
 
     // Original price
     const priceLine = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "実価格",
       priceScaleId: "right",
@@ -490,7 +491,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
               <li><span className="font-medium" style={{color: "#3b82f6"}}>加速</span>: トレンドが強まっている（加速度が大きい）</li>
               <li><span className="font-medium" style={{color: "#f97316"}}>減速</span>: トレンドが弱まっている（加速度が負）</li>
               <li><span className="font-medium" style={{color: "#f59e0b"}}>高ボラティリティ</span>: イノベーション分散が大きい</li>
-              <li><span className="font-medium" style={{color: "#94a3b8"}}>低ボラティリティ</span>: 方向性なし・レンジ相場</li>
+              <li><span className="font-medium" style={{color: CHART_COLORS.neutral}}>低ボラティリティ</span>: 方向性なし・レンジ相場</li>
             </ul>
           </div>
 

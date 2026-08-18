@@ -8,6 +8,7 @@ import {
   falseNearestNeighbors,
 } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -113,12 +114,12 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
 
     // 1/e threshold line
     const threshY = toY(amiResult.ami[0] / Math.E);
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 0.8;
     ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(m.left, threshY); ctx.lineTo(m.left + plotW, threshY); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("1/e 閾値", m.left + 3, threshY - 3);
@@ -139,7 +140,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
     ctx.restore();
 
     // X-axis ticks
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     for (let lag = 0; lag <= maxLagVal; lag += Math.max(1, Math.floor(maxLagVal / 6))) {
@@ -241,7 +242,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
     ctx.restore();
 
     // X-axis ticks
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     dims.forEach(d => ctx.fillText(String(d), toX(d), height - 20));

@@ -47,6 +47,7 @@ import {
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 import WeekSlotGrid, { type SlotSide, AVOID_WEEKEND } from "./WeekSlotGrid";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -196,7 +197,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
     const toRows = (r: SimResult) => r.path.map((p) => ({ time: (Math.floor(p.t / 86400000) * 86400) as unknown as Time, value: p.post - 1 }));
     const nisaS = chart.addSeries(LineSeries, { color: "#059669", lineWidth: 2, title: "NISA(非課税)", priceLineVisible: false });
     nisaS.setData(dedupe(toRows(cmp.nisa)));
-    const bhS = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, title: "現物B&H(課税)", priceLineVisible: false });
+    const bhS = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "現物B&H(課税)", priceLineVisible: false });
     bhS.setData(dedupe(toRows(cmp.taxableBH)));
     const stS = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "現物 曜日戦略", priceLineVisible: false });
     stS.setData(dedupe(toRows(cmp.strategy)));
@@ -246,7 +247,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
     ctx.fillStyle = "#b45309"; ctx.textAlign = xm > width / 2 ? "right" : "left";
     ctx.fillText(`中央値 ${pct(rolling.medianEdge)}`, xm + (xm > width / 2 ? -4 : 4), padT + 10);
     // 軸ラベル
-    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "left";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "left";
     ctx.fillText(`←NISA有利 ${pct(lo)}`, padL, height - 4);
     ctx.textAlign = "right";
     ctx.fillText(`${pct(hi)} 戦略有利→`, width - padR, height - 4);
@@ -294,7 +295,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           ctx.fillText(`k*=${sweep.kStar.toFixed(2)}`, xk, padT + 9);
         }
         // y軸ラベル
-        ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
+        ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "right";
         ctx.fillText(pct(hi), padL - 4, padT + 8);
         ctx.fillText(pct(lo), padL - 4, padT + plotH);
         ctx.textAlign = "center";
@@ -337,7 +338,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           ctx.setLineDash([]);
         }
         // 軸・凡例
-        ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+        ctx.fillStyle = CHART_COLORS.ink; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
         ctx.fillText(`${(hi * 100).toFixed(0)}%`, padL - 4, padT + 8);
         ctx.fillText("0%", padL - 4, padT + plotH);
         ctx.textAlign = "center";

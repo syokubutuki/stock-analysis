@@ -11,6 +11,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -858,7 +859,7 @@ export default function SpiralHeatmap({ prices }: Props) {
 
     const all = groups.flatMap(g => g.values);
     if (all.length < 5) {
-      ctx.fillStyle = "#9ca3af"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
       ctx.fillText("選択された組み合わせのデータが不足しています", width / 2, height / 2);
       return;
     }
@@ -933,7 +934,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     }
     if (lo <= 0 && hi >= 0) {
       const zx = toX(0);
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(zx, pad.top); ctx.lineTo(zx, pad.top + plotH); ctx.stroke();
       ctx.setLineDash([]);
     }

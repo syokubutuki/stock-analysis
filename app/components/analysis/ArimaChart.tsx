@@ -18,6 +18,7 @@ import {
 } from "../../lib/sarima";
 import type { SarimaWorkerResponse } from "../../lib/sarima.worker";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -224,7 +225,7 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
       .filter(Boolean) as { time: Time; value: number }[];
     if (data.length) {
       const s = chart.addSeries(LineSeries, {
-        color: "#94a3b8",
+        color: CHART_COLORS.neutral,
         lineWidth: 1,
         title: "残差",
       });

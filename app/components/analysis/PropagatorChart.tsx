@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePropagator } from "../../lib/propagator";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -93,7 +94,7 @@ export default function PropagatorChart({ prices }: Props) {
     // 0% ライン
     const zeroY = toY(0);
     if (zeroY > margin.top && zeroY < margin.top + plotH) {
-      ctx.strokeStyle = "#9ca3af";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();

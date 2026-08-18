@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { computePriceForecast } from "../../lib/simulation";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -100,7 +101,7 @@ export default function PriceForecastChart({ prices }: Props) {
       const y = mt + (plotH * i) / nGridY;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = maxD - (rangeD * i) / nGridY;
-      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText(fmtAxis(val), ml - 4, y + 3);
     }
 
@@ -108,7 +109,7 @@ export default function PriceForecastChart({ prices }: Props) {
     const baseDisp = isReturn ? 0 : lastPrice;
     if (baseDisp >= minD && baseDisp <= maxD) {
       const yb = yFromD(baseDisp);
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(ml, yb); ctx.lineTo(width - mr, yb); ctx.stroke();
       ctx.setLineDash([]);
     }

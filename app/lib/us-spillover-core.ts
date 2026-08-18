@@ -18,6 +18,7 @@ import {
   DayData, BinGrid, binIndexOfMinute, localMinute,
 } from "./intraday-core";
 import { mean, quantileSorted, studentTwoSidedP } from "./stats-significance";
+import { CHART_COLORS } from "./chart-colors";
 
 // ───────────────────────── 米国リターン系列 ─────────────────────────
 
@@ -79,9 +80,9 @@ export interface BinMeta {
   colors: string[];
 }
 
-const BIN5_COLORS = ["#dc2626", "#fb923c", "#9ca3af", "#4ade80", "#16a34a"];
+const BIN5_COLORS = ["#dc2626", "#fb923c", CHART_COLORS.neutral, "#4ade80", "#16a34a"];
 const BIN5_LABELS = ["米大幅安", "米安", "米中立", "米高", "米大幅高"];
-const BIN3_COLORS = ["#dc2626", "#9ca3af", "#16a34a"];
+const BIN3_COLORS = ["#dc2626", CHART_COLORS.neutral, "#16a34a"];
 const BIN3_LABELS = ["米安", "米中立", "米高"];
 const SIGN_COLORS = ["#dc2626", "#16a34a"];
 const SIGN_LABELS = ["米陰(下落)", "米陽(上昇)"];

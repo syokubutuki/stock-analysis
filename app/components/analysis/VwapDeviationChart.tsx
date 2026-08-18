@@ -8,6 +8,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -33,7 +34,7 @@ function drawSample(ctx: CanvasRenderingContext2D, W: number, H: number, r: Vwap
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText(`VWAP±1σ/±2σ バンドと価格（${s.date}）`, ml, mt - 12);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(vmax.toFixed(1), ml - 4, mt + 9);
   ctx.fillText(vmin.toFixed(1), ml - 4, mt + plotH);
 
@@ -70,9 +71,9 @@ function drawBuckets(ctx: CanvasRenderingContext2D, W: number, H: number, r: Vwa
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText(`VWAP乖離Z 別の ${r.horizonBars}バー先 平均リターン`, ml, mt - 12);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${amax.toFixed(3)}%`, ml - 4, mt + 9);
   ctx.fillText(`-${amax.toFixed(3)}%`, ml - 4, mt + plotH);
 
@@ -85,7 +86,7 @@ function drawBuckets(ctx: CanvasRenderingContext2D, W: number, H: number, r: Vwa
     ctx.fillRect(x, Math.min(y0, yv), barW, Math.abs(yv - y0));
     ctx.fillStyle = "#374151"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(r.buckets[i].label, ml + i * slot + slot / 2, mt + plotH + 14);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(`n=${r.buckets[i].n}`, ml + i * slot + slot / 2, mt + plotH + 26);
   }
 }

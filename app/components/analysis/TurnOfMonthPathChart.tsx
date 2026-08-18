@@ -12,6 +12,7 @@ import {
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -49,7 +50,7 @@ export default function TurnOfMonthPathChart({ ticker }: Props) {
     [result]
   );
   const colorOf = useCallback(
-    (key: string) => result?.bins.find((b) => b.group === key)?.color ?? "#9ca3af",
+    (key: string) => result?.bins.find((b) => b.group === key)?.color ?? CHART_COLORS.neutral,
     [result]
   );
 

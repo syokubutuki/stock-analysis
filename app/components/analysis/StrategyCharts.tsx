@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { FeaturePoint } from "../../lib/feature-series";
 import { SimResult, StrategyMode, ExitRule } from "../../lib/strategy-sim";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   features: FeaturePoint[];
@@ -104,7 +105,7 @@ export default function StrategyCharts({ features, sim, mode }: Props) {
         }
 
         // 軸ラベル(日付3点・価格2点)
-        ctx.fillStyle = "#9ca3af";
+        ctx.fillStyle = CHART_COLORS.ink;
         ctx.font = "10px sans-serif";
         ctx.textAlign = "left";
         ctx.fillText(features[0].time, PAD, height - 6);
@@ -125,7 +126,7 @@ export default function StrategyCharts({ features, sim, mode }: Props) {
       if (init) {
         const { ctx, width, height } = init;
         const series: { key: string; data: number[]; color: string }[] = [
-          { key: "Buy&Hold", data: sim.hold, color: "#9ca3af" },
+          { key: "Buy&Hold", data: sim.hold, color: CHART_COLORS.neutral },
           { key: "悪化シグナル", data: sim.byRule.model.equity, color: RULE_COLOR.model },
           { key: "固定−X%", data: sim.byRule.fixed.equity, color: RULE_COLOR.fixed },
           { key: "ATR", data: sim.byRule.atr.equity, color: RULE_COLOR.atr },

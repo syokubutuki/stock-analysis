@@ -6,6 +6,7 @@ import { useBenchmarkPrices, BENCHMARK_PRESETS } from "../../hooks/useBenchmarkP
 import { computeCapm, CapmResult } from "../../lib/capm-sml";
 import { useSharedMuMode } from "../../lib/mu-mode-store";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -90,7 +91,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
 
     // グリッド + 軸
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.lineWidth = 1;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "right";

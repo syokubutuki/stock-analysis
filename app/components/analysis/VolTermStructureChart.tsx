@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { computeVolTermStructure, type VolTermPoint } from "../../lib/cross-analysis";
 
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -122,7 +123,7 @@ export default function VolTermStructureChart({ prices }: Props) {
       const y = mt + (plotH * i) / 4;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = maxR - (rangeR * i) / 4;
-      ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
       ctx.fillText(val.toFixed(2), ml - 5, y + 3);
     }
 

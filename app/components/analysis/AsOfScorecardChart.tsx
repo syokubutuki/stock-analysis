@@ -15,6 +15,7 @@ import {
   AsOfReplayResult, AsOfReplayParams, FWD_HORIZONS,
 } from "../../lib/asof-replay";
 import type { AsOfWorkerRequest, AsOfWorkerResponse } from "../../lib/asof-replay.worker";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -62,7 +63,7 @@ function drawReliability(canvas: HTMLCanvasElement, res: AsOfReplayResult) {
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   ctx.strokeRect(pad.l, pad.t, W, H);
   // 対角線（完全較正）
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([3, 3]);
   ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(1), Y(1)); ctx.stroke();
   ctx.setLineDash([]);
 
@@ -107,7 +108,7 @@ function drawCoverage(canvas: HTMLCanvasElement, res: AsOfReplayResult) {
   const pad = { l: 60, r: 12, t: 12, b: 24 };
   const W = width - pad.l - pad.r, H = height - pad.t - pad.b;
   if (rows.length === 0) {
-    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "11px sans-serif";
     ctx.fillText("区間を採点できる標本がありません", pad.l, pad.t + 20);
     return;
   }
@@ -151,7 +152,7 @@ function drawMz(canvas: HTMLCanvasElement, res: AsOfReplayResult, hIdx: number) 
     pts.push({ x: p.fc.dailyVolGarch * 100, y: f.realizedVolDaily * 100 });
   }
   if (pts.length < 5) {
-    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "11px sans-serif";
     ctx.fillText("標本不足", pad.l, pad.t + 20);
     return;
   }
@@ -159,7 +160,7 @@ function drawMz(canvas: HTMLCanvasElement, res: AsOfReplayResult, hIdx: number) 
   const X = (v: number) => pad.l + (v / mx) * W;
   const Y = (v: number) => pad.t + (1 - v / mx) * H;
   ctx.strokeStyle = "#e5e7eb"; ctx.strokeRect(pad.l, pad.t, W, H);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([3, 3]);
   ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(mx), Y(mx)); ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = "rgba(37,99,235,0.45)";

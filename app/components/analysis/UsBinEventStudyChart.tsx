@@ -19,6 +19,7 @@ import { initCanvas, fmtSignedPct, fmtPct } from "./intradayShared";
 import { BinSchemeButtons, UsDriverButtons } from "./usSpilloverShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -49,7 +50,7 @@ function drawEventPaths(
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);

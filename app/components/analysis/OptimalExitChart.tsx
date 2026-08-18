@@ -11,6 +11,7 @@ import {
   StratStat,
 } from "../../lib/optimal-exit";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -172,7 +173,7 @@ function drawExitByDay(
   refLine(holdSharpe, "#6b7280", "金曜保持");
   refLine(adaptiveSharpe, "#16a34a", "適応最適");
 
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   ctx.fillText(maxAbs.toFixed(1), ml - 4, mt + 8);

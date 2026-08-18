@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeRegimeDistribution } from "../../lib/regime-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -54,7 +55,7 @@ export default function RegimeDistributionChart({ prices }: Props) {
     // Zero line
     const zeroX = xFrom(0);
     if (zeroX > ml && zeroX < width - mr) {
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(zeroX, mt); ctx.lineTo(zeroX, mt + plotH); ctx.stroke();
       ctx.setLineDash([]);
     }

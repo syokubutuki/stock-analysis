@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { drawdownEpisodes } from "../../lib/risk-extra";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -54,7 +55,7 @@ export default function DrawdownDistChart({ prices }: Props) {
       ctx.fillStyle = color;
       ctx.fillRect(ml + i * slot + 1, mt + plotH - bh, slot - 2, bh);
     });
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     [0, Math.floor(h.length / 2), h.length - 1].forEach((i) => h[i] && ctx.fillText(fmt(h[i].x0), ml + i * slot + slot / 2, mt + plotH + 12));
   };
 

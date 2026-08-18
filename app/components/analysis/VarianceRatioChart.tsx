@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeVarianceRatio } from "../../lib/variance-ratio";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -124,7 +125,7 @@ export default function VarianceRatioChart({ prices, seriesMode }: Props) {
 
       // p-value
       ctx.font = "9px monospace";
-      ctx.fillStyle = p.significant ? "#dc2626" : "#9ca3af";
+      ctx.fillStyle = p.significant ? "#dc2626" : CHART_COLORS.ink;
       ctx.fillText(`p=${p.pValue.toFixed(3)}`, toX(i), height - pad.bottom + 27);
     }
 

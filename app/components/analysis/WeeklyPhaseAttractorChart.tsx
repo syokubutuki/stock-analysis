@@ -19,6 +19,7 @@ import {
   WEEKDAY_COLORS,
 } from "../../lib/weekly-phase-attractor";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -198,7 +199,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 1;
     ctx.strokeRect(margin, margin, width - margin * 2, height - margin * 2);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.fillText("r(t)", width - margin - 24, height - margin + 14);
     ctx.save();
@@ -489,7 +490,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
         ctx.lineWidth = 1.2;
         ctx.stroke();
       }
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "9px sans-serif";
       ctx.fillText(pl.hLabel, size - m - ctx.measureText(pl.hLabel).width, size - 5);
       ctx.save();
@@ -591,7 +592,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     ctx.fillText(label, Math.min(o + 4, width - margin - lw), margin + 14);
 
     // X軸ラベル
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.fillText(lo.toFixed(2), margin, height - margin + 12);
     ctx.fillText(hi.toFixed(2), width - margin - 20, height - margin + 12);
@@ -629,7 +630,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
       ctx.fillStyle = lag % 5 === 0 ? "#dc2626" : "#cbd5e1";
       ctx.fillRect(margin + i * barW, height - margin - h, barW - 1, h);
       if (lag % 5 === 0) {
-        ctx.fillStyle = "#9ca3af";
+        ctx.fillStyle = CHART_COLORS.ink;
         ctx.font = "8px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(`${lag}`, margin + i * barW + barW / 2, height - margin + 10);
@@ -648,7 +649,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     ctx.fillStyle = "#6b7280";
     ctx.font = "9px sans-serif";
     ctx.fillText("平均", width - margin - 22, my - 3);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText("RR(ℓ): ラグℓのリカレンス率 (赤=週次ラグ5,10,15…)", margin, 14);
   }, [lagResult]);
 
@@ -707,7 +708,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     ctx.stroke();
 
     // X軸目盛
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     [2, 5, 10, 21, 30].forEach((p) => {
@@ -775,7 +776,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
       }
     }
 
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.fillText(pts[0].time, margin, height - margin + 12);
     ctx.textAlign = "right";
@@ -830,7 +831,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     drawCurve(smapResult.rhoAug, "#dc2626");
 
     // X軸ラベル
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     th.forEach((t, i) => ctx.fillText(`${t}`, sx(i), height - margin + 12));

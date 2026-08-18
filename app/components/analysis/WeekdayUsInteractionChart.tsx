@@ -29,6 +29,7 @@ import type {
 } from "../../lib/weekday-us-interaction.worker";
 import { US_DRIVERS, useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -167,7 +168,7 @@ function drawBeta(
   one.dows.forEach((d, i) => {
     ctx.fillText(`${dowName(d.dow, isOver)}（n=${d.n}）`, ml + i * bw + bw / 2, mt + ph + 15);
   });
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   for (let i = 0; i <= 4; i++) {
@@ -275,7 +276,7 @@ function drawAsym(
   one.dows.forEach((d, i) =>
     ctx.fillText(dowName(d.dow, isOver), ml + i * bw + bw / 2, mt + ph + 15),
   );
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   for (let i = 0; i <= 4; i++) {
@@ -408,7 +409,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
       );
     }
     const pooledS = c1.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 2,
       lineStyle: LineStyle.Dashed,
       title: "共通β",

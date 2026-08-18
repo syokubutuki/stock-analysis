@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeForecastRange } from "../../lib/forecast-range";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -57,7 +58,7 @@ export default function ForecastRangeChart({ prices }: Props) {
 
     // x軸グリッド + ラベル
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     for (let d = 0; d <= maxH; d++) {
@@ -95,7 +96,7 @@ export default function ForecastRangeChart({ prices }: Props) {
     }
 
     // 正規分布95%レンジ(点線アウトライン、比較用)
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     for (const side of ["high", "low"] as const) {

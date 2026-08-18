@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeClosePosition } from "../../lib/ohlc-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -28,7 +29,7 @@ export default function ClosePositionChart({ prices }: Props) {
     });
     apiRef.current = chart;
 
-    const cpSeries = chart.addSeries(LineSeries, { color: "#94a3b8", lineWidth: 1, title: "Close Position" });
+    const cpSeries = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "Close Position" });
     const avgSeries = chart.addSeries(LineSeries, { color: "#3b82f6", lineWidth: 2, title: "20日平均" });
 
     cpSeries.setData(result.dates.map((t, i) => ({ time: t as Time, value: result.closePosition[i] })));

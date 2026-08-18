@@ -11,6 +11,7 @@ import {
   StatCell, drawTimeAxisLabels, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -39,7 +40,7 @@ function drawProfile(ctx: CanvasRenderingContext2D, W: number, H: number, p: Pro
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, top, plotW, paneH);
     ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
     ctx.fillText(title, ml, top - 7);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText("0", ml - 5, top + paneH); ctx.fillText(fmt(maxV), ml - 5, top + 9);
     for (let i = 0; i < n; i++) {
       const h = (vals[i] / maxV) * (paneH - 6);
@@ -68,9 +69,9 @@ function drawDrift(ctx: CanvasRenderingContext2D, W: number, H: number, p: Profi
 
   // 0ライン
   const y0 = ys(0);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${amax.toFixed(3)}%`, ml - 4, mt + 9);
   ctx.fillText(`-${amax.toFixed(3)}%`, ml - 4, mt + plotH);
 

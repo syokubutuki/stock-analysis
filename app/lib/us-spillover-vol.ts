@@ -8,6 +8,7 @@
 import { AlignedDay, ols, Regression, assignBins } from "./us-spillover-core";
 import { BinGrid, garmanKlassVar, localMinute, binIndexOfMinute } from "./intraday-core";
 import { mean } from "./stats-significance";
+import { CHART_COLORS } from "./chart-colors";
 
 export interface VolSample { absUs: number; vol: number; range: number; date: string; }
 
@@ -40,7 +41,7 @@ function dayBinGk(day: AlignedDay["jp"], grid: BinGrid, gmtoffset: number): numb
 }
 
 const MAG_LABELS = ["米|変|小", "米|変|中", "米|変|大"];
-const MAG_COLORS = ["#9ca3af", "#fb923c", "#dc2626"];
+const MAG_COLORS = [CHART_COLORS.neutral, "#fb923c", "#dc2626"];
 
 export function computeVol(
   aligned: AlignedDay[], grid: BinGrid | null, gmtoffset: number

@@ -21,6 +21,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -28,7 +29,7 @@ const WD_NAMES: Record<number, string> = { 0: "日", 1: "月", 2: "火", 3: "水
 const fmtSigned = (v: number, d = 3) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
 
 // 5分位ビンの発散カラー（下位=赤 〜 上位=緑）
-const BIN_COLORS = ["#dc2626", "#fb923c", "#9ca3af", "#4ade80", "#16a34a"];
+const BIN_COLORS = ["#dc2626", "#fb923c", CHART_COLORS.neutral, "#4ade80", "#16a34a"];
 const BIN_LABELS = ["最下位", "下位", "中位", "上位", "最上位"];
 const fmtYM = (ms: number) => {
   const d = new Date(ms);
@@ -45,7 +46,7 @@ function drawWeekdayBars(ctx: CanvasRenderingContext2D, W: number, H: number, re
   const zeroX = ml + plotW / 2;
   const rowH = plotH / rows.length;
 
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(zeroX, mt); ctx.lineTo(zeroX, mt + plotH); ctx.stroke();
   ctx.setLineDash([]);
 
@@ -165,7 +166,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
     const markers: SeriesMarker<Time>[] = timing.days.map((d) => ({
       time: d.date as Time,
       position: "inBar",
-      color: BIN_COLORS[d.bin] ?? "#9ca3af",
+      color: BIN_COLORS[d.bin] ?? CHART_COLORS.neutral,
       shape: "circle",
       size: 1,
     }));

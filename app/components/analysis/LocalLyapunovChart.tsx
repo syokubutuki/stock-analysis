@@ -16,6 +16,7 @@ import {
   autoMutualInformation,
 } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -88,7 +89,7 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
 
     // Zero line
     const zeroSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       lineStyle: 2,
       title: "",

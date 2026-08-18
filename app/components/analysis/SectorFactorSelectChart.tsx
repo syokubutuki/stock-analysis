@@ -38,6 +38,7 @@ import SectorStabilityPanel, {
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 import DataQualityNotice from "./DataQualityNotice";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -372,7 +373,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
 
     // 目盛
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     const step = span > 2 ? 0.5 : 0.25;
@@ -403,7 +404,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
       ctx.fillText(label, padL - 8, y + 3);
 
       // 95%CI
-      ctx.strokeStyle = a.purity >= 0.25 ? "#94a3b8" : "#fca5a5";
+      ctx.strokeStyle = a.purity >= 0.25 ? CHART_COLORS.axis : "#fca5a5";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(x(a.bLo), y);
@@ -498,7 +499,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
     for (let i = 0; i <= 4; i++) {
       const vx = xLo + ((xHi - xLo) * i) / 4;
       const vy = yLo + ((yHi - yLo) * i) / 4;
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.textAlign = "center";
       ctx.fillText(vx.toFixed(2), X(vx), padT + plotH + 14);
       ctx.textAlign = "right";

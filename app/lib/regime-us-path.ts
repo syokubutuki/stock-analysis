@@ -22,6 +22,7 @@ import { BinGrid } from "./intraday-core";
 import {
   PathGroup, PathStat, PairDiff, buildPathStats, pairwiseEndDiffs,
 } from "./intraday-path-core";
+import { CHART_COLORS } from "./chart-colors";
 
 export type RegimeSource = "jp" | "us" | "concord";
 
@@ -76,12 +77,12 @@ function trendSign(v: number, T: number): number {
 // 基調ソース別のバケツ定義(キー/ラベル/色)。concord は銘柄×米国の一致/背反で5分類。
 const JP_BUCKETS = [
   { key: "up", label: "上昇基調", color: "#16a34a" },
-  { key: "flat", label: "中立", color: "#9ca3af" },
+  { key: "flat", label: "中立", color: CHART_COLORS.neutral },
   { key: "down", label: "下落基調", color: "#dc2626" },
 ];
 const US_BUCKETS = [
   { key: "up", label: "米国上昇基調", color: "#16a34a" },
-  { key: "flat", label: "米国中立", color: "#9ca3af" },
+  { key: "flat", label: "米国中立", color: CHART_COLORS.neutral },
   { key: "down", label: "米国下落基調", color: "#dc2626" },
 ];
 const CONCORD_BUCKETS = [
@@ -89,7 +90,7 @@ const CONCORD_BUCKETS = [
   { key: "divA", label: "背反・自強米弱（自↑米↓）", color: "#f59e0b" },
   { key: "divB", label: "背反・自弱米強（自↓米↑）", color: "#7c3aed" },
   { key: "bear", label: "順行・弱気（自↓米↓）", color: "#dc2626" },
-  { key: "mid", label: "中立混在", color: "#9ca3af" },
+  { key: "mid", label: "中立混在", color: CHART_COLORS.neutral },
 ];
 
 function bucketDefs(source: RegimeSource) {

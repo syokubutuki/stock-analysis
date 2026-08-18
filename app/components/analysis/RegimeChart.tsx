@@ -13,6 +13,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitHMM, detectChangePoints, kalmanFilter } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -192,7 +193,7 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
 
     // Observed
     const obsSeries = chart.addSeries(LineSeries, {
-      color: "#94a3b8",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "観測値",
     });

@@ -12,6 +12,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeAnalyticSignal, analyticSignalStats } from "../../lib/analytic-signal";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -50,7 +51,7 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
 
     // 対数リターン
     const returnSeries = chart.addSeries(LineSeries, {
-      color: "#94a3b8",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "log return",
     });

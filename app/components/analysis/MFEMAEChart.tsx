@@ -12,6 +12,7 @@ import { computeMFEMAE, computeMFEMAEStats } from "../../lib/mfe-mae";
 import AnalysisGuide from "./AnalysisGuide";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -131,7 +132,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
     ctx.setLineDash([]);
 
     // ラベル
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "11px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("MAE (%)", margin + plotW / 2, h - 5);
@@ -154,7 +155,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
     }
 
     // 軸の数値
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "right";
     ctx.fillText("0", margin - 4, margin + plotH + 3);

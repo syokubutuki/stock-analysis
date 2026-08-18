@@ -22,6 +22,7 @@ import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -132,7 +133,7 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
       rightPriceScale: { mode: 1, borderColor: "#e5e7eb" }, // 対数
       timeScale: { borderColor: "#e5e7eb" },
     });
-    const floor = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, priceLineVisible: false });
+    const floor = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, priceLineVisible: false });
     floor.setData(result.baselineEquity.map((p) => ({ time: p.time as Time, value: p.value })));
     const tilt = chart.addSeries(LineSeries, {
       color: selResult.passes ? "#16a34a" : "#2563eb", lineWidth: 2, priceLineVisible: false,

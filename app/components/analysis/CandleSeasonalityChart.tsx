@@ -9,6 +9,7 @@ import {
   SeasonAxis,
 } from "../../lib/candle-seasonality";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -100,7 +101,7 @@ function drawGrouped(
   frame(ctx, ml, mt, plotW, plotH, title);
   const slot = plotW / buckets.length;
   const maxV = Math.max(1e-9, ...buckets.flatMap((b) => series.map((s) => s.get(b))));
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`${(maxV * 100).toFixed(2)}%`, ml - 4, mt + 9);
   ctx.fillText("0", ml - 4, mt + plotH);
   const groupW = slot * 0.7;
@@ -136,9 +137,9 @@ function drawDiverging(
   const barW = Math.max(4, slot * 0.5);
   const maxAbs = Math.max(1e-9, ...buckets.flatMap((b) => [Math.abs(posOf(b)), Math.abs(negOf(b))]));
   const zeroY = mt + plotH / 2;
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, zeroY); ctx.lineTo(ml + plotW, zeroY); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmt(maxAbs), ml - 4, mt + 9);
   ctx.fillText(fmt(-maxAbs), ml - 4, mt + plotH);
   buckets.forEach((b, i) => {
@@ -166,10 +167,10 @@ function drawBull(ctx: CanvasRenderingContext2D, width: number, buckets: BucketA
   ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (const g of [0, 0.5, 1]) {
     const y = toY(g);
-    ctx.strokeStyle = g === 0.5 ? "#9ca3af" : "#eee";
+    ctx.strokeStyle = g === 0.5 ? CHART_COLORS.reference : "#eee";
     ctx.setLineDash(g === 0.5 ? [2, 2] : []);
     ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.fillText(`${(g * 100).toFixed(0)}%`, ml - 4, y + 3);
+    ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(`${(g * 100).toFixed(0)}%`, ml - 4, y + 3);
   }
   buckets.forEach((b, i) => {
     const x = ml + i * slot + (slot - barW) / 2;

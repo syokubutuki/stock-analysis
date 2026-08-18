@@ -26,6 +26,7 @@ import {
 } from "../../lib/vol-targeting";
 import { useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -182,7 +183,7 @@ export default function VolTargetingChart({ prices }: Props) {
     levSeriesRef.current = [];
 
     const bhs = eqChart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
+      color: CHART_COLORS.neutral, lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
     });
     bhs.setData(result.rows.map((r) => ({ time: r.time as Time, value: r.bh })));
     const sts = eqChart.addSeries(LineSeries, {
@@ -241,7 +242,7 @@ export default function VolTargetingChart({ prices }: Props) {
       ctx.fillStyle = color; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
       ctx.fillText(label, xOf(k) + 3, padT + dy);
     };
-    marker(1, "#9ca3af", "k=1 (B&H)", 10);
+    marker(1, CHART_COLORS.neutral, "k=1 (B&H)", 10);
     marker(kStarEmp, "#16a34a", `k*=${kStarEmp.toFixed(2)}`, 22);
     marker(result.meta.avgLev, "#2563eb", `平均レバ=${result.meta.avgLev.toFixed(2)}`, 34);
 

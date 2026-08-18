@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeBacktest, type BacktestResult } from "../../lib/predictability";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -51,7 +52,7 @@ export default function SimpleBacktestChart({ prices }: Props) {
       const y = mt + (plotH * i) / 5;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = maxCum - (rangeCum * i) / 5;
-      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText((val * 100).toFixed(0) + "%", ml - 4, y + 3);
     }
     // Zero line

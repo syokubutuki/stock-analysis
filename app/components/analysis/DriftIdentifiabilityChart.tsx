@@ -20,6 +20,7 @@ import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -222,7 +223,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
       rightPriceScale: { mode: 1, borderColor: "#e5e7eb" },
       timeScale: { borderColor: "#e5e7eb" },
     });
-    const floor = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, priceLineVisible: false });
+    const floor = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, priceLineVisible: false });
     floor.setData(result.wf.equityFloor.map((p) => ({ time: p.time as Time, value: p.value })));
     const tilt = chart.addSeries(LineSeries, {
       color: result.wf.passes ? "#16a34a" : "#2563eb", lineWidth: 2, priceLineVisible: false,

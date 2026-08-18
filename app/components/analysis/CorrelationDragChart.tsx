@@ -51,6 +51,7 @@ import {
 } from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // ── 定数 ───────────────────────────────────────────────────────────────────
 /** 崖の横軸（総建玉）の上限。300% ＝ 信用3倍まで見せる（仕様書 §G1）。 */
@@ -1819,7 +1820,7 @@ function drawProfile(canvas: HTMLCanvasElement, points: StressProfilePoint[]) {
 
   const ok = points.filter((p) => p.ci.ok);
   if (ok.length === 0) {
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "11px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("どの窓でも算出できませんでした", padL + plotW / 2, padT + plotH / 2);
@@ -1861,7 +1862,7 @@ function drawProfile(canvas: HTMLCanvasElement, points: StressProfilePoint[]) {
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(v.toFixed(2), padL - 6, y);
   }
 
@@ -1877,11 +1878,11 @@ function drawProfile(canvas: HTMLCanvasElement, points: StressProfilePoint[]) {
   ctx.textBaseline = "top";
   points.forEach((p, i) => {
     const x = xOf(i);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(`${p.periods}日`, x, padT + plotH + 6);
     if (!p.ci.ok) return;
     const crosses = p.ci.crossesZero;
-    const color = crosses ? "#9ca3af" : p.ci.delta > 0 ? "#b91c1c" : "#1d4ed8";
+    const color = crosses ? CHART_COLORS.neutral : p.ci.delta > 0 ? "#b91c1c" : "#1d4ed8";
     // CI の縦棒（跨いでいるものは灰色＝「判定なし」が一目で分かる）
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -1975,12 +1976,12 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(`${(g * 100).toFixed(0)}%`, padL - 6, y + 3);
   }
 
   // ゼロ線
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(padL, y0);
@@ -1993,7 +1994,7 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
   ctx.clip();
 
   // 見かけの期待リターン W·μ（ドラッグを無視した直線）
-  ctx.strokeStyle = "#94a3b8";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -2148,7 +2149,7 @@ function drawCliffs(canvas: HTMLCanvasElement, d: CliffView) {
   // 軸ラベル
   ctx.textAlign = "center";
   ctx.font = "10px sans-serif";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   for (let w = 0; w <= W_MAX + 1e-9; w += 0.5) {
     ctx.fillText(`${(w * 100).toFixed(0)}%`, xOf(w), padT + plotH + 14);
   }
@@ -2216,7 +2217,7 @@ function drawSync(canvas: HTMLCanvasElement, v: SyncView, off: number) {
   ctx.fillStyle = "#6b7280";
   const assetMid = padT + (N * rowH) / 2;
   ctx.fillText(`${N}銘柄それぞれ`, padL - 10, assetMid - 6);
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText("の値動き", padL - 10, assetMid + 8);
 
   // ── 下段: 合成ポートフォリオ ─────────────────────────────────────────
@@ -2243,7 +2244,7 @@ function drawSync(canvas: HTMLCanvasElement, v: SyncView, off: number) {
   ctx.stroke();
 
   // 見かけの期待リターン W·μ·t（ドラッグを無視した直線）
-  ctx.strokeStyle = "#94a3b8";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -2294,11 +2295,11 @@ function drawSync(canvas: HTMLCanvasElement, v: SyncView, off: number) {
   ctx.font = "10px sans-serif";
   ctx.fillStyle = "#6b7280";
   ctx.fillText("合成ポートフォリオ", padL - 10, pTop + portH / 2 - 6);
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText("（等ウェイト）", padL - 10, pTop + portH / 2 + 8);
 
   ctx.textAlign = "left";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "10px sans-serif";
   ctx.fillText("← 1年ぶんの窓が流れています（横軸は合成時間・日付に意味はありません）", padL, height - 6);
 }

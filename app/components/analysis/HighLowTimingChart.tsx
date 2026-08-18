@@ -17,6 +17,7 @@ import {
   WeekdayHLProb,
 } from "../../lib/highlow-timing";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   ticker: string;
@@ -116,7 +117,7 @@ function drawDistribution(ctx: CanvasRenderingContext2D, W: number, H: number, a
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, top, plotW, paneH);
     ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
     ctx.fillText(title, ml, top - 7);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText("0", ml - 5, top + paneH); ctx.fillText(String(maxV), ml - 5, top + 9);
     for (let i = 0; i < n; i++) {
       const h = (counts[i] / maxV) * (paneH - 6);
@@ -155,7 +156,7 @@ function drawHazard(ctx: CanvasRenderingContext2D, W: number, H: number, a: Intr
   for (let p = 0; p <= 1.0001; p += 0.25) {
     const y = mt + plotH - p * plotH;
     ctx.strokeStyle = "#eee"; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.fillText(`${(p * 100).toFixed(0)}%`, ml - 4, y + 3);
+    ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(`${(p * 100).toFixed(0)}%`, ml - 4, y + 3);
   }
 
   const line = (cdf: number[], color: string) => {
@@ -232,15 +233,15 @@ function drawProfile(ctx: CanvasRenderingContext2D, W: number, H: number, a: Int
 
   // 0ライン
   const y0 = ys(0);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText("0%", ml - 4, y0 + 3);
   ctx.fillText(`${vmax.toFixed(2)}`, ml - 4, mt + 9);
   ctx.fillText(`${vmin.toFixed(2)}`, ml - 4, mt + plotH);
 
   // ±1σ帯
-  ctx.fillStyle = "#9ca3af33"; ctx.beginPath();
+  ctx.fillStyle = `${CHART_COLORS.neutral}33`; ctx.beginPath();
   for (let i = 0; i < n; i++) { const x = xs(i), y = ys(hi[i]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
   for (let i = n - 1; i >= 0; i--) ctx.lineTo(xs(i), ys(lo[i]));
   ctx.closePath(); ctx.fill();
@@ -298,9 +299,9 @@ function drawWeekday(
 
   // 0ライン・y目盛
   const y0 = ys(0);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText("0%", ml - 4, y0 + 3);
   ctx.fillText(vmax.toFixed(2), ml - 4, mt + 9);
   ctx.fillText(vmin.toFixed(2), ml - 4, mt + plotH);
@@ -357,7 +358,7 @@ function drawActivity(ctx: CanvasRenderingContext2D, W: number, H: number, a: In
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, top, plotW, paneH);
     ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
     ctx.fillText(title, ml, top - 7);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText("0", ml - 5, top + paneH); ctx.fillText(fmt(maxV), ml - 5, top + 9);
     for (let i = 0; i < n; i++) {
       const h = (vals[i] / maxV) * (paneH - 6);

@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { fitARPoles, selectARByAic, ARFit } from "../../lib/z-plane";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -74,7 +75,7 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
     ctx.stroke();
 
     // 単位円（定常/非定常の境界）
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -82,7 +83,7 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("|z|=1", X(0) + R * 0.72, Y(0) - R * 0.72);

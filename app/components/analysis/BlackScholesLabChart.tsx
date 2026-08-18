@@ -10,6 +10,7 @@ import {
 } from "../../lib/derivatives-core";
 import { wholePeriodVol } from "../../lib/ohlc-volatility";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -135,7 +136,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
       ctx.stroke();
     }
     // K と現値の縦線
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     ctx.moveTo(toX(K), pad.top);
@@ -233,7 +234,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
     ctx.lineTo(width - pad.right, pad.top + ph / 2);
     ctx.stroke();
     // K縦線
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     ctx.moveTo(toX(K), pad.top);

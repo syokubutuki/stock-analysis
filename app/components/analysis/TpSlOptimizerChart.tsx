@@ -6,6 +6,7 @@ import { TpSlResult } from "../../lib/tp-sl-optimizer";
 import type { TpSlWorkerRequest, TpSlWorkerResponse } from "../../lib/tp-sl-optimizer.worker";
 import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -80,7 +81,7 @@ function drawMfeMae(ctx: CanvasRenderingContext2D, width: number, height: number
   const n = r.mfeMae.length;
   const xOf = (i: number) => ml + (i / Math.max(1, n - 1)) * plotW;
   const yOf = (v: number) => mt + plotH - (v / maxV) * plotH;
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`${(maxV * 100).toFixed(1)}%`, ml - 4, mt + 8);
   ctx.fillText("0", ml - 4, mt + plotH);
   const line = (key: "meanMFE" | "meanMAE", color: string) => {
@@ -90,7 +91,7 @@ function drawMfeMae(ctx: CanvasRenderingContext2D, width: number, height: number
   };
   line("meanMFE", "#16a34a");
   line("meanMAE", "#dc2626");
-  ctx.font = "9px sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#9ca3af";
+  ctx.font = "9px sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = CHART_COLORS.ink;
   for (let i = 0; i < n; i += Math.max(1, Math.round(n / 6))) ctx.fillText(`${r.mfeMae[i].hold}d`, xOf(i), mt + plotH + 14);
   ctx.textAlign = "left";
   ctx.fillStyle = "#16a34a"; ctx.fillText("■MFE", ml + 4, mt + 10);

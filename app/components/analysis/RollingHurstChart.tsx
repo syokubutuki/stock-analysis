@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeRollingHurst, RollingHurstResult } from "../../lib/rolling-hurst";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -53,7 +54,7 @@ function drawRolling(canvas: HTMLCanvasElement, result: RollingHurstResult) {
   ctx.fillStyle = "rgba(148,163,184,0.30)";
   ctx.fillRect(pad.left, toY(result.band.q975), pw, toY(result.band.q025) - toY(result.band.q975));
   // 帯の境界線
-  ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
   for (const v of [result.band.q025, result.band.q975]) {
     ctx.beginPath(); ctx.moveTo(pad.left, toY(v)); ctx.lineTo(width - pad.right, toY(v)); ctx.stroke();
   }

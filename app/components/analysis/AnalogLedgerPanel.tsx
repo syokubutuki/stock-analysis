@@ -19,6 +19,7 @@ import {
 } from "../../lib/ledger-store";
 import AnalysisGuide from "./AnalysisGuide";
 import LedgerSyncBar from "./LedgerSyncBar";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   rows: { ticker: string; res: WeeklyAnalogResult | null }[];
@@ -30,7 +31,7 @@ interface Props {
 const VERDICT_META: Record<string, { label: string; color: string }> = {
   verified: { label: "確定", color: "#16a34a" },
   partial: { label: "進行中", color: "#2563eb" },
-  waiting: { label: "待機", color: "#9ca3af" },
+  waiting: { label: "待機", color: CHART_COLORS.neutral },
   stale: { label: "照合不可", color: "#dc2626" },
 };
 

@@ -18,6 +18,7 @@ import {
   falseNearestNeighbors,
 } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -200,7 +201,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
     }
 
     // Y-axis tick labels
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px monospace";
     ctx.textAlign = "right";
     for (let i = 0; i <= yTicks; i++) {
@@ -250,7 +251,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
     }
 
     // θ=0 label (linear)
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("← 線形", m.left + 3, m.top + plotH - 5);

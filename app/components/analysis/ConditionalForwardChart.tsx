@@ -13,6 +13,7 @@ import {
 } from "../../lib/conditional-forward-returns";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -69,7 +70,7 @@ function drawDivergingBars(
   const maxAbs = Math.max(1e-9, ...buckets.map((b) => Math.abs(b.meanFwd)));
   const zeroX = ml + plotW / 2;
   const rowH = plotH / buckets.length;
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([2, 2]);
   ctx.beginPath();
   ctx.moveTo(zeroX, mt);
@@ -144,7 +145,7 @@ function drawYearStrip(
     });
   });
   // 年ラベル（間引き）
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "8px sans-serif";
   ctx.textAlign = "center";
   const step = Math.ceil(years.length / 12);
@@ -183,7 +184,7 @@ function drawIndicator(
     const y = ys(t.value);
     ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#94a3b8"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
     const lbl = series.unit === "%" ? `${t.value >= 0 ? "+" : ""}${t.value.toFixed(0)}%` : `${t.value}${series.unit}`;
     ctx.fillText(lbl, ml + plotW + 3, y + 3);
   });
@@ -212,7 +213,7 @@ function drawIndicator(
   }
 
   // 時刻ラベル（端と中央）
-  ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
   [0, Math.floor(n / 2), n - 1].forEach((i) => { if (times[i]) ctx.fillText(times[i], xs(i), mt + plotH + 12); });
 }
 

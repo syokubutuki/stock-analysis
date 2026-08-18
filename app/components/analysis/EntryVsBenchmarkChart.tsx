@@ -11,6 +11,7 @@ import {
 } from "../../lib/entry-vs-benchmark";
 import { TickerPrices, Side, EXIT_LABEL } from "../../lib/weekly-allocation";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -106,7 +107,7 @@ function drawEquity(ctx: CanvasRenderingContext2D, width: number, height: number
     ctx.fillText(`${row.label.split("（")[0]} ×${last.toFixed(2)}`, ml + plotW + 4, yOf(last) + 3);
   }
 
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   ctx.fillText(`×${Math.exp(hi).toFixed(1)}`, ml - 4, mt + 4);

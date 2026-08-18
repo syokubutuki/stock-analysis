@@ -6,6 +6,7 @@ import { computeGapSeries, type GapPoint } from "../../lib/gap-analysis";
 import AnalysisGuide from "./AnalysisGuide";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -154,7 +155,7 @@ export default function GapScatterChart({ prices, period }: Props) {
     ctx.restore();
 
     // 軸の数値
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(`-${maxAbs.toFixed(1)}`, margin, cy + 14);

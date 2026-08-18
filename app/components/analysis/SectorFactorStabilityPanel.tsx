@@ -30,6 +30,7 @@ import {
 import type { StabilityWorkerRequest, StabilityWorkerResponse } from "../../lib/sector-factor-stability.worker";
 import type { FactorPrices } from "../../lib/sector-factor-select";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
 
@@ -304,7 +305,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
 
     // 目盛
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let v = Math.ceil(yLo * 4) / 4; v <= yHi; v += 0.25) {
       ctx.beginPath();
@@ -321,7 +322,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
       [0, "0 順位は無意味"],
     ] as [number, string][]) {
       if (v < yLo || v > yHi) continue;
-      ctx.strokeStyle = "#94a3b8";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(padL, Y(v));
@@ -375,7 +376,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
     // CI と点
     for (const c of cur) {
       if (Number.isFinite(c.lo) && Number.isFinite(c.hi)) {
-        ctx.strokeStyle = "#94a3b8";
+        ctx.strokeStyle = CHART_COLORS.axis;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(X(c.h), Y(c.lo));
@@ -395,7 +396,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
       ctx.fillStyle = "#6b7280";
       ctx.textAlign = "center";
       ctx.fillText(`${c.h}日`, X(c.h), height - 16);
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText(c.overlap > 0 ? `φ=${c.overlap.toFixed(2)}` : "非重複", X(c.h), height - 5);
     }
 
@@ -456,7 +457,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
       const ms: SeriesMarker<Time>[] = [];
       for (const ev of BOJ_POLICY_EVENTS) {
         const d = snap(ev.date);
-        if (d) ms.push({ time: d as Time, position: "aboveBar", color: "#94a3b8", shape: "arrowDown", text: ev.label.slice(0, 8) });
+        if (d) ms.push({ time: d as Time, position: "aboveBar", color: CHART_COLORS.neutral, shape: "arrowDown", text: ev.label.slice(0, 8) });
       }
       for (const cb of breaks?.consensusBreaks.slice(0, 3) ?? []) {
         const d = snap(cb.date);
@@ -503,7 +504,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
     const Y = (v: number) => padT + plotH - v * plotH;
 
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let v = 0; v <= 1.0001; v += 0.25) {
       ctx.beginPath();
@@ -640,7 +641,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
     ctx.fillStyle = "#b45309";
     ctx.textAlign = "center";
     ctx.fillText(`等加重 ${pct(eq, 1)}`, X(eq), height - 3);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.textAlign = "left";
     ctx.fillText("上=持続率で割り引かない（P1 と同じ式） / 下=二段収縮後", padL, 10);
   }, [result, heldSet, label]);
@@ -685,7 +686,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
       ctx.moveTo(padL, Y(v));
       ctx.lineTo(padL + plotW, Y(v));
       ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.textAlign = "right";
       ctx.fillText(`${(v * 100).toFixed(2)}%`, padL - 5, Y(v) + 3);
     }
@@ -721,7 +722,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
     }
     for (let k = 0; k <= 4; k++) {
       const v = (xMax * k) / 4;
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.textAlign = "center";
       ctx.fillText(`${Math.round(v)}日`, X(v), height - 8);
     }
@@ -758,13 +759,13 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
       ctx.font = "10px sans-serif";
       ctx.fillStyle = sig ? "#059669" : "#a7f3d0";
       ctx.fillRect(padL, y, X(r.bPlus) - padL, 9);
-      ctx.fillStyle = bad ? "#dc2626" : sig ? "#94a3b8" : "#e5e7eb";
+      ctx.fillStyle = bad ? "#dc2626" : sig ? CHART_COLORS.neutral : "#e5e7eb";
       ctx.fillRect(padL, y + 10, X(r.bMinus) - padL, 9);
       ctx.textAlign = "left";
       ctx.fillStyle = "#6b7280";
       ctx.fillText(`${r.bPlus.toFixed(2)} / ${r.bMinus.toFixed(2)}`, padL + plotW + 4, y + 12);
     });
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.textAlign = "left";
     ctx.fillText("上=b⁺（セクター上昇日） / 下=b⁻（下落日）。赤=下げで強まる", padL, 10);
     ctx.strokeStyle = "#d1d5db";

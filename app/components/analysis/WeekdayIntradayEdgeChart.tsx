@@ -21,6 +21,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -59,7 +60,7 @@ function drawHeatmap(
   ctx.textAlign = "center";
   const everyX = G > 16 ? Math.ceil(G / 12) : 1;
   for (let j = 0; j < G; j++) { if (j % everyX) continue; ctx.fillText(labels[j], ml + j * cw + cw / 2, H - mb + 10); }
-  ctx.fillStyle = "#9ca3af"; ctx.textAlign = "left";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "left";
   ctx.fillText("縦=買い建て時刻 ／ 横=手仕舞い時刻（緑=ロング平均プラス／赤=マイナス、枠=最良）", ml, mt - 7);
 }
 

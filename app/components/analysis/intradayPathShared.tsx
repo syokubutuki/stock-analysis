@@ -12,6 +12,7 @@ import {
 import { PathStat, PairDiff } from "../../lib/intraday-path-core";
 import { fmtSignedPct, drawTimeAxisLabels, initCanvas } from "./intradayShared";
 import StatBadge from "./StatBadge";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 0..1 の不透明度を #rrggbb に付ける2桁16進に変換。
 const alphaHex = (a: number) =>
@@ -95,7 +96,7 @@ export function drawPathStats(
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
   // 縦軸目盛
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);

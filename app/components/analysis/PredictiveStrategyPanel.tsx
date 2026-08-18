@@ -28,6 +28,7 @@ import {
 import AnalysisGuide from "./AnalysisGuide";
 import { listScenarios, getActiveId, reconcileTrades } from "../../lib/discretionary-store";
 import { holdingStateByDate } from "../../lib/discretionary-policy";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // ── 型定義 ─────────────────────────────────────────
 
@@ -821,15 +822,15 @@ function WalkForwardDiagram({
   }
 
   const colors: Record<string, string> = {
-    train: "#34d399", embargo: "#94a3b8", test: "#fbbf24",
+    train: "#34d399", embargo: CHART_COLORS.neutral, test: "#fbbf24",
   };
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 170 }}>
       {/* 時間軸 */}
       <line x1={ml} y1={H - mb + 4} x2={W - mr} y2={H - mb + 4} stroke="#cbd5e1" strokeWidth={1} />
-      <text x={ml} y={H - 6} fontSize={10} fill="#94a3b8">過去</text>
-      <text x={W - mr} y={H - 6} fontSize={10} fill="#94a3b8" textAnchor="end">時間 →（直近）</text>
+      <text x={ml} y={H - 6} fontSize={10} fill={CHART_COLORS.ink}>過去</text>
+      <text x={W - mr} y={H - 6} fontSize={10} fill={CHART_COLORS.ink} textAnchor="end">時間 →（直近）</text>
 
       {blocks.map((b, i) => {
         const y = mt + b.row * rowH + (rowH - barH) / 2;

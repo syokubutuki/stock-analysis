@@ -22,6 +22,7 @@ import {
 import { representativeSpread, type SpreadEstimator } from "../../lib/spread-estimator";
 import { roundTripCost } from "../../lib/strategy-vs-benchmark";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -128,7 +129,7 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
     const bhRows = result.equity.map((e) => ({ time: e.time as Time, value: e.bh }));
     const stRows = result.equity.map((e) => ({ time: e.time as Time, value: e.strat }));
     const bhs = chart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
+      color: CHART_COLORS.neutral, lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
     });
     bhs.setData(bhRows);
     const sts = chart.addSeries(LineSeries, {

@@ -9,6 +9,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -36,7 +37,7 @@ function drawHeatmap(ctx: CanvasRenderingContext2D, W: number, H: number, res: T
   for (let j = 0; j < G; j++) if (j % every === 0) ctx.fillText(res.timeLabels[j], ml + j * cell + cell / 2, mt + gridW + 12);
   ctx.textAlign = "right";
   for (let i = 0; i < G; i++) if (i % every === 0) ctx.fillText(res.timeLabels[i], ml - 2, mt + i * cell + cell / 2 + 3);
-  ctx.textAlign = "left"; ctx.fillStyle = "#9ca3af";
+  ctx.textAlign = "left"; ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText("行=建て / 列=手仕舞い（緑=ロング有利, 赤=ショート有利, 枠=有意）", ml, mt + gridW + 24);
 }
 

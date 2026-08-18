@@ -22,6 +22,7 @@ import { useExceedanceAll } from "../../hooks/usePortfolioTail";
 import { publishDownsideRho } from "../../lib/downside-rho";
 import { openAnalysisPanel } from "../../lib/panel-nav";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -873,7 +874,7 @@ function drawSmile(canvas: HTMLCanvasElement, r: ExceedanceResult) {
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(v.toFixed(2), padL - 6, y);
   }
 
@@ -888,7 +889,7 @@ function drawSmile(canvas: HTMLCanvasElement, r: ExceedanceResult) {
       ctx.moveTo(x, padT);
       ctx.lineTo(x, padT + plotH);
       ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText(s === 0 ? "0" : `${s > 0 ? "+" : "−"}${Math.abs(s).toFixed(1)}σ`, x, padT + plotH + 6);
     }
   }

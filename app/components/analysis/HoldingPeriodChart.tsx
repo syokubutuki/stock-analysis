@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { computeHoldingPeriods, type HoldingPeriodStats } from "../../lib/cross-analysis";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -64,7 +65,7 @@ export default function HoldingPeriodChart({ prices }: Props) {
       const y = mt + (plotH * i) / nGrid;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = minSharpe - sharpeRange * 0.1 + (sharpeRange * 1.2 * (nGrid - i)) / nGrid;
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "10px sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(val.toFixed(2), ml - 6, y + 3);

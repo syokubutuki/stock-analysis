@@ -21,6 +21,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -30,7 +31,7 @@ interface Props {
 const MAX_COMPARE = 10;
 
 const PALETTE = [
-  "#9ca3af", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444",
+  CHART_COLORS.neutral, "#10b981", "#f59e0b", "#8b5cf6", "#ef4444",
   "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
 ];
 

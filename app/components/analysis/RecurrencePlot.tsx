@@ -8,6 +8,7 @@ import {
   estimateLyapunov,
 } from "../../lib/nonlinear";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -67,7 +68,7 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
     }
 
     // Ticks
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.strokeStyle = "#d1d5db";
     ctx.font = "9px monospace";
     ctx.lineWidth = 0.5;
@@ -210,7 +211,7 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
     }
 
     // X-axis title
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.fillText("step", margin.l + pw / 2, h - 16);
     ctx.textAlign = "left";

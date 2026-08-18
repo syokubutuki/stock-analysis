@@ -19,6 +19,7 @@ import {
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -439,7 +440,7 @@ function drawPremiumBars(
 
   // ゼロ線。
   const zx = xOf(0);
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(zx, padT);
@@ -513,7 +514,7 @@ function drawPremiumBars(
   });
 
   // x軸ラベル（下端）。
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "10px sans-serif";
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";

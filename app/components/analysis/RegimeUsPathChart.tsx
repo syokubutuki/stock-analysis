@@ -18,6 +18,7 @@ import {
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -90,7 +91,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
     [result]
   );
   const colorOf = useCallback(
-    (key: string) => result?.buckets.find((b) => b.key === key)?.color ?? "#9ca3af",
+    (key: string) => result?.buckets.find((b) => b.key === key)?.color ?? CHART_COLORS.neutral,
     [result]
   );
 

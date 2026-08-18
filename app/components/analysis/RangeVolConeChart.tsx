@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { rangeVolCone } from "../../lib/vol-cone-range";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -44,7 +45,7 @@ export default function RangeVolConeChart({ prices }: Props) {
     const xOf = (i: number) => ml + (rows.length === 1 ? plotW / 2 : (i / (rows.length - 1)) * plotW);
     const yOf = (v: number) => mt + plotH - (v / maxV) * plotH;
     // y軸
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (const g of [0, 0.5, 1]) { const v = maxV * g; ctx.fillText(`${(v * 100).toFixed(0)}%`, ml - 4, yOf(v) + 3); }
     // 帯（25-75）
     ctx.fillStyle = "rgba(37,99,235,0.10)";

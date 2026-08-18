@@ -23,6 +23,7 @@ import type { BarrierWorkerRequest, BarrierWorkerResponse } from "../../lib/week
 import { initCanvas, fmtPct, fmtSignedPct, ViewTabs } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
 
@@ -84,7 +85,7 @@ function drawDesignCurves(
     ctx.stroke();
     ctx.fillStyle = "#6b7280"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
     ctx.fillText(p.label, ml + 4, top + 10);
-    ctx.textAlign = "right"; ctx.fillStyle = "#9ca3af";
+    ctx.textAlign = "right"; ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(p.hi.toFixed(1), ml - 3, top + 8);
     ctx.fillText(p.lo.toFixed(1), ml - 3, top + panelH);
   });
@@ -187,7 +188,7 @@ function drawBestScatter(
   ctx.save(); ctx.translate(10, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
   ctx.fillText(unit === "pct" ? "SL（%）" : "B（SLのσ倍）", 0, 0);
   ctx.restore();
-  ctx.textAlign = "right"; ctx.fillStyle = "#9ca3af";
+  ctx.textAlign = "right"; ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText(unit === "pct" ? `${xHi.toFixed(2)}%` : xHi.toFixed(2), ml + plotW, mt - 3);
 }
 
@@ -252,7 +253,7 @@ function drawDeviationBars(
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(metric === "p" ? `+${(mx * 100).toFixed(1)}pp` : `+${mx.toFixed(3)}`, ml - 3, mt + 8);
   ctx.fillText("理論値", ml - 3, Y(0) + 3);
   ctx.fillText(metric === "p" ? `−${(mx * 100).toFixed(1)}pp` : `−${mx.toFixed(3)}`, ml - 3, mt + plotH);

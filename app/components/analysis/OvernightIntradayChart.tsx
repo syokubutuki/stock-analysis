@@ -6,6 +6,7 @@ import { PricePoint } from "../../lib/types";
 import { decomposeEquity } from "../../lib/overnight-intraday";
 import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -43,7 +44,7 @@ export default function OvernightIntradayChart({ prices }: Props) {
     };
     add("#dc2626", "夜間(持ち越し)", "overnight", 2);
     add("#2563eb", "日中(寄→引)", "intraday", 2);
-    add("#9ca3af", "単純保有", "buyhold", 1);
+    add(CHART_COLORS.neutral, "単純保有", "buyhold", 1);
     chart.timeScale().fitContent();
     const onResize = () => chartRef.current && chart.applyOptions({ width: chartRef.current.clientWidth });
     window.addEventListener("resize", onResize);

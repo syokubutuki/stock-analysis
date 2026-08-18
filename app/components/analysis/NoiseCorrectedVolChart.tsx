@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { noiseCorrectedVol } from "../../lib/noise-corrected-vol";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -41,7 +42,7 @@ export default function NoiseCorrectedVolChart({ prices }: Props) {
     });
     apiRef.current = chart;
     const naive = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "素朴ボラ",
       priceScaleId: "right",

@@ -11,6 +11,7 @@ import {
   DEFAULT_CAPACITY_PARAMS,
   type CapacityResult,
 } from "../../lib/edge-capacity";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -56,7 +57,7 @@ function drawCurve(canvas: HTMLCanvasElement, r: CapacityResult, deflate: boolea
   const yProf = (v: number) => padT + (1 - (v - pMin) / (pMax - pMin || 1)) * h;
 
   // グリッドとX軸目盛(対数: 10万/100万/1000万/1億/10億…)
-  ctx.strokeStyle = "#e5e7eb"; ctx.fillStyle = "#9ca3af";
+  ctx.strokeStyle = "#e5e7eb"; ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "10px sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 1;
   for (let e = 5; e <= 11; e++) {
     const k = Math.pow(10, e);
