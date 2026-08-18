@@ -27,6 +27,7 @@ import {
 } from "../../lib/chart-series";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -466,12 +467,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
         if (def.type === "candlestick" && computed.ohlc) {
           if (computed.ohlc.length === 0) continue;
           api = chart.addSeries(CandlestickSeries, {
-            upColor: "#26a69a",
-            downColor: "#ef5350",
-            borderUpColor: "#26a69a",
-            borderDownColor: "#ef5350",
-            wickUpColor: "#26a69a",
-            wickDownColor: "#ef5350",
+            ...CANDLESTICK_OPTIONS,
             priceScaleId,
           });
           api.setData(
@@ -796,6 +792,9 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
           ref={containerRef}
           className="w-full rounded border border-gray-100"
         />
+        {enabledSeries.some((s) => s.type === "candlestick") && (
+          <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
+        )}
 
         {/* 計算中インジケータ */}
         {loading && (

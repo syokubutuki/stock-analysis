@@ -11,6 +11,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeTrendSeries, judgeTrend, type TrendJudgment as TrendResult } from "../../lib/trend-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -63,12 +64,7 @@ export default function TrendJudgment({ prices }: Props) {
 
     // ローソク足
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      ...CANDLESTICK_OPTIONS,
     });
     candleSeries.setData(
       prices.map((p) => ({
@@ -161,6 +157,7 @@ export default function TrendJudgment({ prices }: Props) {
       </div>
 
       <div ref={containerRef} className="w-full rounded border border-gray-100" />
+      <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
 
       <div className="mt-2 flex gap-3 text-xs text-gray-500">
         <span className="flex items-center gap-1">

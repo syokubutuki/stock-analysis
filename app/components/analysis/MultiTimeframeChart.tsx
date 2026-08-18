@@ -4,12 +4,20 @@ import { useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeMultiTimeframe, type TimeframeStats } from "../../lib/multi-timeframe";
 import GuideEntryPanel from "./GuideEntryPanel";
+import DirectionValue from "./DirectionValue";
 
 interface Props { prices: PricePoint[]; }
 
 function StatCell({ value, fmt, green }: { value: number; fmt: (v: number) => string; green?: boolean }) {
-  const color = green === undefined ? "text-gray-700" : value >= 0 ? "text-green-600" : "text-red-600";
-  return <td className={`py-1.5 px-2 text-center font-mono ${color}`}>{fmt(value)}</td>;
+  // green 未指定のセルは方向を持たない指標（σ・尖度など）なので記号も色も付けない
+  if (green === undefined) {
+    return <td className="py-1.5 px-2 text-center font-mono text-gray-700">{fmt(value)}</td>;
+  }
+  return (
+    <td className="py-1.5 px-2 text-center font-mono">
+      <DirectionValue value={value}>{fmt(value)}</DirectionValue>
+    </td>
+  );
 }
 
 export default function MultiTimeframeChart({ prices }: Props) {

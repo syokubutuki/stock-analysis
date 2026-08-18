@@ -22,6 +22,7 @@ import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
 import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -445,8 +446,8 @@ export default function BenchmarkChart({ prices, period }: Props) {
                     <td className={`text-right py-1.5 px-2 font-mono ${c.stats.beta > 1.2 ? "text-red-600" : c.stats.beta < 0.8 ? "text-blue-600" : ""}`}>
                       {fmt(c.stats.beta)}
                     </td>
-                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.alpha >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {pct(c.stats.alpha)}%
+                    <td className="text-right py-1.5 px-2 font-mono">
+                      <DirectionValue value={c.stats.alpha}>{pct(c.stats.alpha)}%</DirectionValue>
                     </td>
                     <td className="text-right py-1.5 px-2 font-mono">
                       {fmt(c.stats.correlation)}
@@ -457,14 +458,14 @@ export default function BenchmarkChart({ prices, period }: Props) {
                     <td className="text-right py-1.5 px-2 font-mono text-gray-500">
                       {pct(c.stats.trackingError)}%
                     </td>
-                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.stockReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {pct(c.stats.stockReturn)}%
+                    <td className="text-right py-1.5 px-2 font-mono">
+                      <DirectionValue value={c.stats.stockReturn}>{pct(c.stats.stockReturn)}%</DirectionValue>
                     </td>
-                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.benchReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {pct(c.stats.benchReturn)}%
+                    <td className="text-right py-1.5 px-2 font-mono">
+                      <DirectionValue value={c.stats.benchReturn}>{pct(c.stats.benchReturn)}%</DirectionValue>
                     </td>
-                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.excessReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {pct(c.stats.excessReturn)}%
+                    <td className="text-right py-1.5 px-2 font-mono">
+                      <DirectionValue value={c.stats.excessReturn}>{pct(c.stats.excessReturn)}%</DirectionValue>
                     </td>
                   </tr>
                 ))}

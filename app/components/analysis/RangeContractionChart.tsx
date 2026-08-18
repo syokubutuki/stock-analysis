@@ -11,7 +11,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { analyzeRangeContraction, TriggerStat } from "../../lib/range-contraction";
 import AnalysisGuide from "./AnalysisGuide";
-import { CHART_COLORS } from "../../lib/chart-colors";
+import { CHART_COLORS, CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -89,9 +89,7 @@ export default function RangeContractionChart({ prices }: Props) {
     });
     apiRef.current = chart;
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a", downColor: "#ef5350",
-      borderUpColor: "#26a69a", borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+      ...CANDLESTICK_OPTIONS,
     });
     candle.setData(prices.map((p) => ({ time: p.time as Time, open: p.open, high: p.high, low: p.low, close: p.close })));
     if (result.markers.length > 0) {
@@ -152,6 +150,7 @@ export default function RangeContractionChart({ prices }: Props) {
       )}
 
       <div ref={chartRef} className="w-full rounded border border-gray-100" />
+      <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
       <div className="text-xs text-gray-500">
         マーカー: <span style={{ color: COLORS.NR7 }}>▲NR7</span> / <span style={{ color: COLORS.inside }}>▲inside</span> / <span style={{ color: COLORS.squeeze }}>▲squeeze</span>（直近{result.markers.length}件）
       </div>

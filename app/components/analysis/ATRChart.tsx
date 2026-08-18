@@ -11,6 +11,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeATR, computeKeltnerChannel } from "../../lib/atr";
 import AnalysisGuide from "./AnalysisGuide";
+import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -43,12 +44,7 @@ export default function ATRChart({ prices }: Props) {
 
     // Candlestick series
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      ...CANDLESTICK_OPTIONS,
     });
     candle.setData(
       prices.map((p) => ({
@@ -190,6 +186,7 @@ export default function ATRChart({ prices }: Props) {
       <div className="mb-1">
         <div className="text-xs text-gray-500 mb-1">価格 + ケルトナーチャネル</div>
         <div ref={priceChartRef} className="w-full rounded border border-gray-100" />
+        <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
       </div>
 
       {/* Legend */}

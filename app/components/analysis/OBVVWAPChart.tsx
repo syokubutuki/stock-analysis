@@ -17,7 +17,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
-import { CHART_COLORS } from "../../lib/chart-colors";
+import { CHART_COLORS, CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -55,12 +55,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
     priceChartApi.current = priceChart;
 
     const candleSeries = priceChart.addSeries(CandlestickSeries, {
-      upColor: "#10b981",
-      downColor: "#ef4444",
-      borderUpColor: "#10b981",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#10b981",
-      wickDownColor: "#ef4444",
+      ...CANDLESTICK_OPTIONS,
     });
     candleSeries.setData(
       prices.map((p) => ({
@@ -215,6 +210,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
           価格 / VWAP
         </div>
         <div ref={priceChartRef} className="w-full rounded border border-gray-100" />
+        <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
       </div>
 
       {/* OBV Chart */}
