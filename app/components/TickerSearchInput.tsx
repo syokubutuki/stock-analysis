@@ -194,7 +194,7 @@ export default function TickerSearchInput({ value, onChange, onSubmit, loading }
             className="w-44 rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-72 sm:px-4"
           />
           {searching && value.trim().length >= 2 && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400" aria-label="検索中">…</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500" aria-label="検索中">…</span>
           )}
         </div>
         <button type="submit" disabled={loading} className="shrink-0 whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5">

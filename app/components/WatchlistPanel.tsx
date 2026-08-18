@@ -121,7 +121,7 @@ export default function WatchlistPanel({
                       handleRemove(item.ticker);
                     }}
                     title="削除"
-                    className="ml-2 text-gray-400 hover:text-red-400 transition-colors text-base leading-none flex-shrink-0"
+                    className="ml-2 text-gray-500 hover:text-red-400 transition-colors text-base leading-none flex-shrink-0"
                   >
                     ×
                   </button>

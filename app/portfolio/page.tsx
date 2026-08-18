@@ -560,11 +560,11 @@ export default function PortfolioPage() {
           ) : null}
 
           {loading ? (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-fg-muted">
               取得中… {progress.done}/{progress.total}
             </span>
           ) : computing ? (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-fg-muted">
               シグナル計算中… {Object.keys(digests).length}/{tickers.length}
             </span>
           ) : null}
@@ -592,7 +592,7 @@ export default function PortfolioPage() {
         })()}
 
         {watchlist.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
+          <div className="py-16 text-center text-fg-muted">
             ウォッチリストが空です。上の「一括追加」で業種バスケットをまとめて入れるか、
             入力欄／個別分析画面の ★ で1銘柄ずつ追加してください。
           </div>
@@ -768,7 +768,7 @@ export default function PortfolioPage() {
                 <div key={title}>
                   <div className="flex items-center gap-2 mb-1.5 mt-1">
                     <span className={`text-sm font-semibold ${accent}`}>{title}</span>
-                    <span className="text-xs text-gray-400">{count}</span>
+                    <span className="text-xs text-fg-muted">{count}</span>
                   </div>
                   <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden">
                     {rows.map(renderRow)}
@@ -781,7 +781,7 @@ export default function PortfolioPage() {
                 {section("保有", groups.held.length, groups.held, "text-gray-700")}
                 {section("狙い", groups.target.length, groups.target, "text-gray-700")}
                 {groups.urgent.length + groups.held.length + groups.target.length === 0 && (
-                  <div className="py-10 text-center text-gray-400 text-sm">
+                  <div className="py-10 text-center text-fg-muted text-sm">
                     該当する銘柄がありません。
                   </div>
                 )}
@@ -791,7 +791,7 @@ export default function PortfolioPage() {
           </>
         )}
 
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-fg-muted">
           判定はルールベース(等重み)の暫定版です。閾値は調整前提。投資判断はご自身の責任で。
         </p>
       </main>
@@ -841,7 +841,7 @@ function ListRow({
 
         <button onClick={onOpenAnalysis} className="text-left min-w-0 flex-1 hover:underline">
           <span className="font-medium text-gray-800">{d.ticker}</span>
-          <span className="ml-2 text-xs text-gray-400 truncate">{d.name}</span>
+          <span className="ml-2 text-xs text-fg-muted truncate">{d.name}</span>
         </button>
 
         <a
@@ -896,7 +896,7 @@ function ListRow({
         )}
         <span className="min-w-0 flex-1 truncate text-xs text-gray-500">{reason}</span>
         <SignalStats stats={stats} />
-        <button onClick={onToggleEdit} className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600">
+        <button onClick={onToggleEdit} className="shrink-0 text-[10px] text-fg-muted hover:text-gray-900">
           編集
         </button>
         <button onClick={onRemove} className="shrink-0 text-gray-300 hover:text-red-400 text-xs leading-none">
@@ -924,7 +924,7 @@ function SignalStats({ stats }: { stats: SignalStat[] }) {
     <span className="shrink-0 flex items-center gap-2.5 text-[11px] tabular-nums">
       {stats.map((s) => (
         <span key={s.label} title={s.title} className="whitespace-nowrap">
-          <span className="text-gray-400">{s.label}</span>{" "}
+          <span className="text-fg-muted">{s.label}</span>{" "}
           <span className={TONE_TEXT[s.tone]}>{s.display}</span>
         </span>
       ))}
@@ -977,7 +977,7 @@ function EvidencePanel({ row, backtest }: { row: Row; backtest: BacktestResult |
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-1 text-xs">
         {items.map(([k, v]) => (
           <div key={k} className="flex justify-between border-b border-gray-200 py-0.5">
-            <span className="text-gray-400">{k}</span>
+            <span className="text-fg-muted">{k}</span>
             <span className="text-gray-700 tabular-nums">{v}</span>
           </div>
         ))}
@@ -986,7 +986,7 @@ function EvidencePanel({ row, backtest }: { row: Row; backtest: BacktestResult |
       {/* このシグナルの実績(バックテスト済みの場合) */}
       {backtest?.ok && activeEvents.length > 0 && (
         <div className="text-xs text-gray-600 border-t border-gray-200 pt-2 space-y-0.5">
-          <span className="text-gray-400">点灯中シグナルの実績(5日後・横断プール):</span>
+          <span className="text-fg-muted">点灯中シグナルの実績(5日後・横断プール):</span>
           {activeEvents.map((ev) => {
             const s = backtest.byEvent[ev]?.find((x) => x.horizon === 5);
             const base = backtest.baseRate.find((x) => x.horizon === 5)?.median ?? 0;
@@ -1010,7 +1010,7 @@ function EvidencePanel({ row, backtest }: { row: Row; backtest: BacktestResult |
         </div>
       )}
       {!backtest?.ok && activeEvents.length > 0 && (
-        <p className="text-[10px] text-gray-400 border-t border-gray-200 pt-2">
+        <p className="text-[10px] text-fg-muted border-t border-gray-200 pt-2">
           上の「判定の実績」で計算すると、このシグナルの過去実績がここに表示されます。
         </p>
       )}

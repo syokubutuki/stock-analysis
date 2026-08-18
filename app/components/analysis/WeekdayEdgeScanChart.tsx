@@ -818,7 +818,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             onClick={() => setRankingOpen((v) => !v)}
             className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
           >
-            <span className="text-gray-400">{rankingOpen ? "▼" : "▶"}</span>
+            <span className="text-gray-500">{rankingOpen ? "▼" : "▶"}</span>
             戦略ランキング: 全{scan.nTested}組合せ(N≥{scan.minTrades})を検定・
             <span className="text-blue-600 font-medium">FDR補正後に有意なのは {nSignificant} 件</span>
           </button>

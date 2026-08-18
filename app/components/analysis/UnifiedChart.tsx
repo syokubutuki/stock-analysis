@@ -598,7 +598,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
         {query && (
           <button
             onClick={() => setQuery("")}
-            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs px-1"
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 text-xs px-1"
             title="クリア"
           >
             ✕

@@ -157,7 +157,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                 {!isBase && (
                   <button
                     onClick={() => setExtra((prev) => prev.filter((x) => x !== t))}
-                    className="text-gray-400 hover:text-red-600 ml-0.5"
+                    className="text-gray-500 hover:text-red-600 ml-0.5"
                     aria-label="削除"
                   >
                     ×
@@ -311,7 +311,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
               onClick={() => setShowDist((v) => !v)}
               className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
             >
-              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              <span className="text-gray-500">{showDist ? "▼" : "▶"}</span>
               曜日分布の確認（基準銘柄）
             </button>
             {showDist && (

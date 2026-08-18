@@ -632,7 +632,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
             className="flex items-center gap-2 text-left font-medium text-gray-700"
           >
             <span
-              className="text-gray-400 transition-transform"
+              className="text-gray-500 transition-transform"
               style={{ transform: exclusionOpen ? "rotate(90deg)" : "rotate(0deg)" }}
             >
               ▶

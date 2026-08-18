@@ -360,7 +360,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
   return (
     <div>
       <p className="text-[11px] text-gray-500 mb-1">
-        このビンを曜日で分解：<span className="inline-flex items-center gap-0.5 rounded bg-white/70 border border-gray-200 px-1 font-medium text-gray-600">{entryGlyph}<span className="text-gray-400">▸</span>引</span>{" "}
+        このビンを曜日で分解：<span className="inline-flex items-center gap-0.5 rounded bg-white/70 border border-gray-200 px-1 font-medium text-gray-600">{entryGlyph}<span className="text-gray-500">▸</span>引</span>{" "}
         各曜日に<span className="font-medium text-gray-600">{entryLabel(entry)}建て→{hLabel}まで</span>持ったときの平均リターン
         （その日を<em className="not-italic font-medium">起点にした先行き</em>。週内クロックの“水準”とは別物）。
         <br />全日共通ビン境界・◀=今日／青枠=今日の曜日／基準 全日平均{fmtPct(baselineMean)}
@@ -383,7 +383,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
           <tbody>
             <tr>
               <td className="px-1 py-0.5 text-left text-gray-500 whitespace-nowrap" title={`各曜日に${entryLabel(entry)}建て→${hLabel}の平均リターン`}>
-                <span className="text-gray-400">{entryGlyph}▸引</span> 平均
+                <span className="text-gray-500">{entryGlyph}▸引</span> 平均
               </td>
               {rows.map((r) => (
                 <td key={r.dow} className={`px-1 py-0.5 font-medium tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}

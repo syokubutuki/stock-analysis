@@ -331,7 +331,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
               onClick={() => setShowDist((v) => !v)}
               className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
             >
-              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              <span className="text-gray-500">{showDist ? "▼" : "▶"}</span>
               基調の分布確認
             </button>
             {showDist && (

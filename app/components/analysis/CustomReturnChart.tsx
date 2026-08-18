@@ -396,7 +396,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
             ))}
           </select>
         </div>
-        <div className="text-gray-400 text-lg pb-1">→</div>
+        <div className="text-gray-500 text-lg pb-1">→</div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">エグジット (売り)</label>
           <select

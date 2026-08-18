@@ -186,7 +186,7 @@ export default function InvestorBiasCoach({ prices }: Props) {
                   className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-gray-50"
                 >
                   <span
-                    className="inline-block text-gray-400 transition-transform duration-200"
+                    className="inline-block text-gray-500 transition-transform duration-200"
                     style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
                   >
                     ▶

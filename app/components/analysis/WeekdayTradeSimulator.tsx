@@ -651,7 +651,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               </select>
             </div>
           </div>
-          <div className="text-gray-400 pb-1">→</div>
+          <div className="text-gray-500 pb-1">→</div>
           <div>
             <div className="text-fg-muted mb-0.5">エグジット</div>
             <div className="flex gap-1">
@@ -697,7 +697,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
           {specs.map((s, i) => (
             <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border" style={{ borderColor: STRAT_COLORS[i % STRAT_COLORS.length], color: STRAT_COLORS[i % STRAT_COLORS.length] }}>
               {specLabel(s)}
-              <button onClick={() => removeSpec(i)} className="text-gray-400 hover:text-gray-700 leading-none">×</button>
+              <button onClick={() => removeSpec(i)} className="text-gray-500 hover:text-gray-700 leading-none">×</button>
             </span>
           ))}
           {specs.length === 0 && <span className="text-[11px] text-fg-muted">戦略を「比較に追加」してください</span>}
@@ -785,7 +785,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-800"
               aria-expanded={showRanking}
             >
-              <span className="text-gray-400 text-[10px] w-3 inline-block">{showRanking ? "▼" : "▶"}</span>
+              <span className="text-gray-500 text-[10px] w-3 inline-block">{showRanking ? "▼" : "▶"}</span>
               ロング戦略ランキング
             </button>
             <span className="text-[11px] text-fg-muted">全{longRanking.length}通り(注文4×曜日ペア25, 取引3未満は除外)を{RANK_METRIC_LABELS[rankMetric]}の高い順に</span>

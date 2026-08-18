@@ -312,7 +312,7 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
                 </button>
                 <button
                   onClick={() => handleDelete(s)}
-                  className="text-gray-400 hover:text-red-500"
+                  className="text-gray-500 hover:text-red-500"
                   title="削除"
                 >
                   ×

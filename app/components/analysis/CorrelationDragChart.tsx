@@ -1167,7 +1167,7 @@ export default function CorrelationDragChart({
             <div className="text-[10px] text-gray-500">実質銘柄数</div>
             <div className="text-xl font-bold tabular-nums text-gray-800">
               <span className="text-fg-muted">{nAssets.toFixed(1)}</span>
-              <span className="text-gray-400 text-sm"> → </span>
+              <span className="text-gray-500 text-sm"> → </span>
               <span
                 className={
                   nEff > nAssets * 0.7

@@ -1333,7 +1333,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           placeholder={ticker}
         />
         <button onClick={commit} title="保存" className="text-emerald-600 hover:text-emerald-700 text-sm leading-none">✓</button>
-        <button onClick={() => setEditing(false)} title="取消" className="text-gray-400 hover:text-gray-600 text-sm leading-none">✕</button>
+        <button onClick={() => setEditing(false)} title="取消" className="text-gray-500 hover:text-gray-600 text-sm leading-none">✕</button>
       </div>
     );
   }

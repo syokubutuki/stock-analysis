@@ -564,7 +564,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                           }}
                           className="w-[110px] px-1 py-0.5 text-[11px] border border-gray-300 rounded" placeholder={r.ticker} />
                         <button onClick={() => { const t = editVal.trim(); if (t) onRename?.(r.ticker, t); setEditing(null); }} className="text-emerald-600 text-sm leading-none">✓</button>
-                        <button onClick={() => setEditing(null)} className="text-gray-400 text-sm leading-none">✕</button>
+                        <button onClick={() => setEditing(null)} className="text-gray-500 text-sm leading-none">✕</button>
                       </div>
                     ) : (
                       <div style={{ maxWidth: NAME_COL_W.name - 16 }}>
