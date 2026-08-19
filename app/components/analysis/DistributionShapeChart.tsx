@@ -9,6 +9,7 @@ import {
   analyzeTails, ppPlot, ksTest, adTest,
 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -73,7 +74,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
     for (let i = 0; i <= 4; i++) {
       const y = toY(i / 4);
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
-      ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText((i * 25).toString() + "%", pad.left - 5, y + 3);
     }
 
@@ -178,7 +179,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
     ctx.stroke();
 
     // Y軸ラベル
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let v = Math.ceil(logMin); v <= Math.floor(logMax); v++) {
       const y = toY(v);
       ctx.fillText(`10^${v}`, pad.left - 5, y + 3);

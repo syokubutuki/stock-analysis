@@ -11,6 +11,7 @@ import {
   type AtomYearGrid,
   type ScanSort,
 } from "../../lib/weekday-scan";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -371,7 +372,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     // y軸グリッド
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (const v of [-maxAbs, 0, maxAbs]) {
       const y = zeroY - (v / maxAbs) * (plotH / 2);
       ctx.fillText((v * 100).toFixed(3) + "%", pad.left - 5, y + 3);
@@ -451,7 +452,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     }
 
     // y軸
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const v = lo + (range * i) / 4;
       const y = toY(v);
@@ -492,7 +493,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     atoms.forEach((a, i) => {
       ctx.save();
       ctx.translate(toX(i + 1), height - 20); ctx.rotate(-Math.PI / 6);
-      ctx.fillStyle = "#999"; ctx.fillText(a.label, 0, 0);
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(a.label, 0, 0);
       ctx.restore();
     });
   }, []);

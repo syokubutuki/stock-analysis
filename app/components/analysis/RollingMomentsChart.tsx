@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { rollingMoments } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -71,7 +72,7 @@ function drawTimeSeries(
   }
 
   // Y軸
-  ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 4; i++) {
     const v = minV + (fullRange * i) / 4;
     ctx.fillText(v.toFixed(2), pad.left - 5, toY(v) + 3);

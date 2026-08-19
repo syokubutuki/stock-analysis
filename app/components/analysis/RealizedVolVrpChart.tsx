@@ -13,6 +13,7 @@ import { varianceSwapAnalysis } from "../../lib/kelly-bs";
 import { logReturns, normalCdf } from "../../lib/derivatives-core";
 import AnalysisGuide from "./AnalysisGuide";
 import StatBadge from "./StatBadge";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -204,7 +205,7 @@ export default function RealizedVolVrpChart({ prices }: Props) {
     const toY = (v: number) => pad.top + ph * (1 - v / maxV);
 
     ctx.strokeStyle = "#eee";
-    ctx.fillStyle = "#888";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let g = 0; g <= 4; g++) {
       const yy = pad.top + (ph * g) / 4;
@@ -293,7 +294,7 @@ export default function RealizedVolVrpChart({ prices }: Props) {
     ctx.moveTo(toX(xMin), toY(slope * xMin + intc));
     ctx.lineTo(toX(xMax), toY(slope * xMax + intc));
     ctx.stroke();
-    ctx.fillStyle = "#888";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.fillText("現在ボラ水準(%) →", pad.left, height - 6);
     ctx.save();

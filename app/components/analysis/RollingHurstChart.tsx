@@ -35,7 +35,7 @@ function drawRolling(canvas: HTMLCanvasElement, result: RollingHurstResult) {
   const data = result.series;
   const n = data.length;
   if (n < 2) {
-    ctx.fillStyle = "#999"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("データ不足 (窓を小さくしてください)", width / 2, height / 2);
     return;
   }
@@ -71,7 +71,7 @@ function drawRolling(canvas: HTMLCanvasElement, result: RollingHurstResult) {
   }
 
   // Y軸
-  ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 4; i++) {
     const v = minV + (fullRange * i) / 4;
     ctx.fillText(v.toFixed(2), pad.left - 5, toY(v) + 3);

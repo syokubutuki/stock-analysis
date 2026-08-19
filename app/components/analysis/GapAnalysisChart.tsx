@@ -18,6 +18,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -275,7 +276,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
     const barW = Math.max(2, plotW / data.length - 1);
 
     // Y-axis
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const val = Math.round((maxCount * i) / 4);
       const y = pad.top + plotH * (1 - i / 4);
@@ -293,7 +294,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
     }
 
     // X-axis labels
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     const step = Math.max(1, Math.floor(data.length / 6));
     for (let i = 0; i < data.length; i += step) {
       const x = pad.left + ((i + 0.5) / data.length) * plotW;
@@ -322,7 +323,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
     ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
 
     // Y-axis
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 5; i++) {
       const val = allMin + (range * i) / 5;
       const y = pad.top + plotH * (1 - i / 5);
@@ -332,7 +333,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
 
     for (const k of keys) {
       const pts = data[k]; if (pts.length < 2) continue;
-      ctx.strokeStyle = QUAD_COLORS[k] || "#999"; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = QUAD_COLORS[k] || CHART_COLORS.axis; ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < pts.length; i++) {
         const x = pad.left + (pts[i].idx / allMaxIdx) * plotW;
@@ -347,7 +348,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
     let lx = pad.left;
     for (const k of keys) {
       if (!data[k] || data[k].length === 0) continue;
-      ctx.fillStyle = QUAD_COLORS[k] || "#999"; ctx.fillRect(lx, height - 12, 12, 3);
+      ctx.fillStyle = QUAD_COLORS[k] || CHART_COLORS.neutral; ctx.fillRect(lx, height - 12, 12, 3);
       ctx.fillStyle = "#666"; ctx.fillText(k, lx + 15, height - 7);
       lx += ctx.measureText(k).width + 25;
     }

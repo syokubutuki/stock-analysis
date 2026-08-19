@@ -21,7 +21,7 @@ interface Props {
 const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const DOW_TRADING = [1, 2, 3, 4, 5];
 // distinct colors per weekday for distribution overlay (index = getDay())
-const DOW_COLORS_DIST = ["#999", "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#999"];
+const DOW_COLORS_DIST = [CHART_COLORS.neutral, "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", CHART_COLORS.neutral];
 const MONTH_LABELS = [
   "1月","2月","3月","4月","5月","6月",
   "7月","8月","9月","10月","11月","12月",
@@ -535,7 +535,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     return grid;
   }, [days]);
 
-  const DOW_COLORS = ["#999", "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#999"];
+  const DOW_COLORS = [CHART_COLORS.neutral, "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", CHART_COLORS.neutral];
   const MONTH_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#14b8a6","#06b6d4","#3b82f6","#6366f1","#8b5cf6","#a855f7","#ec4899","#f43f5e"];
 
   // =============== DRAW FUNCTIONS ===============
@@ -559,7 +559,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     // grid
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (const v of [-maxAbs, 0, maxAbs]) {
       const y = zeroY - (v / maxAbs) * (plotH / 2);
       ctx.fillText((v * 100).toFixed(2) + "%", pad.left - 5, y + 3);
@@ -632,7 +632,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     if (zeroY >= pad.top && zeroY <= pad.top + plotH) {
       ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
     }
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 5; i++) {
       const val = minVal + (range * i) / 5;
       const y = pad.top + plotH * (1 - i / 5);
@@ -765,7 +765,7 @@ export default function SpiralHeatmap({ prices }: Props) {
 
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (const v of [-maxAbs, 0, maxAbs]) {
       const y = zeroY - (v / maxAbs) * (plotH / 2);
       ctx.fillText((v * 100).toFixed(3) + "%", pad.left - 5, y + 3);
@@ -799,7 +799,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom, range = allMax - allMin || 0.01;
     const zeroY = pad.top + plotH * (1 - (0 - allMin) / range);
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 5; i++) { const val = allMin + (range * i) / 5; const y = pad.top + plotH * (1 - i / 5); ctx.fillText((val * 100).toFixed(1) + "%", pad.left - 5, y + 3); ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke(); }
     for (const k of keys) { const pts = seriesData[k]; if (pts.length < 2) continue; ctx.strokeStyle = colors[k]; ctx.lineWidth = 1.5; ctx.beginPath(); for (let i = 0; i < pts.length; i++) { const x = pad.left + (pts[i].idx / allMaxIdx) * plotW; const y = pad.top + plotH * (1 - (pts[i].cumRet - allMin) / range); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke(); }
     ctx.font = "9px sans-serif"; ctx.textAlign = "left"; let lx = pad.left;
@@ -817,11 +817,11 @@ export default function SpiralHeatmap({ prices }: Props) {
     const maxAbs = Math.max(...valid.map(d => Math.abs(d.mean)), 0.001);
     const zeroY = pad.top + plotH / 2;
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (const v of [-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs]) { const y = zeroY - (v / maxAbs) * (plotH / 2); ctx.fillText((v * 100).toFixed(2) + "%", pad.left - 5, y + 3); ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke(); }
     const barW = Math.max(2, plotW / 31 - 2);
     for (const d of valid) { const x = pad.left + ((d.dom - 1) / 30) * plotW; const barH = (d.mean / maxAbs) * (plotH / 2); ctx.fillStyle = d.mean > 0 ? "rgba(38, 166, 154, 0.7)" : "rgba(239, 83, 80, 0.7)"; ctx.fillRect(x, zeroY - Math.max(barH, 0), barW, Math.abs(barH)); }
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     for (let i = 1; i <= 31; i += 5) { const x = pad.left + ((i - 1) / 30) * plotW + barW / 2; ctx.fillText(String(i), x, height - 8); }
   }, []);
 
@@ -837,11 +837,11 @@ export default function SpiralHeatmap({ prices }: Props) {
     for (const pt of data) { minVal = Math.min(minVal, pt.avg); maxVal = Math.max(maxVal, pt.avg); }
     const range = maxVal - minVal || 0.01;
     if (minVal <= 0 && maxVal >= 0) { const zy = pad.top + plotH * (1 - (0 - minVal) / range); ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, zy); ctx.lineTo(width - pad.right, zy); ctx.stroke(); }
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 5; i++) { const val = minVal + (range * i) / 5; const y = pad.top + plotH * (1 - i / 5); ctx.fillText((val * 100).toFixed(1) + "%", pad.left - 5, y + 3); ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke(); }
     ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 2; ctx.beginPath();
     for (let i = 0; i < data.length; i++) { const x = pad.left + ((data[i].day - 1) / (maxDay - 1)) * plotW; const y = pad.top + plotH * (1 - (data[i].avg - minVal) / range); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke();
-    ctx.fillStyle = "#bbb"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     for (let m = 0; m < 12; m++) { const da = Math.round(m * (maxDay / 12)); if (da === 0) continue; const x = pad.left + (da / (maxDay - 1)) * plotW; ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke(); ctx.fillText(MONTH_LABELS[m], x, height - 8); }
   }, []);
 
@@ -918,7 +918,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     const toY = (d: number) => pad.top + plotH * (1 - d / yMax);
 
     // y grid + labels
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const d = (yMax * i) / 4, y = pad.top + plotH * (1 - i / 4);
       ctx.fillText(d.toFixed(d < 10 ? 1 : 0), pad.left - 5, y + 3);
@@ -930,7 +930,7 @@ export default function SpiralHeatmap({ prices }: Props) {
     for (let i = 0; i <= 6; i++) {
       const v = lo + ((hi - lo) * i) / 6, x = pad.left + (plotW * i) / 6;
       ctx.strokeStyle = "#f3f4f6"; ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke();
-      ctx.fillStyle = "#999"; ctx.fillText((v * 100).toFixed(2) + "%", x, height - 24);
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText((v * 100).toFixed(2) + "%", x, height - 24);
     }
     if (lo <= 0 && hi >= 0) {
       const zx = toX(0);

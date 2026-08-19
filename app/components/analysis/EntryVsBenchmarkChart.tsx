@@ -26,7 +26,7 @@ const num = (v: number) => (isFinite(v) ? v.toFixed(2) : "∞");
 const COLOR: Record<StrategyKey, string> = {
   bh: "#6b7280",
   fixed: "#d97706",
-  random: "#a3a3a3",
+  random: CHART_COLORS.neutral,
   equal: "#2563eb",
   best: "#059669",
   worst: "#dc2626",

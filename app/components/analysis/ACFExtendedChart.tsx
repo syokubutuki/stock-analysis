@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries, SERIES_MODE_LABELS } from "../../lib/series-
 import { acf, confidenceBound } from "../../lib/autocorrelation";
 import { ljungBoxTest, rollingACF1 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -54,7 +55,7 @@ function drawACFBars(
   ctx.moveTo(margin.left, toY(-bound)); ctx.lineTo(width - margin.right, toY(-bound));
   ctx.stroke(); ctx.setLineDash([]);
 
-  ctx.strokeStyle = "#999"; ctx.lineWidth = 0.5;
+  ctx.strokeStyle = CHART_COLORS.axis; ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(margin.left, toY(0)); ctx.lineTo(width - margin.right, toY(0)); ctx.stroke();
 
   for (const d of plotData) {
@@ -66,7 +67,7 @@ function drawACFBars(
 
   ctx.fillStyle = "#333"; ctx.font = "bold 11px sans-serif";
   ctx.fillText(title, margin.left + 5, margin.top - 5);
-  ctx.font = "10px sans-serif"; ctx.fillStyle = "#999";
+  ctx.font = "10px sans-serif"; ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText("Lag", width / 2 - 10, height - 3);
 }
 
@@ -119,7 +120,7 @@ export default function ACFExtendedChart({ prices, seriesMode }: Props) {
     }
 
     // Y軸
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const v = minV + (range * i) / 4;
       const y = toY(v);

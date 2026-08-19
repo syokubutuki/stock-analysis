@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { simulateDeltaHedge } from "../../lib/delta-hedge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -114,7 +115,7 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
     const bw = (pw / scan.length) * 0.6;
 
     ctx.strokeStyle = "#eee";
-    ctx.fillStyle = "#888";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let g = 0; g <= 4; g++) {
       const yy = pad.top + (ph * g) / 4;

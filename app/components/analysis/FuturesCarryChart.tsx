@@ -14,6 +14,7 @@ import {
   minVarianceHedgeRatio,
 } from "../../lib/futures-carry";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -149,7 +150,7 @@ export default function FuturesCarryChart({ prices }: Props) {
     const toY = (v: number) => pad.top + ph * (1 - (v - y0) / (y1 - y0));
 
     ctx.strokeStyle = "#eee";
-    ctx.fillStyle = "#888";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let g = 0; g <= 4; g++) {
       const yy = pad.top + (ph * g) / 4;

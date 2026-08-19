@@ -793,7 +793,7 @@ function drawACF(
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.strokeStyle = "#999";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 0.5;
   ctx.beginPath();
   ctx.moveTo(margin.left, toY(0));
@@ -811,7 +811,7 @@ function drawACF(
   ctx.fillStyle = "#333";
   ctx.font = "bold 11px sans-serif";
   ctx.fillText(title, margin.left + 5, margin.top - 5);
-  ctx.fillStyle = "#999";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "10px sans-serif";
   ctx.fillText("Lag", width / 2 - 8, height - 3);
 }
@@ -867,7 +867,7 @@ function drawQQ(
     ctx.fill();
   }
 
-  ctx.fillStyle = "#999";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "10px sans-serif";
   ctx.fillText("理論分位", width / 2 - 18, height - 4);
 }

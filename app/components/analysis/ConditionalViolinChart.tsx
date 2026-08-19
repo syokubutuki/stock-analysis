@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { conditionalDistributions, violinByGroup, type ViolinData } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -95,12 +96,12 @@ function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: strin
     // ラベル
     ctx.fillStyle = "#333"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(d.label, cx, height - pad.bottom + 14);
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
     ctx.fillText(`n=${d.n}`, cx, height - pad.bottom + 24);
   }
 
   // Y軸
-  ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 5; i++) {
     const v = allMinX + (xRange * i) / 5;
     const y = toY(v);

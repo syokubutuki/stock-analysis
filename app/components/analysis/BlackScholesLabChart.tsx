@@ -116,7 +116,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
     // grid + 軸
     ctx.strokeStyle = "#eee";
     ctx.lineWidth = 1;
-    ctx.fillStyle = "#888";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let g = 0; g <= 4; g++) {
       const yy = pad.top + (ph * g) / 4;

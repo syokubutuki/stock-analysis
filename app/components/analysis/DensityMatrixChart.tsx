@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeDensityMatrix } from "../../lib/density-matrix";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -122,7 +123,7 @@ export default function DensityMatrixChart({ prices }: Props) {
       }
 
       // Axis lines
-      ctx.strokeStyle = "#999";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(ml, mt);
