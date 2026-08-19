@@ -60,7 +60,7 @@ function MetricRow({
       <td className="py-1 pr-2 text-gray-600">{label}</td>
       <td
         className={`py-1 pr-2 text-right tabular-nums ${
-          sWins ? "font-bold text-emerald-600" : "text-gray-700"
+          sWins ? "font-bold text-emerald-700" : "text-gray-700"
         }`}
       >
         {format(s)}

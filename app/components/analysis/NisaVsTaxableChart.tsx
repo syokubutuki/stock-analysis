@@ -59,7 +59,7 @@ type ViewMode = "single" | "rolling" | "leverage";
 
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
 const yen = (v: number) => `${Math.round(v).toLocaleString()}円`;
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
@@ -543,7 +543,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             <canvas ref={histRef} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-            <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" color={rolling.winRate > 0.5 ? "text-blue-600" : "text-emerald-600"} />
+            <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" color={rolling.winRate > 0.5 ? "text-blue-600" : "text-emerald-700"} />
             <Stat label="差の中央値" value={pct(rolling.medianEdge)} sub="戦略 − NISA" color={cls(rolling.medianEdge)} />
             <Stat label="差の平均" value={pct(rolling.meanEdge)} sub="戦略 − NISA" color={cls(rolling.meanEdge)} />
             <Stat label="差の5–95%" value={`${pct(rolling.p5)} 〜 ${pct(rolling.p95)}`} sub="ばらつき" />
@@ -622,7 +622,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
         税引前で <span className="font-bold">{pct(cmp.breakEvenGross)}</span> 稼ぐ必要があります
         （税率 {taxRatePct.toFixed(3)}% ぶんの上乗せハードル <span className={cls(cmp.requiredEdge)}>{pct(cmp.requiredEdge)}</span>）。
         現状の戦略は税引前 {pct(cmp.strategy.preTaxReturn)} なので、
-        <span className={cmp.strategy.preTaxReturn >= cmp.breakEvenGross ? "text-blue-600 font-medium" : "text-emerald-600 font-medium"}>
+        <span className={cmp.strategy.preTaxReturn >= cmp.breakEvenGross ? "text-blue-600 font-medium" : "text-emerald-700 font-medium"}>
           {cmp.strategy.preTaxReturn >= cmp.breakEvenGross ? " ハードルを越えています。" : " ハードルに届いていません。"}
         </span>
       </div>

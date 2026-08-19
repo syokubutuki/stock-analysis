@@ -254,7 +254,7 @@ export default function HoldingPeriodChart({ prices }: Props) {
                   <td className="py-1 px-2 text-center font-mono">
                     <DirectionValue value={s.medianReturn}>{pctFmt(s.medianReturn)}</DirectionValue>
                   </td>
-                  <td className="py-1 px-2 text-center font-mono text-green-600">{pctFmt(s.maxReturn)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-green-700">{pctFmt(s.maxReturn)}</td>
                   <td className="py-1 px-2 text-center font-mono text-red-600">{pctFmt(s.minReturn)}</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-500">{s.n}</td>
                 </tr>

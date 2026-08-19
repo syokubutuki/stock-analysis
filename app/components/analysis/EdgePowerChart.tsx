@@ -123,7 +123,7 @@ export default function EdgePowerChart({ prices }: Props) {
               <tr key={r.id} className="border-b border-gray-100">
                 <td className="py-1 px-1.5">
                   {r.label}
-                  <span className={`ml-1 ${r.direction === "long" ? "text-green-600" : "text-red-600"}`}>{r.direction === "long" ? "買" : "売"}</span>
+                  <span className={`ml-1 ${r.direction === "long" ? "text-green-700" : "text-red-600"}`}>{r.direction === "long" ? "買" : "売"}</span>
                 </td>
                 <td className="text-right px-1 font-mono">{r.muBp.toFixed(1)}bp</td>
                 <td className="text-right px-1 font-mono">{r.srAnnual.toFixed(2)}</td>

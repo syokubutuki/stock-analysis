@@ -604,7 +604,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
             </div>
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">歪度 (A−B)/√(AB)</div>
-              <div className={`font-bold ${board.skew >= 0 ? "text-green-600" : "text-red-600"}`}>{board.skew.toFixed(2)}</div>
+              <div className={`font-bold ${board.skew >= 0 ? "text-green-700" : "text-red-600"}`}>{board.skew.toFixed(2)}</div>
               <div className="text-[10px] text-fg-muted">正=大勝ち小負け</div>
             </div>
             <div className="bg-gray-50 rounded p-2">

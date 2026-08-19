@@ -165,18 +165,18 @@ export default function ExecutionTimingChart({ ticker }: Props) {
                   return (
                     <tr key={b.barOffset} className={`border-b border-gray-100 ${isBest ? "ring-2 ring-green-400 ring-inset" : ""}`}>
                       <td className="py-1 px-2 font-medium text-gray-700">
-                        {isBest && <span className="text-green-600 mr-1">◀</span>}
+                        {isBest && <span className="text-green-700 mr-1">◀</span>}
                         {b.label}{b.isMark && <span className="text-fg-muted">（成行・基準）</span>}
                       </td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium tabular-nums ${b.isMark ? "text-fg-muted" : b.meanImprovePct >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 font-medium tabular-nums ${b.isMark ? "text-fg-muted" : b.meanImprovePct >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {b.isMark ? "—" : fmtSignedPct(b.meanImprovePct / 100)}
                       </td>
                       <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">
                         {b.isMark ? "—" : `${fmtSignedPct(b.ciLoPct / 100)}〜${fmtSignedPct(b.ciHiPct / 100)}`}
                       </td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{b.isMark ? "—" : `${(b.winRate * 100).toFixed(0)}%`}</td>
-                      <td className={`text-right px-2 tabular-nums ${b.meanVsVwapPct >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${b.meanVsVwapPct >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {fmtSignedPct(b.meanVsVwapPct / 100)}
                       </td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{b.driftStdPct.toFixed(2)}%</td>

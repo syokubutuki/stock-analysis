@@ -287,7 +287,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                         {pathResult.bins.map((b) => {
                           const v = s.perWeekday[b.weekday];
                           return (
-                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-gray-300" : v >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-gray-300" : v >= 0 ? "text-green-700" : "text-red-600"}`}>
                               {isNaN(v) ? "-" : fmtSignedPct(v, 1)}
                             </td>
                           );
@@ -382,7 +382,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                             {w.ci ? (
                               <span title={`同符号率 ${(w.ci.stable * 100).toFixed(0)}%`}>
                                 {fmtSignedPct(w.ci.lo, 1)}〜{fmtSignedPct(w.ci.hi, 1)}
-                                {w.ci.lo > 0 || w.ci.hi < 0 ? <span className="text-green-600 font-bold"> ★</span> : null}
+                                {w.ci.lo > 0 || w.ci.hi < 0 ? <span className="text-green-700 font-bold"> ★</span> : null}
                               </span>
                             ) : <span className="text-fg-muted">日数不足</span>}
                           </td>

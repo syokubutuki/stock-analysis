@@ -364,7 +364,7 @@ const SIGNAL_TONES = {
   use: {
     wrap: "border-emerald-100 bg-emerald-50/60",
     heading: "text-emerald-900",
-    icon: "text-emerald-500",
+    icon: "text-emerald-700",
     dot: "bg-emerald-400",
   },
   warning: {
@@ -492,7 +492,7 @@ function tone(name: string): CategoryStyle {
     },
     emerald: {
       header: "from-emerald-50 via-white to-white",
-      glyph: "border-emerald-100 bg-emerald-50 text-emerald-600",
+      glyph: "border-emerald-100 bg-emerald-50 text-emerald-700",
       chip: "bg-emerald-100 text-emerald-800",
       step: "border-emerald-200 bg-emerald-50 text-emerald-700",
     },

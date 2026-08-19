@@ -156,10 +156,10 @@ export default function EntropyRegimeChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-3 gap-3 text-xs mb-3">
         <div className="p-2 bg-green-50 rounded border border-green-200">
           <div className="text-green-700">構造化レジーム</div>
-          <div className="font-mono font-medium text-sm text-green-600">
+          <div className="font-mono font-medium text-sm text-green-700">
             {(stats.structured * 100).toFixed(1)}%
           </div>
-          <div className="text-green-500">PE {"<"} 0.75</div>
+          <div className="text-green-700">PE {"<"} 0.75</div>
         </div>
         <div className="p-2 bg-gray-50 rounded border border-gray-200">
           <div className="text-gray-700">ランダムレジーム</div>
@@ -192,7 +192,7 @@ export default function EntropyRegimeChart({ prices, seriesMode }: Props) {
         <p className="font-medium text-gray-700">1. レジーム分類</p>
         <p>ローリングPE(30日)の値と変化率からレジームを3分類します:</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><span className="text-green-600 font-medium">構造化 (PE {"<"} 0.75):</span> パターンが明確。テクニカル分析やアルゴリズム戦略が有効。</li>
+          <li><span className="text-green-700 font-medium">構造化 (PE {"<"} 0.75):</span> パターンが明確。テクニカル分析やアルゴリズム戦略が有効。</li>
           <li><span className="text-gray-600 font-medium">ランダム (PE ≥ 0.75, 安定):</span> 効率的市場。アルファの獲得が困難。</li>
           <li><span className="text-yellow-600 font-medium">遷移 (PE急変中):</span> レジームが変化中。リスク管理を強化すべき。</li>
         </ul>

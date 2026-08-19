@@ -311,7 +311,7 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
             <div className="text-xs space-y-2">
               <div className="flex justify-between">
                 <span>最大Lyapunov指数 ({"\u03BB"})</span>
-                <span className={`font-mono font-bold ${lyap.exponent > 0.01 ? "text-red-600" : lyap.exponent < -0.01 ? "text-green-600" : "text-amber-600"}`}>
+                <span className={`font-mono font-bold ${lyap.exponent > 0.01 ? "text-red-600" : lyap.exponent < -0.01 ? "text-green-700" : "text-amber-600"}`}>
                   {lyap.exponent.toFixed(4)}
                 </span>
               </div>

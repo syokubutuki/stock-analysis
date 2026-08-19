@@ -139,7 +139,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
 
   const obvVsMA =
     latestOBV && latestOBV.obv > latestOBV.obvMA
-      ? { label: "MA上回り", className: "text-green-600" }
+      ? { label: "MA上回り", className: "text-green-700" }
       : { label: "MA下回り", className: "text-red-600" };
 
   return (
@@ -171,7 +171,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
             <div
               className={`text-xs mt-0.5 ${
                 latestPrice.close >= latestVWAP.vwap
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : "text-red-600"
               }`}
             >

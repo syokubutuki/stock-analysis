@@ -270,7 +270,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                       </td>
                       <td className="text-right px-2 text-gray-600">{s.n}</td>
                       <td className="px-2 text-gray-500 text-[11px]">{g.desc}</td>
-                      <td className={`text-right px-2 tabular-nums ${result.gapMeans[i] >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(result.gapMeans[i])}</td>
+                      <td className={`text-right px-2 tabular-nums ${result.gapMeans[i] >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(result.gapMeans[i])}</td>
                       <td className={`text-right px-2 font-medium tabular-nums ${s.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(s.endMean)}</td>
                       <td className="text-center px-2 text-gray-600">{result.jpLabels[s.peakIdx] ?? "-"}</td>
                       <td className="px-2"><StatBadge n={s.n} p={s.endP} significant={s.endP < 0.05} /></td>
@@ -316,7 +316,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">増分 ΔR²</div>
-                    <div className={`font-bold ${inc.p < 0.05 ? "text-green-600" : "text-gray-800"}`}>{fmtPct(inc.dR2, 2)}</div>
+                    <div className={`font-bold ${inc.p < 0.05 ? "text-green-700" : "text-gray-800"}`}>{fmtPct(inc.dR2, 2)}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">増分F（q={inc.q}）</div>

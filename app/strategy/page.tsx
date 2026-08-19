@@ -202,7 +202,7 @@ export default function StrategyLabPage() {
                           <td className="py-1">{EXIT_LABEL[r.rule]}</td>
                           <td className="py-1 text-right tabular-nums">{features[r.exitIndex].time}</td>
                           <td className="py-1 text-right tabular-nums">{r.daysHeld}日</td>
-                          <td className={`py-1 text-right tabular-nums ${r.retPct >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          <td className={`py-1 text-right tabular-nums ${r.retPct >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                             {r.retPct >= 0 ? "+" : ""}
                             {r.retPct.toFixed(1)}%
                           </td>
@@ -227,7 +227,7 @@ export default function StrategyLabPage() {
                     <tbody>
                       <tr className="border-t border-gray-100 text-gray-500">
                         <td className="py-1">Buy&Hold</td>
-                        <td className={`py-1 text-right tabular-nums ${holdRet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className={`py-1 text-right tabular-nums ${holdRet >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                           {holdRet >= 0 ? "+" : ""}
                           {holdRet.toFixed(1)}%
                         </td>
@@ -241,7 +241,7 @@ export default function StrategyLabPage() {
                         return (
                           <tr key={r} className="border-t border-gray-100">
                             <td className="py-1">{EXIT_LABEL[r]}</td>
-                            <td className={`py-1 text-right tabular-nums ${s.totalReturnPct >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            <td className={`py-1 text-right tabular-nums ${s.totalReturnPct >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                               {s.totalReturnPct >= 0 ? "+" : ""}
                               {s.totalReturnPct.toFixed(1)}%
                             </td>

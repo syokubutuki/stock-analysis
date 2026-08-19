@@ -24,7 +24,7 @@ const DIRECTION_LABEL: Record<string, string> = {
 };
 
 const DIRECTION_COLOR: Record<string, string> = {
-  up: "text-green-600",
+  up: "text-green-700",
   down: "text-red-600",
   range: "text-yellow-600",
 };

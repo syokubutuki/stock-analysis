@@ -78,7 +78,7 @@ export default function CandlePatternEdgeChart({ prices }: Props) {
             {result.edges.map((e) => (
               <tr key={e.meta.kind} className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium text-gray-700">
-                  <span className={`mr-1 ${e.meta.bias === "bull" ? "text-green-600" : "text-red-600"}`}>
+                  <span className={`mr-1 ${e.meta.bias === "bull" ? "text-green-700" : "text-red-600"}`}>
                     {e.meta.bias === "bull" ? "▲" : "▼"}
                   </span>
                   {e.meta.label}

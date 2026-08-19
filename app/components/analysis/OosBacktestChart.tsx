@@ -214,10 +214,10 @@ export default function OosBacktestChart({ data }: Props) {
                         <td className="py-1 pr-2 text-gray-700">
                           <span className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle" style={{ background: STRAT_COLOR[s.key] }} />
                           {s.label}
-                          {s.key === bestKey && <span className="ml-1 text-emerald-600 text-[10px]">◎最良</span>}
+                          {s.key === bestKey && <span className="ml-1 text-emerald-700 text-[10px]">◎最良</span>}
                         </td>
                         <td className="py-1 px-2 text-right font-semibold text-gray-800">{s.sharpe.toFixed(2)}</td>
-                        <td className={`py-1 px-2 text-right ${s.cagr >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className={`py-1 px-2 text-right ${s.cagr >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                           {s.cagr >= 0 ? "+" : ""}
                           {(s.cagr * 100).toFixed(1)}%
                         </td>
@@ -633,7 +633,7 @@ function MuModeCompare({ base, alt }: { base: OosResult; alt: OosResult }) {
                   {r.label}
                 </td>
                 <td className="py-1 px-2 text-right font-semibold text-gray-800">{r.s.sharpe.toFixed(2)}</td>
-                <td className={`py-1 px-2 text-right ${r.s.cagr >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                <td className={`py-1 px-2 text-right ${r.s.cagr >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                   {r.s.cagr >= 0 ? "+" : ""}
                   {(r.s.cagr * 100).toFixed(1)}%
                 </td>

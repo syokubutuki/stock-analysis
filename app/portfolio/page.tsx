@@ -173,7 +173,7 @@ const BORDER_CLASS: Record<string, string> = {
 type Tone = "good" | "warn" | "bad" | "neutral";
 // 値は常に表示し、色は「注意・警戒」だけを浮かせる(平常はグレー)。
 const TONE_TEXT: Record<Tone, string> = {
-  good: "text-emerald-600",
+  good: "text-emerald-700",
   warn: "text-amber-600 font-medium",
   bad: "text-red-600 font-semibold",
   neutral: "text-gray-600",
@@ -861,7 +861,7 @@ function ListRow({
 
         <span className="shrink-0 w-20 text-right tabular-nums text-sm">
           {pnl !== null ? (
-            <span className={pnl >= 0 ? "text-green-600" : "text-red-600"}>
+            <span className={pnl >= 0 ? "text-green-700" : "text-red-600"}>
               {pnl >= 0 ? "+" : ""}
               {pnl.toFixed(1)}%
             </span>
@@ -998,7 +998,7 @@ function EvidencePanel({ row, backtest }: { row: Row; backtest: BacktestResult |
                   {SIGNAL_EVENT_META[ev].label}
                 </span>
                 : 中央値{" "}
-                <b className={s.median < 0 ? "text-red-600" : "text-emerald-600"}>
+                <b className={s.median < 0 ? "text-red-600" : "text-emerald-700"}>
                   {s.median >= 0 ? "+" : ""}
                   {s.median.toFixed(1)}%
                 </b>{" "}

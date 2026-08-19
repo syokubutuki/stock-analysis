@@ -344,7 +344,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                       <td className="px-1 py-0.5 text-center align-middle">
                         {ev.verdict === "stale" ? <span className="text-gray-300">—</span> : <PathCompare ev={ev} scale={scale} />}
                       </td>
-                      <td className={`px-2 py-1 text-right tabular-nums font-medium ${e.predMedian >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`px-2 py-1 text-right tabular-nums font-medium ${e.predMedian >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {fmtPct(e.predMedian)}
                       </td>
                       <td className={`px-2 py-1 text-right tabular-nums font-semibold ${isFinite(ev.actFinal) ? (ev.actFinal >= 0 ? "text-green-700" : "text-red-700") : "text-gray-300"}`}>
@@ -352,7 +352,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                       </td>
                       <td className="px-1 py-1 text-center">
                         {ev.dirHit === null ? <span className="text-gray-300">—</span>
-                          : ev.dirHit ? <span className="text-green-600">○</span> : <span className="text-red-500">×</span>}
+                          : ev.dirHit ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums text-gray-600">
                         {isFinite(ev.coverage) ? `${(ev.coverage * 100).toFixed(0)}%` : "—"}
@@ -361,7 +361,7 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                         title={`予測 高${fmtPct(e.predMfe)}/安${fmtPct(e.predMae)} → 実測 高${fmtPct(ev.actMfe)}/安${fmtPct(ev.actMae)}`}>
                         {ev.verdict === "stale" ? <span className="text-gray-300">—</span> : (
                           <>
-                            <span className={ev.mfeReached ? "text-green-600" : "text-gray-300"}>▲</span>
+                            <span className={ev.mfeReached ? "text-green-700" : "text-gray-300"}>▲</span>
                             <span className={ev.maeReached ? "text-red-500" : "text-gray-300"}>▼</span>
                           </>
                         )}

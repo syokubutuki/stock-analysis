@@ -219,7 +219,7 @@ export default function KramersMoyalChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-green-50 rounded">
           <div className="text-green-700 font-medium">安定点 (ポテンシャル極小)</div>
           <div className="font-bold">{km.stablePoints.map((p) => p.toFixed(0)).join(", ") || "なし"}</div>
-          <div className="text-green-600">株価が引き寄せられる価格帯</div>
+          <div className="text-green-700">株価が引き寄せられる価格帯</div>
         </div>
         <div className="p-2 bg-red-50 rounded">
           <div className="text-red-700 font-medium">不安定点 (ポテンシャル極大)</div>

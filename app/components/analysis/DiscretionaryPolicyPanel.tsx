@@ -186,7 +186,7 @@ export default function DiscretionaryPolicyPanel({
                   <div className="text-xs text-gray-500 mb-1">差 ({sim.trades.length}回売買)</div>
                   <div
                     className={`text-lg font-bold ${
-                      sim.humanPct >= sim.bhPct ? "text-green-600" : "text-red-600"
+                      sim.humanPct >= sim.bhPct ? "text-green-700" : "text-red-600"
                     }`}
                   >
                     {pct(sim.humanPct - sim.bhPct)}

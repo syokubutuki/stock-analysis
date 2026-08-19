@@ -452,7 +452,7 @@ export default function BenchmarkChart({ prices, period }: Props) {
                     <td className="text-right py-1.5 px-2 font-mono">
                       {fmt(c.stats.correlation)}
                     </td>
-                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.informationRatio >= 0.5 ? "text-green-600" : c.stats.informationRatio <= -0.5 ? "text-red-600" : ""}`}>
+                    <td className={`text-right py-1.5 px-2 font-mono ${c.stats.informationRatio >= 0.5 ? "text-green-700" : c.stats.informationRatio <= -0.5 ? "text-red-600" : ""}`}>
                       {fmt(c.stats.informationRatio)}
                     </td>
                     <td className="text-right py-1.5 px-2 font-mono text-gray-500">

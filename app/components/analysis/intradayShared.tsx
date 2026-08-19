@@ -93,7 +93,7 @@ export function LoadingError({ loading, error }: { loading: boolean; error: stri
 }
 
 export function StatCell({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" | "neutral" }) {
-  const c = tone === "up" ? "text-green-600" : tone === "down" ? "text-red-600" : "text-gray-800";
+  const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="bg-gray-50 rounded p-2">
       <div className="text-gray-500">{label}</div>

@@ -341,14 +341,14 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">KS検定 D値</div>
           <div className="font-mono font-medium">{ks.D.toFixed(4)}</div>
-          <div className={`text-fg-muted ${ks.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`text-fg-muted ${ks.pValue < 0.05 ? "text-red-500" : "text-green-700"}`}>
             p={ks.pValue.toFixed(4)} {ks.pValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">AD検定 A²*</div>
           <div className="font-mono font-medium">{ad.A2star.toFixed(4)}</div>
-          <div className={`text-fg-muted ${ad.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`text-fg-muted ${ad.pValue < 0.05 ? "text-red-500" : "text-green-700"}`}>
             p={ad.pValue.toFixed(4)} {ad.pValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>
@@ -361,7 +361,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">上側テール &gt;1%</div>
-          <div className="font-mono font-medium text-green-600">{pctFmt(tails.upper.exceedance1pct, 2)}</div>
+          <div className="font-mono font-medium text-green-700">{pctFmt(tails.upper.exceedance1pct, 2)}</div>
           <div className="text-fg-muted">&gt;2%: {pctFmt(tails.upper.exceedance2pct, 2)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">

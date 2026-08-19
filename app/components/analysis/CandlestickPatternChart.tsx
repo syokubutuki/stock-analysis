@@ -40,20 +40,20 @@ export default function CandlestickPatternChart({ prices }: Props) {
                   <div className="text-fg-muted text-[10px]">{p.name}</div>
                 </td>
                 <td className="py-1 px-2 text-center font-mono">{p.stats.count}</td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn1d >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn1d >= 0 ? "text-green-700" : "text-red-600"}`}>
                   {(p.stats.avgReturn1d * 100).toFixed(3)}%
                 </td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn5d >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn5d >= 0 ? "text-green-700" : "text-red-600"}`}>
                   {(p.stats.avgReturn5d * 100).toFixed(3)}%
                 </td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.winRate1d >= 0.5 ? "text-green-600" : "text-red-600"}`}>
+                <td className={`py-1 px-2 text-center font-mono ${p.stats.winRate1d >= 0.5 ? "text-green-700" : "text-red-600"}`}>
                   {(p.stats.winRate1d * 100).toFixed(0)}%
                 </td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.winRate5d >= 0.5 ? "text-green-600" : "text-red-600"}`}>
+                <td className={`py-1 px-2 text-center font-mono ${p.stats.winRate5d >= 0.5 ? "text-green-700" : "text-red-600"}`}>
                   {(p.stats.winRate5d * 100).toFixed(0)}%
                 </td>
                 <td className="py-1 px-2 text-center font-mono text-gray-600">{p.stats.tStat.toFixed(2)}</td>
-                <td className={`py-1 px-2 text-center font-bold ${p.stats.significant ? "text-green-600" : "text-fg-muted"}`}>
+                <td className={`py-1 px-2 text-center font-bold ${p.stats.significant ? "text-green-700" : "text-fg-muted"}`}>
                   {p.stats.significant ? "Yes" : "No"}
                 </td>
               </tr>

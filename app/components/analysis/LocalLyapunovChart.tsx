@@ -166,9 +166,9 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3 text-xs">
         <div className={`p-2 rounded ${recentLyap > 0 ? "bg-red-50" : "bg-green-50"}`}>
-          <div className={recentLyap > 0 ? "text-red-600" : "text-green-600"}>現在のλ</div>
+          <div className={recentLyap > 0 ? "text-red-600" : "text-green-700"}>現在のλ</div>
           <div className="font-bold">{recentLyap.toFixed(4)}</div>
-          <div className={recentLyap > 0 ? "text-red-500" : "text-green-500"}>
+          <div className={recentLyap > 0 ? "text-red-500" : "text-green-700"}>
             {recentLyap > 0 ? "不安定(カオス的)" : "安定(収束的)"}
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
       <div className="space-y-3 mb-3">
         <div>
           <div className="text-xs text-gray-500 mb-1">
-            局所Lyapunov指数 λ(t) — <span className="text-green-600">緑: 安定(λ{"<"}0)</span> / <span className="text-red-600">赤: 不安定(λ{">"}0)</span>
+            局所Lyapunov指数 λ(t) — <span className="text-green-700">緑: 安定(λ{"<"}0)</span> / <span className="text-red-600">赤: 不安定(λ{">"}0)</span>
           </div>
           <div ref={lyapRef} className="w-full rounded border border-gray-100" />
         </div>
@@ -235,7 +235,7 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
               |δx(t)| ≈ |δx(0)| · exp(λ · t)
             </div>
             <ul className="list-disc pl-4 space-y-1 text-xs">
-              <li><span className="font-medium text-green-600">λ {"<"} 0 (安定・収束的)</span>: 近傍の軌道が収束する → アトラクタの引力圏内にいる → <span className="font-medium">平均回帰的な振る舞い</span>。短期予測が比較的容易。</li>
+              <li><span className="font-medium text-green-700">λ {"<"} 0 (安定・収束的)</span>: 近傍の軌道が収束する → アトラクタの引力圏内にいる → <span className="font-medium">平均回帰的な振る舞い</span>。短期予測が比較的容易。</li>
               <li><span className="font-medium text-red-600">λ {">"} 0 (不安定・カオス的)</span>: 近傍の軌道が指数関数的に発散 → 微小な違いが急速に拡大 → <span className="font-medium">予測困難</span>。ブレイクアウトやボラティリティ拡大の前兆。</li>
               <li><span className="font-medium text-gray-600">λ ≈ 0 (臨界状態)</span>: 安定と不安定の境界 → <span className="font-medium">レジーム転換の前兆</span>。次にどちらに動くか注視。</li>
             </ul>
@@ -254,7 +254,7 @@ export default function LocalLyapunovChart({ prices, seriesMode }: Props) {
                 <div>
                   <p className="font-medium">正 → 負 への遷移</p>
                   <p>カオスから新しい安定状態へ</p>
-                  <p className="text-green-600">→ 新トレンド確立・ボラ収縮</p>
+                  <p className="text-green-700">→ 新トレンド確立・ボラ収縮</p>
                   <p>→ トレンドフォロー開始</p>
                 </div>
               </div>

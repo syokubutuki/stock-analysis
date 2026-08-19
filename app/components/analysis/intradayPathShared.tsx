@@ -438,8 +438,8 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
                     </span>
                   </td>
                   <td className="text-right px-2 text-gray-500 tabular-nums">{d.nRho}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(d.endEarly)}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(d.endLate)}</td>
+                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d.endEarly)}</td>
+                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d.endLate)}</td>
                   <td className={`text-right px-2 font-medium tabular-nums ${d.endDiff >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(d.endDiff)}</td>
                   <td className="px-2"><StatBadge n={Math.min(d.nEarly, d.nLate)} p={d.endP} significant={d.endP < 0.05} /></td>
                   {rhoCell(d.peakRho, d.peakP, "peak")}
@@ -566,7 +566,7 @@ export function PathSummaryTable({
               </td>
               <td className="text-right px-2 text-gray-600">{b.n}</td>
               <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
-              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(b.endMed)}</td>
+              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.endMed)}</td>
               <td className="text-center px-2 text-gray-600">
                 <span className="text-blue-600">▲</span> {timeLabels[b.peakIdx] ?? "-"} <span className="text-fg-muted">({fmtSignedPct(b.mean[b.peakIdx])})</span>
               </td>

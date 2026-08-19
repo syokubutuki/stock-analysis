@@ -537,7 +537,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
                       {(r.exposure * 100).toFixed(0)}%
                     </td>
                     <td className="py-1.5 px-2 text-right tabular-nums text-blue-700">
-                      {pct(r.expected)} {expUp && <span className="text-green-600">↑</span>}
+                      {pct(r.expected)} {expUp && <span className="text-green-700">↑</span>}
                     </td>
                     <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">
                       {pctAbs(r.sigmaP)}
@@ -686,7 +686,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-blue-700">
                     {pct(splitAdd.add.expected)}{" "}
-                    <span className="text-green-600">↑{splitAdd.n}倍</span>
+                    <span className="text-green-700">↑{splitAdd.n}倍</span>
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">

@@ -299,7 +299,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                 ? "text-red-600"
                 : entropyRatio > 0.4
                   ? "text-yellow-600"
-                  : "text-green-600"
+                  : "text-green-700"
             }`}
           >
             {currentEntropy.toFixed(3)}
@@ -313,7 +313,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                 ? "text-red-600"
                 : entropyRatio > 0.4
                   ? "text-yellow-600"
-                  : "text-green-600"
+                  : "text-green-700"
             }`}
           >
             {(entropyRatio * 100).toFixed(1)}%
@@ -410,7 +410,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                   </td>
                   <td
                     className={`p-1 text-right font-mono ${
-                      r.meanReturn >= 0 ? "text-green-600" : "text-red-600"
+                      r.meanReturn >= 0 ? "text-green-700" : "text-red-600"
                     }`}
                   >
                     {(r.meanReturn * 100).toFixed(1)}%

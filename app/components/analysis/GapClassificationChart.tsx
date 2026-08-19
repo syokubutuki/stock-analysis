@@ -58,8 +58,8 @@ export default function GapClassificationChart({ prices }: Props) {
                     <span className="text-gray-600 tabular-nums">{(s.fillRate * 100).toFixed(0)}%</span>
                   </div>
                 </td>
-                <td className={`text-right px-2 font-medium ${s.goFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{s.n ? fmtPct(s.goFwd) : "—"}</td>
-                <td className={`text-right px-2 ${s.fadeFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{s.n ? fmtPct(s.fadeFwd) : "—"}</td>
+                <td className={`text-right px-2 font-medium ${s.goFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{s.n ? fmtPct(s.goFwd) : "—"}</td>
+                <td className={`text-right px-2 ${s.fadeFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{s.n ? fmtPct(s.fadeFwd) : "—"}</td>
               </tr>
             ))}
           </tbody>

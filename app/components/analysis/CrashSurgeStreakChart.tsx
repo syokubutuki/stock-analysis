@@ -478,14 +478,14 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
                 <td className="py-1 px-2 font-medium" style={{ color: C_DOWN }}>暴落後 平均(Close)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("down", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.closeMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f ? pct(f.closeMean) : "-"}</td>;
+                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.closeMean ?? 0) >= 0 ? "text-green-700" : "text-red-600"}`}>{f ? pct(f.closeMean) : "-"}</td>;
                 })}
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium" style={{ color: C_DOWN_OPEN }}>暴落後 平均(Open)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("down", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.openMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f && d >= 1 ? pct(f.openMean) : "-"}</td>;
+                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.openMean ?? 0) >= 0 ? "text-green-700" : "text-red-600"}`}>{f && d >= 1 ? pct(f.openMean) : "-"}</td>;
                 })}
               </tr>
               <tr className="border-b border-gray-100">
@@ -499,14 +499,14 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
                 <td className="py-1 px-2 font-medium" style={{ color: C_UP }}>暴騰後 平均(Close)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("up", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.closeMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f ? pct(f.closeMean) : "-"}</td>;
+                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.closeMean ?? 0) >= 0 ? "text-green-700" : "text-red-600"}`}>{f ? pct(f.closeMean) : "-"}</td>;
                 })}
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium" style={{ color: C_UP_OPEN }}>暴騰後 平均(Open)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("up", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.openMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f && d >= 1 ? pct(f.openMean) : "-"}</td>;
+                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.openMean ?? 0) >= 0 ? "text-green-700" : "text-red-600"}`}>{f && d >= 1 ? pct(f.openMean) : "-"}</td>;
                 })}
               </tr>
               <tr>

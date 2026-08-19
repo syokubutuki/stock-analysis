@@ -309,8 +309,8 @@ export default function UsBinEventStudyChart({ prices }: Props) {
                       </span>
                     </td>
                     <td className="text-right px-2 text-gray-600">{g.n}</td>
-                    <td className={`text-right px-2 tabular-nums ${g.car0 >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(g.car0)}</td>
-                    <td className={`text-right px-2 tabular-nums ${g.carPost >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(g.carPost)}</td>
+                    <td className={`text-right px-2 tabular-nums ${g.car0 >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(g.car0)}</td>
+                    <td className={`text-right px-2 tabular-nums ${g.carPost >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(g.carPost)}</td>
                     <td className={`text-right px-2 font-medium tabular-nums ${g.postDiff >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(g.postDiff)}</td>
                     <td className="text-right px-2 text-gray-500 tabular-nums text-[10px]">
                       {isFinite(g.postLo) ? `[${fmtSignedPct(g.postLo, 1)}, ${fmtSignedPct(g.postHi, 1)}]` : "—"}

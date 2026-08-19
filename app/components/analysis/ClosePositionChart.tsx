@@ -60,8 +60,8 @@ export default function ClosePositionChart({ prices }: Props) {
             {result.bucketReturns.map((b, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium text-gray-700">{b.range}</td>
-                <td className={`py-1 px-2 text-center font-mono ${b.avgReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{(b.avgReturn * 100).toFixed(3)}%</td>
-                <td className={`py-1 px-2 text-center font-mono ${b.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>{(b.winRate * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${b.avgReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{(b.avgReturn * 100).toFixed(3)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${b.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}>{(b.winRate * 100).toFixed(1)}%</td>
                 <td className="py-1 px-2 text-center font-mono text-gray-500">{b.n}</td>
               </tr>
             ))}

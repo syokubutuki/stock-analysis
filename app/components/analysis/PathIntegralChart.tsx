@@ -217,7 +217,7 @@ export default function PathIntegralChart({ prices }: Props) {
           <div className="text-gray-500">上昇確率</div>
           <div
             className={`font-mono font-bold ${
-              finalStats.upProb >= 0.5 ? "text-green-600" : "text-red-600"
+              finalStats.upProb >= 0.5 ? "text-green-700" : "text-red-600"
             }`}
           >
             {(finalStats.upProb * 100).toFixed(1)}%
@@ -227,7 +227,7 @@ export default function PathIntegralChart({ prices }: Props) {
           <div className="text-gray-500">期待リターン</div>
           <div
             className={`font-mono font-bold ${
-              finalStats.mean >= 0 ? "text-green-600" : "text-red-600"
+              finalStats.mean >= 0 ? "text-green-700" : "text-red-600"
             }`}
           >
             {(finalStats.mean * 100).toFixed(2)}%
@@ -243,7 +243,7 @@ export default function PathIntegralChart({ prices }: Props) {
           <div className="text-gray-500">歪度</div>
           <div
             className={`font-mono font-bold ${
-              finalStats.skew < 0 ? "text-red-600" : "text-green-600"
+              finalStats.skew < 0 ? "text-red-600" : "text-green-700"
             }`}
           >
             {finalStats.skew.toFixed(3)}

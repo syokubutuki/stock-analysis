@@ -607,7 +607,7 @@ export default function HighLowTimingChart({ ticker }: Props) {
                     <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: WD_COLORS[wm.weekday] }} />
                     <span className="text-gray-600">{WD_NAMES[wm.weekday]}曜（{wm.count}日）</span>
                   </div>
-                  <div className={`font-bold ${wm.endMean >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  <div className={`font-bold ${wm.endMean >= 0 ? "text-green-700" : "text-red-600"}`}>
                     引け平均 {wm.endMean >= 0 ? "+" : ""}{wm.endMean.toFixed(2)}%
                   </div>
                 </div>
@@ -694,9 +694,9 @@ export default function HighLowTimingChart({ ticker }: Props) {
                           <div className="text-fg-muted">{p.desc}</div>
                         </td>
                         <td className="text-right">{pct(p.share)}<br /><span className="text-fg-muted">{p.count}日</span></td>
-                        <td className={`text-right ${p.avgDayRet >= 0 ? "text-green-600" : "text-red-600"}`}>{signedPct(p.avgDayRet)}</td>
-                        <td className={`text-right ${p.avgNextRet >= 0 ? "text-green-600" : "text-red-600"}`}>{signedPct(p.avgNextRet)}</td>
-                        <td className={`text-right ${p.winRateNext > 0.52 ? "text-green-600" : p.winRateNext < 0.48 ? "text-red-600" : "text-gray-600"}`}>{pct(p.winRateNext)}</td>
+                        <td className={`text-right ${p.avgDayRet >= 0 ? "text-green-700" : "text-red-600"}`}>{signedPct(p.avgDayRet)}</td>
+                        <td className={`text-right ${p.avgNextRet >= 0 ? "text-green-700" : "text-red-600"}`}>{signedPct(p.avgNextRet)}</td>
+                        <td className={`text-right ${p.winRateNext > 0.52 ? "text-green-700" : p.winRateNext < 0.48 ? "text-red-600" : "text-gray-600"}`}>{pct(p.winRateNext)}</td>
                       </tr>
                     ))}
                   </tbody>

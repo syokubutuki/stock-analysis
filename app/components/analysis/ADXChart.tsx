@@ -27,7 +27,7 @@ const STRENGTH_COLORS: Record<string, string> = {
 };
 
 const TREND_COLORS: Record<string, string> = {
-  "上昇": "text-green-600",
+  "上昇": "text-green-700",
   "下降": "text-red-600",
 };
 
@@ -180,7 +180,7 @@ export default function ADXChart({ prices, period }: Props) {
           </div>
           <div className="p-2 bg-gray-50 rounded">
             <div className="text-gray-500">+DI</div>
-            <div className="font-mono font-medium text-green-600">
+            <div className="font-mono font-medium text-green-700">
               {last.plusDI.toFixed(2)}
             </div>
           </div>

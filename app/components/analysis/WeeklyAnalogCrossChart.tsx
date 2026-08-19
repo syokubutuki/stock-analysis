@@ -563,7 +563,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                             if (e.key === "Escape") setEditing(null);
                           }}
                           className="w-[110px] px-1 py-0.5 text-[11px] border border-gray-300 rounded" placeholder={r.ticker} />
-                        <button onClick={() => { const t = editVal.trim(); if (t) onRename?.(r.ticker, t); setEditing(null); }} className="text-emerald-600 text-sm leading-none">✓</button>
+                        <button onClick={() => { const t = editVal.trim(); if (t) onRename?.(r.ticker, t); setEditing(null); }} className="text-emerald-700 text-sm leading-none">✓</button>
                         <button onClick={() => setEditing(null)} className="text-gray-500 text-sm leading-none">✕</button>
                       </div>
                     ) : (
@@ -591,14 +591,14 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                   <td className="px-1 py-0.5 text-center align-middle">
                     {res ? <ForwardSpark res={res} scale={scale} /> : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className={`px-2 py-1 text-right font-semibold tabular-nums ${res ? (res.medianFinal >= 0 ? "text-green-600" : "text-red-600") : "text-gray-300"}`}>
+                  <td className={`px-2 py-1 text-right font-semibold tabular-nums ${res ? (res.medianFinal >= 0 ? "text-green-700" : "text-red-600") : "text-gray-300"}`}>
                     {res ? fmtPct(res.medianFinal) : "—"}
                   </td>
                   <td className={`px-2 py-1 text-right tabular-nums ${res ? (res.diffP < 0.05 ? "text-gray-700 font-medium" : "text-fg-muted") : "text-gray-300"}`}
                     title={res ? `p=${res.diffP < 0.001 ? "<.001" : res.diffP.toFixed(3)}` : ""}>
                     {res ? `${res.diffMedian >= 0 ? "+" : ""}${(res.diffMedian * 100).toFixed(1)}pt${res.diffP < 0.05 ? "*" : ""}` : "—"}
                   </td>
-                  <td className="px-2 py-1 text-right tabular-nums text-green-600">
+                  <td className="px-2 py-1 text-right tabular-nums text-green-700">
                     {res ? fmtPct(res.medianMfe) : "—"}
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums text-red-600">
@@ -620,7 +620,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
                       <>
                         <td className={`px-2 py-1 text-right tabular-nums border-l border-gray-100 ${o ? (icOk ? "text-green-700 font-semibold" : o.ic > 0 ? "text-gray-600" : "text-red-500") : "text-gray-300"}`}
                           title={o ? `IC=${o.ic.toFixed(3)} 95%CI [${o.icLo.toFixed(3)}, ${o.icHi.toFixed(3)}] / 予測週数 n=${o.n}(実効${o.nEff})${oosCross && o.ic > oosCross.thr ? " / 横断補正閾値超え" : ""}` : pending ? "検証待ち" : "週数不足で算出不可"}>
-                          {o ? <>{o.ic.toFixed(3)}{oosCross && o.ic > oosCross.thr ? <span className="text-green-600">✓</span> : null}</> : pending ? "…" : "—"}
+                          {o ? <>{o.ic.toFixed(3)}{oosCross && o.ic > oosCross.thr ? <span className="text-green-700">✓</span> : null}</> : pending ? "…" : "—"}
                         </td>
                         <td className={`px-2 py-1 text-right tabular-nums ${o ? (o.hit - o.baseHit > 0 ? "text-gray-700" : "text-fg-muted") : "text-gray-300"}`}
                           title={o ? `方向的中率 ${(o.hit * 100).toFixed(0)}% / 無条件 ${(o.baseHit * 100).toFixed(0)}%` : ""}>
@@ -647,7 +647,7 @@ export default function WeeklyAnalogCrossChart({ tickers, pricesByTicker, names,
       </div>
 
       <p className="text-[11px] text-fg-muted">
-        ミニチャート: <span className="text-blue-600">青=終値中央</span> / <span className="text-green-600">緑点線=高値到達中央(MFE=利確目安)</span> / <span className="text-red-600">赤点線=安値到達中央(MAE=損切り目安)</span> / 薄青帯=終値25–75%。
+        ミニチャート: <span className="text-blue-600">青=終値中央</span> / <span className="text-green-700">緑点線=高値到達中央(MFE=利確目安)</span> / <span className="text-red-600">赤点線=安値到達中央(MAE=損切り目安)</span> / 薄青帯=終値25–75%。
         中央値が揃って右肩上がり＝全体に追い風(地合い集中=分散不足の裏返し)。1銘柄だけ逆行＝個別要因/ヘッジ候補。事例小は偶然に振られやすい。
       </p>
 

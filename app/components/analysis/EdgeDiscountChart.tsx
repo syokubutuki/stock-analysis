@@ -134,8 +134,8 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
                     </td>
                     <td className="text-right px-2 text-gray-600 tabular-nums">{e.n}</td>
                     <td className="text-right px-2 tabular-nums text-gray-700">{fmtSignedPct(e.grossPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(e.openTermPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(e.closeTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(e.openTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(e.closeTermPct / 100)}</td>
                     <td className="text-right px-2 tabular-nums text-gray-500">{fmtSignedPct(e.spreadTermPct / 100)}</td>
                     <td className={`text-right px-2 font-bold tabular-nums ${e.effPct >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(e.effPct / 100)}</td>
                     <td className="text-center px-2">

@@ -225,7 +225,7 @@ export default function PropagatorChart({ prices }: Props) {
               <div className="text-[10px] text-gray-500">{h}日後</div>
               <div
                 className={`text-sm font-bold ${
-                  med >= 0 ? "text-green-600" : "text-red-600"
+                  med >= 0 ? "text-green-700" : "text-red-600"
                 }`}
               >
                 {med >= 0 ? "+" : ""}

@@ -79,7 +79,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           <ul className="mt-4 space-y-2 text-xs text-gray-600">
             {FREE_FEATURES.map((f) => (
               <li key={f} className="flex gap-2">
-                <span className="text-green-600">✓</span>
+                <span className="text-green-700">✓</span>
                 <span>{f}</span>
               </li>
             ))}

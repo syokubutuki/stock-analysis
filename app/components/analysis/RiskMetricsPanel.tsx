@@ -88,7 +88,7 @@ export default function RiskMetricsPanel({ prices, period }: Props) {
 
   const ratingColor = (v: number, thresholds: [number, number]) =>
     v >= thresholds[1]
-      ? "text-green-600"
+      ? "text-green-700"
       : v <= thresholds[0]
       ? "text-red-600"
       : "";
@@ -103,17 +103,17 @@ export default function RiskMetricsPanel({ prices, period }: Props) {
         <MetricBox
           label="累積リターン"
           value={`${pct(metrics.totalReturn)}%`}
-          color={metrics.totalReturn >= 0 ? "text-green-600" : "text-red-600"}
+          color={metrics.totalReturn >= 0 ? "text-green-700" : "text-red-600"}
         />
         <MetricBox
           label="年率リターン"
           value={`${pct(metrics.annualizedReturn)}%`}
-          color={metrics.annualizedReturn >= 0 ? "text-green-600" : "text-red-600"}
+          color={metrics.annualizedReturn >= 0 ? "text-green-700" : "text-red-600"}
         />
         <MetricBox
           label="最良日"
           value={`+${pct(metrics.bestDay)}%`}
-          color="text-green-600"
+          color="text-green-700"
         />
         <MetricBox
           label="最悪日"
@@ -204,12 +204,12 @@ export default function RiskMetricsPanel({ prices, period }: Props) {
         <MetricBox
           label="勝率"
           value={`${pct(metrics.winRate)}%`}
-          color={metrics.winRate >= 0.5 ? "text-green-600" : "text-red-600"}
+          color={metrics.winRate >= 0.5 ? "text-green-700" : "text-red-600"}
         />
         <MetricBox
           label="平均利益日"
           value={`+${pct(metrics.avgWin)}%`}
-          color="text-green-600"
+          color="text-green-700"
         />
         <MetricBox
           label="平均損失日"

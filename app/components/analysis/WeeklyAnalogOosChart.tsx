@@ -487,9 +487,9 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
                 {catalog.rows.map((row, i) => (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 text-gray-700">{row.label}</td>
-                    <td className={`text-right px-2 font-medium tabular-nums ${row.ic > 0 ? "text-green-600" : "text-red-600"}`}>{row.ic.toFixed(3)}</td>
+                    <td className={`text-right px-2 font-medium tabular-nums ${row.ic > 0 ? "text-green-700" : "text-red-600"}`}>{row.ic.toFixed(3)}</td>
                     <td className="text-right px-2 text-gray-500 tabular-nums">{row.n}</td>
-                    <td className="text-right px-2">{row.ic > catalog.deflatedThreshold ? <span className="text-green-600">✓</span> : <span className="text-gray-300">—</span>}</td>
+                    <td className="text-right px-2">{row.ic > catalog.deflatedThreshold ? <span className="text-green-700">✓</span> : <span className="text-gray-300">—</span>}</td>
                   </tr>
                 ))}
               </tbody>

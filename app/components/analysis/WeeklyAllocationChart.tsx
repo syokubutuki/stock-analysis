@@ -648,7 +648,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 </td>
                 <td className="py-1 px-2 text-right">{pct(r.soloSum)}</td>
                 <td className="py-1 px-2 text-right font-semibold">
-                  {pct(r.exposure)}<span className="text-emerald-600"> / {pct(r.cash)}</span>
+                  {pct(r.exposure)}<span className="text-emerald-700"> / {pct(r.cash)}</span>
                 </td>
                 <td className="py-1 px-2" />
                 <td className="py-1 px-2 text-right font-semibold bg-blue-50/70">{totalShares.toLocaleString()}株</td>

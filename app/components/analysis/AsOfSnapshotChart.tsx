@@ -260,7 +260,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
                     <td className={`text-right px-1.5 font-mono font-semibold ${f.ret >= 0 ? "text-green-700" : "text-red-600"}`}>{pct(f.ret)}</td>
                     <td className="text-center px-1.5">
                       {dirOk === null ? <span className="text-gray-300">中立</span>
-                        : dirOk ? <span className="text-green-600">○</span> : <span className="text-red-500">×</span>}
+                        : dirOk ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}
                     </td>
                     <td className="text-right px-1.5 font-mono text-gray-600">{pct(f.mfe, 1)}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600">{pct(f.mae, 1)}</td>
@@ -270,7 +270,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
                     </td>
                     <td className="text-center px-1.5">
                       {inBand === null ? <span className="text-gray-300">—</span>
-                        : inBand ? <span className="text-green-600">内</span> : <span className="text-red-500">外</span>}
+                        : inBand ? <span className="text-green-700">内</span> : <span className="text-red-500">外</span>}
                     </td>
                   </tr>
                 );

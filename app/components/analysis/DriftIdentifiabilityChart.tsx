@@ -416,11 +416,11 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                       <td className="text-right px-2 tabular-nums text-gray-500 whitespace-nowrap">
                         [{pct(r.ciMuLo, 0)}, {pct(r.ciMuHi, 0)}]
                       </td>
-                      <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-700" : "text-red-600"}`}>
                         {pct(r.excessMu)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(r.tExcess)}</td>
-                      <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-600" : "text-fg-muted"}`}>
+                      <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-700" : "text-fg-muted"}`}>
                         {r.qExcess.toFixed(3)}
                       </td>
                       <td className="text-right px-2 tabular-nums text-amber-700">{yearsFmt(r.requiredYearsObserved)}</td>

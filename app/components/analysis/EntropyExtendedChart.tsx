@@ -101,7 +101,7 @@ export default function EntropyExtendedChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Weighted PE</div>
-          <div className="font-mono font-medium text-sm text-green-600">{wpe.toFixed(3)}</div>
+          <div className="font-mono font-medium text-sm text-green-700">{wpe.toFixed(3)}</div>
         </div>
       </div>
 

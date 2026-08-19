@@ -35,7 +35,7 @@ const num2 = (v: number) => v.toFixed(2);
 // 往復コストは bp（=0.01%）で読むほうが手数料表と突き合わせやすい
 const bp = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 10000).toFixed(1)}bp`;
 const bpAbs = (v: number) => `${(v * 10000).toFixed(1)}bp`;
-const cls = (v: number) => (v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
 
 // p値 → 星付き表示
 function pStars(p: number | null): { text: string; sig: boolean } {
@@ -271,7 +271,7 @@ export default function WeekdayVsBuyHoldChart({ prices }: Props) {
                 <>
                   <tr className="border-b border-gray-100">
                     <td className="py-1 px-2 text-gray-600">時変系列の損益分岐 λ*</td>
-                    <td className={`text-right px-2 font-mono ${pathAbsorbs ? "text-green-600" : "text-red-600"}`}>
+                    <td className={`text-right px-2 font-mono ${pathAbsorbs ? "text-green-700" : "text-red-600"}`}>
                       {pathScale === null ? "-" : `${pathScale.toFixed(2)}×`}
                     </td>
                     <td className="px-2 text-xs text-gray-500">

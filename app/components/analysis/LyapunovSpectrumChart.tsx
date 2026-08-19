@@ -356,7 +356,7 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 mb-3 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">最大 λ</div>
-          <div className={`font-bold ${spectrum.exponents[0] > 0 ? "text-red-600" : "text-green-600"}`}>
+          <div className={`font-bold ${spectrum.exponents[0] > 0 ? "text-red-600" : "text-green-700"}`}>
             {spectrum.exponents[0]?.toFixed(4) ?? "N/A"}
           </div>
         </div>

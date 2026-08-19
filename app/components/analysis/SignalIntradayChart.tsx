@@ -111,7 +111,7 @@ export default function SignalIntradayChart({ ticker }: Props) {
                   <tr key={rule.label} className="border-b border-gray-100">
                     <td className="py-1 font-medium">{rule.label}</td>
                     <td className="text-right">{rule.n}</td>
-                    <td className={`text-right ${rule.meanRetPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(rule.meanRetPct / 100)}</td>
+                    <td className={`text-right ${rule.meanRetPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(rule.meanRetPct / 100)}</td>
                     <td className="text-right">{fmtPct(rule.winRate)}</td>
                   </tr>
                 ))}

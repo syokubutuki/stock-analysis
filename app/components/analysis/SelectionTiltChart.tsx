@@ -286,14 +286,14 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
                         {TILT_SIGNAL_LABEL[s.signal]}
                       </td>
                       <td className="text-right px-2 tabular-nums">{pct(s.annTilt)}</td>
-                      <td className={`text-right px-2 tabular-nums font-semibold ${s.excessAnn > 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums font-semibold ${s.excessAnn > 0 ? "text-green-700" : "text-red-600"}`}>
                         {pct(s.excessAnn)}
                       </td>
-                      <td className={`text-right px-2 tabular-nums ${s.netExcessAnn > 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${s.netExcessAnn > 0 ? "text-green-700" : "text-red-600"}`}>
                         {pct(s.netExcessAnn)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(s.excessT)}</td>
-                      <td className={`text-right px-2 tabular-nums ${s.qValueBH < 0.1 ? "text-green-600" : "text-gray-500"}`}>
+                      <td className={`text-right px-2 tabular-nums ${s.qValueBH < 0.1 ? "text-green-700" : "text-gray-500"}`}>
                         {s.qValueBH.toFixed(3)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{pct(s.gTilt)}</td>

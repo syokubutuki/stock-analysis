@@ -337,7 +337,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
             <ul className="list-disc pl-4 space-y-1 text-xs">
               <li><span className="font-medium">FNN率が高い</span> → 次元が不足 → 位相空間上の構造が正しく展開されていない</li>
               <li><span className="font-medium">FNN率 {"<"} 5%</span> → 十分な次元 → それ以上次元を上げても改善しない</li>
-              <li><span className="font-medium">低次元(d=3〜5)で飽和</span> → 低次元の決定論的構造あり → <span className="text-green-600">テクニカル分析が有効な銘柄</span></li>
+              <li><span className="font-medium">低次元(d=3〜5)で飽和</span> → 低次元の決定論的構造あり → <span className="text-green-700">テクニカル分析が有効な銘柄</span></li>
               <li><span className="font-medium">高次元(d{">"}10)でも飽和しない</span> → ランダム性が支配的 → <span className="text-red-600">系統的予測が困難</span></li>
             </ul>
           </div>

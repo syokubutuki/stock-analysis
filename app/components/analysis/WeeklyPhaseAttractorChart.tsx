@@ -1275,13 +1275,13 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                           {l}
                         </td>
                         <td className="py-1 px-2">{kmResult.counts[k]}</td>
-                        <td className={`py-1 px-2 font-mono ${kmResult.drift[k] >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        <td className={`py-1 px-2 font-mono ${kmResult.drift[k] >= 0 ? "text-green-700" : "text-red-600"}`}>
                           {(kmResult.drift[k] * 100).toFixed(3)}%
                         </td>
                         <td className={`py-1 px-2 font-mono ${k === kmResult.highVolPhase ? "text-red-600 font-bold" : k === kmResult.lowVolPhase ? "text-blue-600" : ""}`}>
                           {(kmResult.diffusion[k] * 100).toFixed(3)}%
                         </td>
-                        <td className={`py-1 px-2 font-mono ${k === kmResult.entryPhase ? "text-blue-600 font-bold" : k === kmResult.exitPhase ? "text-green-600 font-bold" : ""}`}>
+                        <td className={`py-1 px-2 font-mono ${k === kmResult.entryPhase ? "text-blue-600 font-bold" : k === kmResult.exitPhase ? "text-green-700 font-bold" : ""}`}>
                           {(kmResult.cumulative[k] * 100).toFixed(3)}%
                         </td>
                       </tr>
@@ -1299,7 +1299,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                     <b>方向バイアス (§6.3, 弱い修飾子)</b>: 累積の谷 =
                     <span className="text-blue-600 font-bold"> {WEEKDAY_LABELS[kmResult.entryPhase]}</span>
                     (積み増し候補) / ピーク =
-                    <span className="text-green-600 font-bold"> {WEEKDAY_LABELS[kmResult.exitPhase]}</span>
+                    <span className="text-green-700 font-bold"> {WEEKDAY_LABELS[kmResult.exitPhase]}</span>
                     (軽量化候補)。
                   </p>
                 </div>

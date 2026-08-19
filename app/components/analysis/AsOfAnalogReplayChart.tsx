@@ -63,7 +63,7 @@ function PathCell({ p, H, scale }: { p: OosPredPoint; H: number; scale: number }
         <span className="font-mono">{p.date}</span>
         <span>
           {dirOk === null ? <span className="text-gray-300">—</span>
-            : dirOk ? <span className="text-green-600">○</span> : <span className="text-red-500">×</span>}
+            : dirOk ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}
         </span>
       </div>
       <svg width={W} height={HT} style={{ overflow: "visible" }}>

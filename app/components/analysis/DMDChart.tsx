@@ -97,7 +97,7 @@ export default function DMDChart({ prices, seriesMode }: Props) {
     !isFinite(p) ? "トレンド" : `${p.toFixed(1)}日`;
 
   const growthColor = (g: number) => {
-    if (g > 1.005) return "text-green-600";
+    if (g > 1.005) return "text-green-700";
     if (g < 0.995) return "text-red-600";
     return "text-gray-600";
   };

@@ -385,15 +385,15 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">アナログの引け予想</div>
-                  <div className={`font-bold ${result.analog.end >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(result.analog.end)}</div>
+                  <div className={`font-bold ${result.analog.end >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(result.analog.end)}</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">条件セル平均</div>
-                  <div className={`font-bold ${result.cell.end >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(result.cell.end)}</div>
+                  <div className={`font-bold ${result.cell.end >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(result.cell.end)}</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">無条件平均</div>
-                  <div className={`font-bold ${result.uncond.end >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(result.uncond.end)}</div>
+                  <div className={`font-bold ${result.uncond.end >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(result.uncond.end)}</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">今日の実測（寄り→現在）</div>
@@ -426,8 +426,8 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                       <td className="px-2 text-gray-500">{WD_LABELS[n.weekday]}</td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{n.dist.toFixed(3)}</td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{fmtPct(n.weight, 1)}</td>
-                      <td className={`text-right px-2 tabular-nums ${n.usValue >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(n.usValue)}</td>
-                      <td className={`text-right px-2 tabular-nums ${n.gap >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(n.gap)}</td>
+                      <td className={`text-right px-2 tabular-nums ${n.usValue >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(n.usValue)}</td>
+                      <td className={`text-right px-2 tabular-nums ${n.gap >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(n.gap)}</td>
                       <td className={`text-right px-2 font-medium tabular-nums ${n.end >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(n.end)}</td>
                     </tr>
                   ))}
@@ -471,7 +471,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                           <td className={`text-right px-2 font-medium tabular-nums ${o.ic >= 0 ? "text-green-700" : "text-red-700"}`}>{o.ic.toFixed(3)}</td>
                           {/* ICが負なら「有意に外している」ので、有意バッジは付けない(正のICだけを実績とみなす) */}
                           <td className="px-2"><StatBadge n={o.n} p={o.icP} significant={o.icP < 0.05 && o.ic > 0} /></td>
-                          <td className={`text-right px-2 tabular-nums ${o.hit > 0.5 ? "text-green-600" : "text-gray-600"}`}>
+                          <td className={`text-right px-2 tabular-nums ${o.hit > 0.5 ? "text-green-700" : "text-gray-600"}`}>
                             {fmtPct(o.hit, 1)}{o.hitP < 0.05 ? "★" : ""}
                           </td>
                           <td className="text-right px-2 text-gray-600 tabular-nums">{fmtPct(o.rmse, 2)}</td>
@@ -490,7 +490,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">損失差（セル − アナログ）</div>
-                    <div className={`font-bold ${result.oos.lossMean > 0 ? "text-green-600" : "text-red-600"}`}>
+                    <div className={`font-bold ${result.oos.lossMean > 0 ? "text-green-700" : "text-red-600"}`}>
                       {(result.oos.lossMean * 1e4).toFixed(2)}<span className="text-[10px] font-normal">×10⁻⁴</span>
                     </div>
                     <div className="text-[10px] text-fg-muted">p={result.oos.lossP.toFixed(3)}／CI[{(result.oos.lossLo * 1e4).toFixed(2)}, {(result.oos.lossHi * 1e4).toFixed(2)}]</div>

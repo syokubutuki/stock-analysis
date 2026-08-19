@@ -230,7 +230,7 @@ export default function SignalStackingChart({ prices }: Props) {
                   <tr key={p.id} className="border-b border-gray-100">
                     <td className="py-1 px-1.5 text-fg-muted">{i + 1}</td>
                     <td className="px-1.5">{p.label}</td>
-                    <td className={`text-right px-1 font-mono ${p.sharpe > 0 ? "text-green-600" : "text-red-600"}`}>{p.sharpe.toFixed(2)}</td>
+                    <td className={`text-right px-1 font-mono ${p.sharpe > 0 ? "text-green-700" : "text-red-600"}`}>{p.sharpe.toFixed(2)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{(p.annReturn * 100).toFixed(1)}%</td>
                     <td className="text-right px-1 font-mono text-gray-600">{scheme === "agreement" ? "–" : (p.weight * 100).toFixed(0) + "%"}</td>
                     <td className={`text-right px-1.5 font-mono ${p.looDelta > 0 ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{p.looDelta >= 0 ? "+" : ""}{p.looDelta.toFixed(2)}</td>

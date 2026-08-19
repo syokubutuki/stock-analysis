@@ -523,7 +523,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                           <td className="py-1 px-2 text-gray-700">{result.timeLabels[g]}{g === result.lastIdx && result.inSession ? " ◀現在" : ""}</td>
                           <td className={`text-right px-2 font-medium tabular-nums ${t.actual >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(t.actual)}</td>
                           <td className="text-right px-2 text-gray-500 tabular-nums">{fmtSignedPct(result.fan[g].mean)}</td>
-                          <td className={`text-right px-2 tabular-nums ${d >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(d)}</td>
+                          <td className={`text-right px-2 tabular-nums ${d >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-700">{t.z.toFixed(2)}</td>
                           <td className={`text-right px-2 tabular-nums ${extreme ? "font-bold text-amber-800" : "text-gray-600"}`}>{fmtPct(t.pctile, 0)}</td>
                           <td className="px-2 text-gray-500">
@@ -586,7 +586,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="bg-gray-50 rounded p-2">
                       <div className="text-gray-500">β（{result.timeLabels[selG]}）</div>
-                      <div className={`font-bold ${result.betas[selG].beta >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <div className={`font-bold ${result.betas[selG].beta >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {fmtSignedPct(result.betas[selG].beta)} / 1σ
                       </div>
                     </div>
@@ -644,11 +644,11 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">終端の符号一致率</div>
-                        <div className={`font-bold ${signShare > 0.6 ? "text-green-600" : signShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(signShare, 0)}</div>
+                        <div className={`font-bold ${signShare > 0.6 ? "text-green-700" : signShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(signShare, 0)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">相関が正だった日</div>
-                        <div className={`font-bold ${posShare > 0.6 ? "text-green-600" : posShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(posShare, 0)}</div>
+                        <div className={`font-bold ${posShare > 0.6 ? "text-green-700" : posShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(posShare, 0)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">パス相関の中央値（参考）</div>

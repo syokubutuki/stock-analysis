@@ -58,26 +58,26 @@ export default function BreakoutStatsChart({ prices }: Props) {
                 <td className="py-1 px-2 text-gray-700">{d.lookback}日高値 上抜け</td>
                 <td className="text-right px-2 text-gray-600">{d.upN}</td>
                 <td className="px-2 text-gray-600">{fmtRate(d.upHold)}</td>
-                <td className={`text-right px-2 font-medium ${d.upFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(d.upFwd)}</td>
+                <td className={`text-right px-2 font-medium ${d.upFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(d.upFwd)}</td>
               </tr>,
               <tr key={`d${d.lookback}`} className="border-b border-gray-100">
                 <td className="py-1 px-2 text-gray-700">{d.lookback}日安値 下抜け</td>
                 <td className="text-right px-2 text-gray-600">{d.downN}</td>
                 <td className="px-2 text-gray-600">{fmtRate(d.downHold)}</td>
-                <td className={`text-right px-2 font-medium ${d.downFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(d.downFwd)}</td>
+                <td className={`text-right px-2 font-medium ${d.downFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(d.downFwd)}</td>
               </tr>,
             ])}
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-700">前日高値 上抜け</td>
               <td className="text-right px-2 text-gray-600">{res.priorHL.brokeHighN}</td>
               <td className="px-2 text-gray-600">{fmtRate(res.priorHL.highHoldRate)}</td>
-              <td className={`text-right px-2 font-medium ${res.priorHL.highFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(res.priorHL.highFwd)}</td>
+              <td className={`text-right px-2 font-medium ${res.priorHL.highFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(res.priorHL.highFwd)}</td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-700">前日安値 下抜け</td>
               <td className="text-right px-2 text-gray-600">{res.priorHL.brokeLowN}</td>
               <td className="px-2 text-gray-600">{fmtRate(res.priorHL.lowHoldRate)}</td>
-              <td className={`text-right px-2 font-medium ${res.priorHL.lowFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(res.priorHL.lowFwd)}</td>
+              <td className={`text-right px-2 font-medium ${res.priorHL.lowFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(res.priorHL.lowFwd)}</td>
             </tr>
           </tbody>
         </table>

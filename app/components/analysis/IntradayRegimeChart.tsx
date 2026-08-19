@@ -172,7 +172,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
                       <tr key={b.label} className="border-b border-gray-100">
                         <td className="py-1 font-medium" style={{ color: LABEL_COLOR[b.label] }}>{LABEL_NAME[b.label]}</td>
                         <td className="text-right">{b.count}</td>
-                        <td className={`text-right ${b.nextMeanPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(b.nextMeanPct / 100)}</td>
+                        <td className={`text-right ${b.nextMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.nextMeanPct / 100)}</td>
                         <td className="text-right">{fmtPct(b.nextWin)}</td>
                       </tr>
                     ))}
@@ -228,7 +228,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
                       <tr key={b.label} className="border-b border-gray-100">
                         <td className="py-1 font-medium">{b.label}</td>
                         <td className="text-right">{b.n}</td>
-                        <td className={`text-right ${b.pmMeanPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(b.pmMeanPct / 100)}</td>
+                        <td className={`text-right ${b.pmMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.pmMeanPct / 100)}</td>
                         <td className="text-right">{fmtPct(b.pmWin)}</td>
                       </tr>
                     ))}

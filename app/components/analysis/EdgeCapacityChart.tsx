@@ -250,7 +250,7 @@ export default function EdgeCapacityChart({ prices }: Props) {
                   className={`border-b border-gray-100 cursor-pointer ${isSel ? "bg-blue-50" : "hover:bg-gray-50"}`}
                 >
                   <td className="py-1 px-1.5">{r.edge.label}</td>
-                  <td className={`text-right px-1 font-mono ${r.direction === "long" ? "text-green-600" : "text-red-600"}`}>{r.direction === "long" ? "買" : "売"}</td>
+                  <td className={`text-right px-1 font-mono ${r.direction === "long" ? "text-green-700" : "text-red-600"}`}>{r.direction === "long" ? "買" : "売"}</td>
                   <td className="text-right px-1 font-mono">
                     {(r.muGross * 100).toFixed(3)}%
                     {deflate && <span className="text-blue-600">→{(r.muDeflated * 100).toFixed(3)}%</span>}

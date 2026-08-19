@@ -89,7 +89,7 @@ function quantile(sorted: number[], q: number): number {
 }
 function pct(v: number): string { return (v * 100).toFixed(3) + "%"; }
 function pct2(v: number): string { return (v * 100).toFixed(2) + "%"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
 
 // t-test
 function tTestPValue(arr: number[]): number | null {
@@ -1666,7 +1666,7 @@ export default function SpiralHeatmap({ prices }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             <div className="p-2 bg-gray-50 rounded">
               <div className="text-fg-muted">最長連騰</div>
-              <div className="font-mono text-green-600 text-sm">{streakStats.maxUp}日</div>
+              <div className="font-mono text-green-700 text-sm">{streakStats.maxUp}日</div>
             </div>
             <div className="p-2 bg-gray-50 rounded">
               <div className="text-fg-muted">最長連落</div>

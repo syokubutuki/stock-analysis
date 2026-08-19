@@ -242,7 +242,7 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
           </div>
           <div className="mt-2 text-xs p-2 bg-gray-50 rounded">
             <span className="text-gray-500">MSE傾き: </span>
-            <span className={`font-mono font-medium ${mseSlope > 0 ? "text-orange-600" : "text-green-600"}`}>
+            <span className={`font-mono font-medium ${mseSlope > 0 ? "text-orange-600" : "text-green-700"}`}>
               {mseSlope.toFixed(4)}
             </span>
             <span className="text-gray-500 ml-2">

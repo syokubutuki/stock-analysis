@@ -369,7 +369,7 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
                   {state.trades.map((t, i) => (
                     <tr key={i} className="border-t border-gray-100">
                       <td>{t.date}</td>
-                      <td className={t.action === "buy" ? "text-green-600" : "text-red-600"}>
+                      <td className={t.action === "buy" ? "text-green-700" : "text-red-600"}>
                         {t.action === "buy" ? "買い" : "売り"}
                       </td>
                       <td className="text-right font-mono">
@@ -501,10 +501,10 @@ export default function DiscretionaryLab({ prices, ticker, currency }: Props) {
                 </div>
               </div>
               <div className={`rounded-lg p-3 text-center ${isWorse ? "bg-red-50" : "bg-green-50"}`}>
-                <div className={`text-xs mb-1 ${isWorse ? "text-red-600" : "text-green-600"}`}>
+                <div className={`text-xs mb-1 ${isWorse ? "text-red-600" : "text-green-700"}`}>
                   {isWorse ? "放置していた方が良かった…" : "Buy & Holdに勝利!"}
                 </div>
-                <div className={`text-2xl font-black ${isWorse ? "text-red-600" : "text-green-600"}`}>
+                <div className={`text-2xl font-black ${isWorse ? "text-red-600" : "text-green-700"}`}>
                   {comparison.differencePercent >= 0 ? "+" : ""}
                   {comparison.differencePercent.toFixed(1)}%
                 </div>

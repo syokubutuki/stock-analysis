@@ -1171,7 +1171,7 @@ export default function CorrelationDragChart({
               <span
                 className={
                   nEff > nAssets * 0.7
-                    ? "text-green-600"
+                    ? "text-green-700"
                     : nEff > nAssets * 0.4
                       ? "text-amber-600"
                       : "text-red-600"

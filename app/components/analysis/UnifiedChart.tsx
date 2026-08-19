@@ -628,7 +628,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
             </button>
             <button
               onClick={() => deleteCustomPreset(preset.id)}
-              className="px-1 py-0.5 text-emerald-400 hover:text-emerald-700"
+              className="px-1 py-0.5 text-emerald-700 hover:text-emerald-900"
               title="このセットを削除"
             >
               ✕
@@ -651,7 +651,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
         <button
           onClick={() => setSavingPreset((v) => !v)}
           disabled={enabled.size === 0}
-          className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="現在表示中の系列をセットとして保存"
         >
           ＋セット保存

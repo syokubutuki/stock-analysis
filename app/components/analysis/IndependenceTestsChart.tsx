@@ -46,7 +46,7 @@ export default function IndependenceTestsChart({ prices, seriesMode }: Props) {
           </div>
           <div className="p-2 bg-gray-50 rounded">
             <div className="text-gray-500">p値</div>
-            <div className={`font-mono font-medium ${runs.pValue < 0.05 ? "text-red-600" : "text-green-600"}`}>
+            <div className={`font-mono font-medium ${runs.pValue < 0.05 ? "text-red-600" : "text-green-700"}`}>
               {pFmt(runs.pValue)}
             </div>
           </div>
@@ -58,7 +58,7 @@ export default function IndependenceTestsChart({ prices, seriesMode }: Props) {
           </div>
           <div className={`p-2 rounded ${runs.pValue < 0.05 ? "bg-red-50" : "bg-green-50"}`}>
             <div className="text-gray-500">判定</div>
-            <div className={`font-mono font-medium ${runs.pValue < 0.05 ? "text-red-600" : "text-green-600"}`}>
+            <div className={`font-mono font-medium ${runs.pValue < 0.05 ? "text-red-600" : "text-green-700"}`}>
               {runs.interpretation}
             </div>
           </div>
@@ -88,10 +88,10 @@ export default function IndependenceTestsChart({ prices, seriesMode }: Props) {
                     <td className={`py-1 px-2 text-center font-mono ${Math.abs(d.zStat) > 1.96 ? "text-red-600 font-medium" : "text-gray-600"}`}>
                       {d.zStat.toFixed(3)}
                     </td>
-                    <td className={`py-1 px-2 text-center font-mono ${d.pValue < 0.05 ? "text-red-600 font-medium" : "text-green-600"}`}>
+                    <td className={`py-1 px-2 text-center font-mono ${d.pValue < 0.05 ? "text-red-600 font-medium" : "text-green-700"}`}>
                       {pFmt(d.pValue)}
                     </td>
-                    <td className={`py-1 px-2 text-center ${d.pValue < 0.05 ? "text-red-600" : "text-green-600"}`}>
+                    <td className={`py-1 px-2 text-center ${d.pValue < 0.05 ? "text-red-600" : "text-green-700"}`}>
                       {d.pValue < 0.05 ? "iid棄却" : "棄却せず"}
                     </td>
                   </tr>

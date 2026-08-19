@@ -164,7 +164,7 @@ function hitTestTimingMatrix(width: number, x: number, y: number): { idx: number
 function pct(v: number): string { return (v * 100).toFixed(3) + "%"; }
 function pct2(v: number): string { return (v * 100).toFixed(2) + "%"; }
 function bpDay(v: number): string { return (v * 10000).toFixed(2) + "bp"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
 function initCanvas(canvas: HTMLCanvasElement, height: number): { ctx: CanvasRenderingContext2D; width: number; height: number } | null {
   const parent = canvas.parentElement;
   if (!parent) return null;

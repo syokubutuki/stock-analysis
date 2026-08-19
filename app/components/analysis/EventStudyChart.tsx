@@ -353,10 +353,10 @@ export default function EventStudyChart({ prices }: Props) {
                 return (
                   <tr key={s.k} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium text-gray-700">{s.k}日後</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.mean >= 0 ? "text-green-600" : "text-red-600"}`}>{pct(s.mean)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.median >= 0 ? "text-green-600" : "text-red-600"}`}>{pct(s.median)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${s.mean >= 0 ? "text-green-700" : "text-red-600"}`}>{pct(s.mean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${s.median >= 0 ? "text-green-700" : "text-red-600"}`}>{pct(s.median)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{(s.std * 100).toFixed(2)}%</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>{(s.winRate * 100).toFixed(0)}%</td>
+                    <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}>{(s.winRate * 100).toFixed(0)}%</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{pct(base)}</td>
                     <td className={`py-1 px-2 text-center font-mono font-medium ${ex > 0 ? "text-green-700" : ex < 0 ? "text-red-700" : ""}`}>{pct(ex)}</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">{s.n}</td>

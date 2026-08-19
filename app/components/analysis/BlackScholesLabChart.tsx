@@ -356,7 +356,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
       <div className="text-xs bg-gray-50 rounded p-2">
         <span className="font-medium text-gray-700">プット・コール・パリティ検証: </span>
         C−P = {fmt(parity.lhs, 3)} / S·e^(−qT)−K·e^(−rT) = {fmt(parity.rhs, 3)} → 残差 ={" "}
-        <span className={Math.abs(parity.residual) < 1e-4 ? "text-green-600" : "text-red-600"}>
+        <span className={Math.abs(parity.residual) < 1e-4 ? "text-green-700" : "text-red-600"}>
           {parity.residual.toExponential(2)}
         </span>
         （理論上0。BS価格は無裁定なので一致する）

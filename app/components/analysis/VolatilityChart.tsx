@@ -124,7 +124,7 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">現在のEWMA Vol (年率)</div>
-          <div className={`font-mono font-medium text-sm ${currentVol > 30 ? "text-red-600" : currentVol > 20 ? "text-orange-600" : "text-green-600"}`}>
+          <div className={`font-mono font-medium text-sm ${currentVol > 30 ? "text-red-600" : currentVol > 20 ? "text-orange-600" : "text-green-700"}`}>
             {currentVol.toFixed(1)}%
           </div>
         </div>

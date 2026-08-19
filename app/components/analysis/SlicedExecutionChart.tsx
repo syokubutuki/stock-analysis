@@ -174,13 +174,13 @@ export default function SlicedExecutionChart({ ticker }: Props) {
                   return (
                     <tr key={m.id} className={`border-b border-gray-100 ${isBest ? "ring-2 ring-green-400 ring-inset" : ""} ${m.isSingle ? "bg-gray-50/60" : ""}`}>
                       <td className="py-1 px-2 font-medium text-gray-700">
-                        {isBest && <span className="text-green-600 mr-1">◀</span>}{m.label}
+                        {isBest && <span className="text-green-700 mr-1">◀</span>}{m.label}
                       </td>
                       <td className="text-right px-2 text-gray-600">{m.n}</td>
-                      <td className={`text-right px-2 tabular-nums ${m.meanQPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(m.meanQPct / 100)}</td>
+                      <td className={`text-right px-2 tabular-nums ${m.meanQPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(m.meanQPct / 100)}</td>
                       <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">{fmtSignedPct(m.qCiLoPct / 100)}〜{fmtSignedPct(m.qCiHiPct / 100)}</td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{m.fillStdPct.toFixed(2)}%</td>
-                      <td className={`text-right px-2 tabular-nums ${m.isMeanPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(m.isMeanPct / 100)}</td>
+                      <td className={`text-right px-2 tabular-nums ${m.isMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(m.isMeanPct / 100)}</td>
                     </tr>
                   );
                 })}

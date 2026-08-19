@@ -396,7 +396,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
 
         <div>
           <div className="text-xs text-gray-500 mb-1">
-            <span className="text-green-500">速度 (トレンド) [右軸]</span> /
+            <span className="text-green-700">速度 (トレンド) [右軸]</span> /
             <span className="text-orange-500"> 加速度 [左軸]</span>
           </div>
           <div ref={velAccRef} className="w-full rounded border border-gray-100" />
@@ -435,7 +435,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
             <div className="space-y-1">
               {recentTurningPoints.map((tp, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className={tp.type === "peak" ? "text-red-500" : "text-green-500"}>
+                  <span className={tp.type === "peak" ? "text-red-500" : "text-green-700"}>
                     {tp.type === "peak" ? "天井" : "底"}
                   </span>
                   <span className="text-gray-500">{tp.time}</span>

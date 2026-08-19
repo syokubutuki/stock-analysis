@@ -183,7 +183,7 @@ export default function ForecastRangeChart({ prices }: Props) {
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">歪度</div>
-          <div className={`font-mono text-sm ${result.skewness < 0 ? "text-red-600" : "text-green-600"}`}>
+          <div className={`font-mono text-sm ${result.skewness < 0 ? "text-red-600" : "text-green-700"}`}>
             {result.skewness.toFixed(2)}
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function ForecastRangeChart({ prices }: Props) {
                   <td className="text-right font-mono">
                     {b95.lowPrice.toFixed(2)}〜{b95.highPrice.toFixed(2)}
                   </td>
-                  <td className={`text-right font-mono ${h.upProb >= 0.5 ? "text-green-600" : "text-red-600"}`}>
+                  <td className={`text-right font-mono ${h.upProb >= 0.5 ? "text-green-700" : "text-red-600"}`}>
                     {prob(h.upProb)}
                   </td>
                 </tr>

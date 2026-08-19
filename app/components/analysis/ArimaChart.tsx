@@ -529,7 +529,7 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
                 </div>
                 <div
                   className={
-                    diag.ljungBox.pValue > 0.05 ? "text-green-600" : "text-orange-600"
+                    diag.ljungBox.pValue > 0.05 ? "text-green-700" : "text-orange-600"
                   }
                 >
                   {diag.ljungBox.pValue > 0.05
@@ -552,7 +552,7 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
                 </div>
                 <div
                   className={
-                    diag.jarqueBera.pValue > 0.05 ? "text-green-600" : "text-orange-600"
+                    diag.jarqueBera.pValue > 0.05 ? "text-green-700" : "text-orange-600"
                   }
                 >
                   {diag.jarqueBera.pValue > 0.05

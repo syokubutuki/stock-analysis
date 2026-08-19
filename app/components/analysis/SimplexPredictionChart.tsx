@@ -288,7 +288,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3 text-xs">
         <div className={`p-2 rounded ${simplex.correlation > 0.3 ? "bg-green-50" : "bg-gray-50"}`}>
-          <div className={simplex.correlation > 0.3 ? "text-green-600" : "text-gray-500"}>Simplexスキル</div>
+          <div className={simplex.correlation > 0.3 ? "text-green-700" : "text-gray-500"}>Simplexスキル</div>
           <div className="font-bold">ρ = {simplex.correlation.toFixed(3)}</div>
         </div>
         <div className={`p-2 rounded ${smap.correlation > 0.3 ? "bg-blue-50" : "bg-gray-50"}`}>
@@ -403,7 +403,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
             <p className="font-medium text-gray-700 mb-1">4. 予測スキルの時間変化 (メタ戦略指標)</p>
             <p>ローリングウィンドウでの予測スキルρ(t)は、「今の市場が予測しやすいかどうか」を教えてくれる<span className="font-medium">メタ指標</span>です。</p>
             <ul className="list-disc pl-4 space-y-1 text-xs">
-              <li><span className="font-medium text-green-600">スキルが高い期間</span>: 系統的戦略の信頼性が高い → レバレッジ可能</li>
+              <li><span className="font-medium text-green-700">スキルが高い期間</span>: 系統的戦略の信頼性が高い → レバレッジ可能</li>
               <li><span className="font-medium text-red-600">スキルが低い期間</span>: ランダム性が支配的 → 待機/ポジション縮小</li>
               <li><span className="font-medium text-orange-600">方向精度 {">"} 60%</span>: 上昇/下落の方向を予測できている → 方向性ベットが有効</li>
             </ul>

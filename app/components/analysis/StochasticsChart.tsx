@@ -181,7 +181,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.fastK > 80
                   ? "text-red-600"
                   : last.fastK < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -195,7 +195,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.fastD > 80
                   ? "text-red-600"
                   : last.fastD < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -209,7 +209,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.slowK > 80
                   ? "text-red-600"
                   : last.slowK < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -223,7 +223,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.slowD > 80
                   ? "text-red-600"
                   : last.slowD < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >

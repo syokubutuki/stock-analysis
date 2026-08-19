@@ -240,7 +240,7 @@ export default function EdgeBookChart({ prices }: Props) {
                 {result.legs.map((l) => (
                   <tr key={l.id} className="border-b border-gray-100">
                     <td className="py-1 px-1.5">{l.label}</td>
-                    <td className={`text-right px-1 ${l.direction === "long" ? "text-green-600" : "text-red-600"}`}>{l.direction === "long" ? "買" : "売"}</td>
+                    <td className={`text-right px-1 ${l.direction === "long" ? "text-green-700" : "text-red-600"}`}>{l.direction === "long" ? "買" : "売"}</td>
                     <td className="text-right px-1 font-mono">{num2(l.sharpe)}</td>
                     <td className="text-right px-1 font-mono">{pct(l.annReturn)}</td>
                     <td className="text-right px-1 font-mono text-gray-500">{(l.weight * 100).toFixed(0)}%</td>

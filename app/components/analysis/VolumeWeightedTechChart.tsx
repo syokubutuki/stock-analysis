@@ -97,7 +97,7 @@ export default function VolumeWeightedTechChart({ prices }: Props) {
                     <td className="py-1 px-2 text-center font-medium">{d.type.toUpperCase()}</td>
                     <td className="py-1 px-2 text-center font-mono">{d.standard.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono">{d.vw.toFixed(2)}</td>
-                    <td className={`py-1 px-2 text-center font-mono font-medium ${d.diff > 0 ? "text-green-600" : "text-red-600"}`}>{d.diff > 0 ? "+" : ""}{d.diff.toFixed(2)}</td>
+                    <td className={`py-1 px-2 text-center font-mono font-medium ${d.diff > 0 ? "text-green-700" : "text-red-600"}`}>{d.diff > 0 ? "+" : ""}{d.diff.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

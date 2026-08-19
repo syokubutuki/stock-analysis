@@ -1101,7 +1101,7 @@ export default function PredictiveStrategyPanel({
             <WalkForwardDiagram trainWindow={trainWindow} testWindow={testWindow} embargo={embargo} />
             <div className="text-[11px] text-gray-500 space-y-1">
               <p>
-                <span className="text-emerald-600 font-medium">緑=学習期間</span>・
+                <span className="text-emerald-700 font-medium">緑=学習期間</span>・
                 <span className="text-slate-500 font-medium">灰=Embargo</span>・
                 <span className="text-amber-600 font-medium">黄=テスト(予測)期間</span>。
                 時間を右に進めながら、学習窓とテスト窓を「テスト窓の幅」ずつスライドさせて繰り返します。
@@ -1282,18 +1282,18 @@ export default function PredictiveStrategyPanel({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
             <MetricCell label="正答率" value={pct(result.metrics.accuracy)} />
             <MetricCell label="バランス正答率" value={pct(result.metrics.balancedAcc)}
-              color={result.metrics.balancedAcc > 0.5 ? "text-green-600" : "text-red-600"} />
+              color={result.metrics.balancedAcc > 0.5 ? "text-green-700" : "text-red-600"} />
             <MetricCell label="AUC" value={result.metrics.auc.toFixed(3)}
-              color={result.metrics.auc > 0.5 ? "text-green-600" : "text-red-600"} />
+              color={result.metrics.auc > 0.5 ? "text-green-700" : "text-red-600"} />
             <MetricCell label="ベースレート" value={pct(result.metrics.baseRate)} />
             <MetricCell label="適合率" value={pct(result.metrics.precision)} />
             <MetricCell label="再現率" value={pct(result.metrics.recall)} />
             <MetricCell label="F1スコア" value={result.metrics.f1.toFixed(3)} />
             <MetricCell label="LogLoss" value={result.metrics.logLoss.toFixed(4)} />
             <MetricCell label="予測累積リターン" value={pct(result.metrics.totalReturn)}
-              color={result.metrics.totalReturn > 0 ? "text-green-600" : "text-red-600"} />
+              color={result.metrics.totalReturn > 0 ? "text-green-700" : "text-red-600"} />
             <MetricCell label="B&H累積リターン" value={pct(result.metrics.bhReturn)}
-              color={result.metrics.bhReturn > 0 ? "text-green-600" : "text-red-600"} />
+              color={result.metrics.bhReturn > 0 ? "text-green-700" : "text-red-600"} />
             <MetricCell label="超過リターン"
               value={(result.metrics.totalReturn - result.metrics.bhReturn > 0 ? "+" : "") + pct(result.metrics.totalReturn - result.metrics.bhReturn)}
               color={result.metrics.totalReturn > result.metrics.bhReturn ? "text-green-700" : "text-red-700"} />
@@ -1371,12 +1371,12 @@ export default function PredictiveStrategyPanel({
                 <MetricCell label="起点(学習最終日)" value={forecast.trainEnd.slice(2)} />
                 <MetricCell label="起点終値" value={forecast.lastClose.toFixed(2)} />
                 <MetricCell label={`${forecast.horizon}日後 予測終値`} value={last.close.toFixed(2)}
-                  color={last.close >= forecast.lastClose ? "text-green-600" : "text-red-600"} />
+                  color={last.close >= forecast.lastClose ? "text-green-700" : "text-red-600"} />
                 <MetricCell label="期間 期待リターン" value={(totalRet >= 0 ? "+" : "") + (totalRet * 100).toFixed(2) + "%"}
-                  color={totalRet >= 0 ? "text-green-600" : "text-red-600"} />
+                  color={totalRet >= 0 ? "text-green-700" : "text-red-600"} />
                 <MetricCell label="上昇予測日数" value={`${up}/${forecast.horizon}`} />
                 <MetricCell label="日次ボラ σ" value={(forecast.sigma * 100).toFixed(2) + "%"} />
-                <MetricCell label="上昇日平均 μ↑" value={"+" + (forecast.muUp * 100).toFixed(2) + "%"} color="text-green-600" />
+                <MetricCell label="上昇日平均 μ↑" value={"+" + (forecast.muUp * 100).toFixed(2) + "%"} color="text-green-700" />
                 <MetricCell label="下落日平均 μ↓" value={(forecast.muDown * 100).toFixed(2) + "%"} color="text-red-600" />
               </div>
               <div className="text-[11px] text-fg-muted">

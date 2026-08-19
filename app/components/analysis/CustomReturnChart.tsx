@@ -471,7 +471,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
               <span className="text-fg-muted">予測行の色の濃さ＝確信度</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-400" /> 的中</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-400" /> 外れ</span>
-              <span className={`ml-auto font-medium ${last.predicted === 1 ? "text-green-600" : "text-red-600"}`}>
+              <span className={`ml-auto font-medium ${last.predicted === 1 ? "text-green-700" : "text-red-600"}`}>
                 直近 {last.time}: {last.predicted === 1 ? "▲上昇" : "▼下落"}予測（{(last.proba * 100).toFixed(1)}%）
               </span>
             </div>
@@ -550,7 +550,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
 }
 
 function StatCell({ label, value, positive, negative }: { label: string; value: string; positive?: boolean; negative?: boolean }) {
-  const color = positive ? "text-green-600" : negative ? "text-red-600" : "";
+  const color = positive ? "text-green-700" : negative ? "text-red-600" : "";
   return (
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>

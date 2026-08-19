@@ -161,28 +161,28 @@ export default function ACFExtendedChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Ljung-Box (リターン, L=10)</div>
           <div className="font-mono font-medium">Q={lb10.Q.toFixed(2)}</div>
-          <div className={`${lb10.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`${lb10.pValue < 0.05 ? "text-red-500" : "text-green-700"}`}>
             p={lb10.pValue.toFixed(4)} {lb10.pValue < 0.05 ? "有意" : "非有意"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Ljung-Box (リターン, L=20)</div>
           <div className="font-mono font-medium">Q={lb20.Q.toFixed(2)}</div>
-          <div className={`${lb20.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`${lb20.pValue < 0.05 ? "text-red-500" : "text-green-700"}`}>
             p={lb20.pValue.toFixed(4)} {lb20.pValue < 0.05 ? "有意" : "非有意"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Ljung-Box (r², L=10)</div>
           <div className="font-mono font-medium">Q={lbSq10.Q.toFixed(2)}</div>
-          <div className={`${lbSq10.pValue < 0.05 ? "text-orange-600 font-medium" : "text-green-500"}`}>
+          <div className={`${lbSq10.pValue < 0.05 ? "text-orange-600 font-medium" : "text-green-700"}`}>
             p={lbSq10.pValue.toFixed(4)} {lbSq10.pValue < 0.05 ? "ボラクラスタ有意" : "非有意"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Ljung-Box (|r|, L=10)</div>
           <div className="font-mono font-medium">Q={lbAbs10.Q.toFixed(2)}</div>
-          <div className={`${lbAbs10.pValue < 0.05 ? "text-orange-600 font-medium" : "text-green-500"}`}>
+          <div className={`${lbAbs10.pValue < 0.05 ? "text-orange-600 font-medium" : "text-green-700"}`}>
             p={lbAbs10.pValue.toFixed(4)} {lbAbs10.pValue < 0.05 ? "長期記憶有意" : "非有意"}
           </div>
         </div>

@@ -241,7 +241,7 @@ export default function DFAChart({ prices, seriesMode }: Props) {
           <div className="text-gray-500">Hurst指数 (α)</div>
           <div className={`font-mono font-medium text-sm ${
             dfa.hurstExponent > 0.6
-              ? "text-green-600"
+              ? "text-green-700"
               : dfa.hurstExponent < 0.4
               ? "text-blue-600"
               : ""

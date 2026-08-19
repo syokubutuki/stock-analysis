@@ -576,9 +576,9 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                         : <span className="text-gray-300">—</span>}
                     </td>
                     {mode !== "usbin" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
-                    <td className="text-right px-2 text-green-600 tabular-nums">{fmtPct(s.mfe)}</td>
+                    <td className="text-right px-2 text-green-700 tabular-nums">{fmtPct(s.mfe)}</td>
                     <td className="text-right px-2 text-red-600 tabular-nums">{fmtPct(s.mae)}</td>
-                    <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
+                    <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
                   </tr>
                 ))}
               </tbody>

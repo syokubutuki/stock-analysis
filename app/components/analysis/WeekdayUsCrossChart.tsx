@@ -1310,7 +1310,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
         <div className="font-mono font-medium text-gray-700 truncate">{ticker}</div>
         <div className="text-[9px] text-fg-muted tabular-nums truncate">
           n={n}
-          {allocTxt && <span className="ml-1 text-emerald-600 font-medium">{allocTxt}</span>}
+          {allocTxt && <span className="ml-1 text-emerald-700 font-medium">{allocTxt}</span>}
         </div>
       </div>
     );
@@ -1332,7 +1332,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           className="w-[112px] px-1 py-0.5 text-[11px] border border-gray-300 rounded"
           placeholder={ticker}
         />
-        <button onClick={commit} title="保存" className="text-emerald-600 hover:text-emerald-700 text-sm leading-none">✓</button>
+        <button onClick={commit} title="保存" className="text-emerald-700 hover:text-emerald-700 text-sm leading-none">✓</button>
         <button onClick={() => setEditing(false)} title="取消" className="text-gray-500 hover:text-gray-600 text-sm leading-none">✕</button>
       </div>
     );
@@ -1359,7 +1359,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           <span className="text-gray-500" title={`並び替えに使っている値: ${sortLabel}`}>{sortTxt}</span>
         )}
         {allocTxt && (
-          <span className={alloc?.excluded ? "text-gray-300" : "text-emerald-600 font-medium"} title={allocTip}>
+          <span className={alloc?.excluded ? "text-gray-300" : "text-emerald-700 font-medium"} title={allocTip}>
             配分{allocTxt}
           </span>
         )}
