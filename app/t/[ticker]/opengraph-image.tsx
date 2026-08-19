@@ -71,7 +71,17 @@ const COLORS = {
   accent: "#38bdf8",
   cardBg: "rgba(255,255,255,0.06)",
   cardBorder: "rgba(148,197,236,0.24)",
+  // 符号の色はサイト内の既定（正=緑 / 負=赤。text-green-600 / text-red-600 が134箇所）に
+  // 合わせる。ただし本文の 600 番台は濃紺の上でコントラストが足りないので、暗色背景用に
+  // 既に前例のある 400 番台を使う（#34d399 で 7.9:1・#f87171 で 5.3:1）。
+  positive: "#34d399",
+  negative: "#f87171",
 };
+
+/** 符号を持つ数値の色。持たない数値（現在値・ボラティリティ）は既定の白のまま。 */
+function signColor(value: number): string {
+  return value >= 0 ? COLORS.positive : COLORS.negative;
+}
 
 type Props = { params: Promise<{ ticker: string }> };
 
@@ -195,7 +205,7 @@ function Footer({ right }: { right: string }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div
       style={{
@@ -210,7 +220,9 @@ function Metric({ label, value }: { label: string; value: string }) {
       }}
     >
       <div style={{ fontSize: 20, color: COLORS.muted }}>{label}</div>
-      <div style={{ fontSize: 38, fontWeight: 700, marginTop: 10 }}>{value}</div>
+      <div style={{ fontSize: 38, fontWeight: 700, marginTop: 10, color: color ?? COLORS.text }}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -246,9 +258,17 @@ function InstrumentCard({
             label={`現在値 ${currency}`}
             value={formatSummaryPrice(summary.currentPrice, currency)}
           />
-          <Metric label="期間リターン" value={signedPercent(summary.periodReturn)} />
+          <Metric
+            label="期間リターン"
+            value={signedPercent(summary.periodReturn)}
+            color={signColor(summary.periodReturn)}
+          />
           <Metric label="年率ボラティリティ" value={plainPercent(summary.annualizedVolatility)} />
-          <Metric label="最大ドローダウン" value={signedPercent(summary.maxDrawdown)} />
+          <Metric
+            label="最大ドローダウン"
+            value={signedPercent(summary.maxDrawdown)}
+            color={signColor(summary.maxDrawdown)}
+          />
         </div>
       ) : (
         <div
