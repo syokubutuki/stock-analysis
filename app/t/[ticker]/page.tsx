@@ -26,6 +26,8 @@ type Props = { params: Promise<{ ticker: string }> };
 // Cache Components を有効化する必要があり、どちらも /api/stock 全体に波及する。
 //
 // したがってキャッシュは getStockData の Runtime Cache（fresh 8時間・保持7日）が担う。
+// OG画像（opengraph-image.tsx）はこの層を共有したうえで、CDN 側の s-maxage を明示して
+// 1銘柄あたりの画像生成を8時間に1回へ抑える。
 export const dynamic = "force-dynamic";
 export const dynamicParams = false;
 
@@ -50,8 +52,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: canonicalPath },
+    // images は指定しない。opengraph-image.tsx（ファイル規約）が銘柄別の画像を
+    // og:image / twitter:image の両方に流し込む。ここで images を書くと上書きしてしまう。
     openGraph: { title, description, type: "website", url: canonicalPath },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
