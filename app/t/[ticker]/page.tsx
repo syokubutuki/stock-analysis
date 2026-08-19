@@ -15,8 +15,17 @@ import type { StockData } from "../../lib/types";
 
 type Props = { params: Promise<{ ticker: string }> };
 
-// stock-source.server.ts は上流取得を no-store にしているため、このページはリクエスト時に
-// SSRする。価格そのものの fresh 8時間・stale 7日は getStockData の共有キャッシュが担う。
+// FU21（キャッシュ方針）の判断: **force-dynamic を維持する。**
+//
+// ISR（revalidate）へ寄せることは、このページの範囲では選べない。
+// stock-source.server.ts の上流 fetch が `cache: "no-store"` なので、`revalidate` を
+// 付けても Next は各銘柄で `DYNAMIC_SERVER_USAGE` を投げて動的へ落ちる。実測すると
+// ビルドが98銘柄ぶん Yahoo を叩いたうえで1ページも prerender されない（`ƒ` のまま）。
+// しかも例外は本ファイルの try/catch が拾ってしまうため、静かに「取得できませんでした」
+// を焼き付けかねない。ISR を成立させるには stock-source.server.ts の no-store を外すか
+// Cache Components を有効化する必要があり、どちらも /api/stock 全体に波及する。
+//
+// したがってキャッシュは getStockData の Runtime Cache（fresh 8時間・保持7日）が担う。
 export const dynamic = "force-dynamic";
 export const dynamicParams = false;
 
