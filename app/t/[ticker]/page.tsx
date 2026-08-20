@@ -15,8 +15,19 @@ import type { StockData } from "../../lib/types";
 
 type Props = { params: Promise<{ ticker: string }> };
 
-// stock-source.server.ts は上流取得を no-store にしているため、このページはリクエスト時に
-// SSRする。価格そのものの fresh 8時間・stale 7日は getStockData の共有キャッシュが担う。
+// FU21（キャッシュ方針）の判断: **force-dynamic を維持する。**
+//
+// ISR（revalidate）へ寄せることは、このページの範囲では選べない。
+// stock-source.server.ts の上流 fetch が `cache: "no-store"` なので、`revalidate` を
+// 付けても Next は各銘柄で `DYNAMIC_SERVER_USAGE` を投げて動的へ落ちる。実測すると
+// ビルドが98銘柄ぶん Yahoo を叩いたうえで1ページも prerender されない（`ƒ` のまま）。
+// しかも例外は本ファイルの try/catch が拾ってしまうため、静かに「取得できませんでした」
+// を焼き付けかねない。ISR を成立させるには stock-source.server.ts の no-store を外すか
+// Cache Components を有効化する必要があり、どちらも /api/stock 全体に波及する。
+//
+// したがってキャッシュは getStockData の Runtime Cache（fresh 8時間・保持7日）が担う。
+// OG画像（opengraph-image.tsx）はこの層を共有したうえで、CDN 側の s-maxage を明示して
+// 1銘柄あたりの画像生成を8時間に1回へ抑える。
 export const dynamic = "force-dynamic";
 
 // generateStaticParams に無い値もページ本体で受ける。false にすると Next が
@@ -52,8 +63,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: canonicalPath },
+    // images は指定しない。opengraph-image.tsx（ファイル規約）が銘柄別の画像を
+    // og:image / twitter:image の両方に流し込む。ここで images を書くと上書きしてしまう。
     openGraph: { title, description, type: "website", url: canonicalPath },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
