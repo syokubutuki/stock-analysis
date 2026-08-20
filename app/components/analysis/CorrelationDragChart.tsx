@@ -862,7 +862,7 @@ export default function CorrelationDragChart({
                                 <td
                                   className={`py-1 px-2 text-right font-medium ${
                                     !p.ci.ok
-                                      ? "text-gray-300"
+                                      ? "text-fg-muted"
                                       : p.ci.delta > 0
                                         ? "text-red-700"
                                         : "text-blue-700"

@@ -190,7 +190,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         <span>
           価格キャッシュ(IndexedDB): {cache ? `${cache.count}銘柄` : "—"}
           {cache && cache.newestAt ? `・最終取得 ${new Date(cache.newestAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
-          <span className="text-gray-300">（ブラウザ8時間TTL・サーバー共有キャッシュあり）</span>
+          <span className="text-fg-muted">（ブラウザ8時間TTL・サーバー共有キャッシュあり）</span>
         </span>
         {cache && cache.count > 0 && (
           <button

@@ -1229,7 +1229,7 @@ export default function SpiralHeatmap({ prices }: Props) {
             >
               全営業日
             </button>
-            <span className="mx-1 text-gray-300">|</span>
+            <span className="mx-1 text-gray-500">|</span>
             <button onClick={() => setDistDows([1, 2, 3, 4, 5])} className="px-2 py-0.5 text-[11px] rounded bg-white text-gray-500 border border-gray-200 hover:bg-gray-100">全曜日</button>
           </div>
         </div>

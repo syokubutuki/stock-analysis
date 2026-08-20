@@ -197,10 +197,10 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
                 <span className="inline-flex items-center gap-1">
                   <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: b.color }} />
                   {b.label}
-                  <span className={isSel ? "text-gray-300" : "text-fg-muted"}>(n={b.n})</span>
+                  <span className={isSel ? "text-fg-muted" : "text-fg-muted"}>(n={b.n})</span>
                   {isToday && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今</span>}
                 </span>
-                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-fg-muted"}`}>
+                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-fg-muted" : "text-fg-muted"}`}>
                   {fmtBinRange(b.rangeLo, b.rangeHi)}
                 </span>
               </button>

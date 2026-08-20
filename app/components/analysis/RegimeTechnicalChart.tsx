@@ -218,7 +218,7 @@ export default function RegimeTechnicalChart({ prices }: Props) {
                     {results.map((r, i) => (
                       <React.Fragment key={i}>
                         <td className="py-1.5 px-1 text-center font-mono text-gray-500">{row.getN(r)}</td>
-                        <td className={`py-1.5 px-1 text-center font-mono ${row.getWR(r) >= 0.5 ? "text-green-700 font-medium" : row.getN(r) > 0 ? "text-red-600" : "text-gray-300"}`}>
+                        <td className={`py-1.5 px-1 text-center font-mono ${row.getWR(r) >= 0.5 ? "text-green-700 font-medium" : row.getN(r) > 0 ? "text-red-600" : "text-fg-muted"}`}>
                           {row.getN(r) > 0 ? `${(row.getWR(r) * 100).toFixed(0)}%` : "-"}
                         </td>
                         <td className={`py-1.5 px-1 text-center font-mono ${row.getR(r) >= 0 ? "text-green-700" : "text-red-600"}`}>

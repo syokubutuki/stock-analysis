@@ -141,7 +141,7 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
                     <td className="text-center px-2">
                       {e.grossSignificant
                         ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${e.survives ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>{e.survives ? "生存" : "消滅"}</span>
-                        : <span className="text-gray-300">—</span>}
+                        : <span className="text-gray-500">—</span>}
                     </td>
                   </tr>
                 ))}

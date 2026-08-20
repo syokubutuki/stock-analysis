@@ -871,11 +871,11 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
                     <td className="text-right px-1 font-mono text-gray-700">{s.t.toFixed(2)}</td>
                     <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{s.pAdj.toFixed(3)}{star(s.pAdj)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{Math.round(s.yearsPositive * 100)}%<span className="text-fg-muted">({s.nYears})</span></td>
-                    <td className="text-center px-1">{s.halfAgree ? <span className="text-green-700">✓</span> : <span className="text-gray-300">–</span>}</td>
+                    <td className="text-center px-1">{s.halfAgree ? <span className="text-green-700">✓</span> : <span className="text-gray-500">–</span>}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600 whitespace-nowrap">
                       {s.ciLo !== null && s.ciHi !== null
                         ? <span className={s.ciLo > 0 || s.ciHi < 0 ? "text-blue-600" : "text-fg-muted"}>[{pct(s.ciLo, 2)}, {pct(s.ciHi, 2)}]</span>
-                        : <span className="text-gray-300">–</span>}
+                        : <span className="text-gray-500">–</span>}
                     </td>
                   </tr>
                 );

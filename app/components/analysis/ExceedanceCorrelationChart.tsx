@@ -457,7 +457,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                       </td>
                       <td className={`py-1 px-2 text-right ${sig ? "font-semibold" : ""}`}>
                         {sv(l.asym)}
-                        <span className="text-gray-300">
+                        <span className="text-fg-muted">
                           {" "}
                           [{cv(l.asymLo)}, {cv(l.asymHi)}]
                         </span>
@@ -560,7 +560,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                     <tr key={`${p.a}|${p.b}`} className="border-b border-gray-100">
                       <td className="py-1 pr-2 text-gray-700">
                         <span className="font-medium">{p.a}</span>
-                        <span className="text-gray-300"> × </span>
+                        <span className="text-gray-500"> × </span>
                         <span className="font-medium">{p.b}</span>
                         <span className="text-fg-muted ml-1 hidden sm:inline">
                           {names[p.a] && names[p.b] ? `${names[p.a]} / ${names[p.b]}` : ""}

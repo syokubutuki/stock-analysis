@@ -348,7 +348,7 @@ export function PathEvolutionControls({ stats, evo }: { stats: PathStat[]; evo: 
         個別日（古→新のグラデーション）
       </label>
       <label
-        className={`flex items-center gap-1 text-xs ${hasEras ? "text-gray-600" : "text-gray-300"}`}
+        className={`flex items-center gap-1 text-xs ${hasEras ? "text-gray-600" : "text-fg-muted"}`}
         title={hasEras ? "" : "時代分割には1群あたり8営業日以上が必要"}
       >
         <input
@@ -446,7 +446,7 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
                   {rhoCell(d.troughRho, d.troughP, "trough")}
                   <td className="text-center px-2 text-gray-600">
                     <span className="text-blue-600">▲</span> {timeLabels[last.peakIdx] ?? "-"}
-                    <span className="text-gray-300 mx-1">/</span>
+                    <span className="text-gray-500 mx-1">/</span>
                     <span className="text-red-500">▽</span> {timeLabels[last.troughIdx] ?? "-"}
                   </td>
                 </tr>
@@ -611,10 +611,10 @@ export function PairDiffMatrix({ stats, pairDiffs }: { stats: PathStat[]; pairDi
                   <td className="p-1 text-gray-600 font-medium text-right">{r.label}</td>
                   {active.map((c) => {
                     const ci = stats.indexOf(c);
-                    if (ri === ci) return <td key={c.key} className="p-1 text-center text-gray-300">—</td>;
+                    if (ri === ci) return <td key={c.key} className="p-1 text-center text-gray-500">—</td>;
                     const key = ri < ci ? `${ri}-${ci}` : `${ci}-${ri}`;
                     const d = lookup.get(key);
-                    if (!d) return <td key={c.key} className="p-1 text-center text-gray-300">·</td>;
+                    if (!d) return <td key={c.key} className="p-1 text-center text-fg-muted">·</td>;
                     const diff = ri < ci ? d.diff : -d.diff;
                     const sig = d.pAdj < 0.05;
                     return (

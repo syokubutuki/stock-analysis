@@ -450,7 +450,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
               ))}
             </select>
           </label>
-          <label className={`flex items-center gap-1 ${RAKUTEN_MARGIN_RATES[marginKind].preferential ? "text-gray-500" : "text-gray-300"}`}>
+          <label className={`flex items-center gap-1 ${RAKUTEN_MARGIN_RATES[marginKind].preferential ? "text-gray-500" : "text-fg-muted"}`}>
             <input
               type="checkbox"
               disabled={!RAKUTEN_MARGIN_RATES[marginKind].preferential}

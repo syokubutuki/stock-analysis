@@ -568,7 +568,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                   {b.label}
                   {isToday && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今</span>}
                 </span>
-                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-fg-muted"}`}>
+                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-fg-muted" : "text-fg-muted"}`}>
                   {fmtBinRange(b.rangeLo, b.rangeHi)}
                 </span>
               </button>
@@ -954,7 +954,7 @@ function CrossHeatmap({
   };
 
   const renderCell = (c: CellStats | null, consensusP?: number, rowKey = "") => {
-    if (!c || c.n < 1) return <span className="text-gray-300">—</span>;
+    if (!c || c.n < 1) return <span className="text-gray-500">—</span>;
     if (metric.key === "shape") {
       return (
         <PathSpark
@@ -1190,7 +1190,7 @@ function CrossRankTable({
   const maxW = positive.reduce((m, r) => Math.max(m, r.weight), 0);
 
   const cell = (v: number, fmt: (x: number) => string, extra = "") =>
-    isFinite(v) ? <span className={extra}>{fmt(v)}</span> : <span className="text-gray-300">—</span>;
+    isFinite(v) ? <span className={extra}>{fmt(v)}</span> : <span className="text-gray-500">—</span>;
   const pctS = (x: number) => fmtSignedPct(x, 2);
   const pct2 = (x: number) => `${(x * 100).toFixed(2)}%`;
   const pct0 = (x: number) => `${(x * 100).toFixed(0)}%`;
@@ -1217,14 +1217,14 @@ function CrossRankTable({
       <td className="px-2 py-1 text-right tabular-nums text-gray-700">{cell(r.kelly, (x) => x.toFixed(2))}</td>
       <td className="px-2 py-1 text-right tabular-nums">
         {r.isConsensus ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-500">—</span>
         ) : r.excluded ? (
-          <span className="text-gray-300" title={`n=${r.n} が最小n(${minN})未満`}>対象外</span>
+          <span className="text-fg-muted" title={`n=${r.n} が最小n(${minN})未満`}>対象外</span>
         ) : (
           <div className="relative">
             <div className="absolute inset-y-0 right-0 rounded-sm bg-emerald-100"
               style={{ width: maxW > 0 ? `${Math.max(2, (r.weight / maxW) * 100)}%` : 0 }} />
-            <span className={`relative ${r.weight > 0 ? "font-semibold text-emerald-800" : "text-gray-300"}`}>
+            <span className={`relative ${r.weight > 0 ? "font-semibold text-emerald-800" : "text-fg-muted"}`}>
               {(r.weight * 100).toFixed(1)}%
             </span>
           </div>
@@ -1348,7 +1348,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           <button
             onClick={() => { setVal(hasName ? name! : ""); setEditing(true); }}
             title="銘柄名を編集(ウォッチリストに保存)"
-            className="text-gray-300 hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
+            className="text-fg-muted hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
           >✎</button>
         )}
       </div>
@@ -1359,7 +1359,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           <span className="text-gray-500" title={`並び替えに使っている値: ${sortLabel}`}>{sortTxt}</span>
         )}
         {allocTxt && (
-          <span className={alloc?.excluded ? "text-gray-300" : "text-emerald-700 font-medium"} title={allocTip}>
+          <span className={alloc?.excluded ? "text-fg-muted" : "text-emerald-700 font-medium"} title={allocTip}>
             配分{allocTxt}
           </span>
         )}
@@ -1387,7 +1387,7 @@ function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
   const { path, band, peakIdx, troughIdx, highMin, lowMin } = cell;
   const W = 104, H = 54, padX = 6, padTop = 9, padBot = 9;
   const G = path.length;
-  if (G < 2) return <span className="text-gray-300">—</span>;
+  if (G < 2) return <span className="text-gray-500">—</span>;
 
   // 山谷の振幅(寄り基準)は縦軸モードによらず同じ量。
   let pLo = Infinity, pHi = -Infinity;

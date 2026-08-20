@@ -54,7 +54,7 @@ export function NameColHeader({ mode, onChange }: {
       <button
         onClick={() => onChange(narrow ? "name" : "code")}
         title={narrow ? "銘柄列を広げて名称を表示" : "銘柄列を狭めてコードのみ表示(横スクロール時の表示幅を稼ぐ)"}
-        className="text-gray-300 hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
+        className="text-fg-muted hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
       >
         {narrow ? "»" : "«"}
       </button>

@@ -485,7 +485,7 @@ function MuReversalCheck({ rf, currentTickers }: { rf: number; currentTickers: s
                         </td>
                         {r.deltas.length === 0
                           ? CHECK_LOOKBACKS.map((lb) => (
-                              <td key={lb} className="py-1 px-2 text-right text-gray-300">
+                              <td key={lb} className="py-1 px-2 text-right text-fg-muted">
                                 —
                               </td>
                             ))
@@ -494,7 +494,7 @@ function MuReversalCheck({ rf, currentTickers }: { rf: number; currentTickers: s
                                 key={i}
                                 className={`py-1 px-2 text-right ${
                                   !Number.isFinite(d)
-                                    ? "text-gray-300"
+                                    ? "text-fg-muted"
                                     : d < -0.02
                                       ? "text-red-700 font-semibold"
                                       : d >= 0

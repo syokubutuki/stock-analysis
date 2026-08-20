@@ -355,7 +355,7 @@ export default function VolTargetingChart({ prices }: Props) {
                   ? "max(自銘柄σ̂, 較正済VIX): どちらかの警告に従う防御型"
                   : "自銘柄の過去リターンのみ"
               }
-              className={`px-2 py-0.5 rounded border ${sigmaSource === s ? "bg-purple-600 text-white border-purple-600" : extReady[s] ? "bg-white text-gray-600 border-gray-300" : "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed"}`}
+              className={`px-2 py-0.5 rounded border ${sigmaSource === s ? "bg-purple-600 text-white border-purple-600" : extReady[s] ? "bg-white text-gray-600 border-gray-300" : "bg-gray-100 text-fg-muted border-gray-200 cursor-not-allowed"}`}
             >
               {SIGMA_SOURCE_LABEL[s]}
             </button>

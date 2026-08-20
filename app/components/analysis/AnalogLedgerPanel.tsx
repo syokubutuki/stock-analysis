@@ -44,7 +44,7 @@ function fmtPct(v: number, d = 1): string {
 function PathCompare({ ev, scale }: { ev: AnalogLedgerEval; scale: number }) {
   const H = ev.entry.settings.H;
   const W = 120, HT = 40, padX = 3, padY = 4;
-  if (H < 1 || scale <= 0) return <span className="text-gray-300">—</span>;
+  if (H < 1 || scale <= 0) return <span className="text-gray-500">—</span>;
   const x = (m: number) => padX + (m / H) * (W - 2 * padX);
   const clamp = (v: number) => Math.max(-scale, Math.min(scale, v));
   const y = (v: number) => HT / 2 - (clamp(v) / scale) * (HT / 2 - padY);
@@ -267,14 +267,14 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
             {summary.nVerified >= 1 ? (
               <div className="text-gray-700">
                 確定分の成績: 方向的中 <span className="font-bold">{isFinite(summary.dirHitRate) ? `${(summary.dirHitRate * 100).toFixed(0)}%` : "—"}</span>
-                <span className="mx-1.5 text-gray-300">|</span>
+                <span className="mx-1.5 text-gray-500">|</span>
                 帯被覆 <span className="font-bold">{isFinite(summary.coverage) ? `${(summary.coverage * 100).toFixed(0)}%` : "—"}</span><span className="text-gray-500">（名目50%）</span>
-                <span className="mx-1.5 text-gray-300">|</span>
+                <span className="mx-1.5 text-gray-500">|</span>
                 誤差中央(実測−予測) <span className="font-bold">{fmtPct(summary.medianErr)}</span>
-                <span className="mx-1.5 text-gray-300">|</span>
+                <span className="mx-1.5 text-gray-500">|</span>
                 高値到達 {isFinite(summary.mfeReachRate) ? `${(summary.mfeReachRate * 100).toFixed(0)}%` : "—"} / 安値到達 {isFinite(summary.maeReachRate) ? `${(summary.maeReachRate * 100).toFixed(0)}%` : "—"}
                 <span className="text-gray-500">（較正なら各≒50%）</span>
-                {isFinite(summary.ic) && (<><span className="mx-1.5 text-gray-300">|</span>IC <span className="font-bold">{summary.ic.toFixed(3)}</span></>)}
+                {isFinite(summary.ic) && (<><span className="mx-1.5 text-gray-500">|</span>IC <span className="font-bold">{summary.ic.toFixed(3)}</span></>)}
               </div>
             ) : (
               <div className="text-gray-500">確定した記録がまだありません（{settings.H}営業日ぶんのデータが揃うまで待つ）。</div>
@@ -291,12 +291,12 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
               <input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} className="accent-blue-600" />
               未確定だけ表示
             </label>
-            <span className="text-gray-300">|</span>
+            <span className="text-gray-500">|</span>
             <button onClick={doExport} className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600">エクスポート(JSON)</button>
             <button onClick={() => fileRef.current?.click()} className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600">インポート</button>
             <input ref={fileRef} type="file" accept="application/json" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) doImport(f); e.target.value = ""; }} />
-            <span className="text-gray-300">|</span>
+            <span className="text-gray-500">|</span>
             {confirmClear ? (
               <>
                 <span className="text-red-600">全{entries.length}件を削除しますか？（サーバーからも消えます・復元不可）</span>
@@ -342,16 +342,16 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                         {ev.verdict !== "stale" && <span className="text-fg-muted"> {ev.daysDone}/{e.settings.H}</span>}
                       </td>
                       <td className="px-1 py-0.5 text-center align-middle">
-                        {ev.verdict === "stale" ? <span className="text-gray-300">—</span> : <PathCompare ev={ev} scale={scale} />}
+                        {ev.verdict === "stale" ? <span className="text-gray-500">—</span> : <PathCompare ev={ev} scale={scale} />}
                       </td>
                       <td className={`px-2 py-1 text-right tabular-nums font-medium ${e.predMedian >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {fmtPct(e.predMedian)}
                       </td>
-                      <td className={`px-2 py-1 text-right tabular-nums font-semibold ${isFinite(ev.actFinal) ? (ev.actFinal >= 0 ? "text-green-700" : "text-red-700") : "text-gray-300"}`}>
+                      <td className={`px-2 py-1 text-right tabular-nums font-semibold ${isFinite(ev.actFinal) ? (ev.actFinal >= 0 ? "text-green-700" : "text-red-700") : "text-fg-muted"}`}>
                         {fmtPct(ev.actFinal)}
                       </td>
                       <td className="px-1 py-1 text-center">
-                        {ev.dirHit === null ? <span className="text-gray-300">—</span>
+                        {ev.dirHit === null ? <span className="text-gray-500">—</span>
                           : ev.dirHit ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums text-gray-600">
@@ -359,10 +359,21 @@ export default function AnalogLedgerPanel({ rows, settings, pricesByTicker, name
                       </td>
                       <td className="px-1 py-1 text-center whitespace-nowrap"
                         title={`予測 高${fmtPct(e.predMfe)}/安${fmtPct(e.predMae)} → 実測 高${fmtPct(ev.actMfe)}/安${fmtPct(ev.actMae)}`}>
-                        {ev.verdict === "stale" ? <span className="text-gray-300">—</span> : (
+                        {ev.verdict === "stale" ? <span className="text-gray-500">—</span> : (
                           <>
-                            <span className={ev.mfeReached ? "text-green-700" : "text-gray-300"}>▲</span>
-                            <span className={ev.maeReached ? "text-red-500" : "text-gray-300"}>▼</span>
+                            {/* 到達/未到達を色だけで出さない。塗り(▲▼)=到達・中空(△▽)=未到達 */}
+                            <span
+                              className={ev.mfeReached ? "text-green-700" : "text-gray-500"}
+                              aria-label={ev.mfeReached ? "高値目標に到達" : "高値目標に未到達"}
+                            >
+                              {ev.mfeReached ? "▲" : "△"}
+                            </span>
+                            <span
+                              className={ev.maeReached ? "text-red-700" : "text-gray-500"}
+                              aria-label={ev.maeReached ? "安値目標に到達" : "安値目標に未到達"}
+                            >
+                              {ev.maeReached ? "▼" : "▽"}
+                            </span>
                           </>
                         )}
                       </td>

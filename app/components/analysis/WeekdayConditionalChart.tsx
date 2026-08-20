@@ -69,7 +69,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number) => void
           {z === 1 ? "100%" : `${z * 100}%`}
         </button>
       ))}
-      {zoom !== 1 && <span className="text-gray-300 ml-1">拡大時は枠内を横スクロール</span>}
+      {zoom !== 1 && <span className="text-fg-muted ml-1">拡大時は枠内を横スクロール</span>}
     </div>
   );
 }

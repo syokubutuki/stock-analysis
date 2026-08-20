@@ -225,7 +225,7 @@ export default function InteractionScanChart({ prices }: Props) {
                     <td className="text-right px-1.5 font-mono text-gray-600 whitespace-nowrap">
                       {c.ciLo !== null && c.ciHi !== null
                         ? <span className={c.ciLo > 0 || c.ciHi < 0 ? "text-blue-600" : "text-fg-muted"}>[{pct(c.ciLo, 2)}, {pct(c.ciHi, 2)}]</span>
-                        : <span className="text-gray-300">–</span>}
+                        : <span className="text-gray-500">–</span>}
                     </td>
                     <td className="text-center px-1">{c.isNow ? <span className="text-blue-600 font-bold">●</span> : ""}</td>
                   </tr>

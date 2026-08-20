@@ -464,7 +464,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                   >
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[b] }} />
                     {label}
-                    <span className={`text-[10px] ${isSel ? "text-gray-300" : "text-fg-muted"}`}>n={result.binCounts[b]}</span>
+                    <span className={`text-[10px] ${isSel ? "text-fg-muted" : "text-fg-muted"}`}>n={result.binCounts[b]}</span>
                     {isQuery && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今週</span>}
                   </button>
                 );
@@ -573,7 +573,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                     <td className="text-right px-2">
                       {s.usBin !== null
                         ? <span className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[s.usBin] }} />{result.binMetaObj.labels[s.usBin]}</span>
-                        : <span className="text-gray-300">—</span>}
+                        : <span className="text-gray-500">—</span>}
                     </td>
                     {mode !== "usbin" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
                     <td className="text-right px-2 text-green-700 tabular-nums">{fmtPct(s.mfe)}</td>

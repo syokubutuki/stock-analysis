@@ -221,7 +221,7 @@ function GuideCard({ guide }: { guide: AnalysisGuideEntry }) {
       </div>
 
       <footer className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-2.5">
-        <span className="text-[11px] text-slate-400">{guide.category}</span>
+        <span className="text-[11px] text-fg-muted">{guide.category}</span>
         <Link
           href={`/guide/${guide.slug}`}
           className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:text-blue-900"
@@ -241,7 +241,7 @@ function GuideCard({ guide }: { guide: AnalysisGuideEntry }) {
 function MetaChip({ label, value }: { label: string; value: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] text-slate-500">
-      <span className="text-slate-400">{label}</span>
+      <span className="text-fg-muted">{label}</span>
       <span className="font-medium text-slate-700">{value}</span>
     </span>
   );
@@ -259,7 +259,7 @@ function Block({
   return (
     <section>
       <h5 className="mb-2 flex items-center gap-1.5 font-semibold text-slate-900">
-        <span aria-hidden="true" className="text-slate-400">
+        <span aria-hidden="true" className="text-gray-500">
           {icon}
         </span>
         {heading}

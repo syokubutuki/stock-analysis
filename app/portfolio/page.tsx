@@ -533,7 +533,7 @@ export default function PortfolioPage() {
 
           {/* ユニバース一括追加。業種バスケットは分析側の選択肢としては既にあったが、
               お気に入りへ流し込む導線が無く、30銘柄を手で打つしかなかった。 */}
-          <span className="text-gray-300">|</span>
+          <span className="text-gray-500">|</span>
           <select
             value={bulkUniverse}
             onChange={(e) => {
@@ -871,13 +871,13 @@ function ListRow({
               {dist.toFixed(1)}%
             </span>
           ) : (
-            <span className="text-gray-300">—</span>
+            <span className="text-gray-500">—</span>
           )}
         </span>
 
         <button
           onClick={onToggleExpand}
-          className="shrink-0 text-gray-300 hover:text-gray-500 text-xs w-4"
+          className="shrink-0 text-fg-muted hover:text-gray-500 text-xs w-4"
           title="根拠"
         >
           {expanded ? "▾" : "▸"}
@@ -899,7 +899,7 @@ function ListRow({
         <button onClick={onToggleEdit} className="shrink-0 text-[10px] text-fg-muted hover:text-gray-900">
           編集
         </button>
-        <button onClick={onRemove} className="shrink-0 text-gray-300 hover:text-red-400 text-xs leading-none">
+        <button onClick={onRemove} className="shrink-0 text-fg-muted hover:text-red-400 text-xs leading-none">
           ×
         </button>
       </div>

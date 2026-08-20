@@ -27,7 +27,7 @@ function tColor(t: number): string {
 }
 
 function cellTd(c: CellStat | null, key: number) {
-  if (!c) return <td key={key} className="py-1 px-2 text-center text-gray-300">—</td>;
+  if (!c) return <td key={key} className="py-1 px-2 text-center text-gray-500">—</td>;
   const sig = Math.abs(c.t) >= 1.96;
   return (
     <td key={key} className="py-1 px-2 text-right" style={{ background: tColor(c.t) }}>

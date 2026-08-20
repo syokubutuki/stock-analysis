@@ -853,7 +853,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                           const c = famStat(a, f);
                           if (!c || c.k < 2)
                             return (
-                              <td key={f} className="py-1 px-2 text-right text-gray-300">
+                              <td key={f} className="py-1 px-2 text-right text-fg-muted">
                                 —
                               </td>
                             );

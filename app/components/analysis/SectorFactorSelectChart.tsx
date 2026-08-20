@@ -915,7 +915,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
                             <b>{pct(a.weight, 1)}</b>
                           )
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-gray-500">—</span>
                         )}
                       </td>
                     </tr>

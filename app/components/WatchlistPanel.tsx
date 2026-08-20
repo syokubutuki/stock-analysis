@@ -75,7 +75,7 @@ export default function WatchlistPanel({
         disabled={!currentTicker}
         title={isStarred ? "ウォッチリストから削除" : "ウォッチリストに追加"}
         className={`text-xl leading-none transition-colors disabled:opacity-30 ${
-          isStarred ? "text-yellow-400" : "text-gray-300 hover:text-yellow-300"
+          isStarred ? "text-yellow-400" : "text-fg-muted hover:text-yellow-300"
         }`}
       >
         {isStarred ? "★" : "☆"}

@@ -395,7 +395,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
             <tr>
               <td className="px-1 py-0.5 text-left text-fg-muted">勝率</td>
               {rows.map((r) => (
-                <td key={r.dow} className={`px-1 py-0.5 tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""} ${r.n >= 3 ? "text-gray-600" : "text-gray-300"}`}>
+                <td key={r.dow} className={`px-1 py-0.5 tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""} ${r.n >= 3 ? "text-gray-600" : "text-fg-muted"}`}>
                   {r.n >= 3 ? `${(r.winRate * 100).toFixed(0)}%` : "—"}
                 </td>
               ))}

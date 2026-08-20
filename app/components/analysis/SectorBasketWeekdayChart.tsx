@@ -287,7 +287,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                         {pathResult.bins.map((b) => {
                           const v = s.perWeekday[b.weekday];
                           return (
-                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-gray-300" : v >= 0 ? "text-green-700" : "text-red-600"}`}>
+                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-fg-muted" : v >= 0 ? "text-green-700" : "text-red-600"}`}>
                               {isNaN(v) ? "-" : fmtSignedPct(v, 1)}
                             </td>
                           );

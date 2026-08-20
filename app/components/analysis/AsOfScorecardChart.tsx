@@ -521,7 +521,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                       <tr key={key} className="border-b border-gray-100">
                         <td className="py-1 px-1.5 text-gray-700">{label}</td>
                         {row.map((r, i) => {
-                          if (!r || !isFinite(r.ic)) return <td key={i} className="text-center px-1.5 text-gray-300">—</td>;
+                          if (!r || !isFinite(r.ic)) return <td key={i} className="text-center px-1.5 text-gray-500">—</td>;
                           const sig = isFinite(r.icLo) && (r.icLo > 0 || r.icHi < 0);
                           return (
                             <td key={i} className="text-center px-1.5 font-mono">

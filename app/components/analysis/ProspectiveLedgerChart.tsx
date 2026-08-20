@@ -247,7 +247,7 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
                     <td className="text-right px-1">
                       <button
                         onClick={(ev2) => { ev2.stopPropagation(); onRemove(e.id); }}
-                        className="text-gray-300 hover:text-red-500"
+                        className="text-fg-muted hover:text-red-500"
                         title="台帳から削除"
                       >
                         ✕

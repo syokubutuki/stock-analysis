@@ -938,7 +938,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                         const c = cellAt(main, d, b);
                         if (!c || c.n === 0)
                           return (
-                            <td key={b} className="py-1 px-1 text-center text-gray-300">
+                            <td key={b} className="py-1 px-1 text-center text-fg-muted">
                               —
                             </td>
                           );
@@ -1341,7 +1341,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
                             {[0, 1, 2, 3, 4].map((d) => {
                               if (!isFinite(yb.beta[d]))
                                 return (
-                                  <td key={d} className="py-1 px-1 text-center text-gray-300">
+                                  <td key={d} className="py-1 px-1 text-center text-fg-muted">
                                     —
                                   </td>
                                 );
