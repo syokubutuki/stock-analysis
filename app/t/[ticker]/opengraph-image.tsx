@@ -117,7 +117,11 @@ export default async function TickerOpengraphImage({ params }: Props) {
   }
 
   try {
-    const data = await getStockData(instrument.yahooSymbol, "1y");
+    // page.tsx と同じ 10y で取る。1y にすると range がキャッシュキーに入る都合で
+    // （stock-data.server.ts の cacheKey()）、アプリ本体も銘柄ページも温めない
+    // 専用エントリになり、画像生成のたびに MISS を踏む。掲載する直近1年は
+    // buildTickerPageSummary() が切り出すので、数値は 1y で取るのと同じである。
+    const data = await getStockData(instrument.yahooSymbol, "10y");
     const summary = buildTickerPageSummary(data.prices);
     if (
       summary &&
