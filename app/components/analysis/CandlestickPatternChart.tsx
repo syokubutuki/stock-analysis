@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { detectCandlestickPatterns, type CandlestickPattern } from "../../lib/candlestick-patterns";
 import GuideEntryPanel from "./GuideEntryPanel";
+import DirectionValue from "./DirectionValue";
 
 interface Props { prices: PricePoint[]; }
 
@@ -40,17 +41,17 @@ export default function CandlestickPatternChart({ prices }: Props) {
                   <div className="text-fg-muted text-[10px]">{p.name}</div>
                 </td>
                 <td className="py-1 px-2 text-center font-mono">{p.stats.count}</td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn1d >= 0 ? "text-green-700" : "text-red-600"}`}>
-                  {(p.stats.avgReturn1d * 100).toFixed(3)}%
+                <td className="py-1 px-2 text-center font-mono">
+                  <DirectionValue value={p.stats.avgReturn1d}>{(p.stats.avgReturn1d * 100).toFixed(3)}%</DirectionValue>
                 </td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.avgReturn5d >= 0 ? "text-green-700" : "text-red-600"}`}>
-                  {(p.stats.avgReturn5d * 100).toFixed(3)}%
+                <td className="py-1 px-2 text-center font-mono">
+                  <DirectionValue value={p.stats.avgReturn5d}>{(p.stats.avgReturn5d * 100).toFixed(3)}%</DirectionValue>
                 </td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.winRate1d >= 0.5 ? "text-green-700" : "text-red-600"}`}>
-                  {(p.stats.winRate1d * 100).toFixed(0)}%
+                <td className="py-1 px-2 text-center font-mono">
+                  <DirectionValue value={p.stats.winRate1d - 0.5}>{(p.stats.winRate1d * 100).toFixed(0)}%</DirectionValue>
                 </td>
-                <td className={`py-1 px-2 text-center font-mono ${p.stats.winRate5d >= 0.5 ? "text-green-700" : "text-red-600"}`}>
-                  {(p.stats.winRate5d * 100).toFixed(0)}%
+                <td className="py-1 px-2 text-center font-mono">
+                  <DirectionValue value={p.stats.winRate5d - 0.5}>{(p.stats.winRate5d * 100).toFixed(0)}%</DirectionValue>
                 </td>
                 <td className="py-1 px-2 text-center font-mono text-gray-600">{p.stats.tStat.toFixed(2)}</td>
                 <td className={`py-1 px-2 text-center font-bold ${p.stats.significant ? "text-green-700" : "text-fg-muted"}`}>

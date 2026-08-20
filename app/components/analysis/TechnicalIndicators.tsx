@@ -18,6 +18,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -241,14 +242,14 @@ export default function TechnicalIndicators({ prices, period }: Props) {
           <>
             <div className="p-2 bg-gray-50 rounded">
               <div className="text-gray-500">MACD</div>
-              <div className={`font-mono font-medium ${lastMACD.macd >= 0 ? "text-green-700" : "text-red-600"}`}>
-                {lastMACD.macd.toFixed(2)}
+              <div className="font-mono font-medium">
+                <DirectionValue value={lastMACD.macd}>{lastMACD.macd.toFixed(2)}</DirectionValue>
               </div>
             </div>
             <div className="p-2 bg-gray-50 rounded">
               <div className="text-gray-500">MACD Histogram</div>
-              <div className={`font-mono font-medium ${lastMACD.histogram >= 0 ? "text-green-700" : "text-red-600"}`}>
-                {lastMACD.histogram.toFixed(2)}
+              <div className="font-mono font-medium">
+                <DirectionValue value={lastMACD.histogram}>{lastMACD.histogram.toFixed(2)}</DirectionValue>
               </div>
             </div>
           </>

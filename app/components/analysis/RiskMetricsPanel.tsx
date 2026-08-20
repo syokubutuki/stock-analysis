@@ -12,6 +12,7 @@ import { computeRiskMetrics, rollingRiskMetrics } from "../../lib/risk-metrics";
 import GuideEntryPanel from "./GuideEntryPanel";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -103,12 +104,12 @@ export default function RiskMetricsPanel({ prices, period }: Props) {
         <MetricBox
           label="累積リターン"
           value={`${pct(metrics.totalReturn)}%`}
-          color={metrics.totalReturn >= 0 ? "text-green-700" : "text-red-600"}
+          dirValue={metrics.totalReturn}
         />
         <MetricBox
           label="年率リターン"
           value={`${pct(metrics.annualizedReturn)}%`}
-          color={metrics.annualizedReturn >= 0 ? "text-green-700" : "text-red-600"}
+          dirValue={metrics.annualizedReturn}
         />
         <MetricBox
           label="最良日"
@@ -204,7 +205,7 @@ export default function RiskMetricsPanel({ prices, period }: Props) {
         <MetricBox
           label="勝率"
           value={`${pct(metrics.winRate)}%`}
-          color={metrics.winRate >= 0.5 ? "text-green-700" : "text-red-600"}
+          dirValue={metrics.winRate - 0.5}
         />
         <MetricBox
           label="平均利益日"
@@ -242,16 +243,25 @@ function MetricBox({
   value,
   color,
   sub,
+  dirValue,
 }: {
   label: string;
   value: string;
   color?: string;
   sub?: string;
+  /** 上昇・下落を色以外でも示す指標に渡す。中立点を引いた値を入れること（勝率なら winRate - 0.5） */
+  dirValue?: number;
 }) {
   return (
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>
-      <div className={`font-mono font-medium ${color || ""}`}>{value}</div>
+      <div className="font-mono font-medium">
+        {dirValue === undefined ? (
+          <span className={color || ""}>{value}</span>
+        ) : (
+          <DirectionValue value={dirValue}>{value}</DirectionValue>
+        )}
+      </div>
       {sub && <div className="text-fg-muted mt-0.5">{sub}</div>}
     </div>
   );

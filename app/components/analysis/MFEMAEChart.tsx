@@ -13,6 +13,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -190,8 +191,9 @@ export default function MFEMAEChart({ prices, period }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">MFE/MAE比</div>
-          <div className={`font-mono font-medium ${stats.riskReward >= 1 ? "text-green-700" : "text-red-600"}`}>
-            {stats.riskReward.toFixed(2)}
+          {/* MFE/MAE比 は 1 が中立点 */}
+          <div className="font-mono font-medium">
+            <DirectionValue value={stats.riskReward - 1}>{stats.riskReward.toFixed(2)}</DirectionValue>
           </div>
           <div className="text-fg-muted">
             {stats.riskReward >= 1 ? "上方向優勢" : "下方向優勢"}
