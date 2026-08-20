@@ -4,6 +4,8 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeForecastRange } from "../../lib/forecast-range";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -57,7 +59,7 @@ export default function ForecastRangeChart({ prices }: Props) {
 
     // x軸グリッド + ラベル
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     for (let d = 0; d <= maxH; d++) {
@@ -95,7 +97,7 @@ export default function ForecastRangeChart({ prices }: Props) {
     }
 
     // 正規分布95%レンジ(点線アウトライン、比較用)
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     for (const side of ["high", "low"] as const) {
@@ -182,8 +184,8 @@ export default function ForecastRangeChart({ prices }: Props) {
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">歪度</div>
-          <div className={`font-mono text-sm ${result.skewness < 0 ? "text-red-600" : "text-green-600"}`}>
-            {result.skewness.toFixed(2)}
+          <div className="font-mono text-sm">
+            <DirectionValue value={result.skewness}>{result.skewness.toFixed(2)}</DirectionValue>
           </div>
         </div>
         <div className="border rounded p-2 text-center">
@@ -222,8 +224,8 @@ export default function ForecastRangeChart({ prices }: Props) {
                   <td className="text-right font-mono">
                     {b95.lowPrice.toFixed(2)}〜{b95.highPrice.toFixed(2)}
                   </td>
-                  <td className={`text-right font-mono ${h.upProb >= 0.5 ? "text-green-600" : "text-red-600"}`}>
-                    {prob(h.upProb)}
+                  <td className="text-right font-mono">
+                    <DirectionValue value={h.upProb - 0.5}>{prob(h.upProb)}</DirectionValue>
                   </td>
                 </tr>
               );

@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries, SERIES_MODE_LABELS } from "../../lib/series-mode";
 import { acf, pacf, confidenceBound } from "../../lib/autocorrelation";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -62,7 +63,7 @@ function drawACF(
   ctx.setLineDash([]);
 
   // ゼロ線
-  ctx.strokeStyle = "#999";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 0.5;
   ctx.beginPath();
   ctx.moveTo(margin.left, toY(0));
@@ -82,7 +83,7 @@ function drawACF(
   ctx.font = "bold 11px sans-serif";
   ctx.fillText(title, margin.left + 5, margin.top - 5);
   ctx.font = "10px sans-serif";
-  ctx.fillStyle = "#999";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText("Lag", width / 2 - 10, height - 3);
 }
 

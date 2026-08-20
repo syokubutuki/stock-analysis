@@ -275,7 +275,7 @@ export default function DiscretionaryBacktestPanel({
               <div
                 className={`text-lg font-bold ${
                   result.finalHumanPercent >= result.finalBuyHoldPercent
-                    ? "text-green-600"
+                    ? "text-green-700"
                     : "text-red-600"
                 }`}
               >

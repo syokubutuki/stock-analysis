@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { conditionalForwardReturns, buildStateFn, STATE_AXES, StateAxis } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -66,7 +67,7 @@ export default function PersistenceChart({ prices }: Props) {
       ctx.fillStyle = same ? "#16a34a" : "#dc2626";
       ctx.beginPath(); ctx.arc(xOf(p.first), yOf(p.second), 4, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("前半→", ml + plotW / 2, mt + plotH + 14);
   }, [data]);
 

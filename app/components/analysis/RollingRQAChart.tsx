@@ -12,6 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { rollingRQA, type RollingRQAResult } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -58,7 +59,7 @@ export default function RollingRQAChart({ prices, seriesMode }: Props) {
       title: "LAM (層状性)",
     });
     const rrSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "RR (再帰率)",
     });
@@ -146,7 +147,7 @@ export default function RollingRQAChart({ prices, seriesMode }: Props) {
           <div className="font-bold">{latest ? latest.diagEntropy.toFixed(2) : "—"}</div>
         </div>
         <div className="p-2 bg-green-50 rounded">
-          <div className="text-green-600">TT (現在)</div>
+          <div className="text-green-700">TT (現在)</div>
           <div className="font-bold">{latest ? latest.trappingTime.toFixed(1) : "—"}</div>
         </div>
         <div className="p-2 bg-red-50 rounded">
@@ -230,7 +231,7 @@ export default function RollingRQAChart({ prices, seriesMode }: Props) {
                 <p className="mt-1">垂直線 = 「ある状態に長時間留まる(層状態)」。<span className="font-medium">LAMが高い = 状態が固着 = トレンドの持続</span>。</p>
               </li>
               <li>
-                <span className="font-medium text-green-600">TT (トラッピング時間)</span> — 垂直線の平均長さ
+                <span className="font-medium text-green-700">TT (トラッピング時間)</span> — 垂直線の平均長さ
                 <div className="bg-gray-50 rounded p-1 mt-1 font-mono">
                   TT = Σ(v≥2) v·P(v) / Σ(v≥2) P(v)
                 </div>
@@ -263,7 +264,7 @@ export default function RollingRQAChart({ prices, seriesMode }: Props) {
                   <tr><td className="border p-1 text-orange-600">LAM急増</td><td className="border p-1">状態の固着・トレンド持続</td><td className="border p-1">トレンドフォロー維持</td></tr>
                   <tr><td className="border p-1 text-yellow-600">DET低+LAM高</td><td className="border p-1">予測不能だが固着</td><td className="border p-1">ボラティリティ急変の前兆</td></tr>
                   <tr><td className="border p-1 text-purple-600">ENTR急増</td><td className="border p-1">不確実性が急増</td><td className="border p-1">ストップ幅拡大・様子見</td></tr>
-                  <tr><td className="border p-1 text-green-600">DET高+TT長</td><td className="border p-1">安定的なトレンド</td><td className="border p-1">モメンタム戦略有効</td></tr>
+                  <tr><td className="border p-1 text-green-700">DET高+TT長</td><td className="border p-1">安定的なトレンド</td><td className="border p-1">モメンタム戦略有効</td></tr>
                 </tbody>
               </table>
             </div>

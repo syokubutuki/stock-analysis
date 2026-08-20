@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { conditionalDistributions, violinByGroup, type ViolinData } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -26,7 +27,7 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 }
 
 function pctFmt(v: number, d = 4): string { return (v * 100).toFixed(d) + "%"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
 
 function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: string) {
   const r = initCanvas(canvas, 280); if (!r) return;
@@ -95,12 +96,12 @@ function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: strin
     // ラベル
     ctx.fillStyle = "#333"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(d.label, cx, height - pad.bottom + 14);
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
     ctx.fillText(`n=${d.n}`, cx, height - pad.bottom + 24);
   }
 
   // Y軸
-  ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 5; i++) {
     const v = allMinX + (xRange * i) / 5;
     const y = toY(v);

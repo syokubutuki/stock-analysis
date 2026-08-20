@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeMarketTime } from "../../lib/market-time";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -51,7 +52,7 @@ export default function MarketTimeChart({ prices }: Props) {
       const toY = (v: number) => margin.top + plotH - v * plotH;
 
       // Axes
-      ctx.strokeStyle = "#ccc";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(margin.left, margin.top);
@@ -84,7 +85,7 @@ export default function MarketTimeChart({ prices }: Props) {
         ctx.lineTo(margin.left + plotW, toY(frac));
         ctx.stroke();
 
-        ctx.fillStyle = "#999";
+        ctx.fillStyle = CHART_COLORS.ink;
         ctx.font = "9px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(frac.toFixed(1), toX(frac), margin.top + plotH + 14);
@@ -93,7 +94,7 @@ export default function MarketTimeChart({ prices }: Props) {
       }
 
       // Diagonal reference line (calendar = market time)
-      ctx.strokeStyle = "#bbb";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
@@ -133,7 +134,7 @@ export default function MarketTimeChart({ prices }: Props) {
       const legendY = margin.top + 10;
       ctx.font = "11px sans-serif";
 
-      ctx.strokeStyle = "#bbb";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
@@ -141,7 +142,7 @@ export default function MarketTimeChart({ prices }: Props) {
       ctx.lineTo(legendX + 20, legendY);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = "#888";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.textAlign = "left";
       ctx.fillText("Calendar (reference)", legendX + 25, legendY + 4);
 
@@ -198,7 +199,7 @@ export default function MarketTimeChart({ prices }: Props) {
       const toY = (v: number) => margin.top + plotH - ((v - minP) / rangeP) * plotH;
 
       // Axes
-      ctx.strokeStyle = "#ccc";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(margin.left, margin.top);
@@ -207,7 +208,7 @@ export default function MarketTimeChart({ prices }: Props) {
       ctx.stroke();
 
       // Y axis labels
-      ctx.fillStyle = "#999";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "9px sans-serif";
       ctx.textAlign = "right";
       for (let i = 0; i <= 4; i++) {
@@ -237,7 +238,7 @@ export default function MarketTimeChart({ prices }: Props) {
       const n = result.data.length;
 
       // Calendar time price (gray)
-      ctx.strokeStyle = "#aaa";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
@@ -273,13 +274,13 @@ export default function MarketTimeChart({ prices }: Props) {
       const legendY = margin.top + 10;
       ctx.font = "11px sans-serif";
 
-      ctx.strokeStyle = "#aaa";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(legendX, legendY);
       ctx.lineTo(legendX + 20, legendY);
       ctx.stroke();
-      ctx.fillStyle = "#888";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.textAlign = "left";
       ctx.fillText("Calendar Time Price", legendX + 25, legendY + 4);
 
@@ -331,7 +332,7 @@ export default function MarketTimeChart({ prices }: Props) {
       const toY = (v: number) => margin.top + plotH - ((v - minP) / rangeP) * plotH;
 
       // Axes
-      ctx.strokeStyle = "#ccc";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(margin.left, margin.top);
@@ -340,7 +341,7 @@ export default function MarketTimeChart({ prices }: Props) {
       ctx.stroke();
 
       // Y axis labels
-      ctx.fillStyle = "#999";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "9px sans-serif";
       ctx.textAlign = "right";
       for (let i = 0; i <= 4; i++) {
@@ -355,7 +356,7 @@ export default function MarketTimeChart({ prices }: Props) {
       }
 
       // X axis labels
-      ctx.fillStyle = "#999";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "9px sans-serif";
       ctx.textAlign = "center";
       for (let i = 0; i <= 4; i++) {
@@ -372,7 +373,7 @@ export default function MarketTimeChart({ prices }: Props) {
       const n = result.data.length;
 
       // Calendar time price (gray)
-      ctx.strokeStyle = "#aaa";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
@@ -401,13 +402,13 @@ export default function MarketTimeChart({ prices }: Props) {
       const legendY = margin.top + 10;
       ctx.font = "11px sans-serif";
 
-      ctx.strokeStyle = "#aaa";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(legendX, legendY);
       ctx.lineTo(legendX + 20, legendY);
       ctx.stroke();
-      ctx.fillStyle = "#888";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.textAlign = "left";
       ctx.fillText("Calendar Time Price", legendX + 25, legendY + 4);
 

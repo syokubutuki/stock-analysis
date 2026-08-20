@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeProfile } from "../../lib/volume-profile-ext";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -63,7 +64,7 @@ export default function VolumeProfileExtChart({ prices }: Props) {
     drawLevel(res.vaLow, "#2563eb", "VAL");
     drawLevel(res.currentPrice, "#111827", "現在");
     // y軸ラベル
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let g = 0; g <= 4; g++) { const pr = priceLo + (priceHi - priceLo) * (g / 4); ctx.fillText(pr.toFixed(0), ml - 4, yOf(pr) + 3); }
   }, [res]);
 

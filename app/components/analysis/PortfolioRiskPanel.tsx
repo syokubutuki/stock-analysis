@@ -12,6 +12,7 @@ import {
 } from "../../lib/portfolio-risk";
 import { computeDCC, stressCorrelation } from "../../lib/dcc";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -505,7 +506,7 @@ function Sparkline({ values, baseline }: { values: number[]; baseline: number })
   const baseY = y(baseline).toFixed(1);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" preserveAspectRatio="none">
-      <line x1="0" y1={baseY} x2={W} y2={baseY} stroke="#9ca3af" strokeWidth="1" strokeDasharray="4 3" />
+      <line x1="0" y1={baseY} x2={W} y2={baseY} stroke={CHART_COLORS.reference} strokeWidth="1" strokeDasharray="4 3" />
       <path d={path} fill="none" stroke="#dc2626" strokeWidth="1.5" />
     </svg>
   );

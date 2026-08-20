@@ -18,6 +18,7 @@ import {
   AXIOM_LABEL,
   type AxiomRef,
 } from "../../lib/axioms/corollaries";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 const POSTULATES: AxiomRef[] = ["公準1", "公準2", "公準3", "公準4", "公準5"];
 const AXIOMS: AxiomRef[] = ["公理1", "公理2", "公理3", "公理4", "公理5"];
@@ -44,7 +45,7 @@ interface GNode {
 
 const KIND_STYLE: Record<NodeKind, { fill: string; stroke: string; text: string }> = {
   postulate: { fill: "#eef2ff", stroke: "#6366f1", text: "#3730a3" },
-  axiom: { fill: "#f8fafc", stroke: "#94a3b8", text: "#334155" },
+  axiom: { fill: "#f8fafc", stroke: CHART_COLORS.neutral, text: "#334155" },
   proposition: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1e40af" },
   corollary: { fill: "#ecfdf5", stroke: "#10b981", text: "#065f46" },
 };

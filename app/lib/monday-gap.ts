@@ -16,6 +16,7 @@ import { mean, median, std, tTest, benjaminiHochberg, quantileSorted } from "./s
 import {
   computeUsReturns, UsReturn, ols, bootMeanCI, bootBetaCI, pearson, studentTwoSidedP, Regression,
 } from "./us-spillover-core";
+import { CHART_COLORS } from "./chart-colors";
 
 // ───────────────────────── レコード ─────────────────────────
 
@@ -278,8 +279,8 @@ export function schemeLabels(k: number): string[] {
 }
 const SCHEME_COLORS: Record<number, string[]> = {
   2: ["#dc2626", "#16a34a"],
-  3: ["#dc2626", "#9ca3af", "#16a34a"],
-  5: ["#dc2626", "#fb923c", "#9ca3af", "#4ade80", "#16a34a"],
+  3: ["#dc2626", CHART_COLORS.neutral, "#16a34a"],
+  5: ["#dc2626", "#fb923c", CHART_COLORS.neutral, "#4ade80", "#16a34a"],
 };
 export function schemeColors(k: number): string[] { return SCHEME_COLORS[k] ?? SCHEME_COLORS[3]; }
 

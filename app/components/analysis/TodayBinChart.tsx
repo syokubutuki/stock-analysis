@@ -19,6 +19,7 @@ import {
 } from "../../lib/today-bin";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -115,7 +116,7 @@ function drawStateDist(
   }
 
   // 分位境界線
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.lineWidth = 1;
   ctx.setLineDash([2, 2]);
   res.edges.forEach((e) => {
@@ -156,7 +157,7 @@ function drawStateDist(
   }
 
   // X軸ラベル（両端）
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(`${fmtPct(lo)}`, ml, yBase + 12);
@@ -180,7 +181,7 @@ function drawFwdDist(
   ctx.textAlign = "left";
   ctx.fillText(`該当ビンの先行きリターン分布（${res.horizonLabel}まで・n=${vals.length}）`, ml, 14);
   if (vals.length < 3) {
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.fillText("標本が不足しています。", ml, mt + 20);
     return;
@@ -223,7 +224,7 @@ function drawFwdDist(
   ctx.textAlign = "center";
   ctx.fillText(`平均${fmtPct(bin.meanFwd)}`, xAt(bin.meanFwd), mt + 8);
   // X軸
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(fmtPct(lo), ml, yBase + 12);
@@ -307,7 +308,7 @@ function drawScatter(
   }
 
   // Y軸ラベル
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   ctx.fillText(fmtPct1(yhi), ml - 4, mt + 8);
@@ -340,7 +341,7 @@ function OccurrenceTable({ occ }: { occ: Occurrence[] }) {
               <tr key={i} className="border-b border-gray-50">
                 <td className="px-1.5 py-0.5 text-gray-600">{o.date.slice(0, 10)}</td>
                 <td className="px-1.5 text-right text-gray-500">{fmtPct(o.stateVal)}</td>
-                <td className={`px-1.5 text-right font-medium ${o.fwd >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(o.fwd)}</td>
+                <td className={`px-1.5 text-right font-medium ${o.fwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(o.fwd)}</td>
               </tr>
             ))}
           </tbody>
@@ -359,7 +360,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
   return (
     <div>
       <p className="text-[11px] text-gray-500 mb-1">
-        このビンを曜日で分解：<span className="inline-flex items-center gap-0.5 rounded bg-white/70 border border-gray-200 px-1 font-medium text-gray-600">{entryGlyph}<span className="text-gray-400">▸</span>引</span>{" "}
+        このビンを曜日で分解：<span className="inline-flex items-center gap-0.5 rounded bg-white/70 border border-gray-200 px-1 font-medium text-gray-600">{entryGlyph}<span className="text-gray-500">▸</span>引</span>{" "}
         各曜日に<span className="font-medium text-gray-600">{entryLabel(entry)}建て→{hLabel}まで</span>持ったときの平均リターン
         （その日を<em className="not-italic font-medium">起点にした先行き</em>。週内クロックの“水準”とは別物）。
         <br />全日共通ビン境界・◀=今日／青枠=今日の曜日／基準 全日平均{fmtPct(baselineMean)}
@@ -382,7 +383,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
           <tbody>
             <tr>
               <td className="px-1 py-0.5 text-left text-gray-500 whitespace-nowrap" title={`各曜日に${entryLabel(entry)}建て→${hLabel}の平均リターン`}>
-                <span className="text-gray-400">{entryGlyph}▸引</span> 平均
+                <span className="text-gray-500">{entryGlyph}▸引</span> 平均
               </td>
               {rows.map((r) => (
                 <td key={r.dow} className={`px-1 py-0.5 font-medium tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""}`}
@@ -394,7 +395,7 @@ function WeekdayBreakdownPanel({ rows, todayDow, baselineMean, entry, horizonLab
             <tr>
               <td className="px-1 py-0.5 text-left text-fg-muted">勝率</td>
               {rows.map((r) => (
-                <td key={r.dow} className={`px-1 py-0.5 tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""} ${r.n >= 3 ? "text-gray-600" : "text-gray-300"}`}>
+                <td key={r.dow} className={`px-1 py-0.5 tabular-nums ${r.dow === todayDow ? "ring-2 ring-blue-400 ring-inset" : ""} ${r.n >= 3 ? "text-gray-600" : "text-fg-muted"}`}>
                   {r.n >= 3 ? `${(r.winRate * 100).toFixed(0)}%` : "—"}
                 </td>
               ))}
@@ -600,7 +601,7 @@ export default function TodayBinChart({ prices }: Props) {
                         {isNow && <span className="text-blue-600 mr-1">◀今日</span>}{b.label}
                       </td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium ${b.meanFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(b.meanFwd)}</td>
+                      <td className={`text-right px-2 font-medium ${b.meanFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(b.meanFwd)}</td>
                       <td className="text-right px-2 text-gray-600">{fmtPct(b.medianFwd)}</td>
                       <td className="px-2"><div className="flex items-center gap-1"><div className="relative h-3 w-12 bg-gray-100 rounded-sm overflow-hidden"><div className={`absolute inset-y-0 left-0 ${b.winRate >= 0.5 ? "bg-green-400" : "bg-red-400"}`} style={{ width: `${b.winRate * 100}%` }} /><div className="absolute inset-y-0 left-1/2 w-px bg-gray-400" /></div><span className="text-gray-600 tabular-nums">{(b.winRate * 100).toFixed(0)}%</span></div></td>
                       <td className="px-2 text-gray-500 whitespace-nowrap">{fmtPct(b.ciLow)}〜{fmtPct(b.ciHigh)}</td>

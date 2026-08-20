@@ -202,7 +202,7 @@ export default function RollingTDAChart({ prices, seriesMode }: Props) {
               <li>
                 <span className="font-medium text-red-600">β₁ (ループ数) の変化</span>
                 <ul className="list-disc pl-4 mt-1">
-                  <li><span className="font-medium">β₁の増加</span> → 周期的パターンの出現 → <span className="text-green-600">オシレーター系戦略(RSI等)が有効化</span></li>
+                  <li><span className="font-medium">β₁の増加</span> → 周期的パターンの出現 → <span className="text-green-700">オシレーター系戦略(RSI等)が有効化</span></li>
                   <li><span className="font-medium">β₁の減少</span> → 周期性の消失 → トレンドフォローまたはランダムウォーク</li>
                   <li>β₁が安定して高い → 持続的な周期性 → 平均回帰戦略の根拠</li>
                 </ul>

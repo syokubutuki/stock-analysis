@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { computePriceForecast } from "../../lib/simulation";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -100,7 +101,7 @@ export default function PriceForecastChart({ prices }: Props) {
       const y = mt + (plotH * i) / nGridY;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = maxD - (rangeD * i) / nGridY;
-      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText(fmtAxis(val), ml - 4, y + 3);
     }
 
@@ -108,7 +109,7 @@ export default function PriceForecastChart({ prices }: Props) {
     const baseDisp = isReturn ? 0 : lastPrice;
     if (baseDisp >= minD && baseDisp <= maxD) {
       const yb = yFromD(baseDisp);
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 0.8; ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(ml, yb); ctx.lineTo(width - mr, yb); ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -274,7 +275,7 @@ export default function PriceForecastChart({ prices }: Props) {
         </div>
         <div className="p-2 bg-blue-50 rounded border border-blue-200">
           <div className="text-gray-500">予測中央値</div>
-          <div className={`font-mono font-bold ${changeP50 >= 0 ? "text-green-600" : "text-red-600"}`}>
+          <div className={`font-mono font-bold ${changeP50 >= 0 ? "text-green-700" : "text-red-600"}`}>
             {formatPrice(finalStats.median)} ({changeP50 >= 0 ? "+" : ""}{changeP50.toFixed(1)}%)
           </div>
         </div>
@@ -286,13 +287,13 @@ export default function PriceForecastChart({ prices }: Props) {
         </div>
         <div className="p-2 bg-green-50 rounded border border-green-200">
           <div className="text-gray-500">95%最良</div>
-          <div className="font-mono font-bold text-green-600">
+          <div className="font-mono font-bold text-green-700">
             {formatPrice(finalStats.p95)} ({changeP95 >= 0 ? "+" : ""}{changeP95.toFixed(1)}%)
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded border">
           <div className="text-gray-500">上昇確率</div>
-          <div className={`font-mono font-bold ${finalStats.probUp >= 0.5 ? "text-green-600" : "text-red-600"}`}>
+          <div className={`font-mono font-bold ${finalStats.probUp >= 0.5 ? "text-green-700" : "text-red-600"}`}>
             {(finalStats.probUp * 100).toFixed(1)}%
           </div>
         </div>

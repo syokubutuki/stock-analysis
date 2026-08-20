@@ -29,7 +29,7 @@ function CorollaryCard({ c }: { c: Corollary }) {
           {c.id}
         </span>
         <h3 className="text-base font-bold text-gray-900">{c.theory}</h3>
-        <span className="ml-auto text-[11px] text-gray-400">
+        <span className="ml-auto text-[11px] text-fg-muted">
           優先度 {"★".repeat(c.priority)}
         </span>
       </div>
@@ -189,7 +189,7 @@ export default function AxiomsPage() {
           </div>
         </section>
 
-        <p className="pb-8 text-center text-xs text-gray-400">
+        <p className="pb-8 text-center text-xs text-fg-muted">
           出典: docs/investment-axioms.md ／ データ源: app/lib/axioms/corollaries.ts
         </p>
       </main>

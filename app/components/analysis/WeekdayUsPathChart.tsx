@@ -21,6 +21,7 @@ import {
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -143,7 +144,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
     [result]
   );
   const colorOf = useCallback(
-    (key: string) => result?.bins.find((b) => String(b.weekday) === key)?.color ?? "#9ca3af",
+    (key: string) => result?.bins.find((b) => String(b.weekday) === key)?.color ?? CHART_COLORS.neutral,
     [result]
   );
 
@@ -196,10 +197,10 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
                 <span className="inline-flex items-center gap-1">
                   <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: b.color }} />
                   {b.label}
-                  <span className={isSel ? "text-gray-300" : "text-fg-muted"}>(n={b.n})</span>
+                  <span className={isSel ? "text-fg-muted" : "text-fg-muted"}>(n={b.n})</span>
                   {isToday && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今</span>}
                 </span>
-                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-fg-muted"}`}>
+                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-fg-muted" : "text-fg-muted"}`}>
                   {fmtBinRange(b.rangeLo, b.rangeHi)}
                 </span>
               </button>
@@ -300,7 +301,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
               onClick={() => setShowDist((v) => !v)}
               className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
             >
-              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              <span className="text-gray-500">{showDist ? "▼" : "▶"}</span>
               曜日分布の確認
             </button>
             {showDist && (

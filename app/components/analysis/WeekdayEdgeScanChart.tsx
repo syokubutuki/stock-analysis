@@ -11,6 +11,7 @@ import {
   type AtomYearGrid,
   type ScanSort,
 } from "../../lib/weekday-scan";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -36,7 +37,7 @@ function star(p: number | null): string {
   if (p === null) return "";
   return p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "";
 }
-function colorCls(v: number): string { return v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorCls(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
 
 const SORT_LABELS: Record<ScanSort, string> = {
   pAdj: "FDR補正p値",
@@ -371,7 +372,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     // y軸グリッド
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (const v of [-maxAbs, 0, maxAbs]) {
       const y = zeroY - (v / maxAbs) * (plotH / 2);
       ctx.fillText((v * 100).toFixed(3) + "%", pad.left - 5, y + 3);
@@ -451,7 +452,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     }
 
     // y軸
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
       const v = lo + (range * i) / 4;
       const y = toY(v);
@@ -492,7 +493,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     atoms.forEach((a, i) => {
       ctx.save();
       ctx.translate(toX(i + 1), height - 20); ctx.rotate(-Math.PI / 6);
-      ctx.fillStyle = "#999"; ctx.fillText(a.label, 0, 0);
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(a.label, 0, 0);
       ctx.restore();
     });
   }, []);
@@ -790,7 +791,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             <div className="p-2 bg-green-50 rounded border border-green-100">
               <span className="text-gray-500">最良ロング窓(素片の最大連続和):</span>{" "}
               <span className="font-medium text-green-700">{labelSpec(bl.spec)}</span>{" "}
-              <span className="font-mono text-green-600">合計 {pct(bl.sum)}</span>
+              <span className="font-mono text-green-700">合計 {pct(bl.sum)}</span>
             </div>
           )}
           {bs && (
@@ -818,7 +819,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
             onClick={() => setRankingOpen((v) => !v)}
             className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
           >
-            <span className="text-gray-400">{rankingOpen ? "▼" : "▶"}</span>
+            <span className="text-gray-500">{rankingOpen ? "▼" : "▶"}</span>
             戦略ランキング: 全{scan.nTested}組合せ(N≥{scan.minTrades})を検定・
             <span className="text-blue-600 font-medium">FDR補正後に有意なのは {nSignificant} 件</span>
           </button>
@@ -863,18 +864,18 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
                 return (
                   <tr key={i} className={`border-b border-gray-100 ${sig ? "bg-blue-50/50" : ""}`}>
                     <td className="py-1 px-1.5 font-mono whitespace-nowrap">{s.label}</td>
-                    <td className={`text-center px-1 font-medium ${s.direction === "long" ? "text-green-600" : "text-red-600"}`}>{s.direction === "long" ? "買" : "売"}</td>
+                    <td className={`text-center px-1 font-medium ${s.direction === "long" ? "text-green-700" : "text-red-600"}`}>{s.direction === "long" ? "買" : "売"}</td>
                     <td className="text-right px-1 text-gray-500">{s.n}</td>
                     <td className={`text-right px-1 font-mono ${colorCls(s.annualized)}`}>{pct(s.annualized, 1)}</td>
                     <td className="text-right px-1 font-mono text-gray-700">{s.sharpe.toFixed(2)}</td>
                     <td className="text-right px-1 font-mono text-gray-700">{s.t.toFixed(2)}</td>
                     <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{s.pAdj.toFixed(3)}{star(s.pAdj)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{Math.round(s.yearsPositive * 100)}%<span className="text-fg-muted">({s.nYears})</span></td>
-                    <td className="text-center px-1">{s.halfAgree ? <span className="text-green-600">✓</span> : <span className="text-gray-300">–</span>}</td>
+                    <td className="text-center px-1">{s.halfAgree ? <span className="text-green-700">✓</span> : <span className="text-gray-500">–</span>}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600 whitespace-nowrap">
                       {s.ciLo !== null && s.ciHi !== null
                         ? <span className={s.ciLo > 0 || s.ciHi < 0 ? "text-blue-600" : "text-fg-muted"}>[{pct(s.ciLo, 2)}, {pct(s.ciHi, 2)}]</span>
-                        : <span className="text-gray-300">–</span>}
+                        : <span className="text-gray-500">–</span>}
                     </td>
                   </tr>
                 );

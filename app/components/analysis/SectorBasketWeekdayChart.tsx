@@ -17,6 +17,7 @@ import {
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -115,7 +116,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
       .map((d) => ({ date: d.date, close: d.close, key: String(d.weekday) }));
   }, [prep]);
   const colorOf = useCallback(
-    (key: string) => pathResult?.bins.find((b) => String(b.weekday) === key)?.color ?? "#9ca3af",
+    (key: string) => pathResult?.bins.find((b) => String(b.weekday) === key)?.color ?? CHART_COLORS.neutral,
     [pathResult]
   );
 
@@ -156,7 +157,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                 {!isBase && (
                   <button
                     onClick={() => setExtra((prev) => prev.filter((x) => x !== t))}
-                    className="text-gray-400 hover:text-red-600 ml-0.5"
+                    className="text-gray-500 hover:text-red-600 ml-0.5"
                     aria-label="削除"
                   >
                     ×
@@ -286,7 +287,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                         {pathResult.bins.map((b) => {
                           const v = s.perWeekday[b.weekday];
                           return (
-                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-gray-300" : v >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-fg-muted" : v >= 0 ? "text-green-700" : "text-red-600"}`}>
                               {isNaN(v) ? "-" : fmtSignedPct(v, 1)}
                             </td>
                           );
@@ -310,7 +311,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
               onClick={() => setShowDist((v) => !v)}
               className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
             >
-              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              <span className="text-gray-500">{showDist ? "▼" : "▶"}</span>
               曜日分布の確認（基準銘柄）
             </button>
             {showDist && (
@@ -381,7 +382,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                             {w.ci ? (
                               <span title={`同符号率 ${(w.ci.stable * 100).toFixed(0)}%`}>
                                 {fmtSignedPct(w.ci.lo, 1)}〜{fmtSignedPct(w.ci.hi, 1)}
-                                {w.ci.lo > 0 || w.ci.hi < 0 ? <span className="text-green-600 font-bold"> ★</span> : null}
+                                {w.ci.lo > 0 || w.ci.hi < 0 ? <span className="text-green-700 font-bold"> ★</span> : null}
                               </span>
                             ) : <span className="text-fg-muted">日数不足</span>}
                           </td>

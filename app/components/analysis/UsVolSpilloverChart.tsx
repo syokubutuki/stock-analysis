@@ -9,6 +9,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -34,7 +35,7 @@ function drawVolScatter(ctx: CanvasRenderingContext2D, W: number, H: number, pts
   ctx.fillStyle = "#6b7280"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
   ctx.fillText("前夜 |米国リターン| →", ml + plotW / 2, H - 8);
   ctx.save(); ctx.translate(11, mt + plotH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("当日 実現ボラ →", 0, 0); ctx.restore();
-  ctx.textAlign = "right"; ctx.fillStyle = "#9ca3af";
+  ctx.textAlign = "right"; ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText(fmtPct(yMax, 1), ml - 3, mt + 8);
   ctx.textAlign = "left"; ctx.fillText(fmtPct(xMax, 1), ml + plotW - 20, mt + plotH - 3);
 }
@@ -56,7 +57,7 @@ function drawVolPaths(ctx: CanvasRenderingContext2D, W: number, H: number, res: 
     for (let g = 0; g < G; g++) { const x = X(g), y = Y(p.path[g]); if (g === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.stroke();
   }
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtPct(yMax, 1), ml - 3, mt + 8);
   drawTimeAxisLabels(ctx, res.timeLabels, ml, plotW / G, H - 6);
 }

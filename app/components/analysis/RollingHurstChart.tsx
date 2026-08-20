@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeRollingHurst, RollingHurstResult } from "../../lib/rolling-hurst";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -34,7 +35,7 @@ function drawRolling(canvas: HTMLCanvasElement, result: RollingHurstResult) {
   const data = result.series;
   const n = data.length;
   if (n < 2) {
-    ctx.fillStyle = "#999"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("データ不足 (窓を小さくしてください)", width / 2, height / 2);
     return;
   }
@@ -53,7 +54,7 @@ function drawRolling(canvas: HTMLCanvasElement, result: RollingHurstResult) {
   ctx.fillStyle = "rgba(148,163,184,0.30)";
   ctx.fillRect(pad.left, toY(result.band.q975), pw, toY(result.band.q025) - toY(result.band.q975));
   // 帯の境界線
-  ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
   for (const v of [result.band.q025, result.band.q975]) {
     ctx.beginPath(); ctx.moveTo(pad.left, toY(v)); ctx.lineTo(width - pad.right, toY(v)); ctx.stroke();
   }
@@ -70,7 +71,7 @@ function drawRolling(canvas: HTMLCanvasElement, result: RollingHurstResult) {
   }
 
   // Y軸
-  ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   for (let i = 0; i <= 4; i++) {
     const v = minV + (fullRange * i) / 4;
     ctx.fillText(v.toFixed(2), pad.left - 5, toY(v) + 3);

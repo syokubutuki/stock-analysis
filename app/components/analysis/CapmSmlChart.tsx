@@ -6,6 +6,7 @@ import { useBenchmarkPrices, BENCHMARK_PRESETS } from "../../hooks/useBenchmarkP
 import { computeCapm, CapmResult } from "../../lib/capm-sml";
 import { useSharedMuMode } from "../../lib/mu-mode-store";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -90,7 +91,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
 
     // グリッド + 軸
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.lineWidth = 1;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "right";
@@ -341,7 +342,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                               <span className="text-fg-muted ml-1 hidden sm:inline truncate">{names[a.ticker]}</span>
                             </td>
                             <td className="py-1 px-2 text-right text-gray-700">{a.beta.toFixed(2)}</td>
-                            <td className={`py-1 px-2 text-right ${a.alphaAnnual >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            <td className={`py-1 px-2 text-right ${a.alphaAnnual >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                               {a.alphaAnnual >= 0 ? "+" : ""}
                               {(a.alphaAnnual * 100).toFixed(1)}%
                             </td>
@@ -351,7 +352,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                             <td className="py-1 px-2 text-right text-gray-500">
                               {isFinite(a.treynor) ? (a.treynor * 100).toFixed(1) : "—"}
                             </td>
-                            <td className={`py-1 pl-2 text-right font-medium ${under ? "text-emerald-600" : "text-red-600"}`}>
+                            <td className={`py-1 pl-2 text-right font-medium ${under ? "text-emerald-700" : "text-red-600"}`}>
                               {under ? "割安" : "割高"}
                             </td>
                           </tr>
@@ -360,7 +361,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                     <tr className="border-t-2 border-gray-300 text-gray-700 font-medium">
                       <td className="py-1 pr-2">等加重PF</td>
                       <td className="py-1 px-2 text-right">{result.portfolioBeta.toFixed(2)}</td>
-                      <td className={`py-1 px-2 text-right ${result.portfolioAlphaAnnual >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      <td className={`py-1 px-2 text-right ${result.portfolioAlphaAnnual >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                         {result.portfolioAlphaAnnual >= 0 ? "+" : ""}
                         {(result.portfolioAlphaAnnual * 100).toFixed(1)}%
                       </td>

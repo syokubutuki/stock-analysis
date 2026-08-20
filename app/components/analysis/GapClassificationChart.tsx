@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { classifyGaps } from "../../lib/gap-classification";
 import AnalysisGuide from "./AnalysisGuide";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -58,8 +59,8 @@ export default function GapClassificationChart({ prices }: Props) {
                     <span className="text-gray-600 tabular-nums">{(s.fillRate * 100).toFixed(0)}%</span>
                   </div>
                 </td>
-                <td className={`text-right px-2 font-medium ${s.goFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{s.n ? fmtPct(s.goFwd) : "—"}</td>
-                <td className={`text-right px-2 ${s.fadeFwd >= 0 ? "text-green-600" : "text-red-600"}`}>{s.n ? fmtPct(s.fadeFwd) : "—"}</td>
+                <td className="text-right px-2 font-medium"><DirectionValue value={s.goFwd}>{s.n ? fmtPct(s.goFwd) : "—"}</DirectionValue></td>
+                <td className="text-right px-2"><DirectionValue value={s.fadeFwd}>{s.n ? fmtPct(s.fadeFwd) : "—"}</DirectionValue></td>
               </tr>
             ))}
           </tbody>

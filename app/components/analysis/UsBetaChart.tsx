@@ -11,6 +11,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -70,7 +71,7 @@ function drawScatter(
   ctx.fillText(`JP ${targetLabel} →`, 0, 0);
   ctx.restore();
   // 目盛(±xMax, ±yMax)
-  ctx.textAlign = "left"; ctx.fillStyle = "#9ca3af";
+  ctx.textAlign = "left"; ctx.fillStyle = CHART_COLORS.ink;
   ctx.fillText(fmtSignedPct(yMax, 1), ml + 2, mt + 9);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml + 2, mt + plotH - 2);
   ctx.textAlign = "right";

@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolLeverage } from "../../lib/vol-leverage";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -42,16 +43,16 @@ export default function VolLeverageChart({ prices }: Props) {
     const maxV = Math.max(res.baselineVol, ...res.buckets.map((b) => b.nextVol)) * 1.1 || 1;
     const yOf = (v: number) => mt + plotH - (v / maxV) * plotH;
     // baseline
-    ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(ml, yOf(res.baselineVol)); ctx.lineTo(ml + plotW, yOf(res.baselineVol)); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(`${(maxV * 100).toFixed(0)}%`, ml - 3, mt + 8);
     const slot = plotW / res.buckets.length;
     res.buckets.forEach((b, i) => {
       const x = ml + i * slot + slot * 0.2;
       const w = slot * 0.6;
       const h = (b.nextVol / maxV) * plotH;
-      ctx.fillStyle = i < 2 ? "#dc2626" : i === 2 ? "#9ca3af" : "#16a34a";
+      ctx.fillStyle = i < 2 ? "#dc2626" : i === 2 ? CHART_COLORS.neutral : "#16a34a";
       ctx.fillRect(x, mt + plotH - h, w, h);
       ctx.fillStyle = "#374151"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(`${(b.nextVol * 100).toFixed(0)}%`, x + w / 2, mt + plotH - h - 3);

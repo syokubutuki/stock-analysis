@@ -15,6 +15,7 @@ import {
   computeWeekEmbedding, WeekEmbeddingResult, EmbeddingView, EmbedVariant,
 } from "../../lib/week-embedding";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -64,7 +65,7 @@ function drawEigen(ctx: CanvasRenderingContext2D, x0: number, y0: number, w: num
   loading.forEach((v, i) => { ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 1.8, 0, Math.PI * 2); ctx.fill(); });
   ctx.fillStyle = "#374151"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left";
   ctx.fillText(label, x0, y0 - 3);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(sub, x0 + w, y0 - 3);
 }
 
@@ -128,7 +129,7 @@ function drawAtlas(
   const e0 = view.eigen[0], e1 = view.eigen[1];
   ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
   ctx.fillText(view.variant === "level" ? "アトラス(水準あり)" : "アトラス(形状のみ)", ml, 12);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`PC1→ ${(e0.explained * 100).toFixed(0)}% / PC2↑ ${(e1 ? e1.explained * 100 : 0).toFixed(0)}%`, ml + plotW, 12);
 }
 

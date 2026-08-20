@@ -13,6 +13,7 @@ import { computeADX, judgeADX } from "../../lib/adx";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -26,7 +27,7 @@ const STRENGTH_COLORS: Record<string, string> = {
 };
 
 const TREND_COLORS: Record<string, string> = {
-  "上昇": "text-green-600",
+  "上昇": "text-green-700",
   "下降": "text-red-600",
 };
 
@@ -55,12 +56,7 @@ export default function ADXChart({ prices, period }: Props) {
     upperApiRef.current = chart;
 
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      ...CANDLESTICK_OPTIONS,
     });
     candle.setData(
       prices.map((p) => ({
@@ -184,7 +180,7 @@ export default function ADXChart({ prices, period }: Props) {
           </div>
           <div className="p-2 bg-gray-50 rounded">
             <div className="text-gray-500">+DI</div>
-            <div className="font-mono font-medium text-green-600">
+            <div className="font-mono font-medium text-green-700">
               {last.plusDI.toFixed(2)}
             </div>
           </div>
@@ -199,6 +195,7 @@ export default function ADXChart({ prices, period }: Props) {
 
       {/* Upper chart: price */}
       <div ref={upperRef} className="w-full rounded border border-gray-100" />
+      <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
 
       {/* Lower chart: ADX / +DI / -DI */}
       <div ref={lowerRef} className="w-full rounded border border-gray-100 mt-1" />

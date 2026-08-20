@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { fullCCMAnalysis, type CCMPoint, type CCMResult } from "../../lib/ccm";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -81,7 +82,7 @@ function drawConvergencePlot(canvas: HTMLCanvasElement, result: CCMResult) {
   }
 
   // Zero line
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);
   ctx.beginPath();
@@ -184,7 +185,7 @@ function drawScatterPlot(
   const { predicted, actual, rho } = detail.scatter;
 
   if (predicted.length === 0) {
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("散布図データなし", width / 2, height / 2);
@@ -300,7 +301,7 @@ function drawInputSeries(canvas: HTMLCanvasElement, result: CCMResult) {
     const std = Math.sqrt(
       data.reduce((a, b) => a + (b - mean) ** 2, 0) / data.length
     );
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "8px sans-serif";
     ctx.fillText(`μ=${mean.toFixed(4)} σ=${std.toFixed(4)}`, pad.left - 8, midY + 14);
 

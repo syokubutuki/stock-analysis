@@ -204,7 +204,7 @@ export default function TodayQProposal() {
             </span>
             <span>
               曜日エッジ:{" "}
-              <b className={rec.timingSignificant ? "text-emerald-600" : "text-gray-500"}>
+              <b className={rec.timingSignificant ? "text-emerald-700" : "text-gray-500"}>
                 {rec.timingSignificant ? "FDR<0.10 で有意" : "FDR後 有意なし"}
               </b>
               （C9）

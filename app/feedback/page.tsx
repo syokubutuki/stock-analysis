@@ -28,7 +28,7 @@ export default function FeedbackPage() {
         <FeedbackForm />
       </main>
 
-      <footer className="text-center text-xs text-gray-400 py-8">
+      <footer className="text-center text-xs text-fg-muted py-8">
         いただいたご意見は今後の機能改善の参考にさせていただきます。
       </footer>
     </div>

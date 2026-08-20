@@ -19,6 +19,7 @@ import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import { clearCache, cacheStats, type CacheStats } from "../../lib/price-cache";
 import { MARGIN_KIND_ORDER, MARGIN_KIND_LABEL, resolveMarginRate, type MarginKind } from "../../lib/rakuten-margin";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -30,7 +31,7 @@ type UniverseMode = "watchlist" | "paste" | string; // string=プリセットid
 
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
 
 function Stat({ label, value, tone, sub }: { label: string; value: string; tone?: "good" | "bad" | "neutral"; sub?: string }) {
   const c = tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
@@ -143,7 +144,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
     if (!chart || !result.ok) return;
     for (const s of seriesRef.current) chart.removeSeries(s);
     seriesRef.current = [];
-    const gross = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, title: "グロス", priceLineVisible: false });
+    const gross = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "グロス", priceLineVisible: false });
     gross.setData(result.equity.map((e) => ({ time: e.time as Time, value: e.gross })));
     const net = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "ネット", priceLineVisible: false });
     net.setData(result.equity.map((e) => ({ time: e.time as Time, value: e.net })));
@@ -189,7 +190,7 @@ export default function CrossSectionalEdgeChart({ tickers, pricesByTicker, names
         <span>
           価格キャッシュ(IndexedDB): {cache ? `${cache.count}銘柄` : "—"}
           {cache && cache.newestAt ? `・最終取得 ${new Date(cache.newestAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
-          <span className="text-gray-300">（ブラウザ8時間TTL・サーバー共有キャッシュあり）</span>
+          <span className="text-fg-muted">（ブラウザ8時間TTL・サーバー共有キャッシュあり）</span>
         </span>
         {cache && cache.count > 0 && (
           <button

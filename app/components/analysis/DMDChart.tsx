@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeDMD } from "../../lib/dmd";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -52,7 +53,7 @@ export default function DMDChart({ prices, seriesMode }: Props) {
 
     // Original series (gray)
     const origSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "原系列",
     });
@@ -96,7 +97,7 @@ export default function DMDChart({ prices, seriesMode }: Props) {
     !isFinite(p) ? "トレンド" : `${p.toFixed(1)}日`;
 
   const growthColor = (g: number) => {
-    if (g > 1.005) return "text-green-600";
+    if (g > 1.005) return "text-green-700";
     if (g < 0.995) return "text-red-600";
     return "text-gray-600";
   };

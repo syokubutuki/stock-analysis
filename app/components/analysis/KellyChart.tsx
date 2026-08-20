@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { kellyOptimal } from "../../lib/kelly-bs";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -60,7 +61,7 @@ export default function KellyChart({ prices }: Props) {
     };
     if (res.kellyFraction > 0 && res.kellyFraction < fMax) mark(res.kellyFraction, "#dc2626", `f*=${res.kellyFraction.toFixed(2)}`);
     if (res.halfKelly > 0 && res.halfKelly < fMax) mark(res.halfKelly, "#16a34a", `½`);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(`${(gMax * 100).toFixed(0)}%`, ml - 3, mt + 8);
     ctx.fillText("0", ml - 3, yOf(0) + 3);
     ctx.textAlign = "center";

@@ -23,6 +23,7 @@ import type {
   NullCalibWorkerResponse,
 } from "../../lib/null-calibration.worker";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -150,7 +151,7 @@ function drawHistogram(
   const noteX = beyond ? Math.min(xAct + 5, ml + plotW) : Math.max(xAct - 5, ml);
   ctx.fillText(beyond ? "床を突破 →" : "← 偶然の範囲内", noteX, mt + 22);
 
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "center";
   for (let i = 0; i <= 4; i++) {

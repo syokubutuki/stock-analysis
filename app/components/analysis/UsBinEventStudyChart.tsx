@@ -19,6 +19,7 @@ import { initCanvas, fmtSignedPct, fmtPct } from "./intradayShared";
 import { BinSchemeButtons, UsDriverButtons } from "./usSpilloverShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -49,7 +50,7 @@ function drawEventPaths(
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
@@ -308,8 +309,8 @@ export default function UsBinEventStudyChart({ prices }: Props) {
                       </span>
                     </td>
                     <td className="text-right px-2 text-gray-600">{g.n}</td>
-                    <td className={`text-right px-2 tabular-nums ${g.car0 >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(g.car0)}</td>
-                    <td className={`text-right px-2 tabular-nums ${g.carPost >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(g.carPost)}</td>
+                    <td className={`text-right px-2 tabular-nums ${g.car0 >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(g.car0)}</td>
+                    <td className={`text-right px-2 tabular-nums ${g.carPost >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(g.carPost)}</td>
                     <td className={`text-right px-2 font-medium tabular-nums ${g.postDiff >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(g.postDiff)}</td>
                     <td className="text-right px-2 text-gray-500 tabular-nums text-[10px]">
                       {isFinite(g.postLo) ? `[${fmtSignedPct(g.postLo, 1)}, ${fmtSignedPct(g.postHi, 1)}]` : "—"}

@@ -10,6 +10,7 @@ import {
 } from "../../lib/phase-clock";
 import { conditionalForwardReturns } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -147,12 +148,12 @@ export default function PhaseClockChart({ prices, seriesMode }: Props) {
     // 外周リング
     ctx.beginPath();
     ctx.arc(cx, cy, R, 0, 2 * Math.PI);
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.axis;
     ctx.lineWidth = 1;
     ctx.stroke();
 
     // 12/3/6/9時の目盛りラベル
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -285,7 +286,7 @@ export default function PhaseClockChart({ prices, seriesMode }: Props) {
         <div className="text-xs text-gray-600 space-y-2 flex-1 min-w-0">
           <p>
             針が今サイクルのどこにいるかを示します。針が指すセクターの色が
-            <strong className="text-emerald-600">緑</strong>なら、過去その位相にいた後は
+            <strong className="text-emerald-700">緑</strong>なら、過去その位相にいた後は
             平均的に上昇しており、<strong className="text-red-600">赤</strong>なら下落していました。
           </p>
           <div className="p-2 bg-gray-50 rounded space-y-1">
@@ -387,7 +388,7 @@ function StatCard({
   badge?: string;
 }) {
   const valueColor =
-    accent === "pos" ? "text-emerald-600" : accent === "neg" ? "text-red-600" : "text-gray-800";
+    accent === "pos" ? "text-emerald-700" : accent === "neg" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 bg-gray-50 rounded text-xs">
       <div className="text-gray-500 flex items-center gap-1">

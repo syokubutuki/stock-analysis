@@ -13,6 +13,7 @@ import { computeStochastics, detectStochSignals } from "../../lib/stochastics";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -57,12 +58,7 @@ export default function StochasticsChart({ prices, period }: Props) {
     upperApiRef.current = upperChart;
 
     const candleSeries = upperChart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      ...CANDLESTICK_OPTIONS,
     });
     candleSeries.setData(
       prices.map((p) => ({
@@ -185,7 +181,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.fastK > 80
                   ? "text-red-600"
                   : last.fastK < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -199,7 +195,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.fastD > 80
                   ? "text-red-600"
                   : last.fastD < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -213,7 +209,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.slowK > 80
                   ? "text-red-600"
                   : last.slowK < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -227,7 +223,7 @@ export default function StochasticsChart({ prices, period }: Props) {
                 last.slowD > 80
                   ? "text-red-600"
                   : last.slowD < 20
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : ""
               }`}
             >
@@ -239,6 +235,7 @@ export default function StochasticsChart({ prices, period }: Props) {
 
       {/* Upper chart: candlestick */}
       <div ref={upperRef} className="w-full rounded border border-gray-100 mb-1" />
+      <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
 
       {/* Lower chart: stochastics */}
       <div ref={lowerRef} className="w-full rounded border border-gray-100" />

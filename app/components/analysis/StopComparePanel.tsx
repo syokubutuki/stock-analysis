@@ -19,7 +19,7 @@ interface Props {
 
 function retColor(v: number): string {
   if (v <= -0.05) return "text-red-600";
-  if (v >= 0.05) return "text-emerald-600";
+  if (v >= 0.05) return "text-emerald-700";
   return "text-gray-500";
 }
 

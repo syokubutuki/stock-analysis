@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { crossCorrelogram } from "../../lib/distribution-extended";
 import { confidenceBound } from "../../lib/autocorrelation";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -69,7 +70,7 @@ export default function CrossCorrelogramChart({ prices }: Props) {
     ctx.stroke(); ctx.setLineDash([]);
 
     // ゼロ線
-    ctx.strokeStyle = "#999"; ctx.lineWidth = 0.5;
+    ctx.strokeStyle = CHART_COLORS.axis; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(pad.left, toY(0)); ctx.lineTo(width - pad.right, toY(0)); ctx.stroke();
 
     // ゼロラグの垂直線
@@ -91,11 +92,11 @@ export default function CrossCorrelogramChart({ prices }: Props) {
     // ラベル
     ctx.fillStyle = "#333"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("クロスコレログラム: 夜間リターン ↔ 日中リターン", pad.left + 5, pad.top - 8);
-    ctx.font = "9px sans-serif"; ctx.fillStyle = "#999"; ctx.textAlign = "center";
+    ctx.font = "9px sans-serif"; ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "center";
     ctx.fillText("← 日中が先行 | Lag | 夜間が先行 →", width / 2, height - 5);
 
     // Y軸
-    ctx.fillStyle = "#999"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "right";
     for (let i = -2; i <= 2; i++) {
       const v = (i / 2) * maxVal;
       if (Math.abs(v) > maxVal) continue;

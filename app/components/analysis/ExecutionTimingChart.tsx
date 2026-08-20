@@ -9,6 +9,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -37,9 +38,9 @@ function drawBins(ctx: CanvasRenderingContext2D, W: number, H: number, res: Exec
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText(`${res.markLabel}比 約定改善（${res.side === "buy" ? "買い" : "売り"}・正=有利）`, ml, mt - 12);
   // ゼロ線(=成行マーク基準)
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${amax.toFixed(3)}%`, ml - 4, mt + 9);
   ctx.fillText(`-${amax.toFixed(3)}%`, ml - 4, mt + plotH);
 
@@ -51,7 +52,7 @@ function drawBins(ctx: CanvasRenderingContext2D, W: number, H: number, res: Exec
     const yv = ys(v);
     const isBest = res.best && b.barOffset === res.best.barOffset;
     ctx.fillStyle = b.isMark
-      ? "#9ca3af"
+      ? CHART_COLORS.neutral
       : v >= 0 ? (isBest ? "#15803d" : "#16a34a") : "#dc2626";
     ctx.fillRect(x, Math.min(y0, yv), barW, Math.abs(yv - y0) || 1);
 
@@ -72,7 +73,7 @@ function drawBins(ctx: CanvasRenderingContext2D, W: number, H: number, res: Exec
     // ラベル・n
     ctx.fillStyle = isBest ? "#15803d" : "#374151"; ctx.font = `${isBest ? "bold " : ""}9px sans-serif`; ctx.textAlign = "center";
     ctx.fillText(b.label, cx, mt + plotH + 14);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
     ctx.fillText(`n=${b.n}`, cx, mt + plotH + 26);
   });
 }
@@ -164,18 +165,18 @@ export default function ExecutionTimingChart({ ticker }: Props) {
                   return (
                     <tr key={b.barOffset} className={`border-b border-gray-100 ${isBest ? "ring-2 ring-green-400 ring-inset" : ""}`}>
                       <td className="py-1 px-2 font-medium text-gray-700">
-                        {isBest && <span className="text-green-600 mr-1">◀</span>}
+                        {isBest && <span className="text-green-700 mr-1">◀</span>}
                         {b.label}{b.isMark && <span className="text-fg-muted">（成行・基準）</span>}
                       </td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium tabular-nums ${b.isMark ? "text-fg-muted" : b.meanImprovePct >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 font-medium tabular-nums ${b.isMark ? "text-fg-muted" : b.meanImprovePct >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {b.isMark ? "—" : fmtSignedPct(b.meanImprovePct / 100)}
                       </td>
                       <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">
                         {b.isMark ? "—" : `${fmtSignedPct(b.ciLoPct / 100)}〜${fmtSignedPct(b.ciHiPct / 100)}`}
                       </td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{b.isMark ? "—" : `${(b.winRate * 100).toFixed(0)}%`}</td>
-                      <td className={`text-right px-2 tabular-nums ${b.meanVsVwapPct >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${b.meanVsVwapPct >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {fmtSignedPct(b.meanVsVwapPct / 100)}
                       </td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{b.driftStdPct.toFixed(2)}%</td>

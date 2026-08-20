@@ -11,6 +11,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { analyzeRangeContraction, TriggerStat } from "../../lib/range-contraction";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS, CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -45,7 +46,7 @@ function drawBars(ctx: CanvasRenderingContext2D, width: number, height: number, 
   ctx.fillText("トリガー翌日の平均|変化率| （点線=全日平均）", ml - 140, 14);
   const maxV = Math.max(baseline, ...rows.map((s) => s.meanAbsNext), 1e-9);
   const xBase = ml + (baseline / maxV) * plotW;
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([3, 3]);
   ctx.beginPath();
   ctx.moveTo(xBase, mt);
@@ -56,7 +57,7 @@ function drawBars(ctx: CanvasRenderingContext2D, width: number, height: number, 
     const y = mt + i * rowH;
     const w = (s.meanAbsNext / maxV) * plotW;
     const bigger = s.meanAbsNext > baseline;
-    ctx.fillStyle = bigger ? "#7c3aed" : "#9ca3af";
+    ctx.fillStyle = bigger ? "#7c3aed" : CHART_COLORS.neutral;
     ctx.fillRect(ml, y + rowH * 0.2, w, rowH * 0.5);
     ctx.fillStyle = "#374151";
     ctx.font = "9px sans-serif";
@@ -88,9 +89,7 @@ export default function RangeContractionChart({ prices }: Props) {
     });
     apiRef.current = chart;
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a", downColor: "#ef5350",
-      borderUpColor: "#26a69a", borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+      ...CANDLESTICK_OPTIONS,
     });
     candle.setData(prices.map((p) => ({ time: p.time as Time, open: p.open, high: p.high, low: p.low, close: p.close })));
     if (result.markers.length > 0) {
@@ -151,6 +150,7 @@ export default function RangeContractionChart({ prices }: Props) {
       )}
 
       <div ref={chartRef} className="w-full rounded border border-gray-100" />
+      <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
       <div className="text-xs text-gray-500">
         マーカー: <span style={{ color: COLORS.NR7 }}>▲NR7</span> / <span style={{ color: COLORS.inside }}>▲inside</span> / <span style={{ color: COLORS.squeeze }}>▲squeeze</span>（直近{result.markers.length}件）
       </div>

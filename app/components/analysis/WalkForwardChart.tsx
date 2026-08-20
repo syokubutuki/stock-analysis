@@ -13,6 +13,7 @@ import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
 import { runWalkForward, type WalkMode, type WalkForwardResult } from "../../lib/walk-forward";
 import { buildSignalCatalog } from "../../lib/edge-signals";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -65,7 +66,7 @@ export default function WalkForwardChart({ prices }: Props) {
       timeScale: { timeVisible: false },
     });
     chartRef.current = chart;
-    isSeriesRef.current = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, title: "IS(検証除外)", lineStyle: LineStyle.Dotted });
+    isSeriesRef.current = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, title: "IS(検証除外)", lineStyle: LineStyle.Dotted });
     oosSeriesRef.current = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "OOS(実戦相当)" });
     const onResize = () => { if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth }); };
     window.addEventListener("resize", onResize);
@@ -181,7 +182,7 @@ export default function WalkForwardChart({ prices }: Props) {
                     <td className="py-1 px-1.5 font-mono whitespace-nowrap text-gray-600">{f.oosStartDate}〜{f.oosEndDate}</td>
                     <td className="px-1.5">{f.selectedLabel}</td>
                     <td className="text-right px-1 font-mono text-gray-500">{f.isSharpe.toFixed(2)}</td>
-                    <td className={`text-right px-1 font-mono ${f.oosSharpe > 0 ? "text-green-600" : "text-red-600"}`}>{f.oosSharpe.toFixed(2)}</td>
+                    <td className={`text-right px-1 font-mono ${f.oosSharpe > 0 ? "text-green-700" : "text-red-600"}`}>{f.oosSharpe.toFixed(2)}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600">{Math.round(f.oosRank * 100)}%</td>
                   </tr>
                 ))}

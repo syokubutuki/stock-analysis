@@ -259,8 +259,8 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
                     <td className="py-1 px-1.5 text-gray-600">{h}日後</td>
                     <td className={`text-right px-1.5 font-mono font-semibold ${f.ret >= 0 ? "text-green-700" : "text-red-600"}`}>{pct(f.ret)}</td>
                     <td className="text-center px-1.5">
-                      {dirOk === null ? <span className="text-gray-300">中立</span>
-                        : dirOk ? <span className="text-green-600">○</span> : <span className="text-red-500">×</span>}
+                      {dirOk === null ? <span className="text-fg-muted">中立</span>
+                        : dirOk ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}
                     </td>
                     <td className="text-right px-1.5 font-mono text-gray-600">{pct(f.mfe, 1)}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600">{pct(f.mae, 1)}</td>
@@ -269,8 +269,8 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
                       {isFinite(volRatio) ? `${volRatio.toFixed(2)}倍` : "—"}
                     </td>
                     <td className="text-center px-1.5">
-                      {inBand === null ? <span className="text-gray-300">—</span>
-                        : inBand ? <span className="text-green-600">内</span> : <span className="text-red-500">外</span>}
+                      {inBand === null ? <span className="text-gray-500">—</span>
+                        : inBand ? <span className="text-green-700">内</span> : <span className="text-red-500">外</span>}
                     </td>
                   </tr>
                 );

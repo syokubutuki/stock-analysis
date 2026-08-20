@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeVWTechnical } from "../../lib/volume-price-dynamics";
 import GuideEntryPanel from "./GuideEntryPanel";
+import DirectionValue from "./DirectionValue";
 
 interface Props { prices: PricePoint[]; }
 
@@ -97,7 +98,7 @@ export default function VolumeWeightedTechChart({ prices }: Props) {
                     <td className="py-1 px-2 text-center font-medium">{d.type.toUpperCase()}</td>
                     <td className="py-1 px-2 text-center font-mono">{d.standard.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono">{d.vw.toFixed(2)}</td>
-                    <td className={`py-1 px-2 text-center font-mono font-medium ${d.diff > 0 ? "text-green-600" : "text-red-600"}`}>{d.diff > 0 ? "+" : ""}{d.diff.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-center font-mono font-medium"><DirectionValue value={d.diff}>{d.diff > 0 ? "+" : ""}{d.diff.toFixed(2)}</DirectionValue></td>
                   </tr>
                 ))}
               </tbody>

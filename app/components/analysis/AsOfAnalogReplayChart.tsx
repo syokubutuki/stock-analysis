@@ -62,8 +62,8 @@ function PathCell({ p, H, scale }: { p: OosPredPoint; H: number; scale: number }
       <div className="flex items-center justify-between text-[10px] text-gray-500">
         <span className="font-mono">{p.date}</span>
         <span>
-          {dirOk === null ? <span className="text-gray-300">—</span>
-            : dirOk ? <span className="text-green-600">○</span> : <span className="text-red-500">×</span>}
+          {dirOk === null ? <span className="text-gray-500">—</span>
+            : dirOk ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}
         </span>
       </div>
       <svg width={W} height={HT} style={{ overflow: "visible" }}>
@@ -231,22 +231,22 @@ export default function AsOfAnalogReplayChart({ prices, ticker }: Props) {
             <div>
               終点IC <span className="font-bold">{fmt(oos.ic)}</span>
               <span className="text-gray-500">（95%CI {fmt(oos.icLo, 2)}〜{fmt(oos.icHi, 2)}）</span>
-              <span className="mx-1.5 text-gray-300">|</span>
+              <span className="mx-1.5 text-gray-500">|</span>
               方向的中 <span className="font-bold">{(oos.hit * 100).toFixed(0)}%</span>
               <span className="text-gray-500">（多数派ヌル {(oos.baseHit * 100).toFixed(0)}%）</span>
-              <span className="mx-1.5 text-gray-300">|</span>
+              <span className="mx-1.5 text-gray-500">|</span>
               分位の単調性 {fmt(oos.monotone, 2)}
             </div>
             {oos.path && (
               <div>
                 帯被覆 <span className="font-bold">{(oos.path.coverage * 100).toFixed(0)}%</span>
                 <span className="text-gray-500">（名目50%・CI {(oos.path.coverageLo * 100).toFixed(0)}–{(oos.path.coverageHi * 100).toFixed(0)}%・平均幅{(oos.path.bandWidth * 100).toFixed(1)}pt）</span>
-                <span className="mx-1.5 text-gray-300">|</span>
+                <span className="mx-1.5 text-gray-500">|</span>
                 高値到達 {(oos.path.mfeTouch * 100).toFixed(0)}% / 安値到達 {(oos.path.maeTouch * 100).toFixed(0)}%
                 <span className="text-gray-500">（較正なら各≒50%）</span>
                 {oos.path.shapeOk && (
                   <>
-                    <span className="mx-1.5 text-gray-300">|</span>
+                    <span className="mx-1.5 text-gray-500">|</span>
                     形の一致 {fmt(oos.path.shapeCorr, 2)}
                     <span className="text-gray-500">（ヌル {fmt(oos.path.shapeCorrNull, 2)}・p={oos.path.shapeCorrP < 0.001 ? "<.001" : oos.path.shapeCorrP.toFixed(3)}）</span>
                   </>

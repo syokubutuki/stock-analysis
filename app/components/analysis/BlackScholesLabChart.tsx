@@ -10,6 +10,7 @@ import {
 } from "../../lib/derivatives-core";
 import { wholePeriodVol } from "../../lib/ohlc-volatility";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -115,7 +116,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
     // grid + 軸
     ctx.strokeStyle = "#eee";
     ctx.lineWidth = 1;
-    ctx.fillStyle = "#888";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     for (let g = 0; g <= 4; g++) {
       const yy = pad.top + (ph * g) / 4;
@@ -135,7 +136,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
       ctx.stroke();
     }
     // K と現値の縦線
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     ctx.moveTo(toX(K), pad.top);
@@ -233,7 +234,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
     ctx.lineTo(width - pad.right, pad.top + ph / 2);
     ctx.stroke();
     // K縦線
-    ctx.strokeStyle = "#94a3b8";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     ctx.moveTo(toX(K), pad.top);
@@ -355,7 +356,7 @@ export default function BlackScholesLabChart({ prices }: Props) {
       <div className="text-xs bg-gray-50 rounded p-2">
         <span className="font-medium text-gray-700">プット・コール・パリティ検証: </span>
         C−P = {fmt(parity.lhs, 3)} / S·e^(−qT)−K·e^(−rT) = {fmt(parity.rhs, 3)} → 残差 ={" "}
-        <span className={Math.abs(parity.residual) < 1e-4 ? "text-green-600" : "text-red-600"}>
+        <span className={Math.abs(parity.residual) < 1e-4 ? "text-green-700" : "text-red-600"}>
           {parity.residual.toExponential(2)}
         </span>
         （理論上0。BS価格は無裁定なので一致する）

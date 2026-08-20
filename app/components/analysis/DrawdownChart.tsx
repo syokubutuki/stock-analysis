@@ -157,7 +157,7 @@ export default function DrawdownChart({ prices, period }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Calmar比率</div>
-          <div className={`font-mono font-medium ${stats.calmarRatio >= 1 ? "text-green-600" : stats.calmarRatio < 0.5 ? "text-red-600" : ""}`}>
+          <div className={`font-mono font-medium ${stats.calmarRatio >= 1 ? "text-green-700" : stats.calmarRatio < 0.5 ? "text-red-600" : ""}`}>
             {stats.calmarRatio.toFixed(2)}
           </div>
         </div>

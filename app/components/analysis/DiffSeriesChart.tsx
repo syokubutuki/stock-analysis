@@ -170,7 +170,7 @@ export default function DiffSeriesChart({ prices, period }: Props) {
               <div>平均: {mode === "percent" ? `${s.mean.toFixed(3)}%` : s.mean.toFixed(1)}</div>
               <div>標準偏差: {mode === "percent" ? `${s.stdDev.toFixed(3)}%` : s.stdDev.toFixed(1)}</div>
               <div>上昇率: {(s.positiveRatio * 100).toFixed(1)}%</div>
-              <div className="text-green-600">最大上昇: {mode === "percent" ? `${s.maxUp.toFixed(2)}%` : s.maxUp.toFixed(1)}</div>
+              <div className="text-green-700">最大上昇: {mode === "percent" ? `${s.maxUp.toFixed(2)}%` : s.maxUp.toFixed(1)}</div>
               <div className="text-red-600">最大下落: {mode === "percent" ? `${s.maxDown.toFixed(2)}%` : s.maxDown.toFixed(1)}</div>
             </div>
           ))}

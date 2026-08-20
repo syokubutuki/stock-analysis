@@ -21,7 +21,7 @@ interface Props {
 
 function retColor(v: number): string {
   if (v <= -0.05) return "text-red-600";
-  if (v >= 0.05) return "text-emerald-600";
+  if (v >= 0.05) return "text-emerald-700";
   return "text-gray-500";
 }
 
@@ -29,7 +29,7 @@ function retColor(v: number): string {
 const LABEL_COLOR: Record<string, string> = {
   red: "text-red-600",
   amber: "text-amber-600",
-  green: "text-emerald-600",
+  green: "text-emerald-700",
 };
 
 function stat5(stats: EventStat[]): EventStat | undefined {

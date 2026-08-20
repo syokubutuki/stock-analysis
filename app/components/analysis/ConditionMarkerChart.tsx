@@ -28,6 +28,7 @@ import {
 } from "../../lib/conditional-forward-returns";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -292,7 +293,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
     s.setData(data);
     indicator.thresholds.forEach((t) => {
       const pl = s.createPriceLine({
-        price: t.value, color: "#94a3b8", lineWidth: 1, lineStyle: LineStyle.Dashed,
+        price: t.value, color: CHART_COLORS.neutral, lineWidth: 1, lineStyle: LineStyle.Dashed,
         axisLabelVisible: true, title: t.label,
       });
       indLinesRef.current.push(pl);
@@ -326,7 +327,7 @@ export default function ConditionMarkerChart({ prices, minBars = 250 }: Props) {
       ms.push({
         time: prices[i].time as Time,
         position: "belowBar",
-        color: fr == null ? "#9ca3af" : up ? "#16a34a" : "#dc2626",
+        color: fr == null ? CHART_COLORS.neutral : up ? "#16a34a" : "#dc2626",
         shape: "arrowUp",
         size: inSel ? 1 : 0.6,
       } as SeriesMarker<Time>);

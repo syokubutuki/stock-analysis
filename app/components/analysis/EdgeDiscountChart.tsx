@@ -8,6 +8,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, LoadingError, IntradayCaveat, StatCell,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
 
@@ -24,7 +25,7 @@ function drawDiscount(ctx: CanvasRenderingContext2D, W: number, H: number, rows:
 
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("グロス(目盛)→実効エッジ(棒) ％／取引", ml - 112, 14);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(zeroX, mt); ctx.lineTo(zeroX, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
 
   rows.forEach((r, i) => {
@@ -133,14 +134,14 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
                     </td>
                     <td className="text-right px-2 text-gray-600 tabular-nums">{e.n}</td>
                     <td className="text-right px-2 tabular-nums text-gray-700">{fmtSignedPct(e.grossPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(e.openTermPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(e.closeTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(e.openTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(e.closeTermPct / 100)}</td>
                     <td className="text-right px-2 tabular-nums text-gray-500">{fmtSignedPct(e.spreadTermPct / 100)}</td>
                     <td className={`text-right px-2 font-bold tabular-nums ${e.effPct >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(e.effPct / 100)}</td>
                     <td className="text-center px-2">
                       {e.grossSignificant
                         ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${e.survives ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>{e.survives ? "生存" : "消滅"}</span>
-                        : <span className="text-gray-300">—</span>}
+                        : <span className="text-gray-500">—</span>}
                     </td>
                   </tr>
                 ))}

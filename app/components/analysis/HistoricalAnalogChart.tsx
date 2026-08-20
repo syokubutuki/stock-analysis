@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { findAnalogs, AnalogResult } from "../../lib/historical-analog";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -49,7 +50,7 @@ function drawPaths(ctx: CanvasRenderingContext2D, width: number, height: number,
   ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${(maxV * 100).toFixed(0)}%`, ml - 4, mt + 8);
   ctx.fillText("0%", ml - 4, yOf(0) + 3);
   ctx.fillText(`-${(maxV * 100).toFixed(0)}%`, ml - 4, mt + plotH);
@@ -77,7 +78,7 @@ function drawPaths(ctx: CanvasRenderingContext2D, width: number, height: number,
   r.medianPath.forEach((v, m) => ctx[m === 0 ? "moveTo" : "lineTo"](xOf(m), yOf(v)));
   ctx.stroke();
   // x軸
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
   for (let m = 0; m <= M; m += Math.max(1, Math.round(M / 5))) ctx.fillText(`+${m}d`, xOf(m), mt + plotH + 14);
 }
 
@@ -138,7 +139,7 @@ export default function HistoricalAnalogChart({ prices }: Props) {
                 <tr key={nb.endIndex} className="border-b border-gray-100">
                   <td className="py-1 px-2 text-gray-700">{nb.endTime}</td>
                   <td className="text-right px-2 text-gray-500">{nb.distance.toFixed(2)}</td>
-                  <td className={`text-right px-2 font-medium ${nb.futureReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  <td className={`text-right px-2 font-medium ${nb.futureReturn >= 0 ? "text-green-700" : "text-red-600"}`}>
                     {nb.futureReturn >= 0 ? "+" : ""}{(nb.futureReturn * 100).toFixed(1)}%
                   </td>
                 </tr>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { blockBootstrap } from "../../lib/block-bootstrap";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -55,7 +56,7 @@ export default function BlockBootstrapChart({ prices }: Props) {
     // 実績線
     ctx.strokeStyle = "#dc2626"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(xOf(res.actualTerminal), mt); ctx.lineTo(xOf(res.actualTerminal), mt + plotH); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     [res.terminalLo, res.terminalMedian, res.terminalHi].forEach((v) => ctx.fillText(fmtPct(v), xOf(v), mt + plotH + 12));
   }, [res]);
 

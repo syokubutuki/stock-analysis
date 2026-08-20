@@ -90,7 +90,7 @@ export default function InformationStorageChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Predictability</div>
-          <div className={`font-mono font-medium text-sm ${pred > 0.3 ? "text-green-600" : ""}`}>
+          <div className={`font-mono font-medium text-sm ${pred > 0.3 ? "text-green-700" : ""}`}>
             {pred.toFixed(3)}
           </div>
           <div className="text-fg-muted">{predInterp}</div>

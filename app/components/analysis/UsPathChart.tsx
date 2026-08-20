@@ -20,6 +20,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -54,7 +55,7 @@ function drawPaths(
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
   // 縦軸目盛
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
@@ -155,7 +156,7 @@ export default function UsPathChart({ ticker }: Props) {
     const markers: SeriesMarker<Time>[] = result.days.map((d) => ({
       time: d.date as Time,
       position: "inBar",
-      color: result.bins[d.bin]?.color ?? "#9ca3af",
+      color: result.bins[d.bin]?.color ?? CHART_COLORS.neutral,
       shape: "circle",
       size: 1,
     }));
@@ -306,7 +307,7 @@ export default function UsPathChart({ ticker }: Props) {
               onClick={() => setShowDist((v) => !v)}
               className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
             >
-              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              <span className="text-gray-500">{showDist ? "▼" : "▶"}</span>
               ビン所属の確認
             </button>
             {showDist && (

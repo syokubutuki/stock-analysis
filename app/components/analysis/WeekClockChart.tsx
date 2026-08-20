@@ -19,6 +19,7 @@ import {
   IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -64,10 +65,10 @@ function drawDailyCandle(ctx: CanvasRenderingContext2D, W: number, H: number, r:
   for (let i = 0; i <= ticks; i++) {
     const v = yMin + ((yMax - yMin) * i) / ticks;
     const y = yOf(v);
-    ctx.strokeStyle = Math.abs(v) < 1e-9 ? "#9ca3af" : "#f1f1f1";
+    ctx.strokeStyle = Math.abs(v) < 1e-9 ? CHART_COLORS.reference : "#f1f1f1";
     ctx.setLineDash(Math.abs(v) < 1e-9 ? [3, 3] : []);
     ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.fillText(`${(v * 100).toFixed(1)}%`, ml - 5, y + 3);
+    ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(`${(v * 100).toFixed(1)}%`, ml - 5, y + 3);
   }
   ctx.setLineDash([]);
   const y0 = yOf(0);
@@ -110,7 +111,7 @@ function drawDailyCandle(ctx: CanvasRenderingContext2D, W: number, H: number, r:
   slots.forEach((s, i) => {
     const cx = ml + i * slot + slot / 2;
     ctx.fillStyle = "#374151"; ctx.fillText(s.label, cx, mt + plotH + 14);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
     ctx.fillText(`n=${s.n}`, cx, mt + plotH + 23);
     ctx.font = "10px sans-serif";
   });
@@ -141,10 +142,10 @@ function drawDailyBand(ctx: CanvasRenderingContext2D, W: number, H: number, r: W
   for (let i = 0; i <= 5; i++) {
     const v = yMin + ((yMax - yMin) * i) / 5;
     const y = yOf(v);
-    ctx.strokeStyle = Math.abs(v) < 1e-9 ? "#9ca3af" : "#f1f1f1";
+    ctx.strokeStyle = Math.abs(v) < 1e-9 ? CHART_COLORS.reference : "#f1f1f1";
     ctx.setLineDash(Math.abs(v) < 1e-9 ? [3, 3] : []);
     ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.fillText(`${(v * 100).toFixed(1)}%`, ml - 5, y + 3);
+    ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(`${(v * 100).toFixed(1)}%`, ml - 5, y + 3);
   }
   ctx.setLineDash([]);
 
@@ -166,7 +167,7 @@ function drawDailyBand(ctx: CanvasRenderingContext2D, W: number, H: number, r: W
   ctx.textAlign = "center"; ctx.font = "10px sans-serif";
   slots.forEach((s, i) => {
     ctx.fillStyle = "#374151"; ctx.fillText(s.label, xOf(i), mt + plotH + 14);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif";
     ctx.fillText(`${(s.upRate * 100).toFixed(0)}%↑`, xOf(i), mt + plotH + 23);
     ctx.font = "10px sans-serif";
   });
@@ -204,10 +205,10 @@ function drawIntradayClock(ctx: CanvasRenderingContext2D, W: number, H: number, 
   for (let i = 0; i <= 5; i++) {
     const v = yMin + ((yMax - yMin) * i) / 5;
     const y = yOf(v);
-    ctx.strokeStyle = Math.abs(v) < 1e-9 ? "#9ca3af" : "#f4f4f4";
+    ctx.strokeStyle = Math.abs(v) < 1e-9 ? CHART_COLORS.reference : "#f4f4f4";
     ctx.setLineDash(Math.abs(v) < 1e-9 ? [3, 3] : []);
     ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.fillText(`${(v * 100).toFixed(1)}%`, ml - 5, y + 3);
+    ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(`${(v * 100).toFixed(1)}%`, ml - 5, y + 3);
   }
   ctx.setLineDash([]);
 

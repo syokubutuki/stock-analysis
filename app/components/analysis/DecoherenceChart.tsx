@@ -153,7 +153,7 @@ export default function DecoherenceChart({ prices }: Props) {
 
   const coherenceColor =
     result.currentCoherence > 0.6
-      ? "text-green-600"
+      ? "text-green-700"
       : result.currentCoherence > 0.3
         ? "text-yellow-600"
         : "text-red-600";

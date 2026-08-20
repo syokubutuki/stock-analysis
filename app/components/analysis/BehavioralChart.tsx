@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { behavioralAnalysis } from "../../lib/behavioral";
 import AnalysisGuide from "./AnalysisGuide";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -85,8 +86,8 @@ export default function BehavioralChart({ prices }: Props) {
               {mom.periods.map(p => (
                 <tr key={p.days} className="border-b border-gray-100">
                   <td className="py-1">{p.days}日</td>
-                  <td className={`text-right font-mono ${p.avgReturn > 0 ? "text-green-700" : "text-red-700"}`}>
-                    {(p.avgReturn * 100).toFixed(2)}%
+                  <td className="text-right font-mono">
+                    <DirectionValue value={p.avgReturn}>{(p.avgReturn * 100).toFixed(2)}%</DirectionValue>
                   </td>
                   <td className="text-right font-mono">{(p.winRate * 100).toFixed(1)}%</td>
                   <td className={`text-right font-mono ${Math.abs(p.tStat) > 2 ? "font-semibold" : ""}`}>

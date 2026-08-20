@@ -12,6 +12,7 @@ import {
 import { PathStat, PairDiff } from "../../lib/intraday-path-core";
 import { fmtSignedPct, drawTimeAxisLabels, initCanvas } from "./intradayShared";
 import StatBadge from "./StatBadge";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 0..1 の不透明度を #rrggbb に付ける2桁16進に変換。
 const alphaHex = (a: number) =>
@@ -95,7 +96,7 @@ export function drawPathStats(
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
   // 縦軸目盛
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
@@ -347,7 +348,7 @@ export function PathEvolutionControls({ stats, evo }: { stats: PathStat[]; evo: 
         個別日（古→新のグラデーション）
       </label>
       <label
-        className={`flex items-center gap-1 text-xs ${hasEras ? "text-gray-600" : "text-gray-300"}`}
+        className={`flex items-center gap-1 text-xs ${hasEras ? "text-gray-600" : "text-fg-muted"}`}
         title={hasEras ? "" : "時代分割には1群あたり8営業日以上が必要"}
       >
         <input
@@ -437,15 +438,15 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
                     </span>
                   </td>
                   <td className="text-right px-2 text-gray-500 tabular-nums">{d.nRho}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(d.endEarly)}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(d.endLate)}</td>
+                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d.endEarly)}</td>
+                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d.endLate)}</td>
                   <td className={`text-right px-2 font-medium tabular-nums ${d.endDiff >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(d.endDiff)}</td>
                   <td className="px-2"><StatBadge n={Math.min(d.nEarly, d.nLate)} p={d.endP} significant={d.endP < 0.05} /></td>
                   {rhoCell(d.peakRho, d.peakP, "peak")}
                   {rhoCell(d.troughRho, d.troughP, "trough")}
                   <td className="text-center px-2 text-gray-600">
                     <span className="text-blue-600">▲</span> {timeLabels[last.peakIdx] ?? "-"}
-                    <span className="text-gray-300 mx-1">/</span>
+                    <span className="text-gray-500 mx-1">/</span>
                     <span className="text-red-500">▽</span> {timeLabels[last.troughIdx] ?? "-"}
                   </td>
                 </tr>
@@ -565,7 +566,7 @@ export function PathSummaryTable({
               </td>
               <td className="text-right px-2 text-gray-600">{b.n}</td>
               <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
-              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(b.endMed)}</td>
+              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.endMed)}</td>
               <td className="text-center px-2 text-gray-600">
                 <span className="text-blue-600">▲</span> {timeLabels[b.peakIdx] ?? "-"} <span className="text-fg-muted">({fmtSignedPct(b.mean[b.peakIdx])})</span>
               </td>
@@ -610,10 +611,10 @@ export function PairDiffMatrix({ stats, pairDiffs }: { stats: PathStat[]; pairDi
                   <td className="p-1 text-gray-600 font-medium text-right">{r.label}</td>
                   {active.map((c) => {
                     const ci = stats.indexOf(c);
-                    if (ri === ci) return <td key={c.key} className="p-1 text-center text-gray-300">—</td>;
+                    if (ri === ci) return <td key={c.key} className="p-1 text-center text-gray-500">—</td>;
                     const key = ri < ci ? `${ri}-${ci}` : `${ci}-${ri}`;
                     const d = lookup.get(key);
-                    if (!d) return <td key={c.key} className="p-1 text-center text-gray-300">·</td>;
+                    if (!d) return <td key={c.key} className="p-1 text-center text-fg-muted">·</td>;
                     const diff = ri < ci ? d.diff : -d.diff;
                     const sig = d.pAdj < 0.05;
                     return (

@@ -82,7 +82,7 @@ export default function AttractorSignalDashboard({ prices, seriesMode }: Props) 
           <div className={`text-2xl font-bold ${
             overallRisk === "high" ? "text-red-600" :
             overallRisk === "moderate" ? "text-amber-600" :
-            "text-green-600"
+            "text-green-700"
           }`}>
             {overallRisk === "high" ? "⚠ HIGH RISK" :
              overallRisk === "moderate" ? "△ MODERATE" :
@@ -107,7 +107,7 @@ export default function AttractorSignalDashboard({ prices, seriesMode }: Props) 
           <div className="font-bold text-lg">{dim}</div>
         </div>
         <div className={`p-2 rounded text-center ${recentLyap > 0 ? "bg-red-50" : "bg-green-50"}`}>
-          <div className={recentLyap > 0 ? "text-red-500" : "text-green-500"}>λ (Lyapunov)</div>
+          <div className={recentLyap > 0 ? "text-red-500" : "text-green-700"}>λ (Lyapunov)</div>
           <div className="font-bold">{recentLyap.toFixed(3)}</div>
         </div>
         <div className={`p-2 rounded text-center ${recentDensity < 0.3 ? "bg-red-50" : "bg-purple-50"}`}>
@@ -119,7 +119,7 @@ export default function AttractorSignalDashboard({ prices, seriesMode }: Props) 
           <div className="font-bold">{(recentDet * 100).toFixed(0)}%</div>
         </div>
         <div className={`p-2 rounded text-center ${simplex.correlation > 0.3 ? "bg-green-50" : "bg-gray-50"}`}>
-          <div className={simplex.correlation > 0.3 ? "text-green-500" : "text-gray-500"}>予測ρ</div>
+          <div className={simplex.correlation > 0.3 ? "text-green-700" : "text-gray-500"}>予測ρ</div>
           <div className="font-bold">{simplex.correlation.toFixed(2)}</div>
         </div>
       </div>
@@ -196,7 +196,7 @@ export default function AttractorSignalDashboard({ prices, seriesMode }: Props) 
             <ul className="list-disc pl-4 space-y-1 text-xs">
               <li><span className="font-medium text-red-600">HIGH RISK</span>: 「注意」シグナルが2つ以上、または「強」シグナルが2つ以上</li>
               <li><span className="font-medium text-amber-600">MODERATE</span>: 「注意」シグナルが1つ</li>
-              <li><span className="font-medium text-green-600">LOW RISK</span>: 「注意」シグナルなし</li>
+              <li><span className="font-medium text-green-700">LOW RISK</span>: 「注意」シグナルなし</li>
             </ul>
           </div>
 

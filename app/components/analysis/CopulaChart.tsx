@@ -8,6 +8,7 @@ import { alignSeries } from "../../lib/benchmark";
 import { computeCopulaAnalysis, type CopulaResult } from "../../lib/copula";
 import AnalysisGuide from "./AnalysisGuide";
 import DataQualityNotice from "./DataQualityNotice";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -253,7 +254,7 @@ function drawCopulaScatter(
   ctx.restore();
 
   // Axis tick labels at 0 and 1
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "center";
   ctx.fillText("0", pad.left, pad.top + plotH + 12);

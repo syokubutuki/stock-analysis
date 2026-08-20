@@ -1579,7 +1579,7 @@ export default function AnalysisPage() {
                   color={
                     filteredPrices[filteredPrices.length - 1].close >=
                     filteredPrices[0].close
-                      ? "text-green-600"
+                      ? "text-green-700"
                       : "text-red-600"
                   }
                 />

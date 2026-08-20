@@ -8,6 +8,7 @@ import {
   WEEKDAY_LABELS,
 } from "../../lib/weekly-phase-attractor";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 既定バスケット: 米セクターETF (同一市場・同一タイムゾーンで週次位相を比較)
 const DEFAULT_BASKET = "XLK,XLF,XLE,XLV,XLY,XLP,XLI,XLU,XLB";
@@ -95,7 +96,7 @@ export default function WeeklyPhaseSyncChart() {
       const ang = (2 * Math.PI * k) / 5;
       const x = cx + Math.cos(ang) * R;
       const y = cy + Math.sin(ang) * R;
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "10px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(WEEKDAY_LABELS[k], cx + Math.cos(ang) * (R + 14), cy + Math.sin(ang) * (R + 14) + 3);
@@ -142,7 +143,7 @@ export default function WeeklyPhaseSyncChart() {
     ctx.arc(rx, ry, 5, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.fillText("赤=秩序変数(同期度)  青=各銘柄の選好位相", 8, size - 8);
   }, [result]);

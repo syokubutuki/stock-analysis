@@ -9,6 +9,7 @@ import {
   analyzeTails, ppPlot, ksTest, adTest,
 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -73,7 +74,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
     for (let i = 0; i <= 4; i++) {
       const y = toY(i / 4);
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
-      ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText((i * 25).toString() + "%", pad.left - 5, y + 3);
     }
 
@@ -178,7 +179,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
     ctx.stroke();
 
     // Y軸ラベル
-    ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     for (let v = Math.ceil(logMin); v <= Math.floor(logMax); v++) {
       const y = toY(v);
       ctx.fillText(`10^${v}`, pad.left - 5, y + 3);
@@ -340,14 +341,14 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">KS検定 D値</div>
           <div className="font-mono font-medium">{ks.D.toFixed(4)}</div>
-          <div className={`text-fg-muted ${ks.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`text-fg-muted ${ks.pValue < 0.05 ? "text-red-500" : "text-green-700"}`}>
             p={ks.pValue.toFixed(4)} {ks.pValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">AD検定 A²*</div>
           <div className="font-mono font-medium">{ad.A2star.toFixed(4)}</div>
-          <div className={`text-fg-muted ${ad.pValue < 0.05 ? "text-red-500" : "text-green-500"}`}>
+          <div className={`text-fg-muted ${ad.pValue < 0.05 ? "text-red-500" : "text-green-700"}`}>
             p={ad.pValue.toFixed(4)} {ad.pValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>
@@ -360,7 +361,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">上側テール &gt;1%</div>
-          <div className="font-mono font-medium text-green-600">{pctFmt(tails.upper.exceedance1pct, 2)}</div>
+          <div className="font-mono font-medium text-green-700">{pctFmt(tails.upper.exceedance1pct, 2)}</div>
           <div className="text-fg-muted">&gt;2%: {pctFmt(tails.upper.exceedance2pct, 2)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">

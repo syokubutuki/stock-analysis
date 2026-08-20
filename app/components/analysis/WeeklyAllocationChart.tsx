@@ -11,6 +11,7 @@ import {
   growthRatio,
 } from "../../lib/weekly-allocation";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -97,7 +98,7 @@ function drawAllocation(
     // 注文時に検索するのは銘柄コードなので、コードを太字で前置し、社名は幅に収まる分だけ
     ctx.textAlign = "right";
     ctx.font = "10px sans-serif";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     const nm = s.name && s.name !== s.ticker ? s.name : "";
     const codeW = ctx.measureText(s.ticker).width;
     let shown = nm;
@@ -189,7 +190,7 @@ function drawSlots(ctx: CanvasRenderingContext2D, width: number, height: number,
     ctx.fillStyle = isMon ? "#b45309" : "#6b7280";
     ctx.font = `${isMon ? "bold " : ""}9px sans-serif`;
     ctx.fillText(s.label, cx, mt + plotH + 13);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.fillText(`t=${s.t.toFixed(1)}`, cx, mt + plotH + 24);
   });
@@ -221,7 +222,7 @@ function drawSplit(ctx: CanvasRenderingContext2D, width: number, height: number,
   ctx.fillText("時間分散：先頭kスロットに等分したときの確実性等価 CE(k)（週次）", 4, 14);
 
   if (n < 2) {
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.fillText("出口が近すぎてスロットが1つしかありません", ml, mt + plotH / 2);
     return;
@@ -275,7 +276,7 @@ function drawSplit(ctx: CanvasRenderingContext2D, width: number, height: number,
     }
   });
 
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   ctx.fillText(bp(yMax), ml - 4, mt + 4);
@@ -357,7 +358,7 @@ function drawGrowth(ctx: CanvasRenderingContext2D, width: number, height: number
     ctx.fillText(`${m.label} λ=${m.l.toFixed(2)}`, px + (px > ml + plotW * 0.6 ? -6 : 6), mt + 12 + i * 11);
   });
 
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   ctx.fillText("g_max", ml - 4, yOf(1) + 3);
@@ -647,7 +648,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
                 </td>
                 <td className="py-1 px-2 text-right">{pct(r.soloSum)}</td>
                 <td className="py-1 px-2 text-right font-semibold">
-                  {pct(r.exposure)}<span className="text-emerald-600"> / {pct(r.cash)}</span>
+                  {pct(r.exposure)}<span className="text-emerald-700"> / {pct(r.cash)}</span>
                 </td>
                 <td className="py-1 px-2" />
                 <td className="py-1 px-2 text-right font-semibold bg-blue-50/70">{totalShares.toLocaleString()}株</td>

@@ -23,6 +23,7 @@ import type {
 } from "../../lib/axioms/q-backtest.worker";
 import AnalysisGuide from "./AnalysisGuide";
 import TeX from "./TeX";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 銘柄切替時は親が key={ticker} で作り直すため、ticker 自体は受け取らない。
 interface Props {
@@ -59,7 +60,7 @@ function MetricRow({
       <td className="py-1 pr-2 text-gray-600">{label}</td>
       <td
         className={`py-1 pr-2 text-right tabular-nums ${
-          sWins ? "font-bold text-emerald-600" : "text-gray-700"
+          sWins ? "font-bold text-emerald-700" : "text-gray-700"
         }`}
       >
         {format(s)}
@@ -153,7 +154,7 @@ export default function QBacktestChart({ prices }: Props) {
       title: "合流点の q",
     });
     bhRef.current = chart.addSeries(LineSeries, {
-      color: "#94a3b8",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "買い持ち",
     });

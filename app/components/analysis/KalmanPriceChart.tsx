@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { efficientPrice, type SmoothLevel } from "../../lib/efficient-price";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -45,7 +46,7 @@ export default function KalmanPriceChart({ prices }: Props) {
     });
     apiRef.current = chart;
     const obs = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "観測価格",
     });

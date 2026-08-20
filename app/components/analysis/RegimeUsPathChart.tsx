@@ -18,6 +18,7 @@ import {
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -90,7 +91,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
     [result]
   );
   const colorOf = useCallback(
-    (key: string) => result?.buckets.find((b) => b.key === key)?.color ?? "#9ca3af",
+    (key: string) => result?.buckets.find((b) => b.key === key)?.color ?? CHART_COLORS.neutral,
     [result]
   );
 
@@ -330,7 +331,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
               onClick={() => setShowDist((v) => !v)}
               className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
             >
-              <span className="text-gray-400">{showDist ? "▼" : "▶"}</span>
+              <span className="text-gray-500">{showDist ? "▼" : "▶"}</span>
               基調の分布確認
             </button>
             {showDist && (

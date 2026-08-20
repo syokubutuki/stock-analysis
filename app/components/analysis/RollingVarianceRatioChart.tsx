@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { rollingVarianceRatio } from "../../lib/rolling-variance-ratio";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -32,7 +33,7 @@ export default function RollingVarianceRatioChart({ prices }: Props) {
     apiRef.current = chart;
     const vr = chart.addSeries(LineSeries, { color: "#7c3aed", lineWidth: 2, title: `VR(${q})` });
     vr.setData(series.map((p) => ({ time: p.time as Time, value: p.vr })));
-    const one = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, title: "RW=1" });
+    const one = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "RW=1" });
     one.setData(series.map((p) => ({ time: p.time as Time, value: 1 })));
     for (const key of ["upper", "lower"] as const) {
       const b = chart.addSeries(LineSeries, { color: "#d1d5db", lineWidth: 1, lineStyle: 2 });

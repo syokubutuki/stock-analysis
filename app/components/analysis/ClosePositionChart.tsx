@@ -10,6 +10,8 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeClosePosition } from "../../lib/ohlc-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props { prices: PricePoint[]; }
 
@@ -28,7 +30,7 @@ export default function ClosePositionChart({ prices }: Props) {
     });
     apiRef.current = chart;
 
-    const cpSeries = chart.addSeries(LineSeries, { color: "#94a3b8", lineWidth: 1, title: "Close Position" });
+    const cpSeries = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "Close Position" });
     const avgSeries = chart.addSeries(LineSeries, { color: "#3b82f6", lineWidth: 2, title: "20日平均" });
 
     cpSeries.setData(result.dates.map((t, i) => ({ time: t as Time, value: result.closePosition[i] })));
@@ -59,8 +61,8 @@ export default function ClosePositionChart({ prices }: Props) {
             {result.bucketReturns.map((b, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium text-gray-700">{b.range}</td>
-                <td className={`py-1 px-2 text-center font-mono ${b.avgReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{(b.avgReturn * 100).toFixed(3)}%</td>
-                <td className={`py-1 px-2 text-center font-mono ${b.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>{(b.winRate * 100).toFixed(1)}%</td>
+                <td className="py-1 px-2 text-center font-mono"><DirectionValue value={b.avgReturn}>{(b.avgReturn * 100).toFixed(3)}%</DirectionValue></td>
+                <td className="py-1 px-2 text-center font-mono"><DirectionValue value={b.winRate - 0.5}>{(b.winRate * 100).toFixed(1)}%</DirectionValue></td>
                 <td className="py-1 px-2 text-center font-mono text-gray-500">{b.n}</td>
               </tr>
             ))}

@@ -11,6 +11,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -37,7 +38,7 @@ function drawRv(ctx: CanvasRenderingContext2D, W: number, H: number, r: RvResult
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("年率実現ボラ（黒=RV, 青=実現レンジ, ◆=ジャンプ日, 紫=HAR予測）", ml, mt - 12);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`${vmax.toFixed(0)}%`, ml - 4, mt + 9); ctx.fillText("0", ml - 4, mt + plotH);
 
   const line = (a: number[], color: string, w: number) => {
@@ -84,7 +85,7 @@ function drawOvernight(ctx: CanvasRenderingContext2D, W: number, H: number, r: O
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("累積エクイティ（青=夜間取り / 緑=日中取り, 始点=1）", ml, mt - 12);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(vmax.toFixed(2), ml - 4, mt + 9); ctx.fillText(vmin.toFixed(2), ml - 4, mt + plotH);
 
   // 1.0 ライン
@@ -114,7 +115,7 @@ function drawSignature(ctx: CanvasRenderingContext2D, W: number, H: number, r: S
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, paneH);
     ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("日中リターンの自己相関 ρ(k)", ml, mt - 7);
-    ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
     ctx.beginPath(); ctx.moveTo(ml, y0); ctx.lineTo(ml + plotW, y0); ctx.stroke(); ctx.setLineDash([]);
     for (let i = 0; i < n; i++) {
       const v = r.acf[i].value;
@@ -173,7 +174,7 @@ function drawVolClock(ctx: CanvasRenderingContext2D, W: number, H: number, r: Vo
       ctx.fillRect(ml + i * slot + offset, mt + plotH - h, bw, h);
     }
   };
-  drawHist(tN, "#9ca3afcc", slot * 0.1);
+  drawHist(tN, `${CHART_COLORS.neutral}cc`, slot * 0.1);
   drawHist(vN, "#7c3aedcc", slot * 0.5);
   // x軸 (z)
   ctx.fillStyle = "#6b7280"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";

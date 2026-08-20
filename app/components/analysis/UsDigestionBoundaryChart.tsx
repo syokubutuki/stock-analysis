@@ -12,6 +12,7 @@ import {
   initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct, drawTimeAxisLabels,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -53,7 +54,7 @@ function drawPath(ctx: CanvasRenderingContext2D, W: number, H: number, res: Boun
   ctx.strokeStyle = "#f0f0f0";
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8); ctx.fillText("0", ml - 3, Y(0) + 3); ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
 
   const vline = (idx: number, color: string, label: string, up: boolean) => {
@@ -90,7 +91,7 @@ function drawHazard(ctx: CanvasRenderingContext2D, W: number, H: number, hz: Haz
   ctx.strokeStyle = "#4338ca"; ctx.lineWidth = 2; ctx.beginPath();
   hz.forEach((h, i) => { const x = X(i), y = mt + (1 - h.survival) * plotH; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
   ctx.stroke();
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(hMax.toFixed(2), ml - 3, mt + 8);
   drawTimeAxisLabels(ctx, hz.map((h) => h.label), ml, slot, H - 6);
 }

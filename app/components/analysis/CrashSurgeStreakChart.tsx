@@ -4,6 +4,8 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { analyzeStreaks, type StreakAnalysis } from "../../lib/crash-surge-streak";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -81,7 +83,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
       const yDn = midY + half * frac;
       ctx.beginPath(); ctx.moveTo(ml, yUp); ctx.lineTo(width - mr, yUp); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(ml, yDn); ctx.lineTo(width - mr, yDn); ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText(`${len}`, ml - 5, yUp + 3);
       ctx.fillText(`${len}`, ml - 5, yDn + 3);
     }
@@ -131,7 +133,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
 
     ctx.save();
     ctx.translate(13, midY); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "center"; ctx.font = "9px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "center"; ctx.font = "9px sans-serif";
     ctx.fillText("連続日数", 0, 0);
     ctx.restore();
   }, [analysis, prices]);
@@ -157,7 +159,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     for (let i = 0; i <= 4; i++) {
       const y = mt + (plotH * i) / 4;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText(`${Math.round(maxCount * (4 - i) / 4)}`, ml - 5, y + 3);
     }
 
@@ -179,7 +181,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("連続日数（日）", ml + plotW / 2, height - mb + 32);
     ctx.save(); ctx.translate(13, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.fillText("発生回数", 0, 0); ctx.restore();
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.fillText("発生回数", 0, 0); ctx.restore();
   }, [analysis]);
 
   // ===== 3. 暴落率・暴騰率の分布 =====
@@ -204,7 +206,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     for (let i = 0; i <= 4; i++) {
       const y = mt + (plotH * i) / 4;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
-      ctx.fillStyle = "#9ca3af"; ctx.fillText(`${Math.round(maxCount * (4 - i) / 4)}`, ml - 5, y + 3);
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(`${Math.round(maxCount * (4 - i) / 4)}`, ml - 5, y + 3);
     }
 
     for (const b of rb) {
@@ -223,7 +225,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
 
     // zero line
     const zx = xOf(0);
-    ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(zx, mt); ctx.lineTo(zx, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
 
     // x labels (%)
@@ -238,7 +240,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("ラン累積リターン", ml + plotW / 2, height - mb + 32);
     ctx.save(); ctx.translate(13, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.fillText("発生回数", 0, 0); ctx.restore();
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.fillText("発生回数", 0, 0); ctx.restore();
   }, [analysis]);
 
   // ===== 4. ラン進行に伴う累積率の平均推移 =====
@@ -266,7 +268,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
       const y = yOf(v);
       ctx.strokeStyle = i === 2 ? "#cbd5e1" : "#eceff3"; ctx.lineWidth = i === 2 ? 1 : 0.5;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
-      ctx.fillStyle = "#9ca3af"; ctx.fillText(pct(v, 1), ml - 5, y + 3);
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(pct(v, 1), ml - 5, y + 3);
     }
 
     const drawPath = (pts: typeof dn, color: string) => {
@@ -296,7 +298,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("ラン内の経過日数（日目）", ml + plotW / 2, height - mb + 32);
     ctx.save(); ctx.translate(14, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.fillText("平均累積リターン", 0, 0); ctx.restore();
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.fillText("平均累積リターン", 0, 0); ctx.restore();
   }, [analysis]);
 
   // ===== 5. ラン終了後 N 日の値動き（Close/Open 併記・同一プロット） =====
@@ -330,11 +332,11 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
       const y = yOf(v);
       ctx.strokeStyle = "#eceff3"; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
-      ctx.fillStyle = "#9ca3af"; ctx.fillText(pct(v, 1), ml - 5, y + 3);
+      ctx.fillStyle = CHART_COLORS.ink; ctx.fillText(pct(v, 1), ml - 5, y + 3);
     }
     // zero line
     const zy = yOf(0);
-    ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(ml, zy); ctx.lineTo(width - mr, zy); ctx.stroke(); ctx.setLineDash([]);
 
     // σ band (Closeのみ)
@@ -388,7 +390,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("ラン終了日からの経過営業日数", ml + plotW / 2, height - mb + 32);
     ctx.save(); ctx.translate(15, mt + plotH / 2); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.fillText("平均累積リターン", 0, 0); ctx.restore();
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.fillText("平均累積リターン", 0, 0); ctx.restore();
   }, [analysis]);
 
   if (prices.length < 30) {
@@ -477,14 +479,14 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
                 <td className="py-1 px-2 font-medium" style={{ color: C_DOWN }}>暴落後 平均(Close)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("down", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.closeMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f ? pct(f.closeMean) : "-"}</td>;
+                  return <td key={d} className="py-1 px-2 text-center font-mono">{f ? <DirectionValue value={f.closeMean}>{pct(f.closeMean)}</DirectionValue> : "-"}</td>;
                 })}
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium" style={{ color: C_DOWN_OPEN }}>暴落後 平均(Open)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("down", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.openMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f && d >= 1 ? pct(f.openMean) : "-"}</td>;
+                  return <td key={d} className="py-1 px-2 text-center font-mono">{f && d >= 1 ? <DirectionValue value={f.openMean}>{pct(f.openMean)}</DirectionValue> : "-"}</td>;
                 })}
               </tr>
               <tr className="border-b border-gray-100">
@@ -498,14 +500,14 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
                 <td className="py-1 px-2 font-medium" style={{ color: C_UP }}>暴騰後 平均(Close)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("up", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.closeMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f ? pct(f.closeMean) : "-"}</td>;
+                  return <td key={d} className="py-1 px-2 text-center font-mono">{f ? <DirectionValue value={f.closeMean}>{pct(f.closeMean)}</DirectionValue> : "-"}</td>;
                 })}
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium" style={{ color: C_UP_OPEN }}>暴騰後 平均(Open)</td>
                 {horizons.map((d) => {
                   const f = fwdAt("up", d);
-                  return <td key={d} className={`py-1 px-2 text-center font-mono ${(f?.openMean ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{f && d >= 1 ? pct(f.openMean) : "-"}</td>;
+                  return <td key={d} className="py-1 px-2 text-center font-mono">{f && d >= 1 ? <DirectionValue value={f.openMean}>{pct(f.openMean)}</DirectionValue> : "-"}</td>;
                 })}
               </tr>
               <tr>

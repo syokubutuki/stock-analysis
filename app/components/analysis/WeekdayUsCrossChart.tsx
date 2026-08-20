@@ -22,6 +22,7 @@ import { UsDriverButtons, BinSchemeButtons, intervalToMin } from "./usSpilloverS
 import { IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import { NameColMode, NAME_COL_W, useNameColMode, nameColStyle, NameColHeader } from "./crossTableShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -567,7 +568,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                   {b.label}
                   {isToday && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今</span>}
                 </span>
-                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-gray-300" : "text-fg-muted"}`}>
+                <span className={`text-[10px] font-normal tabular-nums ${isSel ? "text-fg-muted" : "text-fg-muted"}`}>
                   {fmtBinRange(b.rangeLo, b.rangeHi)}
                 </span>
               </button>
@@ -953,7 +954,7 @@ function CrossHeatmap({
   };
 
   const renderCell = (c: CellStats | null, consensusP?: number, rowKey = "") => {
-    if (!c || c.n < 1) return <span className="text-gray-300">—</span>;
+    if (!c || c.n < 1) return <span className="text-gray-500">—</span>;
     if (metric.key === "shape") {
       return (
         <PathSpark
@@ -1189,7 +1190,7 @@ function CrossRankTable({
   const maxW = positive.reduce((m, r) => Math.max(m, r.weight), 0);
 
   const cell = (v: number, fmt: (x: number) => string, extra = "") =>
-    isFinite(v) ? <span className={extra}>{fmt(v)}</span> : <span className="text-gray-300">—</span>;
+    isFinite(v) ? <span className={extra}>{fmt(v)}</span> : <span className="text-gray-500">—</span>;
   const pctS = (x: number) => fmtSignedPct(x, 2);
   const pct2 = (x: number) => `${(x * 100).toFixed(2)}%`;
   const pct0 = (x: number) => `${(x * 100).toFixed(0)}%`;
@@ -1216,14 +1217,14 @@ function CrossRankTable({
       <td className="px-2 py-1 text-right tabular-nums text-gray-700">{cell(r.kelly, (x) => x.toFixed(2))}</td>
       <td className="px-2 py-1 text-right tabular-nums">
         {r.isConsensus ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-500">—</span>
         ) : r.excluded ? (
-          <span className="text-gray-300" title={`n=${r.n} が最小n(${minN})未満`}>対象外</span>
+          <span className="text-fg-muted" title={`n=${r.n} が最小n(${minN})未満`}>対象外</span>
         ) : (
           <div className="relative">
             <div className="absolute inset-y-0 right-0 rounded-sm bg-emerald-100"
               style={{ width: maxW > 0 ? `${Math.max(2, (r.weight / maxW) * 100)}%` : 0 }} />
-            <span className={`relative ${r.weight > 0 ? "font-semibold text-emerald-800" : "text-gray-300"}`}>
+            <span className={`relative ${r.weight > 0 ? "font-semibold text-emerald-800" : "text-fg-muted"}`}>
               {(r.weight * 100).toFixed(1)}%
             </span>
           </div>
@@ -1309,7 +1310,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
         <div className="font-mono font-medium text-gray-700 truncate">{ticker}</div>
         <div className="text-[9px] text-fg-muted tabular-nums truncate">
           n={n}
-          {allocTxt && <span className="ml-1 text-emerald-600 font-medium">{allocTxt}</span>}
+          {allocTxt && <span className="ml-1 text-emerald-700 font-medium">{allocTxt}</span>}
         </div>
       </div>
     );
@@ -1331,8 +1332,8 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           className="w-[112px] px-1 py-0.5 text-[11px] border border-gray-300 rounded"
           placeholder={ticker}
         />
-        <button onClick={commit} title="保存" className="text-emerald-600 hover:text-emerald-700 text-sm leading-none">✓</button>
-        <button onClick={() => setEditing(false)} title="取消" className="text-gray-400 hover:text-gray-600 text-sm leading-none">✕</button>
+        <button onClick={commit} title="保存" className="text-emerald-700 hover:text-emerald-700 text-sm leading-none">✓</button>
+        <button onClick={() => setEditing(false)} title="取消" className="text-gray-500 hover:text-gray-600 text-sm leading-none">✕</button>
       </div>
     );
   }
@@ -1347,7 +1348,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           <button
             onClick={() => { setVal(hasName ? name! : ""); setEditing(true); }}
             title="銘柄名を編集(ウォッチリストに保存)"
-            className="text-gray-300 hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
+            className="text-fg-muted hover:text-blue-500 text-[11px] leading-none flex-shrink-0"
           >✎</button>
         )}
       </div>
@@ -1358,7 +1359,7 @@ function RowHeader({ ticker, name, n, sortVal, sortLabel, sortFmt, alloc, timeLa
           <span className="text-gray-500" title={`並び替えに使っている値: ${sortLabel}`}>{sortTxt}</span>
         )}
         {allocTxt && (
-          <span className={alloc?.excluded ? "text-gray-300" : "text-emerald-600 font-medium"} title={allocTip}>
+          <span className={alloc?.excluded ? "text-fg-muted" : "text-emerald-700 font-medium"} title={allocTip}>
             配分{allocTxt}
           </span>
         )}
@@ -1386,7 +1387,7 @@ function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
   const { path, band, peakIdx, troughIdx, highMin, lowMin } = cell;
   const W = 104, H = 54, padX = 6, padTop = 9, padBot = 9;
   const G = path.length;
-  if (G < 2) return <span className="text-gray-300">—</span>;
+  if (G < 2) return <span className="text-gray-500">—</span>;
 
   // 山谷の振幅(寄り基準)は縦軸モードによらず同じ量。
   let pLo = Infinity, pHi = -Infinity;
@@ -1441,7 +1442,7 @@ function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
       <title>{title}</title>
       {/* 寄り基準の0ライン(実位置) */}
       <line x1={padX} y1={zeroY} x2={W - padX} y2={zeroY} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="2 2" />
-      <path d={area} fill="#94a3b8" opacity={0.18} />
+      <path d={area} fill={CHART_COLORS.reference} opacity={0.18} />
       <path d={line} fill="none" stroke="#334155" strokeWidth={1.4} />
       {/* 高値時刻・中央: 上端▽ + 縦ガイド(緑) */}
       <line x1={highX} y1={padTop - 2} x2={highX} y2={H - padBot} stroke={SP_GREEN} strokeWidth={0.7} strokeDasharray="1.5 1.5" opacity={0.5} />
@@ -1453,7 +1454,7 @@ function PathSpark({ cell, grid, timeLabels, yMax = 0, scaleMode = "cell" }: {
       <circle cx={peakX} cy={peakY} r={2.7} fill={SP_GREEN} stroke="#fff" strokeWidth={0.8} />
       <circle cx={trX} cy={trY} r={2.7} fill={SP_RED} stroke="#fff" strokeWidth={0.8} />
       {/* 山谷の振幅(cross-cellの大きさ比較用) */}
-      <text x={padX} y={7} fontSize={7.5} fill="#9ca3af" style={{ fontVariantNumeric: "tabular-nums" }}>{amplPct}</text>
+      <text x={padX} y={7} fontSize={7.5} fill={CHART_COLORS.ink} style={{ fontVariantNumeric: "tabular-nums" }}>{amplPct}</text>
     </svg>
   );
 }

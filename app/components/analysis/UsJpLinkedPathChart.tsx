@@ -28,6 +28,7 @@ import {
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -57,7 +58,7 @@ function drawUsPaths(
   for (let k = 0; k <= 3; k++) { const y = mt + (k / 3) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
@@ -269,7 +270,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                       </td>
                       <td className="text-right px-2 text-gray-600">{s.n}</td>
                       <td className="px-2 text-gray-500 text-[11px]">{g.desc}</td>
-                      <td className={`text-right px-2 tabular-nums ${result.gapMeans[i] >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(result.gapMeans[i])}</td>
+                      <td className={`text-right px-2 tabular-nums ${result.gapMeans[i] >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(result.gapMeans[i])}</td>
                       <td className={`text-right px-2 font-medium tabular-nums ${s.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(s.endMean)}</td>
                       <td className="text-center px-2 text-gray-600">{result.jpLabels[s.peakIdx] ?? "-"}</td>
                       <td className="px-2"><StatBadge n={s.n} p={s.endP} significant={s.endP < 0.05} /></td>
@@ -315,7 +316,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">増分 ΔR²</div>
-                    <div className={`font-bold ${inc.p < 0.05 ? "text-green-600" : "text-gray-800"}`}>{fmtPct(inc.dR2, 2)}</div>
+                    <div className={`font-bold ${inc.p < 0.05 ? "text-green-700" : "text-gray-800"}`}>{fmtPct(inc.dR2, 2)}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">増分F（q={inc.q}）</div>

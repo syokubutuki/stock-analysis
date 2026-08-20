@@ -17,6 +17,7 @@ import {
   type MarketRegime,
 } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -27,7 +28,7 @@ const REGIME_COLORS: Record<MarketRegime, string> = {
   uptrend: "#22c55e",
   downtrend: "#ef4444",
   high_volatility: "#f59e0b",
-  low_volatility: "#94a3b8",
+  low_volatility: CHART_COLORS.neutral,
   accelerating: "#3b82f6",
   decelerating: "#f97316",
 };
@@ -93,13 +94,13 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
       times.map((t, i) => ({
         time: t as Time,
         value: 1,
-        color: (REGIME_COLORS[marketState.regimes[i]] || "#94a3b8") + "30",
+        color: (REGIME_COLORS[marketState.regimes[i]] || CHART_COLORS.neutral) + "30",
       }))
     );
 
     // Original price
     const priceLine = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "実価格",
       priceScaleId: "right",
@@ -395,7 +396,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
 
         <div>
           <div className="text-xs text-gray-500 mb-1">
-            <span className="text-green-500">速度 (トレンド) [右軸]</span> /
+            <span className="text-green-700">速度 (トレンド) [右軸]</span> /
             <span className="text-orange-500"> 加速度 [左軸]</span>
           </div>
           <div ref={velAccRef} className="w-full rounded border border-gray-100" />
@@ -434,7 +435,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
             <div className="space-y-1">
               {recentTurningPoints.map((tp, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className={tp.type === "peak" ? "text-red-500" : "text-green-500"}>
+                  <span className={tp.type === "peak" ? "text-red-500" : "text-green-700"}>
                     {tp.type === "peak" ? "天井" : "底"}
                   </span>
                   <span className="text-gray-500">{tp.time}</span>
@@ -490,7 +491,7 @@ export default function MarketStateDashboard({ prices, seriesMode }: Props) {
               <li><span className="font-medium" style={{color: "#3b82f6"}}>加速</span>: トレンドが強まっている（加速度が大きい）</li>
               <li><span className="font-medium" style={{color: "#f97316"}}>減速</span>: トレンドが弱まっている（加速度が負）</li>
               <li><span className="font-medium" style={{color: "#f59e0b"}}>高ボラティリティ</span>: イノベーション分散が大きい</li>
-              <li><span className="font-medium" style={{color: "#94a3b8"}}>低ボラティリティ</span>: 方向性なし・レンジ相場</li>
+              <li><span className="font-medium" style={{color: CHART_COLORS.neutral}}>低ボラティリティ</span>: 方向性なし・レンジ相場</li>
             </ul>
           </div>
 

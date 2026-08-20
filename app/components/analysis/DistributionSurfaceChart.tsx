@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { rollingDensitySurface } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -123,7 +124,7 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
       ctx.fillStyle = viridisColor(t);
       ctx.fillRect(barX, pad.top + barH - i, barW, 1);
     }
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("高密度", barX + barW + 3, pad.top + 8);
     ctx.fillText("低密度", barX + barW + 3, pad.top + barH);
   }, [surface]);

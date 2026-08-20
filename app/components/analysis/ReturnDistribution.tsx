@@ -183,7 +183,7 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">正規性</div>
-          <div className={`font-mono font-medium ${stats.jbPValue < 0.05 ? "text-red-600" : "text-green-600"}`}>
+          <div className={`font-mono font-medium ${stats.jbPValue < 0.05 ? "text-red-600" : "text-green-700"}`}>
             {stats.jbPValue < 0.05 ? "棄却" : "不棄却"}
           </div>
         </div>

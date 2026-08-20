@@ -5,6 +5,8 @@ import { PricePoint } from "../../lib/types";
 import { computeHoldingPeriods, type HoldingPeriodStats } from "../../lib/cross-analysis";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -64,7 +66,7 @@ export default function HoldingPeriodChart({ prices }: Props) {
       const y = mt + (plotH * i) / nGrid;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = minSharpe - sharpeRange * 0.1 + (sharpeRange * 1.2 * (nGrid - i)) / nGrid;
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "10px sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(val.toFixed(2), ml - 6, y + 3);
@@ -238,20 +240,21 @@ export default function HoldingPeriodChart({ prices }: Props) {
                   className={`border-b border-gray-100 ${s === optimal ? "bg-amber-50 font-medium" : ""}`}
                 >
                   <td className="py-1 px-2 font-medium text-gray-700">{s.days}日</td>
-                  <td className={`py-1 px-2 text-center font-mono ${s.meanReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {pctFmt(s.meanReturn)}
+                  <td className="py-1 px-2 text-center font-mono">
+                    <DirectionValue value={s.meanReturn}>{pctFmt(s.meanReturn)}</DirectionValue>
                   </td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(s.stdReturn)}</td>
                   <td className={`py-1 px-2 text-center font-mono font-medium ${s.sharpe >= 0 ? "text-blue-600" : "text-red-600"}`}>
                     {s.sharpe.toFixed(3)}
                   </td>
-                  <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>
-                    {(s.winRate * 100).toFixed(1)}%
+                  {/* 勝率は 50% を境に向きを判定する（0 ではない） */}
+                  <td className="py-1 px-2 text-center font-mono">
+                    <DirectionValue value={s.winRate - 0.5}>{(s.winRate * 100).toFixed(1)}%</DirectionValue>
                   </td>
-                  <td className={`py-1 px-2 text-center font-mono ${s.medianReturn >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {pctFmt(s.medianReturn)}
+                  <td className="py-1 px-2 text-center font-mono">
+                    <DirectionValue value={s.medianReturn}>{pctFmt(s.medianReturn)}</DirectionValue>
                   </td>
-                  <td className="py-1 px-2 text-center font-mono text-green-600">{pctFmt(s.maxReturn)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-green-700">{pctFmt(s.maxReturn)}</td>
                   <td className="py-1 px-2 text-center font-mono text-red-600">{pctFmt(s.minReturn)}</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-500">{s.n}</td>
                 </tr>

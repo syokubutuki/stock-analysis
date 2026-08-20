@@ -6,6 +6,7 @@ import { computeGapSeries, type GapPoint } from "../../lib/gap-analysis";
 import AnalysisGuide from "./AnalysisGuide";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -27,7 +28,7 @@ function computeQuadrants(gaps: GapPoint[]): QuadrantStats[] {
   const gapDownContinue = gaps.filter((g) => g.overnightReturn <= 0 && g.intradayReturn <= 0).length;
   const gapDownReverse = gaps.filter((g) => g.overnightReturn <= 0 && g.intradayReturn > 0).length;
   return [
-    { label: "GU→続伸", count: gapUpContinue, ratio: gapUpContinue / n, color: "text-green-600" },
+    { label: "GU→続伸", count: gapUpContinue, ratio: gapUpContinue / n, color: "text-green-700" },
     { label: "GU→反転", count: gapUpReverse, ratio: gapUpReverse / n, color: "text-orange-600" },
     { label: "GD→続落", count: gapDownContinue, ratio: gapDownContinue / n, color: "text-red-600" },
     { label: "GD→反転", count: gapDownReverse, ratio: gapDownReverse / n, color: "text-blue-600" },
@@ -154,7 +155,7 @@ export default function GapScatterChart({ prices, period }: Props) {
     ctx.restore();
 
     // 軸の数値
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(`-${maxAbs.toFixed(1)}`, margin, cy + 14);
@@ -194,7 +195,7 @@ export default function GapScatterChart({ prices, period }: Props) {
       <div className="grid grid-cols-3 gap-2 text-xs mb-4">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">回帰係数 (傾き)</div>
-          <div className={`font-mono font-medium ${regression.slope < 0 ? "text-orange-600" : "text-green-600"}`}>
+          <div className={`font-mono font-medium ${regression.slope < 0 ? "text-orange-600" : "text-green-700"}`}>
             {regression.slope.toFixed(4)}
           </div>
           <div className="text-fg-muted">

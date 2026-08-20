@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { takensEmbedding } from "../../lib/nonlinear";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -237,7 +238,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
           ctx.moveTo(xPx, 30);
           ctx.lineTo(xPx, size - 30);
           ctx.stroke();
-          ctx.fillStyle = "#9ca3af";
+          ctx.fillStyle = CHART_COLORS.ink;
           ctx.fillText(fmtTick(xVal), xPx, size - 16);
         }
         // Y-axis ticks
@@ -248,7 +249,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
           ctx.moveTo(30, yPx);
           ctx.lineTo(size - 10, yPx);
           ctx.stroke();
-          ctx.fillStyle = "#9ca3af";
+          ctx.fillStyle = CHART_COLORS.ink;
           ctx.textAlign = "right";
           ctx.fillText(fmtTick(yVal), 28, yPx + 3);
           ctx.textAlign = "center";
@@ -269,7 +270,7 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     }
 
     // Info
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px monospace";
     ctx.textAlign = "left";
     ctx.fillText(`n=${n}  dim=${dim}  \u03C4=${tau}  zoom=${zoomRef.current.toFixed(1)}x`, 6, 14);

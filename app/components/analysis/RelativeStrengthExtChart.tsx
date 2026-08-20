@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { upDownCapture, cointegration, rollingCorrBeta } from "../../lib/relative-strength-ext";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -75,7 +76,7 @@ export default function RelativeStrengthExtChart({ prices }: Props) {
     const z = chart.addSeries(LineSeries, { color: "#7c3aed", lineWidth: 1, title: "スプレッドZ" });
     z.setData(coint.spread.map((p) => ({ time: p.time as Time, value: p.z })));
     for (const lv of [2, 0, -2]) {
-      const g = chart.addSeries(LineSeries, { color: lv === 0 ? "#9ca3af" : "#d1d5db", lineWidth: 1, lineStyle: 2 });
+      const g = chart.addSeries(LineSeries, { color: lv === 0 ? CHART_COLORS.neutral : "#d1d5db", lineWidth: 1, lineStyle: 2 });
       g.setData(coint.spread.map((p) => ({ time: p.time as Time, value: lv })));
     }
     chart.timeScale().fitContent();
@@ -122,7 +123,7 @@ export default function RelativeStrengthExtChart({ prices }: Props) {
       ctx.fillStyle = l.lag === rolling.peakLag ? "#dc2626" : "#93c5fd";
       ctx.fillRect(ml + i * slot + 1, l.corr >= 0 ? zeroY - h : zeroY, slot - 2, h);
     });
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     [0, Math.floor(rolling.leadLag.length / 2), rolling.leadLag.length - 1].forEach((i) => ctx.fillText(`${rolling.leadLag[i].lag}`, ml + i * slot + slot / 2, mt + plotH + 12));
   }, [rolling]);
 

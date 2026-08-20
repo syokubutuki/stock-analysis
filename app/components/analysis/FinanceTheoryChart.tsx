@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { financeTheoryAnalysis } from "../../lib/kelly-bs";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -89,8 +90,8 @@ export default function FinanceTheoryChart({ prices }: Props) {
         <div className="grid grid-cols-4 gap-2">
           <div className="border rounded p-2 text-center">
             <div className="text-xs text-gray-500">Kelly比率</div>
-            <div className={`font-mono text-sm font-semibold ${kelly.kellyFraction > 0 ? "text-green-700" : "text-red-700"}`}>
-              {(kelly.kellyFraction * 100).toFixed(1)}%
+            <div className="font-mono text-sm font-semibold">
+              <DirectionValue value={kelly.kellyFraction}>{(kelly.kellyFraction * 100).toFixed(1)}%</DirectionValue>
             </div>
           </div>
           <div className="border rounded p-2 text-center">
@@ -155,8 +156,8 @@ export default function FinanceTheoryChart({ prices }: Props) {
           </div>
           <div className="border rounded p-2 text-center">
             <div className="text-xs text-gray-500">VRP</div>
-            <div className={`font-mono text-xs font-semibold ${varianceSwap.varianceRiskPremium > 0 ? "text-green-700" : "text-red-700"}`}>
-              {(varianceSwap.varianceRiskPremium * 10000).toFixed(1)} bps²
+            <div className="font-mono text-xs font-semibold">
+              <DirectionValue value={varianceSwap.varianceRiskPremium}>{(varianceSwap.varianceRiskPremium * 10000).toFixed(1)} bps²</DirectionValue>
             </div>
           </div>
         </div>

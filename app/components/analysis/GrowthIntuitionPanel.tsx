@@ -41,6 +41,7 @@ import {
 } from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // ── 定数 ───────────────────────────────────────────────────────────────────
 /** U2 の元本。100万円を仮の投下資金とする（仕様書 §U2）。 */
@@ -941,12 +942,12 @@ function drawGame(canvas: HTMLCanvasElement, path: number[], arith: number) {
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(`${(v / 10000).toFixed(0)}万`, padL - 6, y + 3);
   }
 
   // 元本ライン
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(padL, yCap);
@@ -959,7 +960,7 @@ function drawGame(canvas: HTMLCanvasElement, path: number[], arith: number) {
   ctx.clip();
 
   // 平均リターンで複利したつもりの線（灰破線）
-  ctx.strokeStyle = "#94a3b8";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -1025,7 +1026,7 @@ function drawGame(canvas: HTMLCanvasElement, path: number[], arith: number) {
   // 軸ラベル
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   const tick = steps <= 12 ? 2 : Math.ceil(steps / 8);
   for (let k = 0; k <= steps; k += tick) ctx.fillText(`${k}`, xOf(k), padT + plotH + 14);
   ctx.textAlign = "left";
@@ -1033,7 +1034,7 @@ function drawGame(canvas: HTMLCanvasElement, path: number[], arith: number) {
   if (n === 0) {
     ctx.textAlign = "center";
     ctx.font = "12px sans-serif";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(
       "ボタンを押すと、ここに資産の推移が出ます",
       padL + plotW / 2,
@@ -1138,7 +1139,7 @@ function drawPeople(canvas: HTMLCanvasElement, people: number[], mean: number) {
   );
 
   // 横軸
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(padL, baseY);
@@ -1146,7 +1147,7 @@ function drawPeople(canvas: HTMLCanvasElement, people: number[], mean: number) {
   ctx.stroke();
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   for (const r of [-0.4, -0.2, 0, 0.2, 0.5]) {
     ctx.fillText(`${r > 0 ? "+" : ""}${(r * 100).toFixed(0)}%`, xOf(r), baseY + 14);
   }
@@ -1214,14 +1215,14 @@ function drawSinglePath(canvas: HTMLCanvasElement, path: number[]) {
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     const label =
       d === 0 ? "×1" : d > 0 ? `×10${sup(d)}` : `÷10${sup(-d)}`;
     ctx.fillText(label, padL - 6, y + 3);
   }
 
   // 元本ライン
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(padL, y1);
@@ -1282,7 +1283,7 @@ function drawSinglePath(canvas: HTMLCanvasElement, path: number[]) {
   // 軸
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   for (let k = 0; k <= n; k += Math.max(1, Math.round(n / 5))) {
     ctx.fillText(`${k}`, xOf(k), padT + plotH + 14);
   }

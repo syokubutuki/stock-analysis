@@ -12,6 +12,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -33,7 +34,7 @@ function drawIR(ctx: CanvasRenderingContext2D, W: number, H: number, pts: Holdin
   ctx.strokeStyle = "#f0f0f0";
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(yMax.toFixed(2), ml - 3, mt + 8); ctx.fillText("0", ml - 3, Y(0) + 3); ctx.fillText((-yMax).toFixed(2), ml - 3, mt + plotH);
   ctx.strokeStyle = "#4338ca"; ctx.lineWidth = 2; ctx.beginPath();
   pts.forEach((p, i) => { const x = X(i), y = Y(p.ir); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
@@ -57,7 +58,7 @@ function drawExcursion(ctx: CanvasRenderingContext2D, W: number, H: number, pts:
   ctx.strokeStyle = "#f0f0f0";
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8); ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
   const drawSeries = (key: "mfe" | "mae", color: string) => {
     ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();

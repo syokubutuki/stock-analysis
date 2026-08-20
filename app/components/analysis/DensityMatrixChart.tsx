@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeDensityMatrix } from "../../lib/density-matrix";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -122,7 +123,7 @@ export default function DensityMatrixChart({ prices }: Props) {
       }
 
       // Axis lines
-      ctx.strokeStyle = "#999";
+      ctx.strokeStyle = CHART_COLORS.axis;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(ml, mt);
@@ -298,7 +299,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                 ? "text-red-600"
                 : entropyRatio > 0.4
                   ? "text-yellow-600"
-                  : "text-green-600"
+                  : "text-green-700"
             }`}
           >
             {currentEntropy.toFixed(3)}
@@ -312,7 +313,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                 ? "text-red-600"
                 : entropyRatio > 0.4
                   ? "text-yellow-600"
-                  : "text-green-600"
+                  : "text-green-700"
             }`}
           >
             {(entropyRatio * 100).toFixed(1)}%
@@ -409,7 +410,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                   </td>
                   <td
                     className={`p-1 text-right font-mono ${
-                      r.meanReturn >= 0 ? "text-green-600" : "text-red-600"
+                      r.meanReturn >= 0 ? "text-green-700" : "text-red-600"
                     }`}
                   >
                     {(r.meanReturn * 100).toFixed(1)}%

@@ -8,6 +8,7 @@ import {
   falseNearestNeighbors,
 } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -113,12 +114,12 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
 
     // 1/e threshold line
     const threshY = toY(amiResult.ami[0] / Math.E);
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 0.8;
     ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(m.left, threshY); ctx.lineTo(m.left + plotW, threshY); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("1/e 閾値", m.left + 3, threshY - 3);
@@ -139,7 +140,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
     ctx.restore();
 
     // X-axis ticks
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     for (let lag = 0; lag <= maxLagVal; lag += Math.max(1, Math.floor(maxLagVal / 6))) {
@@ -241,7 +242,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
     ctx.restore();
 
     // X-axis ticks
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     dims.forEach(d => ctx.fillText(String(d), toX(d), height - 20));
@@ -336,7 +337,7 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
             <ul className="list-disc pl-4 space-y-1 text-xs">
               <li><span className="font-medium">FNN率が高い</span> → 次元が不足 → 位相空間上の構造が正しく展開されていない</li>
               <li><span className="font-medium">FNN率 {"<"} 5%</span> → 十分な次元 → それ以上次元を上げても改善しない</li>
-              <li><span className="font-medium">低次元(d=3〜5)で飽和</span> → 低次元の決定論的構造あり → <span className="text-green-600">テクニカル分析が有効な銘柄</span></li>
+              <li><span className="font-medium">低次元(d=3〜5)で飽和</span> → 低次元の決定論的構造あり → <span className="text-green-700">テクニカル分析が有効な銘柄</span></li>
               <li><span className="font-medium">高次元(d{">"}10)でも飽和しない</span> → ランダム性が支配的 → <span className="text-red-600">系統的予測が困難</span></li>
             </ul>
           </div>

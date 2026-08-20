@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeGarchVar } from "../../lib/simulation";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -82,7 +83,7 @@ export default function GarchVarChart({ prices }: Props) {
       const y = mt + (plotH * i) / 5;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = maxV - (rangeV * i) / 5;
-      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText((val * 100).toFixed(1) + "%", ml - 4, y + 3);
     }
 
@@ -120,7 +121,7 @@ export default function GarchVarChart({ prices }: Props) {
   const bothFail = !pass95 && !pass99;
   const summaryColor = bothPass ? "green" : bothFail ? "red" : "yellow";
   const summaryBg = summaryColor === "green" ? "bg-green-50 border-green-300" : summaryColor === "red" ? "bg-red-50 border-red-300" : "bg-yellow-50 border-yellow-300";
-  const summaryIcon = summaryColor === "green" ? "text-green-600" : summaryColor === "red" ? "text-red-600" : "text-yellow-600";
+  const summaryIcon = summaryColor === "green" ? "text-green-700" : summaryColor === "red" ? "text-red-600" : "text-yellow-600";
   const summaryText = bothPass
     ? "このVaRモデルは過去のデータに対して適切に機能しています。損失限界線を超える回数が統計的に妥当な範囲内です。"
     : bothFail
@@ -156,7 +157,7 @@ export default function GarchVarChart({ prices }: Props) {
           <div className="space-y-0.5">
             <div>違反率: <span className="font-mono font-bold">{violationRate95}%</span> <span className="text-gray-500">(期待: 5.00%)</span></div>
             <div>違反回数: <span className="font-mono">{result.violations95}回</span> / 期待 {result.expectedViolations95.toFixed(1)}回</div>
-            <div className={pass95 ? "text-green-600 font-bold mt-1" : "text-red-600 font-bold mt-1"}>
+            <div className={pass95 ? "text-green-700 font-bold mt-1" : "text-red-600 font-bold mt-1"}>
               {pass95 ? "合格 — モデルは適切" : "不合格 — モデルは不適切"}
             </div>
             {!pass95 && (
@@ -180,7 +181,7 @@ export default function GarchVarChart({ prices }: Props) {
           <div className="space-y-0.5">
             <div>違反率: <span className="font-mono font-bold">{violationRate99}%</span> <span className="text-gray-500">(期待: 1.00%)</span></div>
             <div>違反回数: <span className="font-mono">{result.violations99}回</span> / 期待 {result.expectedViolations99.toFixed(1)}回</div>
-            <div className={pass99 ? "text-green-600 font-bold mt-1" : "text-red-600 font-bold mt-1"}>
+            <div className={pass99 ? "text-green-700 font-bold mt-1" : "text-red-600 font-bold mt-1"}>
               {pass99 ? "合格 — モデルは適切" : "不合格 — テールリスクを過小評価の可能性"}
             </div>
             {!pass99 && (

@@ -36,7 +36,7 @@ export default function StopComparisonChart({ prices }: Props) {
             {stats.map((s) => (
               <tr key={s.method} className={`border-b border-gray-100 ${s.method === best.method ? "bg-green-50" : ""}`}>
                 <td className="py-1 px-2 font-medium text-gray-700">{s.label}</td>
-                <td className={`text-right px-2 font-medium ${s.expReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(s.expReturn)}</td>
+                <td className={`text-right px-2 font-medium ${s.expReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(s.expReturn)}</td>
                 <td className="text-right px-2 text-gray-600">{(s.winRate * 100).toFixed(0)}%</td>
                 <td className="text-right px-2 text-gray-500">{s.avgHold.toFixed(1)}日</td>
                 <td className="text-right px-2 text-gray-500">{s.n}</td>

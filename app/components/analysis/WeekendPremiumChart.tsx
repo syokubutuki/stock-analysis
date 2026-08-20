@@ -195,7 +195,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
               <span>
                 週内 μ_wd/σ_wd² = <b className="text-blue-700">{v.retPerVarWeekday.toFixed(2)}</b>
               </span>
-              <span className="text-gray-400">→</span>
+              <span className="text-gray-500">→</span>
               <span className="font-sans">
                 {v.skipImprovesSharpe
                   ? "週末は週内より"

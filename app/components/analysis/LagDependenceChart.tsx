@@ -7,6 +7,7 @@ import {
   lagScatterHeatmap, copulaScatter, mutualInfoByLag, scatterMatrix,
 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -94,7 +95,7 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
       ctx.fillStyle = densityColor(t * maxDensity, maxDensity);
       ctx.fillRect(barX, pad + barH - i, barW, 1);
     }
-    ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("高", barX + barW + 3, pad + 8);
     ctx.fillText("低", barX + barW + 3, pad + barH);
   }, [heatmap]);

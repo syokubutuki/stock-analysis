@@ -20,6 +20,7 @@ import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -222,7 +223,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
       rightPriceScale: { mode: 1, borderColor: "#e5e7eb" },
       timeScale: { borderColor: "#e5e7eb" },
     });
-    const floor = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, priceLineVisible: false });
+    const floor = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, priceLineVisible: false });
     floor.setData(result.wf.equityFloor.map((p) => ({ time: p.time as Time, value: p.value })));
     const tilt = chart.addSeries(LineSeries, {
       color: result.wf.passes ? "#16a34a" : "#2563eb", lineWidth: 2, priceLineVisible: false,
@@ -415,11 +416,11 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                       <td className="text-right px-2 tabular-nums text-gray-500 whitespace-nowrap">
                         [{pct(r.ciMuLo, 0)}, {pct(r.ciMuHi, 0)}]
                       </td>
-                      <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-700" : "text-red-600"}`}>
                         {pct(r.excessMu)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(r.tExcess)}</td>
-                      <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-600" : "text-fg-muted"}`}>
+                      <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-700" : "text-fg-muted"}`}>
                         {r.qExcess.toFixed(3)}
                       </td>
                       <td className="text-right px-2 tabular-nums text-amber-700">{yearsFmt(r.requiredYearsObserved)}</td>

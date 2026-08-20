@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { multivarSimplex } from "../../lib/multivar-simplex";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -47,7 +48,7 @@ export default function MultivarSimplexChart({ prices }: Props) {
     ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(xOf(0), mt); ctx.lineTo(xOf(0), mt + plotH); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
     ctx.fillStyle = "rgba(37,99,235,0.4)";
     for (const p of res.points) { ctx.beginPath(); ctx.arc(xOf(p.predicted), yOf(p.actual), 1.5, 0, Math.PI * 2); ctx.fill(); }
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("予測→", ml + plotW / 2, mt + plotH + 14);
   }, [res]);
 

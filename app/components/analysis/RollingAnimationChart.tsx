@@ -3,6 +3,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -60,7 +61,7 @@ export default function RollingAnimationChart({ prices }: Props) {
     const yOf = (v: number) => mt + plotH - ((v - minRet) / (maxRet - minRet)) * plotH;
     // 軸
     ctx.strokeStyle = "#e5e7eb"; ctx.beginPath(); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(`${(maxRet * 100).toFixed(0)}%`, ml - 4, mt + 8);
     ctx.fillText("0", ml - 4, yOf(0) + 3);
     ctx.fillText(`${(minRet * 100).toFixed(0)}%`, ml - 4, mt + plotH);

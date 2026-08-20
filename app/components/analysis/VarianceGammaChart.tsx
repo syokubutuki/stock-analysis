@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { fitVarianceGamma, simulateVG } from "../../lib/variance-gamma";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -158,7 +159,7 @@ export default function VarianceGammaChart({ prices }: Props) {
     ctx.stroke();
 
     // Normal density
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -173,7 +174,7 @@ export default function VarianceGammaChart({ prices }: Props) {
     ctx.fillStyle = "#7c3aed";
     ctx.textAlign = "left";
     ctx.fillText("VG分布", pad.left + 5, pad.top + 12);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText("正規分布", pad.left + 55, pad.top + 12);
     ctx.fillStyle = "#666";
     ctx.textAlign = "center";

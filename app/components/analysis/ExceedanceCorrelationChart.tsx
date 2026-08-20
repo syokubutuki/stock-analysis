@@ -22,6 +22,7 @@ import { useExceedanceAll } from "../../hooks/usePortfolioTail";
 import { publishDownsideRho } from "../../lib/downside-rho";
 import { openAnalysisPanel } from "../../lib/panel-nav";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -456,7 +457,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                       </td>
                       <td className={`py-1 px-2 text-right ${sig ? "font-semibold" : ""}`}>
                         {sv(l.asym)}
-                        <span className="text-gray-300">
+                        <span className="text-fg-muted">
                           {" "}
                           [{cv(l.asymLo)}, {cv(l.asymHi)}]
                         </span>
@@ -559,7 +560,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
                     <tr key={`${p.a}|${p.b}`} className="border-b border-gray-100">
                       <td className="py-1 pr-2 text-gray-700">
                         <span className="font-medium">{p.a}</span>
-                        <span className="text-gray-300"> × </span>
+                        <span className="text-gray-500"> × </span>
                         <span className="font-medium">{p.b}</span>
                         <span className="text-fg-muted ml-1 hidden sm:inline">
                           {names[p.a] && names[p.b] ? `${names[p.a]} / ${names[p.b]}` : ""}
@@ -873,7 +874,7 @@ function drawSmile(canvas: HTMLCanvasElement, r: ExceedanceResult) {
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText(v.toFixed(2), padL - 6, y);
   }
 
@@ -888,7 +889,7 @@ function drawSmile(canvas: HTMLCanvasElement, r: ExceedanceResult) {
       ctx.moveTo(x, padT);
       ctx.lineTo(x, padT + plotH);
       ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText(s === 0 ? "0" : `${s > 0 ? "+" : "−"}${Math.abs(s).toFixed(1)}σ`, x, padT + plotH + 6);
     }
   }

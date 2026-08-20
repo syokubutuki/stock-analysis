@@ -22,6 +22,7 @@ import type {
 } from "../../lib/null-anatomy.worker";
 import { US_DRIVERS, useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -128,7 +129,7 @@ function drawTChart(
     const w = cnt * bw;
     ctx.fillStyle = fam === "intra" ? "#ffffff" : fam === "inner" ? "rgba(59,130,246,0.05)" : "rgba(168,85,247,0.07)";
     ctx.fillRect(x, mt, w, plotH);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(
@@ -180,7 +181,7 @@ function drawTChart(
     ctx.textAlign = "right";
     ctx.fillText(label, ml + plotW - 2, above ? y - 3 : y + 10);
   };
-  hline(critS, "#9ca3af", [3, 3], `単独検定の95%点 ${critS.toFixed(2)}`, false);
+  hline(critS, CHART_COLORS.neutral, [3, 3], `単独検定の95%点 ${critS.toFixed(2)}`, false);
   hline(critF, "#dc2626", [5, 3], `多重補正(maxT)の95%点 ${critF.toFixed(2)}`, true);
 
   // 軸
@@ -191,7 +192,7 @@ function drawTChart(
   ctx.lineTo(ml + plotW, mt + plotH);
   ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "9px sans-serif";
   ctx.textAlign = "right";
   for (let i = 0; i <= 3; i++) {
@@ -212,7 +213,7 @@ function drawTChart(
     ctx.save();
     ctx.translate(ml + i * bw + bw / 2 + 4, mt + plotH + 8);
     ctx.rotate(-Math.PI / 4);
-    ctx.fillStyle = vOf(s) === "none" ? "#9ca3af" : "#374151";
+    ctx.fillStyle = vOf(s) === "none" ? CHART_COLORS.ink : "#374151";
     ctx.fillText(slots[s.slot]?.label ?? s.label, 0, 0);
     ctx.restore();
   });
@@ -852,7 +853,7 @@ export default function NullAnatomyChart({ prices }: Props) {
                           const c = famStat(a, f);
                           if (!c || c.k < 2)
                             return (
-                              <td key={f} className="py-1 px-2 text-right text-gray-300">
+                              <td key={f} className="py-1 px-2 text-right text-fg-muted">
                                 —
                               </td>
                             );

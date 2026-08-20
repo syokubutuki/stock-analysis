@@ -6,6 +6,7 @@ import { rMultiples } from "../../lib/execution-stats";
 import { roundTripCost } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -63,9 +64,9 @@ export default function RMultipleChart({ prices }: Props) {
       ctx.fillRect(ml + i * slot + 1, mt + plotH - h, slot - 2, h);
     }
     // 0R線
-    ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
     ctx.beginPath(); ctx.moveTo(ml + zeroBin * slot, mt); ctx.lineTo(ml + zeroBin * slot, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     for (let r = lo; r <= hi; r += 2) ctx.fillText(`${r}R`, ml + ((r - lo) / step) * slot, mt + plotH + 12);
   }, [res]);
 

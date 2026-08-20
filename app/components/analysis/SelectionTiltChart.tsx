@@ -22,6 +22,7 @@ import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   tickers: string[];
@@ -132,7 +133,7 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
       rightPriceScale: { mode: 1, borderColor: "#e5e7eb" }, // 対数
       timeScale: { borderColor: "#e5e7eb" },
     });
-    const floor = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, priceLineVisible: false });
+    const floor = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, priceLineVisible: false });
     floor.setData(result.baselineEquity.map((p) => ({ time: p.time as Time, value: p.value })));
     const tilt = chart.addSeries(LineSeries, {
       color: selResult.passes ? "#16a34a" : "#2563eb", lineWidth: 2, priceLineVisible: false,
@@ -285,14 +286,14 @@ export default function SelectionTiltChart({ tickers, pricesByTicker }: Props) {
                         {TILT_SIGNAL_LABEL[s.signal]}
                       </td>
                       <td className="text-right px-2 tabular-nums">{pct(s.annTilt)}</td>
-                      <td className={`text-right px-2 tabular-nums font-semibold ${s.excessAnn > 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums font-semibold ${s.excessAnn > 0 ? "text-green-700" : "text-red-600"}`}>
                         {pct(s.excessAnn)}
                       </td>
-                      <td className={`text-right px-2 tabular-nums ${s.netExcessAnn > 0 ? "text-green-600" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${s.netExcessAnn > 0 ? "text-green-700" : "text-red-600"}`}>
                         {pct(s.netExcessAnn)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(s.excessT)}</td>
-                      <td className={`text-right px-2 tabular-nums ${s.qValueBH < 0.1 ? "text-green-600" : "text-gray-500"}`}>
+                      <td className={`text-right px-2 tabular-nums ${s.qValueBH < 0.1 ? "text-green-700" : "text-gray-500"}`}>
                         {s.qValueBH.toFixed(3)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{pct(s.gTilt)}</td>

@@ -23,6 +23,7 @@ import {
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 市場代理プリセット。1321=日経225連動ETF（分配金込みadjClose→総収益の床・データ良好）。
 // TOPIX ETF(1306/1475)は Yahoo の adjClose に ~10倍の誤ティックがあり既定から外す（選んでも異常値は自動除外）。
@@ -149,7 +150,7 @@ export default function ParticipationPremiumChart() {
     );
     // 不参加（現金＝1固定）の参照線。
     const cash = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       priceLineVisible: false,
       lineStyle: 2,
@@ -428,7 +429,7 @@ function drawSweepHistogram(canvas: HTMLCanvasElement, result: ParticipationResu
   ctx.fillText(`平均(床) ${(result.sweep.mean * 100).toFixed(1)}%`, mx + 3, padT + 9);
 
   // 軸ラベル（左右端の年率）
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = CHART_COLORS.ink;
   ctx.font = "10px sans-serif";
   ctx.fillText(`${(lo * 100).toFixed(0)}%`, padL, height - 6);
   const hiLabel = `${(hi * 100).toFixed(0)}%`;

@@ -8,6 +8,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -36,7 +37,7 @@ function drawDist(ctx: CanvasRenderingContext2D, W: number, H: number, r: Excurs
       const x = ml + i * slot + (slot - barW) / 2;
       ctx.fillStyle = color; ctx.fillRect(x, top + paneH - h, barW, h);
       if (i % Math.ceil(n / 8) === 0) {
-        ctx.fillStyle = "#9ca3af"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(hist[i].center.toFixed(1), x + barW / 2, top + paneH + 11);
       }
     }

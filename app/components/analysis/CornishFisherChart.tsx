@@ -4,6 +4,8 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeCornishFisherVaR, computeOmegaRatio } from "../../lib/cornish-fisher";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -78,7 +80,7 @@ export default function CornishFisherChart({ prices }: Props) {
 
     // τ=0 vertical line
     if (minT < 0 && maxT > 0) {
-      ctx.strokeStyle = "#94a3b8";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
@@ -161,8 +163,9 @@ export default function CornishFisherChart({ prices }: Props) {
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">Ω(0)</div>
-          <div className={`font-mono text-sm font-semibold ${omega.omega > 1 ? "text-green-700" : "text-red-700"}`}>
-            {omega.omega.toFixed(3)}
+          {/* Ω は 1 が中立点なので 1 を引いて向きを判定する */}
+          <div className="font-mono text-sm font-semibold">
+            <DirectionValue value={omega.omega - 1}>{omega.omega.toFixed(3)}</DirectionValue>
           </div>
         </div>
         <div className="border rounded p-2 text-center">

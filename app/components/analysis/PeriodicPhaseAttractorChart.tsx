@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode } from "../../lib/series-mode";
 import { computePeriodicPhaseAttractor } from "../../lib/weekly-phase-attractor";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -68,7 +69,7 @@ export default function PeriodicPhaseAttractorChart({ prices, seriesMode }: Prop
 
     ctx.strokeStyle = "#e5e7eb";
     ctx.strokeRect(margin, margin, width - margin * 2, height - margin * 2);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.fillText("r(t)", width - margin - 24, height - margin + 14);
     ctx.save();
@@ -113,7 +114,7 @@ export default function PeriodicPhaseAttractorChart({ prices, seriesMode }: Prop
       ctx.stroke();
     }
 
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px monospace";
     ctx.fillText(`n=${result.n}  period=${result.period}  τ=${tau}`, margin + 4, margin + 12);
   }, [result, tau]);

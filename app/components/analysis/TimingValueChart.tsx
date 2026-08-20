@@ -24,6 +24,7 @@ import {
   type TimingValueResult,
 } from "../../lib/timing-value";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -32,7 +33,7 @@ interface Props {
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
 const pct2 = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
 
 function fmtP(p: number): string {
   return p < 0.001 ? "<0.001" : p.toFixed(3);
@@ -117,7 +118,7 @@ export default function TimingValueChart({ prices }: Props) {
     seriesRef.current = [];
 
     const bhs = chart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
+      color: CHART_COLORS.neutral, lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
     });
     bhs.setData(result.equity.map((e) => ({ time: e.time as Time, value: e.bh })));
     seriesRef.current.push(bhs);

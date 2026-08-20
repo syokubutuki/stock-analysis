@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeBacktest, type BacktestResult } from "../../lib/predictability";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -51,7 +52,7 @@ export default function SimpleBacktestChart({ prices }: Props) {
       const y = mt + (plotH * i) / 5;
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
       const val = maxCum - (rangeCum * i) / 5;
-      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
       ctx.fillText((val * 100).toFixed(0) + "%", ml - 4, y + 3);
     }
     // Zero line
@@ -110,12 +111,12 @@ export default function SimpleBacktestChart({ prices }: Props) {
             {results.map((r, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium" style={{ color: STRAT_COLORS[i] }}>{r.strategy}</td>
-                <td className={`py-1 px-2 text-center font-mono ${r.totalReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{(r.totalReturn * 100).toFixed(1)}%</td>
-                <td className={`py-1 px-2 text-center font-mono ${r.annualReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{(r.annualReturn * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${r.totalReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{(r.totalReturn * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${r.annualReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{(r.annualReturn * 100).toFixed(1)}%</td>
                 <td className="py-1 px-2 text-center font-mono text-gray-600">{(r.annualVol * 100).toFixed(1)}%</td>
                 <td className={`py-1 px-2 text-center font-mono font-medium ${r.sharpe >= 0 ? "text-blue-600" : "text-red-600"}`}>{r.sharpe.toFixed(3)}</td>
                 <td className="py-1 px-2 text-center font-mono text-red-600">{(r.maxDrawdown * 100).toFixed(1)}%</td>
-                <td className={`py-1 px-2 text-center font-mono ${r.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>{(r.winRate * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${r.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}>{(r.winRate * 100).toFixed(1)}%</td>
                 <td className="py-1 px-2 text-center font-mono text-gray-500">{r.nTrades}</td>
               </tr>
             ))}

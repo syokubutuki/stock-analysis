@@ -27,6 +27,7 @@ import {
 } from "../../lib/chart-series";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -466,12 +467,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
         if (def.type === "candlestick" && computed.ohlc) {
           if (computed.ohlc.length === 0) continue;
           api = chart.addSeries(CandlestickSeries, {
-            upColor: "#26a69a",
-            downColor: "#ef5350",
-            borderUpColor: "#26a69a",
-            borderDownColor: "#ef5350",
-            wickUpColor: "#26a69a",
-            wickDownColor: "#ef5350",
+            ...CANDLESTICK_OPTIONS,
             priceScaleId,
           });
           api.setData(
@@ -598,7 +594,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
         {query && (
           <button
             onClick={() => setQuery("")}
-            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs px-1"
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 text-xs px-1"
             title="クリア"
           >
             ✕
@@ -632,7 +628,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
             </button>
             <button
               onClick={() => deleteCustomPreset(preset.id)}
-              className="px-1 py-0.5 text-emerald-400 hover:text-emerald-700"
+              className="px-1 py-0.5 text-emerald-700 hover:text-emerald-900"
               title="このセットを削除"
             >
               ✕
@@ -655,7 +651,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
         <button
           onClick={() => setSavingPreset((v) => !v)}
           disabled={enabled.size === 0}
-          className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="現在表示中の系列をセットとして保存"
         >
           ＋セット保存
@@ -796,6 +792,9 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
           ref={containerRef}
           className="w-full rounded border border-gray-100"
         />
+        {enabledSeries.some((s) => s.type === "candlestick") && (
+          <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
+        )}
 
         {/* 計算中インジケータ */}
         {loading && (

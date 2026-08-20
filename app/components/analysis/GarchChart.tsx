@@ -13,6 +13,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitGarch, analyzeLeverage, detectJumps } from "../../lib/garch";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -48,7 +49,7 @@ export default function GarchChart({ prices, seriesMode }: Props) {
     volChartRef.current = chart;
 
     const retSeries = chart.addSeries(HistogramSeries, {
-      color: "#94a3b8",
+      color: CHART_COLORS.neutral,
       title: "log return",
     });
     retSeries.setData(

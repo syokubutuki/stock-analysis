@@ -9,6 +9,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -27,7 +28,7 @@ function drawFraction(ctx: CanvasRenderingContext2D, W: number, H: number, res: 
   // 参照線 0 / 1
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
-  ctx.strokeStyle = "#94a3b8"; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.moveTo(ml, Y(1)); ctx.lineTo(ml + plotW, Y(1)); ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = "#64748b"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";

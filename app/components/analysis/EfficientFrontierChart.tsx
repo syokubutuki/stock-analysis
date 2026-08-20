@@ -21,6 +21,7 @@ import {
 import { placeRect, type LabelRect } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   data: PortfolioData;
@@ -270,7 +271,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
 
     // グリッド + 軸ラベル
     ctx.strokeStyle = "#e5e7eb";
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.lineWidth = 1;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "right";
@@ -398,7 +399,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
         ctx.stroke();
         ctx.setLineDash([]);
       };
-      drawCurve(false, "#9ca3af", [4, 3]);
+      drawCurve(false, CHART_COLORS.neutral, [4, 3]);
       drawCurve(true, "#059669", []);
     }
 
@@ -550,7 +551,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
       for (const b of result.baselines) {
         const x = sx(b.point.sigma), y = sy(b.point.mu);
         if (x < PAD.left || x > width - PAD.right) continue;
-        ctx.strokeStyle = "#94a3b8";
+        ctx.strokeStyle = CHART_COLORS.axis;
         ctx.fillStyle = "#ffffff";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -648,7 +649,7 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
 
     // ホバー十字
     if (hover) {
-      ctx.strokeStyle = "#94a3b8";
+      ctx.strokeStyle = CHART_COLORS.reference;
       ctx.setLineDash([3, 3]);
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -840,12 +841,12 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
                 )}
                 {showBaselines && (
                   <span className="flex items-center gap-1.5">
-                    <svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="#ffffff" stroke="#94a3b8" strokeWidth="1.5" /></svg>
+                    <svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="#ffffff" stroke={CHART_COLORS.reference} strokeWidth="1.5" /></svg>
                     ベースライン(1/N・RP・IV)
                   </span>
                 )}
                 {showShort && <LineLegend color="#059669" label="効率的フロンティア(空売り可)" />}
-                {showShort && <LineLegend color="#9ca3af" label="非効率枝" dashed />}
+                {showShort && <LineLegend color={CHART_COLORS.neutral} label="非効率枝" dashed />}
                 {showShort && <PointLegend shape="diamond" color="#2563eb" label="GMV(空売り可)" />}
                 <span className="text-fg-muted">点群=ランダム配分(色=シャープ比 青低→緑→赤高)</span>
               </div>

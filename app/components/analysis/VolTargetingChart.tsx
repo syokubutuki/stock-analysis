@@ -26,6 +26,7 @@ import {
 } from "../../lib/vol-targeting";
 import { useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -34,7 +35,7 @@ interface Props {
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const pct1 = (v: number) => `${(v * 100).toFixed(1)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
 
 const ESTIMATOR_LABEL: Record<VolEstimator, string> = {
   ewma: "EWMA (λ=0.94)",
@@ -182,7 +183,7 @@ export default function VolTargetingChart({ prices }: Props) {
     levSeriesRef.current = [];
 
     const bhs = eqChart.addSeries(LineSeries, {
-      color: "#9ca3af", lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
+      color: CHART_COLORS.neutral, lineWidth: 1, title: "B&H", priceLineVisible: false, lastValueVisible: true,
     });
     bhs.setData(result.rows.map((r) => ({ time: r.time as Time, value: r.bh })));
     const sts = eqChart.addSeries(LineSeries, {
@@ -241,7 +242,7 @@ export default function VolTargetingChart({ prices }: Props) {
       ctx.fillStyle = color; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
       ctx.fillText(label, xOf(k) + 3, padT + dy);
     };
-    marker(1, "#9ca3af", "k=1 (B&H)", 10);
+    marker(1, CHART_COLORS.neutral, "k=1 (B&H)", 10);
     marker(kStarEmp, "#16a34a", `k*=${kStarEmp.toFixed(2)}`, 22);
     marker(result.meta.avgLev, "#2563eb", `平均レバ=${result.meta.avgLev.toFixed(2)}`, 34);
 
@@ -354,7 +355,7 @@ export default function VolTargetingChart({ prices }: Props) {
                   ? "max(自銘柄σ̂, 較正済VIX): どちらかの警告に従う防御型"
                   : "自銘柄の過去リターンのみ"
               }
-              className={`px-2 py-0.5 rounded border ${sigmaSource === s ? "bg-purple-600 text-white border-purple-600" : extReady[s] ? "bg-white text-gray-600 border-gray-300" : "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed"}`}
+              className={`px-2 py-0.5 rounded border ${sigmaSource === s ? "bg-purple-600 text-white border-purple-600" : extReady[s] ? "bg-white text-gray-600 border-gray-300" : "bg-gray-100 text-fg-muted border-gray-200 cursor-not-allowed"}`}
             >
               {SIGMA_SOURCE_LABEL[s]}
             </button>

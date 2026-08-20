@@ -12,6 +12,8 @@ import { computeMFEMAE, computeMFEMAEStats } from "../../lib/mfe-mae";
 import AnalysisGuide from "./AnalysisGuide";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CHART_COLORS } from "../../lib/chart-colors";
+import DirectionValue from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -131,7 +133,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
     ctx.setLineDash([]);
 
     // ラベル
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "11px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("MAE (%)", margin + plotW / 2, h - 5);
@@ -154,7 +156,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
     }
 
     // 軸の数値
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "10px sans-serif";
     ctx.textAlign = "right";
     ctx.fillText("0", margin - 4, margin + plotH + 3);
@@ -175,7 +177,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-4">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">平均MFE</div>
-          <div className="font-mono font-medium text-green-600">
+          <div className="font-mono font-medium text-green-700">
             +{pct(stats.avgMFE)}%
           </div>
           <div className="text-fg-muted">中央値: +{pct(stats.medianMFE)}%</div>
@@ -189,8 +191,9 @@ export default function MFEMAEChart({ prices, period }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">MFE/MAE比</div>
-          <div className={`font-mono font-medium ${stats.riskReward >= 1 ? "text-green-600" : "text-red-600"}`}>
-            {stats.riskReward.toFixed(2)}
+          {/* MFE/MAE比 は 1 が中立点 */}
+          <div className="font-mono font-medium">
+            <DirectionValue value={stats.riskReward - 1}>{stats.riskReward.toFixed(2)}</DirectionValue>
           </div>
           <div className="text-fg-muted">
             {stats.riskReward >= 1 ? "上方向優勢" : "下方向優勢"}
@@ -208,7 +211,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <div className="mb-2 text-xs text-gray-500 font-medium">
-            <span className="text-green-500">MFE</span> /{" "}
+            <span className="text-green-700">MFE</span> /{" "}
             <span className="text-red-500">MAE</span> 20日移動平均 (%)
           </div>
           <div ref={chartRef} className="w-full rounded border border-gray-100" />
@@ -216,7 +219,7 @@ export default function MFEMAEChart({ prices, period }: Props) {
         <div>
           <div className="mb-2 text-xs text-gray-500 font-medium">
             MFE vs MAE 散布図 (
-            <span className="text-green-500">陽線</span> /{" "}
+            <span className="text-green-700">陽線</span> /{" "}
             <span className="text-red-500">陰線</span>)
           </div>
           <canvas

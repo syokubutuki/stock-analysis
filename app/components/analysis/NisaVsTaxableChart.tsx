@@ -47,6 +47,7 @@ import {
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 import WeekSlotGrid, { type SlotSide, AVOID_WEEKEND } from "./WeekSlotGrid";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -58,7 +59,7 @@ type ViewMode = "single" | "rolling" | "leverage";
 
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
 const yen = (v: number) => `${Math.round(v).toLocaleString()}円`;
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
@@ -196,7 +197,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
     const toRows = (r: SimResult) => r.path.map((p) => ({ time: (Math.floor(p.t / 86400000) * 86400) as unknown as Time, value: p.post - 1 }));
     const nisaS = chart.addSeries(LineSeries, { color: "#059669", lineWidth: 2, title: "NISA(非課税)", priceLineVisible: false });
     nisaS.setData(dedupe(toRows(cmp.nisa)));
-    const bhS = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, title: "現物B&H(課税)", priceLineVisible: false });
+    const bhS = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, title: "現物B&H(課税)", priceLineVisible: false });
     bhS.setData(dedupe(toRows(cmp.taxableBH)));
     const stS = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "現物 曜日戦略", priceLineVisible: false });
     stS.setData(dedupe(toRows(cmp.strategy)));
@@ -246,7 +247,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
     ctx.fillStyle = "#b45309"; ctx.textAlign = xm > width / 2 ? "right" : "left";
     ctx.fillText(`中央値 ${pct(rolling.medianEdge)}`, xm + (xm > width / 2 ? -4 : 4), padT + 10);
     // 軸ラベル
-    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "left";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "left";
     ctx.fillText(`←NISA有利 ${pct(lo)}`, padL, height - 4);
     ctx.textAlign = "right";
     ctx.fillText(`${pct(hi)} 戦略有利→`, width - padR, height - 4);
@@ -294,7 +295,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           ctx.fillText(`k*=${sweep.kStar.toFixed(2)}`, xk, padT + 9);
         }
         // y軸ラベル
-        ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
+        ctx.fillStyle = CHART_COLORS.ink; ctx.textAlign = "right";
         ctx.fillText(pct(hi), padL - 4, padT + 8);
         ctx.fillText(pct(lo), padL - 4, padT + plotH);
         ctx.textAlign = "center";
@@ -337,7 +338,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           ctx.setLineDash([]);
         }
         // 軸・凡例
-        ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+        ctx.fillStyle = CHART_COLORS.ink; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
         ctx.fillText(`${(hi * 100).toFixed(0)}%`, padL - 4, padT + 8);
         ctx.fillText("0%", padL - 4, padT + plotH);
         ctx.textAlign = "center";
@@ -449,7 +450,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
               ))}
             </select>
           </label>
-          <label className={`flex items-center gap-1 ${RAKUTEN_MARGIN_RATES[marginKind].preferential ? "text-gray-500" : "text-gray-300"}`}>
+          <label className={`flex items-center gap-1 ${RAKUTEN_MARGIN_RATES[marginKind].preferential ? "text-gray-500" : "text-fg-muted"}`}>
             <input
               type="checkbox"
               disabled={!RAKUTEN_MARGIN_RATES[marginKind].preferential}
@@ -542,7 +543,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             <canvas ref={histRef} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-            <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" color={rolling.winRate > 0.5 ? "text-blue-600" : "text-emerald-600"} />
+            <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" color={rolling.winRate > 0.5 ? "text-blue-600" : "text-emerald-700"} />
             <Stat label="差の中央値" value={pct(rolling.medianEdge)} sub="戦略 − NISA" color={cls(rolling.medianEdge)} />
             <Stat label="差の平均" value={pct(rolling.meanEdge)} sub="戦略 − NISA" color={cls(rolling.meanEdge)} />
             <Stat label="差の5–95%" value={`${pct(rolling.p5)} 〜 ${pct(rolling.p95)}`} sub="ばらつき" />
@@ -621,7 +622,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
         税引前で <span className="font-bold">{pct(cmp.breakEvenGross)}</span> 稼ぐ必要があります
         （税率 {taxRatePct.toFixed(3)}% ぶんの上乗せハードル <span className={cls(cmp.requiredEdge)}>{pct(cmp.requiredEdge)}</span>）。
         現状の戦略は税引前 {pct(cmp.strategy.preTaxReturn)} なので、
-        <span className={cmp.strategy.preTaxReturn >= cmp.breakEvenGross ? "text-blue-600 font-medium" : "text-emerald-600 font-medium"}>
+        <span className={cmp.strategy.preTaxReturn >= cmp.breakEvenGross ? "text-blue-600 font-medium" : "text-emerald-700 font-medium"}>
           {cmp.strategy.preTaxReturn >= cmp.breakEvenGross ? " ハードルを越えています。" : " ハードルに届いていません。"}
         </span>
       </div>

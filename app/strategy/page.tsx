@@ -158,14 +158,14 @@ export default function StrategyLabPage() {
           </div>
 
           {(loading || computing) && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-fg-muted">
               {loading ? "取得中…" : "計算中…"}
             </span>
           )}
         </div>
 
         {features.length < 2 ? (
-          <div className="py-16 text-center text-gray-400 text-sm">
+          <div className="py-16 text-center text-fg-muted text-sm">
             {watchlist.length === 0
               ? "ウォッチリストに銘柄を追加してください。"
               : "銘柄を選ぶと、特徴量を計算してチャートを表示します。"}
@@ -189,7 +189,7 @@ export default function StrategyLabPage() {
                   </div>
                   <table className="w-full">
                     <thead>
-                      <tr className="text-gray-400 text-left">
+                      <tr className="text-fg-muted text-left">
                         <th className="py-1">出口ルール</th>
                         <th className="py-1 text-right">出口日</th>
                         <th className="py-1 text-right">保有日数</th>
@@ -202,7 +202,7 @@ export default function StrategyLabPage() {
                           <td className="py-1">{EXIT_LABEL[r.rule]}</td>
                           <td className="py-1 text-right tabular-nums">{features[r.exitIndex].time}</td>
                           <td className="py-1 text-right tabular-nums">{r.daysHeld}日</td>
-                          <td className={`py-1 text-right tabular-nums ${r.retPct >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          <td className={`py-1 text-right tabular-nums ${r.retPct >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                             {r.retPct >= 0 ? "+" : ""}
                             {r.retPct.toFixed(1)}%
                           </td>
@@ -215,7 +215,7 @@ export default function StrategyLabPage() {
                 <div className="overflow-x-auto text-xs">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-gray-400 text-left">
+                      <tr className="text-fg-muted text-left">
                         <th className="py-1">戦略</th>
                         <th className="py-1 text-right">総リターン</th>
                         <th className="py-1 text-right">最大DD</th>
@@ -227,7 +227,7 @@ export default function StrategyLabPage() {
                     <tbody>
                       <tr className="border-t border-gray-100 text-gray-500">
                         <td className="py-1">Buy&Hold</td>
-                        <td className={`py-1 text-right tabular-nums ${holdRet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className={`py-1 text-right tabular-nums ${holdRet >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                           {holdRet >= 0 ? "+" : ""}
                           {holdRet.toFixed(1)}%
                         </td>
@@ -241,14 +241,14 @@ export default function StrategyLabPage() {
                         return (
                           <tr key={r} className="border-t border-gray-100">
                             <td className="py-1">{EXIT_LABEL[r]}</td>
-                            <td className={`py-1 text-right tabular-nums ${s.totalReturnPct >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            <td className={`py-1 text-right tabular-nums ${s.totalReturnPct >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                               {s.totalReturnPct >= 0 ? "+" : ""}
                               {s.totalReturnPct.toFixed(1)}%
                             </td>
                             <td className="py-1 text-right tabular-nums text-red-600">{s.maxDDPct.toFixed(1)}%</td>
                             <td className="py-1 text-right tabular-nums">{s.nTrades}</td>
                             <td className="py-1 text-right tabular-nums">{(s.winRate * 100).toFixed(0)}%</td>
-                            <td className="py-1 text-right tabular-nums text-gray-400">{(s.exposure * 100).toFixed(0)}%</td>
+                            <td className="py-1 text-right tabular-nums text-fg-muted">{(s.exposure * 100).toFixed(0)}%</td>
                           </tr>
                         );
                       })}

@@ -6,6 +6,7 @@ import { PricePoint } from "../../lib/types";
 import { alignReturns } from "../../lib/portfolio-risk";
 import { computeDCC } from "../../lib/dcc";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -62,7 +63,7 @@ export default function BenchmarkDCCChart({ prices, ticker = "銘柄" }: Props) 
     apiRef.current = chart;
     const c = chart.addSeries(LineSeries, { color: "#dc2626", lineWidth: 2, title: "DCC相関" });
     c.setData(dcc.res.avgCorrSeries.map((v, i) => ({ time: dcc.dates[i] as Time, value: v })));
-    const u = chart.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 1, lineStyle: 2, title: "平時(無条件)" });
+    const u = chart.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 1, lineStyle: 2, title: "平時(無条件)" });
     u.setData(dcc.res.avgCorrSeries.map((_, i) => ({ time: dcc.dates[i] as Time, value: dcc.res.uncondAvgCorr })));
     chart.timeScale().fitContent();
     const onResize = () => chartRef.current && chart.applyOptions({ width: chartRef.current.clientWidth });

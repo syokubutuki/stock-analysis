@@ -24,6 +24,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -61,7 +62,7 @@ function drawOverlay(
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
@@ -75,8 +76,8 @@ function drawOverlay(
       for (let g = G - 1; g >= 0; g--) ctx.lineTo(X(g), Y(lo(g)));
       ctx.closePath(); ctx.fill();
     };
-    band((g) => r.fan[g].q10, (g) => r.fan[g].q90, "#94a3b81f");
-    band((g) => r.fan[g].q25, (g) => r.fan[g].q75, "#94a3b840");
+    band((g) => r.fan[g].q10, (g) => r.fan[g].q90, `${CHART_COLORS.neutral}1f`);
+    band((g) => r.fan[g].q25, (g) => r.fan[g].q75, `${CHART_COLORS.neutral}40`);
   }
 
   // 期待パス(条件セルの平均)
@@ -107,7 +108,7 @@ function drawOverlay(
     ctx.strokeStyle = TODAY_COLOR; ctx.lineWidth = 1.5; ctx.fillStyle = "#ffffff";
     ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     if (r.inSession) {
-      ctx.setLineDash([2, 3]); ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]); ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx, mt); ctx.lineTo(cx, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = "#6b7280"; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
       ctx.fillText("現在", cx + 3, mt + 8);
@@ -140,7 +141,7 @@ function drawBetaCurve(ctx: CanvasRenderingContext2D, W: number, H: number, r: T
   for (let k = 0; k <= 4; k++) { const y = mt + (k / 4) * plotH; ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + plotW, y); ctx.stroke(); }
   ctx.strokeStyle = "#d1d5db"; ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 2), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, Y(0) + 3);
   ctx.fillText(fmtSignedPct(-yMax, 2), ml - 3, mt + plotH);
@@ -150,7 +151,7 @@ function drawBetaCurve(ctx: CanvasRenderingContext2D, W: number, H: number, r: T
     if (g === selG) { ctx.fillStyle = "#fef3c7"; ctx.fillRect(x - slot / 2, mt, slot, plotH); }
     // ブートCIのヒゲ
     if (isFinite(b.bootLo) && isFinite(b.bootHi)) {
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
+      ctx.strokeStyle = CHART_COLORS.axis; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, Y(b.bootLo)); ctx.lineTo(x, Y(b.bootHi)); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x - 3, Y(b.bootLo)); ctx.lineTo(x + 3, Y(b.bootLo)); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x - 3, Y(b.bootHi)); ctx.lineTo(x + 3, Y(b.bootHi)); ctx.stroke();
@@ -192,7 +193,7 @@ function drawScatter(ctx: CanvasRenderingContext2D, W: number, H: number, r: Tod
   ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(ml + plotW, Y(0)); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(X(0), mt); ctx.lineTo(X(0), mt + plotH); ctx.stroke();
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(fmtSignedPct(yMax, 1), ml - 3, mt + 8);
   ctx.fillText(fmtSignedPct(-yMax, 1), ml - 3, mt + plotH);
   ctx.textAlign = "center";
@@ -277,7 +278,7 @@ function drawTrackHist(ctx: CanvasRenderingContext2D, W: number, H: number, r: T
     ctx.fillText("対象日", tx, mt - 2);
   }
 
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(String(cMax), ml - 3, mt + 8);
   ctx.fillText("0", ml - 3, mt + plotH);
   ctx.textAlign = "center";
@@ -493,7 +494,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   <span className="text-gray-600">条件付き期待パス（n={result.n}）</span>
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#94a3b840" }} />
+                  <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: `${CHART_COLORS.neutral}40` }} />
                   <span className="text-gray-600">過去日の分布帯</span>
                 </span>
               </div>
@@ -522,7 +523,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                           <td className="py-1 px-2 text-gray-700">{result.timeLabels[g]}{g === result.lastIdx && result.inSession ? " ◀現在" : ""}</td>
                           <td className={`text-right px-2 font-medium tabular-nums ${t.actual >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(t.actual)}</td>
                           <td className="text-right px-2 text-gray-500 tabular-nums">{fmtSignedPct(result.fan[g].mean)}</td>
-                          <td className={`text-right px-2 tabular-nums ${d >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(d)}</td>
+                          <td className={`text-right px-2 tabular-nums ${d >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-700">{t.z.toFixed(2)}</td>
                           <td className={`text-right px-2 tabular-nums ${extreme ? "font-bold text-amber-800" : "text-gray-600"}`}>{fmtPct(t.pctile, 0)}</td>
                           <td className="px-2 text-gray-500">
@@ -585,7 +586,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="bg-gray-50 rounded p-2">
                       <div className="text-gray-500">β（{result.timeLabels[selG]}）</div>
-                      <div className={`font-bold ${result.betas[selG].beta >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <div className={`font-bold ${result.betas[selG].beta >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {fmtSignedPct(result.betas[selG].beta)} / 1σ
                       </div>
                     </div>
@@ -643,11 +644,11 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">終端の符号一致率</div>
-                        <div className={`font-bold ${signShare > 0.6 ? "text-green-600" : signShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(signShare, 0)}</div>
+                        <div className={`font-bold ${signShare > 0.6 ? "text-green-700" : signShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(signShare, 0)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">相関が正だった日</div>
-                        <div className={`font-bold ${posShare > 0.6 ? "text-green-600" : posShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(posShare, 0)}</div>
+                        <div className={`font-bold ${posShare > 0.6 ? "text-green-700" : posShare < 0.4 ? "text-red-600" : "text-gray-800"}`}>{fmtPct(posShare, 0)}</div>
                       </div>
                       <div className="bg-gray-50 rounded p-2">
                         <div className="text-gray-500">パス相関の中央値（参考）</div>

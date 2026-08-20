@@ -18,6 +18,7 @@ import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import { AnalogFreezeButton } from "./AnalogLedgerPanel";
 import type { AnalogLedgerSettings } from "../../lib/analog-ledger";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 // C1: 信頼度バッジ。実効n・ベースライン差p・novelty棄却の3条件から緑/黄/赤。
 function confidence(r: WeeklyAnalogResult): { level: "green" | "amber" | "red"; label: string; reasons: string[] } {
@@ -82,7 +83,7 @@ function drawIntraWeek(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.strokeStyle = "#e5e7eb"; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${(maxV * 100).toFixed(1)}%`, ml - 4, mt + 8);
   ctx.fillText("0%", ml - 4, yOf(0) + 3);
   ctx.fillText(`-${(maxV * 100).toFixed(1)}%`, ml - 4, mt + plotH);
@@ -93,7 +94,7 @@ function drawIntraWeek(ctx: CanvasRenderingContext2D, width: number, height: num
     ctx.strokeStyle = "#e5e7eb"; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(x, mt); ctx.lineTo(x, mt + plotH); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif";
     ctx.fillText(d.labels[k], x + 2, mt + plotH + 12);
   });
   // パス
@@ -149,7 +150,7 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   ctx.beginPath(); ctx.moveTo(ml, yOf(0)); ctx.lineTo(ml + plotW, yOf(0)); ctx.stroke();
   ctx.setLineDash([]);
   // y目盛
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${(maxV * 100).toFixed(0)}%`, ml - 4, mt + 8);
   ctx.fillText("0%", ml - 4, yOf(0) + 3);
   ctx.fillText(`-${(maxV * 100).toFixed(0)}%`, ml - 4, mt + plotH);
@@ -160,7 +161,7 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   ctx.setLineDash([]);
   ctx.fillStyle = "#64748b"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
   ctx.fillText("今", xOf(0), mt - 6);
-  ctx.fillStyle = "#94a3b8"; ctx.font = "9px sans-serif";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif";
   ctx.fillText("← 今週の経路", xOf(tMin / 2), mt - 6);
   ctx.fillText("その後 →", xOf(H / 2), mt - 6);
 
@@ -250,7 +251,7 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, r: W
   }
 
   // x目盛
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
   const step = Math.max(1, Math.round((tMax - tMin) / 6));
   for (let t = tMin; t <= tMax; t += step) ctx.fillText(t === 0 ? "0" : `${t > 0 ? "+" : ""}${t}d`, xOf(t), mt + plotH + 14);
 }
@@ -463,7 +464,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                   >
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[b] }} />
                     {label}
-                    <span className={`text-[10px] ${isSel ? "text-gray-300" : "text-fg-muted"}`}>n={result.binCounts[b]}</span>
+                    <span className={`text-[10px] ${isSel ? "text-fg-muted" : "text-fg-muted"}`}>n={result.binCounts[b]}</span>
                     {isQuery && <span className={isSel ? "text-amber-300" : "text-blue-600"}>◀今週</span>}
                   </button>
                 );
@@ -572,12 +573,12 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                     <td className="text-right px-2">
                       {s.usBin !== null
                         ? <span className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: result.binMetaObj.colors[s.usBin] }} />{result.binMetaObj.labels[s.usBin]}</span>
-                        : <span className="text-gray-300">—</span>}
+                        : <span className="text-gray-500">—</span>}
                     </td>
                     {mode !== "usbin" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
-                    <td className="text-right px-2 text-green-600 tabular-nums">{fmtPct(s.mfe)}</td>
+                    <td className="text-right px-2 text-green-700 tabular-nums">{fmtPct(s.mfe)}</td>
                     <td className="text-right px-2 text-red-600 tabular-nums">{fmtPct(s.mae)}</td>
-                    <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
+                    <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -8,6 +8,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
 
@@ -35,10 +36,10 @@ function drawFrontier(ctx: CanvasRenderingContext2D, W: number, H: number, res: 
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("平均フィル品質(↑良) × タイミングリスク(→大)", ml, mt - 12);
   // q=0 線
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(ml, ys(0)); ctx.lineTo(ml + plotW, ys(0)); ctx.stroke(); ctx.setLineDash([]);
   // 軸ラベル
-  ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`+${qAbs.toFixed(3)}%`, ml - 4, mt + 9);
   ctx.fillText(`-${qAbs.toFixed(3)}%`, ml - 4, mt + plotH);
   ctx.textAlign = "center";
@@ -64,7 +65,7 @@ function drawBars(ctx: CanvasRenderingContext2D, W: number, H: number, res: Slic
   const zeroX = ml + plotW / 2;
   ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("手法別 平均フィル品質（VWAP比・CI）", ml - 72, 14);
-  ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = CHART_COLORS.reference; ctx.setLineDash([2, 2]);
   ctx.beginPath(); ctx.moveTo(zeroX, mt); ctx.lineTo(zeroX, mt + plotH); ctx.stroke(); ctx.setLineDash([]);
 
   ms.forEach((m, i) => {
@@ -173,13 +174,13 @@ export default function SlicedExecutionChart({ ticker }: Props) {
                   return (
                     <tr key={m.id} className={`border-b border-gray-100 ${isBest ? "ring-2 ring-green-400 ring-inset" : ""} ${m.isSingle ? "bg-gray-50/60" : ""}`}>
                       <td className="py-1 px-2 font-medium text-gray-700">
-                        {isBest && <span className="text-green-600 mr-1">◀</span>}{m.label}
+                        {isBest && <span className="text-green-700 mr-1">◀</span>}{m.label}
                       </td>
                       <td className="text-right px-2 text-gray-600">{m.n}</td>
-                      <td className={`text-right px-2 tabular-nums ${m.meanQPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(m.meanQPct / 100)}</td>
+                      <td className={`text-right px-2 tabular-nums ${m.meanQPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(m.meanQPct / 100)}</td>
                       <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">{fmtSignedPct(m.qCiLoPct / 100)}〜{fmtSignedPct(m.qCiHiPct / 100)}</td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{m.fillStdPct.toFixed(2)}%</td>
-                      <td className={`text-right px-2 tabular-nums ${m.isMeanPct >= 0 ? "text-green-600" : "text-red-600"}`}>{fmtSignedPct(m.isMeanPct / 100)}</td>
+                      <td className={`text-right px-2 tabular-nums ${m.isMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(m.isMeanPct / 100)}</td>
                     </tr>
                   );
                 })}

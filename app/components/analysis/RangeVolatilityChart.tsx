@@ -15,6 +15,7 @@ import {
 import AnalysisGuide from "./AnalysisGuide";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -22,7 +23,7 @@ interface Props {
 }
 
 const COLORS = {
-  closeToClose: "#9ca3af",
+  closeToClose: CHART_COLORS.neutral,
   parkinson: "#3b82f6",
   garmanKlass: "#8b5cf6",
   rogersSatchell: "#f59e0b",

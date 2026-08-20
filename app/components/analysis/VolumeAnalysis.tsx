@@ -126,7 +126,7 @@ export default function VolumeAnalysis({ prices, period }: Props) {
                     <td
                       className={`text-right ${
                         s.priceChange > 0
-                          ? "text-green-600"
+                          ? "text-green-700"
                           : s.priceChange < 0
                           ? "text-red-600"
                           : "text-fg-muted"

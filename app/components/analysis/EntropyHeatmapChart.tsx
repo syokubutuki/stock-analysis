@@ -9,6 +9,7 @@ import {
   entropyDivergenceMap,
 } from "../../lib/entropy-visualization";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -181,14 +182,14 @@ export default function EntropyHeatmapChart({ prices, seriesMode }: Props) {
     // 一様分布ライン
     const uniformY = margin.top + ph - (uniform / maxFreq) * ph;
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.axis;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(margin.left, uniformY);
     ctx.lineTo(width - margin.right, uniformY);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(`一様: ${(uniform * 100).toFixed(1)}%`, width - margin.right - 5, uniformY - 4);

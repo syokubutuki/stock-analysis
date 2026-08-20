@@ -7,6 +7,7 @@ import {
   StateKind,
 } from "../../lib/potential-landscape";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -54,7 +55,7 @@ export default function PotentialLandscapeChart({ prices }: Props) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
     if (!land) {
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "12px sans-serif";
       ctx.fillText("データが不足しています", 16, 24);
       return;
@@ -299,7 +300,7 @@ export default function PotentialLandscapeChart({ prices }: Props) {
         <div className="p-2 bg-gray-50 rounded space-y-1">
           <p>
             <span className="font-medium">読み方:</span> ボールが
-            <strong className="text-emerald-600">谷</strong>の中(かつ矢印が谷底を向く)なら、
+            <strong className="text-emerald-700">谷</strong>の中(かつ矢印が谷底を向く)なら、
             その谷の価格へ戻る平均回帰を狙える。
             <strong className="text-red-600">丘</strong>の上にいると、わずかな動きで
             どちらかへ転がり落ちる不安定状態=ブレイクに乗る方が有利。
@@ -384,7 +385,7 @@ function StatCard({
 }: {
   label: string; value: string; sub?: string; accent?: "pos" | "neg";
 }) {
-  const c = accent === "pos" ? "text-emerald-600" : accent === "neg" ? "text-red-600" : "text-gray-800";
+  const c = accent === "pos" ? "text-emerald-700" : accent === "neg" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 bg-gray-50 rounded text-xs">
       <div className="text-gray-500">{label}</div>

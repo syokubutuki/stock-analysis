@@ -13,6 +13,7 @@ import {
 import { conditionalSegmentEdge, SegBucket } from "../../lib/open-close-edge";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -67,7 +68,7 @@ function drawPairedBars(
   );
   const zeroX = ml + plotW / 2;
   const rowH = plotH / buckets.length;
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([2, 2]);
   ctx.beginPath();
   ctx.moveTo(zeroX, mt);

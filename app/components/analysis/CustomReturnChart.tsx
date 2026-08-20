@@ -12,6 +12,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStrategyPanel";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -232,7 +233,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
 
     // バイ&ホールド (灰色・破線)
     const bhSeries = chart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 2,
       lineStyle: 2,
       priceFormat: { type: "custom", formatter: (v: number) => (v).toFixed(2) + "%" },
@@ -395,7 +396,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
             ))}
           </select>
         </div>
-        <div className="text-gray-400 text-lg pb-1">→</div>
+        <div className="text-gray-500 text-lg pb-1">→</div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">エグジット (売り)</label>
           <select
@@ -470,7 +471,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
               <span className="text-fg-muted">予測行の色の濃さ＝確信度</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-400" /> 的中</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-400" /> 外れ</span>
-              <span className={`ml-auto font-medium ${last.predicted === 1 ? "text-green-600" : "text-red-600"}`}>
+              <span className={`ml-auto font-medium ${last.predicted === 1 ? "text-green-700" : "text-red-600"}`}>
                 直近 {last.time}: {last.predicted === 1 ? "▲上昇" : "▼下落"}予測（{(last.proba * 100).toFixed(1)}%）
               </span>
             </div>
@@ -549,7 +550,7 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
 }
 
 function StatCell({ label, value, positive, negative }: { label: string; value: string; positive?: boolean; negative?: boolean }) {
-  const color = positive ? "text-green-600" : negative ? "text-red-600" : "";
+  const color = positive ? "text-green-700" : negative ? "text-red-600" : "";
   return (
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>

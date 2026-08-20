@@ -9,10 +9,11 @@
 import { DayData, BinGrid } from "./intraday-core";
 import { dayCumPath } from "./us-spillover-core";
 import { PathGroup, PathStat, PairDiff, buildPathStats, pairwiseEndDiffs } from "./intraday-path-core";
+import { CHART_COLORS } from "./chart-colors";
 
 const GROUP_META = [
   { key: "start", label: "月初", color: "#16a34a" }, // 先頭K営業日
-  { key: "mid", label: "中旬", color: "#9ca3af" },
+  { key: "mid", label: "中旬", color: CHART_COLORS.neutral },
   { key: "end", label: "月末", color: "#dc2626" }, // 末尾K営業日
 ] as const;
 

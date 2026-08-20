@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { rollingOHLCVol, wholePeriodVol, VolEstimates } from "../../lib/ohlc-volatility";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -13,7 +14,7 @@ interface Props {
 const WINDOWS = [10, 20, 60];
 
 const EST_META: { key: keyof VolEstimates; label: string; color: string }[] = [
-  { key: "close", label: "終値間(CC)", color: "#9ca3af" },
+  { key: "close", label: "終値間(CC)", color: CHART_COLORS.neutral },
   { key: "yangZhang", label: "Yang-Zhang", color: "#dc2626" },
   { key: "gk", label: "Garman-Klass", color: "#2563eb" },
   { key: "parkinson", label: "Parkinson", color: "#16a34a" },
@@ -101,14 +102,14 @@ export default function OHLCVolatilityChart({ prices }: Props) {
     // 基準線 1.0
     const maxR = Math.max(1, ...rows.map((m) => eff.varRatio[m.key]));
     const x1 = ml + (1 / maxR) * plotW;
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
     ctx.moveTo(x1, mt);
     ctx.lineTo(x1, mt + rows.length * rowH);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "8px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("CC=1.0", x1, mt - 2);

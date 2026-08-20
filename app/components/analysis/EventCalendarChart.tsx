@@ -10,6 +10,7 @@ import {
 } from "../../lib/event-calendar";
 import { conditionalForwardReturns, ForwardResult } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -57,7 +58,7 @@ function drawBars(ctx: CanvasRenderingContext2D, width: number, height: number, 
 
   // 全体平均の点線
   const baseY = zeroY - r.baselineMean * scale;
-  ctx.strokeStyle = "#9ca3af";
+  ctx.strokeStyle = CHART_COLORS.reference;
   ctx.setLineDash([4, 3]);
   ctx.beginPath();
   ctx.moveTo(ml, baseY);

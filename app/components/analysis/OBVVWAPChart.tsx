@@ -17,6 +17,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { CHART_COLORS, CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -54,12 +55,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
     priceChartApi.current = priceChart;
 
     const candleSeries = priceChart.addSeries(CandlestickSeries, {
-      upColor: "#10b981",
-      downColor: "#ef4444",
-      borderUpColor: "#10b981",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#10b981",
-      wickDownColor: "#ef4444",
+      ...CANDLESTICK_OPTIONS,
     });
     candleSeries.setData(
       prices.map((p) => ({
@@ -105,7 +101,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
     );
 
     const obvMASeries = obvChart.addSeries(LineSeries, {
-      color: "#9ca3af",
+      color: CHART_COLORS.neutral,
       lineWidth: 1,
       title: "OBV MA20",
     });
@@ -143,7 +139,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
 
   const obvVsMA =
     latestOBV && latestOBV.obv > latestOBV.obvMA
-      ? { label: "MA上回り", className: "text-green-600" }
+      ? { label: "MA上回り", className: "text-green-700" }
       : { label: "MA下回り", className: "text-red-600" };
 
   return (
@@ -175,7 +171,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
             <div
               className={`text-xs mt-0.5 ${
                 latestPrice.close >= latestVWAP.vwap
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : "text-red-600"
               }`}
             >
@@ -214,6 +210,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
           価格 / VWAP
         </div>
         <div ref={priceChartRef} className="w-full rounded border border-gray-100" />
+        <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
       </div>
 
       {/* OBV Chart */}

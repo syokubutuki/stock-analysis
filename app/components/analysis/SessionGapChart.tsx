@@ -18,6 +18,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { countRoundTrips } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -94,7 +95,7 @@ export default function SessionGapChart({ prices }: Props) {
     // 軸
     ctx.strokeStyle = "#d1d5db"; ctx.setLineDash([2, 2]);
     ctx.beginPath(); ctx.moveTo(ml, zeroY); ctx.lineTo(ml + plotW, zeroY); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(`+${(maxAbs * 100).toFixed(1)}%`, ml - 6, mt + 8);
     ctx.fillText("0", ml - 6, zeroY + 3);
     ctx.fillText(`-${(maxAbs * 100).toFixed(1)}%`, ml - 6, mt + plotH);

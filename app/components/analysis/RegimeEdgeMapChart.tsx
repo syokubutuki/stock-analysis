@@ -144,7 +144,7 @@ export default function RegimeEdgeMapChart({ prices }: Props) {
                 </td>
                 {row.byRegime.map((c, j) => {
                   const isNow = map.regimeOrder[j] === map.nowRegime;
-                  if (!c) return <td key={j} className="text-right px-1.5 text-gray-300">–</td>;
+                  if (!c) return <td key={j} className="text-right px-1.5 text-gray-500">–</td>;
                   const v = metricValue(c, metric);
                   const sig = c.pAdj < 0.05;
                   return (

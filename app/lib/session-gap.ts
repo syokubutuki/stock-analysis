@@ -15,13 +15,14 @@
 
 import { PricePoint } from "./types";
 import { mean, median, std, quantileSorted, benjaminiHochberg } from "./stats-significance";
+import { CHART_COLORS } from "./chart-colors";
 
 export type GapContext = "normal" | "postBreak" | "preBreak" | "sandwiched";
 
 export const CONTEXT_ORDER: GapContext[] = ["normal", "postBreak", "preBreak", "sandwiched"];
 
 export const CONTEXT_META: Record<GapContext, { label: string; short: string; color: string }> = {
-  normal: { label: "通常日", short: "通常", color: "#9ca3af" },
+  normal: { label: "通常日", short: "通常", color: CHART_COLORS.neutral },
   postBreak: { label: "連休明け", short: "明け", color: "#dc2626" },
   preBreak: { label: "連休前", short: "前", color: "#2563eb" },
   sandwiched: { label: "連休はさみ(孤立立会)", short: "孤立", color: "#7c3aed" },

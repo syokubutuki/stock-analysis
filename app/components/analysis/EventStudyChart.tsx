@@ -11,6 +11,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { positionsFromSignals } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -124,7 +125,7 @@ export default function EventStudyChart({ prices }: Props) {
     const { ctx, width, height } = init;
 
     if (!result || result.nUsable === 0) {
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.font = "12px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(
         loading ? "データ取得中..." : "条件を満たすイベントがありません（しきい値を下げてください）",
@@ -154,20 +155,20 @@ export default function EventStudyChart({ prices }: Props) {
 
     // グリッド + y軸ラベル
     ctx.strokeStyle = "#eef0f2"; ctx.lineWidth = 1;
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
     const nGrid = 6;
     for (let g = 0; g <= nGrid; g++) {
       const v = yMin + (yRange * g) / nGrid;
       const y = yAt(v);
       ctx.strokeStyle = Math.abs(v) < 1e-9 ? "#d1d5db" : "#eef0f2";
       ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(width - mr, y); ctx.stroke();
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = CHART_COLORS.ink;
       ctx.fillText((v * 100).toFixed(1) + "%", ml - 5, y + 3);
     }
 
     // ゼロライン強調
     const zeroY = yAt(0);
-    ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(ml, zeroY); ctx.lineTo(width - mr, zeroY); ctx.stroke();
     ctx.setLineDash([]);
 
@@ -194,7 +195,7 @@ export default function EventStudyChart({ prices }: Props) {
     }
 
     // 無条件平均（比較基準・グレー破線）
-    ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
+    ctx.strokeStyle = CHART_COLORS.reference; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
     ctx.beginPath();
     for (let k = 0; k <= N; k++) { const x = xAt(k), y = yAt(baselineMean[k]); if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.stroke();
@@ -216,7 +217,7 @@ export default function EventStudyChart({ prices }: Props) {
     ctx.beginPath(); ctx.arc(xAt(N), yAt(meanPath[N]), 3.5, 0, Math.PI * 2); ctx.fill();
 
     // x軸ラベル
-    ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
     const xStep = N <= 20 ? 5 : N <= 40 ? 10 : 10;
     for (let k = 0; k <= N; k += xStep) ctx.fillText(`${k}`, xAt(k), height - mb + 14);
     ctx.fillText("経過営業日", ml + plotW / 2, height - 4);
@@ -352,10 +353,10 @@ export default function EventStudyChart({ prices }: Props) {
                 return (
                   <tr key={s.k} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium text-gray-700">{s.k}日後</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.mean >= 0 ? "text-green-600" : "text-red-600"}`}>{pct(s.mean)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.median >= 0 ? "text-green-600" : "text-red-600"}`}>{pct(s.median)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${s.mean >= 0 ? "text-green-700" : "text-red-600"}`}>{pct(s.mean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${s.median >= 0 ? "text-green-700" : "text-red-600"}`}>{pct(s.median)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{(s.std * 100).toFixed(2)}%</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-600" : "text-red-600"}`}>{(s.winRate * 100).toFixed(0)}%</td>
+                    <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}>{(s.winRate * 100).toFixed(0)}%</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{pct(base)}</td>
                     <td className={`py-1 px-2 text-center font-mono font-medium ${ex > 0 ? "text-green-700" : ex < 0 ? "text-red-700" : ""}`}>{pct(ex)}</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">{s.n}</td>

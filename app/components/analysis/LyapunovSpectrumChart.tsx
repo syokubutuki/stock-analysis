@@ -20,6 +20,7 @@ import {
   type LyapunovVectorResult,
 } from "../../lib/lyapunov-spectrum";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -117,7 +118,7 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
     }
 
     // Zero line
-    ctx.strokeStyle = "#9ca3af";
+    ctx.strokeStyle = CHART_COLORS.reference;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -131,7 +132,7 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
       const x = startX + i * (barW + 4) + 2;
       const barH = Math.abs(exps[i]) * scale;
       const y = exps[i] >= 0 ? midY - barH : midY;
-      const color = exps[i] > 0.001 ? "#ef4444" : exps[i] < -0.001 ? "#3b82f6" : "#9ca3af";
+      const color = exps[i] > 0.001 ? "#ef4444" : exps[i] < -0.001 ? "#3b82f6" : CHART_COLORS.neutral;
 
       ctx.fillStyle = color;
       ctx.fillRect(x, y, barW, barH);
@@ -287,7 +288,7 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
     }
 
     // Time axis labels
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "center";
     const labelCount = Math.min(6, nT);
@@ -355,7 +356,7 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 mb-3 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">最大 λ</div>
-          <div className={`font-bold ${spectrum.exponents[0] > 0 ? "text-red-600" : "text-green-600"}`}>
+          <div className={`font-bold ${spectrum.exponents[0] > 0 ? "text-red-600" : "text-green-700"}`}>
             {spectrum.exponents[0]?.toFixed(4) ?? "N/A"}
           </div>
         </div>

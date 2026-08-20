@@ -17,6 +17,7 @@ import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
 import { buildEdgeCatalog } from "../../lib/edge-trades";
 import { computeDecay, DEFAULT_DECAY_PARAMS, type DecayResult } from "../../lib/edge-decay";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -94,7 +95,7 @@ export default function EdgeDecayChart({ prices }: Props) {
     const eq = baseChart(eqRef.current, 240, false);
     const lr = baseChart(lrRef.current, 160, false);
     const cu = baseChart(cuRef.current, 160, true);
-    const eqIS = eq.addSeries(LineSeries, { color: "#9ca3af", lineWidth: 2, title: "IS(発見期間)", lineStyle: LineStyle.Dotted });
+    const eqIS = eq.addSeries(LineSeries, { color: CHART_COLORS.neutral, lineWidth: 2, title: "IS(発見期間)", lineStyle: LineStyle.Dotted });
     const eqOOS = eq.addSeries(LineSeries, { color: "#2563eb", lineWidth: 2, title: "OOS(監視期間)" });
     const lrS = lr.addSeries(LineSeries, { color: "#7c3aed", lineWidth: 2, title: "SPRT logLR" });
     const cuS = cu.addSeries(LineSeries, { color: "#d97706", lineWidth: 2, title: "CUSUM" });
@@ -283,7 +284,7 @@ export default function EdgeDecayChart({ prices }: Props) {
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-1.5 font-mono text-gray-600">{e.label}</td>
                     <td className="text-right px-1 font-mono">{e.n}</td>
-                    <td className={`text-right px-1 font-mono ${e.meanTrade > 0 ? "text-green-600" : "text-red-600"}`}>{(e.meanTrade * 100).toFixed(3)}%</td>
+                    <td className={`text-right px-1 font-mono ${e.meanTrade > 0 ? "text-green-700" : "text-red-600"}`}>{(e.meanTrade * 100).toFixed(3)}%</td>
                     <td className="text-right px-1.5 font-mono text-gray-500">[{(e.ciLo * 100).toFixed(3)}%, {(e.ciHi * 100).toFixed(3)}%]</td>
                     <td className="text-right px-1.5 font-mono">{e.sharpe.toFixed(2)}</td>
                   </tr>
