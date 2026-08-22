@@ -1,7 +1,15 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
-import CollapsibleAnalysis from "./CollapsibleAnalysis";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import CollapsibleAnalysis, { type PanelResultSummary } from "./CollapsibleAnalysis";
 import LockedPanel from "./LockedPanel";
 import { canViewPanel } from "../../lib/tiers";
 import { useEntitlement } from "../../lib/entitlement";
@@ -9,17 +17,24 @@ import { useEntitlement } from "../../lib/entitlement";
 interface AnalysisAvailability {
   unavailableItemIds: ReadonlySet<string>;
   cautionItemIds: ReadonlySet<string>;
+  resultSummaries: ReadonlyMap<string, PanelResultSummary>;
+  reportResultSummary: (itemId: string, summary: PanelResultSummary) => void;
 }
 
 const EMPTY_ITEM_IDS = new Set<string>();
 const DEFAULT_AVAILABILITY: AnalysisAvailability = {
   unavailableItemIds: EMPTY_ITEM_IDS,
   cautionItemIds: EMPTY_ITEM_IDS,
+  resultSummaries: new Map(),
+  reportResultSummary: () => {},
 };
 const AnalysisAvailabilityContext = createContext<AnalysisAvailability>(DEFAULT_AVAILABILITY);
 
-interface AnalysisAvailabilityProviderProps extends AnalysisAvailability {
+interface AnalysisAvailabilityProviderProps {
   active: boolean;
+  unavailableItemIds: ReadonlySet<string>;
+  cautionItemIds: ReadonlySet<string>;
+  summaryScope: string;
   children: ReactNode;
 }
 
@@ -27,17 +42,61 @@ export function AnalysisAvailabilityProvider({
   active,
   unavailableItemIds,
   cautionItemIds,
+  summaryScope,
   children,
 }: AnalysisAvailabilityProviderProps) {
+  const [summaryCache, setSummaryCache] = useState<{
+    scope: string;
+    items: Map<string, PanelResultSummary>;
+  }>(() => ({ scope: summaryScope, items: new Map() }));
+  const currentSummaries = summaryCache.scope === summaryScope
+    ? summaryCache.items
+    : DEFAULT_AVAILABILITY.resultSummaries;
+  const reportResultSummary = useCallback((itemId: string, summary: PanelResultSummary) => {
+    setSummaryCache((current) => {
+      const items = current.scope === summaryScope ? current.items : new Map();
+      const previous = items.get(itemId);
+      if (
+        previous?.status === summary.status &&
+        previous.direction === summary.direction &&
+        previous.label === summary.label
+      ) {
+        return current.scope === summaryScope ? current : { scope: summaryScope, items };
+      }
+      const next = new Map(items);
+      next.set(itemId, summary);
+      return { scope: summaryScope, items: next };
+    });
+  }, [summaryScope]);
   const value = useMemo(
-    () => active ? { unavailableItemIds, cautionItemIds } : DEFAULT_AVAILABILITY,
-    [active, unavailableItemIds, cautionItemIds],
+    () => ({
+      unavailableItemIds: active ? unavailableItemIds : EMPTY_ITEM_IDS,
+      cautionItemIds: active ? cautionItemIds : EMPTY_ITEM_IDS,
+      resultSummaries: currentSummaries,
+      reportResultSummary,
+    }),
+    [active, unavailableItemIds, cautionItemIds, currentSummaries, reportResultSummary],
   );
   return (
     <AnalysisAvailabilityContext.Provider value={value}>
       {children}
     </AnalysisAvailabilityContext.Provider>
   );
+}
+
+/**
+ * パネル本体が既存計算から得た要約を、閉じた後も見出しに残す。
+ * 本体がマウントされる前には呼ばれないため、事前計算は発生しない。
+ */
+export function useAnalysisResultSummary(
+  itemId: string,
+  summary: PanelResultSummary,
+) {
+  const { reportResultSummary } = useContext(AnalysisAvailabilityContext);
+  const { status, direction, label } = summary;
+  useEffect(() => {
+    reportResultSummary(itemId, { status, direction, label });
+  }, [itemId, reportResultSummary, status, direction, label]);
 }
 
 function AnalysisDataLimitation({ unavailable }: { unavailable: boolean }) {
@@ -151,6 +210,7 @@ export default function AccordionSection({
                 title={it.title}
                 subtitle={it.subtitle}
                 bulk={bulk}
+                summary={availability.resultSummaries.get(it.id)}
               >
                 {caution ? <AnalysisDataLimitation unavailable={false} /> : null}
                 {it.node}

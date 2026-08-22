@@ -18,6 +18,7 @@ import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
 import { CHART_COLORS, CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
+import { useAnalysisResultSummary } from "./AccordionSection";
 
 interface Props {
   prices: PricePoint[];
@@ -37,6 +38,14 @@ export default function OBVVWAPChart({ prices, period }: Props) {
   const latestVWAP = vwapData.at(-1);
   const latestOBV = obvData.at(-1);
   const latestPrice = prices.at(-1);
+  useAnalysisResultSummary(
+    "tech-obvvwap",
+    divergence.type === "bullish"
+      ? { status: "finding", direction: "up", label: "強気乖離" }
+      : divergence.type === "bearish"
+        ? { status: "finding", direction: "down", label: "弱気乖離" }
+        : { status: "none", direction: "flat", label: "乖離なし" },
+  );
 
   useEffect(() => {
     if (!priceChartRef.current || !obvChartRef.current) return;

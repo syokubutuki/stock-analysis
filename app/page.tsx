@@ -1595,6 +1595,7 @@ export default function AnalysisPage() {
               active={hasCloseOnlyMarketData}
               unavailableItemIds={CLOSE_ONLY_UNAVAILABLE_PANEL_IDS}
               cautionItemIds={CLOSE_ONLY_CAUTION_PANEL_IDS}
+              summaryScope={`${data.ticker}:${period}:${filteredPrices.at(-1)?.time ?? "empty"}:${filteredPrices.at(-1)?.close ?? "empty"}`}
             >
               <div className="space-y-6">
               {activeSection === "basic" && (

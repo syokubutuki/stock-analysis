@@ -19,6 +19,7 @@ import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
 import DirectionValue from "./DirectionValue";
+import { useAnalysisResultSummary } from "./AccordionSection";
 
 interface Props {
   prices: PricePoint[];
@@ -38,6 +39,19 @@ export default function TechnicalIndicators({ prices, period }: Props) {
   const signals = useMemo(
     () => detectSignals(prices, rsi, macd, bollinger),
     [prices, rsi, macd, bollinger]
+  );
+  const primarySignal = signals.find((signal) => signal.type !== "info");
+  useAnalysisResultSummary(
+    "sa-technical",
+    primarySignal
+      ? {
+          status: "finding",
+          direction: primarySignal.type === "buy" ? "up" : "down",
+          label: primarySignal.type === "buy" ? "買い所見" : "売り所見",
+        }
+      : signals.length > 0
+        ? { status: "finding", direction: "flat", label: "注意所見" }
+        : { status: "none", direction: "flat", label: "該当シグナルなし" },
   );
 
   useEffect(() => {
