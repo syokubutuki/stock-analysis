@@ -14,6 +14,7 @@ import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
 import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
+import { useAnalysisResultSummary } from "./AccordionSection";
 
 interface Props {
   prices: PricePoint[];
@@ -28,6 +29,22 @@ export default function StochasticsChart({ prices, period }: Props) {
 
   const stochPoints = useMemo(() => computeStochastics(prices), [prices]);
   const signals = useMemo(() => detectStochSignals(stochPoints), [stochPoints]);
+  const last = stochPoints.length > 0 ? stochPoints[stochPoints.length - 1] : null;
+  const primarySignal = signals.find((signal) => signal.type !== "info");
+  useAnalysisResultSummary(
+    "tech-stoch",
+    primarySignal
+      ? {
+          status: "finding",
+          direction: primarySignal.type === "buy" ? "up" : "down",
+          label: primarySignal.type === "buy" ? "買い所見" : "売り所見",
+        }
+      : last && last.slowK <= 20
+        ? { status: "finding", direction: "up", label: "売られすぎ" }
+        : last && last.slowK >= 80
+          ? { status: "finding", direction: "down", label: "買われすぎ" }
+          : { status: "none", direction: "flat", label: "中立ゾーン" },
+  );
 
   useEffect(() => {
     if (!upperRef.current || !lowerRef.current) return;
@@ -141,8 +158,6 @@ export default function StochasticsChart({ prices, period }: Props) {
       lowerApiRef.current = null;
     };
   }, [prices, stochPoints, period]);
-
-  const last = stochPoints.length > 0 ? stochPoints[stochPoints.length - 1] : null;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">

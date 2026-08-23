@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect, useMemo, useRef } from "react";
+import { useCallback, useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { track } from "@vercel/analytics";
@@ -14,6 +14,7 @@ import AccordionSection, {
 } from "./components/analysis/AccordionSection";
 import DataQualityNotice from "./components/analysis/DataQualityNotice";
 import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
+import DirectionValue from "./components/analysis/DirectionValue";
 import { formatSummaryPrice } from "./lib/format";
 import { SeriesMode } from "./lib/series-mode";
 import { sectionForPanel } from "./lib/panel-sections";
@@ -1570,18 +1571,18 @@ export default function AnalysisPage() {
                 />
                 <SummaryCard
                   label="期間変動"
-                  value={`${(
-                    ((filteredPrices[filteredPrices.length - 1].close -
-                      filteredPrices[0].close) /
-                      filteredPrices[0].close) *
-                    100
-                  ).toFixed(2)}%`}
-                  color={
-                    filteredPrices[filteredPrices.length - 1].close >=
-                    filteredPrices[0].close
-                      ? "text-green-700"
-                      : "text-red-600"
-                  }
+                  value={(() => {
+                    const change =
+                      ((filteredPrices[filteredPrices.length - 1].close -
+                        filteredPrices[0].close) /
+                        filteredPrices[0].close) *
+                      100;
+                    return (
+                      <DirectionValue value={change}>
+                        {`${change >= 0 ? "+" : ""}${change.toFixed(2)}%`}
+                      </DirectionValue>
+                    );
+                  })()}
                 />
                 <SummaryCard
                   label="データ数"
@@ -1595,6 +1596,7 @@ export default function AnalysisPage() {
               active={hasCloseOnlyMarketData}
               unavailableItemIds={CLOSE_ONLY_UNAVAILABLE_PANEL_IDS}
               cautionItemIds={CLOSE_ONLY_CAUTION_PANEL_IDS}
+              summaryScope={`${data.ticker}:${period}:${filteredPrices.at(-1)?.time ?? "empty"}:${filteredPrices.at(-1)?.close ?? "empty"}`}
             >
               <div className="space-y-6">
               {activeSection === "basic" && (
@@ -2339,16 +2341,14 @@ export default function AnalysisPage() {
 function SummaryCard({
   label,
   value,
-  color,
 }: {
   label: string;
-  value: string;
-  color?: string;
+  value: ReactNode;
 }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-3">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-lg font-bold ${color || "text-gray-800"}`}>
+      <div className="text-lg font-bold text-gray-800">
         {value}
       </div>
     </div>

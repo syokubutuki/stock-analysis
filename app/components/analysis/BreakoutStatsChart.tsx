@@ -7,6 +7,7 @@ import GuideEntryPanel from "./GuideEntryPanel";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 import DirectionValue from "./DirectionValue";
+import { useAnalysisResultSummary } from "./AccordionSection";
 
 interface Props {
   prices: PricePoint[];
@@ -28,6 +29,16 @@ export default function BreakoutStatsChart({ prices }: Props) {
     [prices, lookback, horizon, side]
   );
   const spreadRT = useMemo(() => (prices.length < 100 ? 0 : representativeSpread(prices)), [prices]);
+  const sampleCount = res
+    ? res.donchian.reduce((sum, item) => sum + item.upN + item.downN, 0) +
+      res.priorHL.brokeHighN + res.priorHL.brokeLowN
+    : 0;
+  useAnalysisResultSummary(
+    "tech-breakout",
+    sampleCount > 0
+      ? { status: "finding", direction: "flat", label: `標本 ${sampleCount}件` }
+      : { status: "none", direction: "flat", label: "標本なし" },
+  );
 
   if (prices.length < 100 || !res) return null;
 

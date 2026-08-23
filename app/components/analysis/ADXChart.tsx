@@ -14,6 +14,7 @@ import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
 import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
+import { useAnalysisResultSummary } from "./AccordionSection";
 
 interface Props {
   prices: PricePoint[];
@@ -39,6 +40,20 @@ export default function ADXChart({ prices, period }: Props) {
 
   const adxPoints = useMemo(() => computeADX(prices), [prices]);
   const judgment = useMemo(() => judgeADX(adxPoints), [adxPoints]);
+  const last = adxPoints.length > 0 ? adxPoints[adxPoints.length - 1] : null;
+  const hasNotableTrend = Boolean(
+    last && (last.adx > 25 || judgment.signal.includes("クロス")),
+  );
+  useAnalysisResultSummary(
+    "tech-adx",
+    hasNotableTrend
+      ? {
+          status: "finding",
+          direction: judgment.trend === "上昇" ? "up" : "down",
+          label: judgment.strength,
+        }
+      : { status: "none", direction: "flat", label: "強いトレンドなし" },
+  );
 
   // Upper chart: candlestick
   useEffect(() => {
@@ -137,8 +152,6 @@ export default function ADXChart({ prices, period }: Props) {
       lowerApiRef.current = null;
     };
   }, [adxPoints, prices, period]);
-
-  const last = adxPoints.length > 0 ? adxPoints[adxPoints.length - 1] : null;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">

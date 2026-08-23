@@ -3,6 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { OPEN_PANEL_EVENT, type OpenPanelDetail } from "../../lib/panel-nav";
+import {
+  DIRECTION_GLYPH,
+  DIRECTION_LABEL,
+  DIRECTION_TEXT_CLASS,
+  type Direction,
+} from "../../lib/chart-colors";
+
+export interface PanelResultSummary {
+  status: "finding" | "none";
+  direction: Direction;
+  label: string;
+}
 
 interface Props {
   /** localStorage 永続化・アンカー用の安定ID（銘柄に依存しない） */
@@ -18,6 +30,8 @@ interface Props {
    * 「すべて開く / すべて閉じる」に使う。
    */
   bulk?: { nonce: number; open: boolean };
+  /** 一度開いて計算済みのパネルだけが提供する短い所見。未計算なら表示しない。 */
+  summary?: PanelResultSummary;
   children: React.ReactNode;
 }
 
@@ -49,6 +63,7 @@ export default function CollapsibleAnalysis({
   subtitle,
   defaultOpen = false,
   bulk,
+  summary,
   children,
 }: Props) {
   // 保存済み開閉状態を復元する。この節はデータ取得後にのみクライアント描画され
@@ -127,7 +142,7 @@ export default function CollapsibleAnalysis({
         >
           ▶
         </span>
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-gray-800 truncate">
             {title}
           </span>
@@ -137,6 +152,15 @@ export default function CollapsibleAnalysis({
             </span>
           )}
         </span>
+        {summary && (
+          <span
+            className={`shrink-0 rounded-full border border-current px-2 py-0.5 text-[11px] font-medium ${DIRECTION_TEXT_CLASS[summary.direction]}`}
+            aria-label={`${summary.status === "finding" ? "所見あり" : "所見なし"}: ${summary.label}（${DIRECTION_LABEL[summary.direction]}）`}
+          >
+            <span aria-hidden="true">{DIRECTION_GLYPH[summary.direction]}</span>{" "}
+            {summary.status === "finding" ? summary.label : "所見なし"}
+          </span>
+        )}
       </button>
       {open && <div className="px-4 pb-4 border-t border-gray-100 pt-4">{children}</div>}
     </section>

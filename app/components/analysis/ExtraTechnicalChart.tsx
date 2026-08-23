@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { extraTechnical } from "../../lib/extra-technical";
 import GuideEntryPanel from "./GuideEntryPanel";
+import { useAnalysisResultSummary } from "./AccordionSection";
 
 interface Props {
   prices: PricePoint[];
@@ -22,6 +23,14 @@ export default function ExtraTechnicalChart({ prices }: Props) {
   const wrApiRef = useRef<IChartApi | null>(null);
 
   const result = useMemo(() => extraTechnical(prices), [prices]);
+  useAnalysisResultSummary(
+    "tech-extra",
+    result.cci.current > 100 || result.williamsR.current > -20
+      ? { status: "finding", direction: "down", label: "買われすぎ" }
+      : result.cci.current < -100 || result.williamsR.current < -80
+        ? { status: "finding", direction: "up", label: "売られすぎ" }
+        : { status: "none", direction: "flat", label: "中立ゾーン" },
+  );
 
   // CCI chart
   useEffect(() => {
