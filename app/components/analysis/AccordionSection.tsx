@@ -17,6 +17,7 @@ import { useEntitlement } from "../../lib/entitlement";
 interface AnalysisAvailability {
   unavailableItemIds: ReadonlySet<string>;
   cautionItemIds: ReadonlySet<string>;
+  summaryScope?: string;
   resultSummaries: ReadonlyMap<string, PanelResultSummary>;
   reportResultSummary: (itemId: string, summary: PanelResultSummary) => void;
 }
@@ -25,6 +26,7 @@ const EMPTY_ITEM_IDS = new Set<string>();
 const DEFAULT_AVAILABILITY: AnalysisAvailability = {
   unavailableItemIds: EMPTY_ITEM_IDS,
   cautionItemIds: EMPTY_ITEM_IDS,
+  summaryScope: undefined,
   resultSummaries: new Map(),
   reportResultSummary: () => {},
 };
@@ -72,10 +74,11 @@ export function AnalysisAvailabilityProvider({
     () => ({
       unavailableItemIds: active ? unavailableItemIds : EMPTY_ITEM_IDS,
       cautionItemIds: active ? cautionItemIds : EMPTY_ITEM_IDS,
+      summaryScope,
       resultSummaries: currentSummaries,
       reportResultSummary,
     }),
-    [active, unavailableItemIds, cautionItemIds, currentSummaries, reportResultSummary],
+    [active, unavailableItemIds, cautionItemIds, summaryScope, currentSummaries, reportResultSummary],
   );
   return (
     <AnalysisAvailabilityContext.Provider value={value}>
@@ -193,7 +196,7 @@ export default function AccordionSection({
             if (unavailable) {
               return (
                 <CollapsibleAnalysis
-                  key={it.id}
+                  key={`${it.id}:${availability.summaryScope ?? "unscoped"}`}
                   id={it.id}
                   title={it.title}
                   subtitle={it.subtitle}
@@ -205,7 +208,7 @@ export default function AccordionSection({
             }
             return canViewPanel(it.id, tier) ? (
               <CollapsibleAnalysis
-                key={it.id}
+                key={`${it.id}:${availability.summaryScope ?? "unscoped"}`}
                 id={it.id}
                 title={it.title}
                 subtitle={it.subtitle}
