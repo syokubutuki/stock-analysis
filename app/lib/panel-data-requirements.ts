@@ -22,15 +22,15 @@
 // 挙動を変えずにそのまま写しただけである。価値は既存分類の正しさではなく、
 // **これ以降に足したパネルが黙って SAFE に紛れ込めない**点にある。
 //
-// 移設時に見つかった要判断（挙動を変えないため今回は SAFE のまま残した）
-// -----------------------------------------------------------------
-// 高値・安値を必要とするのに SAFE に入っている:
+// 移設時に見つかった誤分類（2026-08-26 に UNAVAILABLE へ修正）
+// ---------------------------------------------------------
+// 高値・安値を必要とするため、終値だけの系列では別の量に縮退する:
 //   - `tech-adx`     ADX は True Range 由来。H=L=C だと方向性指数が縮退する
 //   - `tech-breakout` ドンチャン・前日高安。高安が終値と同じでは意味が変わる
 //   - `vol-atr`      ATR / ケルトナー。TR がギャップ項を失い |ΔC| になる
 //   - `tech-stoch`   最高値/最安値が終値になるので、実質 close ベースの %K になる
-// いずれも「壊れる」のではなく「別の量になる」ため、UNAVAILABLE と CAUTION の
-// どちらが妥当かは実際の画面を見て決めること。
+// 投信 0331418A で tech-adx が ADX 13.64 ともっともらしい誤解釈を表示したため、
+// 注意書きを添えて結果を残す CAUTION ではなく、4件とも結果を隠す UNAVAILABLE とする。
 
 /** 出来高・OHLC内訳・日中/夜間そのものが対象で、終値だけでは結果が意味を持たないパネル。 */
 export const CLOSE_ONLY_UNAVAILABLE_PANEL_IDS = new Set([
@@ -108,6 +108,10 @@ export const CLOSE_ONLY_UNAVAILABLE_PANEL_IDS = new Set([
   "cal-us-holding",
   "cal-us-digestion",
   "cal-us-eventtime",
+  "tech-adx",
+  "tech-breakout",
+  "vol-atr",
+  "tech-stoch",
 ]);
 
 /**
@@ -162,10 +166,7 @@ export const CLOSE_ONLY_SAFE_PANEL_IDS = new Set([
   "basic-bias-coach",
   // technical
   "sa-technical",
-  "tech-adx",
-  "tech-stoch",
   "tech-extra",
-  "tech-breakout",
   // ohlc
   "ohlc-crash-surge",
   // risk
@@ -207,7 +208,6 @@ export const CLOSE_ONLY_SAFE_PANEL_IDS = new Set([
   "vol-agarch",
   "vol-heston",
   "vol-har",
-  "vol-atr",
   "vol-term",
   "vol-cone",
   "vol-leverage",
