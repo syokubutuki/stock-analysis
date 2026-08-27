@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import {
@@ -211,7 +213,7 @@ export default function ReturnBinHeatmapChart({ prices, minBars = 250 }: Props) 
                     {row.label}
                   </td>
                   <td className="text-right px-2 text-gray-500">{row.n}</td>
-                  <td className={`text-right px-2 font-medium ${row.meanFwd >= 0 ? "text-green-700" : "text-red-700"}`}>
+                  <td className={`text-right px-2 font-medium ${row.meanFwd >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={row.meanFwd} />
                     {fmtPct(row.meanFwd)}
                   </td>
                   {row.freqs.map((f, j) => (

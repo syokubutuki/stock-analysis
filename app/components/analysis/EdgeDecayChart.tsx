@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
@@ -284,7 +286,7 @@ export default function EdgeDecayChart({ prices }: Props) {
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-1.5 font-mono text-gray-600">{e.label}</td>
                     <td className="text-right px-1 font-mono">{e.n}</td>
-                    <td className={`text-right px-1 font-mono ${e.meanTrade > 0 ? "text-green-700" : "text-red-600"}`}>{(e.meanTrade * 100).toFixed(3)}%</td>
+                    <td className={`text-right px-1 font-mono ${e.meanTrade > 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={e.meanTrade} />{(e.meanTrade * 100).toFixed(3)}%</td>
                     <td className="text-right px-1.5 font-mono text-gray-500">[{(e.ciLo * 100).toFixed(3)}%, {(e.ciHi * 100).toFixed(3)}%]</td>
                     <td className="text-right px-1.5 font-mono">{e.sharpe.toFixed(2)}</td>
                   </tr>

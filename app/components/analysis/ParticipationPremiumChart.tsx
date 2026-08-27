@@ -23,6 +23,7 @@ import {
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
+import { DirectionGlyph } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 市場代理プリセット。1321=日経225連動ETF（分配金込みadjClose→総収益の床・データ良好）。
@@ -47,18 +48,20 @@ function Stat({
   value,
   tone,
   sub,
+  directionValue,
 }: {
   label: string;
   value: string;
   tone?: "good" | "bad" | "neutral";
   sub?: string;
+  directionValue?: number;
 }) {
   const c =
     tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
   return (
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
-      <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
+      <div className={`text-sm font-bold font-mono ${c}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
       {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
@@ -254,6 +257,7 @@ export default function ParticipationPremiumChart() {
                 label="実現プレミアム(年率)"
                 value={pct(p.premium)}
                 tone={p.premium > 0 ? "good" : "bad"}
+                directionValue={p.premium}
                 sub={`ドリフト${pct(p.annualDrift)} − rf${(p.rf * 100).toFixed(1)}%`}
               />
               <Stat label="±標準誤差(年率)" value={`±${(p.seAnnual * 100).toFixed(1)}%`} sub="SE=σ/√T" />
@@ -289,6 +293,7 @@ export default function ParticipationPremiumChart() {
                 label="時間平均成長率 g"
                 value={pct(part.growthRate)}
                 tone={part.growthRate > 0 ? "good" : "bad"}
+                directionValue={part.growthRate}
                 sub="C21: 実際に生きる成長"
               />
               <Stat label="年率リターン(幾何)" value={pct(part.annualReturn)} />
@@ -297,6 +302,7 @@ export default function ParticipationPremiumChart() {
                 label="最大ドローダウン"
                 value={pct(part.maxDrawdown)}
                 tone="bad"
+                directionValue={part.maxDrawdown}
                 sub="床を得る対価の谷"
               />
               <Stat label="累積リターン" value={pct(part.totalReturn, 0)} />
@@ -321,11 +327,11 @@ export default function ParticipationPremiumChart() {
               ③ エントリー時刻スイープ（{sw.holdLabel}保有・全開始点の年率リターン分布）
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-2">
-              <Stat label="平均(≒床)" value={pct(sw.mean)} tone={sw.mean > 0 ? "good" : "bad"} />
+              <Stat label="平均(≒床)" value={pct(sw.mean)} tone={sw.mean > 0 ? "good" : "bad"} directionValue={sw.mean} />
               <Stat label="中央値" value={pct(sw.median)} />
               <Stat label="ばらつき(sd)" value={`${(sw.sd * 100).toFixed(1)}%`} sub="タイミングが動かす分散" />
-              <Stat label="最良" value={pct(sw.max)} tone="good" />
-              <Stat label="最悪" value={pct(sw.min)} tone="bad" />
+              <Stat label="最良" value={pct(sw.max)} tone="good" directionValue={sw.max} />
+              <Stat label="最悪" value={pct(sw.min)} tone="bad" directionValue={sw.min} />
               <Stat
                 label="床が負の窓"
                 value={`${(sw.shareNegative * 100).toFixed(0)}%`}

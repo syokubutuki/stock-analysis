@@ -3,6 +3,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -100,6 +101,11 @@ export default function RollingAnimationChart({ prices }: Props) {
 
   if (prices.length < 100 || series.length < 10) return null;
 
+  const current = series[Math.min(t, series.length - 1)];
+  const animationDescription = current
+    ? `63日ローリングのリスク・リターン。${current.time}は年率リターン${(current.ret * 100).toFixed(1)}%、年率ボラティリティ${(current.vol * 100).toFixed(1)}%です。`
+    : "63日ローリングのリスク・リターン。計算できるデータが不足しています。";
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
       <h3 className="font-bold text-gray-800">ローリング・アニメーション（リスク/リターンの遷移）</h3>
@@ -113,7 +119,7 @@ export default function RollingAnimationChart({ prices }: Props) {
         <span className="text-xs text-gray-500 w-24 text-right">{series[Math.min(t, series.length - 1)]?.time}</span>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={animationDescription} /></div>
       <div className="text-xs text-gray-500">点＝63日ローリングの年率リスク/リターン。再生で時間推移（レジーム遷移）を可視化。</div>
 
       <AnalysisGuide title="ローリング・アニメーションの詳細理論">

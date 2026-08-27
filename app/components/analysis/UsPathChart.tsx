@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
@@ -287,7 +289,7 @@ export default function UsPathChart({ ticker }: Props) {
                       </td>
                       <td className="px-2 text-gray-500 tabular-nums whitespace-nowrap">{fmtBinRange(b.rangeLo, b.rangeHi)}</td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
+                      <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.endMean} />{fmtSignedPct(b.endMean)}</td>
                       <td className="px-2"><StatBadge n={b.n} p={b.endP} significant={b.endP < 0.05} /></td>
                     </tr>
                   );

@@ -13,6 +13,7 @@ import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStra
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 import { CHART_COLORS } from "../../lib/chart-colors";
+import { DirectionGlyph } from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -494,18 +495,18 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
             />
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
-            <StatCell label="累積リターン" value={pctFmt(stats.totalReturn)} positive={stats.totalReturn > 0} />
-            <StatCell label="年率リターン" value={pctFmt(stats.annualReturn)} positive={stats.annualReturn > 0} />
+            <StatCell label="累積リターン" value={pctFmt(stats.totalReturn)} positive={stats.totalReturn > 0} directionValue={stats.totalReturn} />
+            <StatCell label="年率リターン" value={pctFmt(stats.annualReturn)} positive={stats.annualReturn > 0} directionValue={stats.annualReturn} />
             <StatCell label="年率ボラティリティ" value={pctFmt(stats.annualVol)} />
-            <StatCell label="シャープレシオ" value={stats.sharpe.toFixed(3)} positive={stats.sharpe > 0} />
+            <StatCell label="シャープレシオ" value={stats.sharpe.toFixed(3)} positive={stats.sharpe > 0} directionValue={stats.sharpe} />
             <StatCell label="勝率" value={pctFmt(stats.winRate)} />
             <StatCell label="取引日数" value={`${stats.n}日`} />
-            <StatCell label="平均日次リターン" value={pctFmt(stats.avg, 4)} positive={stats.avg > 0} />
+            <StatCell label="平均日次リターン" value={pctFmt(stats.avg, 4)} positive={stats.avg > 0} directionValue={stats.avg} />
             <StatCell label="日次標準偏差" value={pctFmt(stats.stdev, 4)} />
             <StatCell label="平均利益" value={pctFmt(stats.avgWin, 4)} />
             <StatCell label="平均損失" value={pctFmt(stats.avgLoss, 4)} />
-            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative />
-            <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} />
+            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative directionValue={stats.maxDD} />
+            <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} directionValue={stats.profitFactor - 1} />
           </div>
         </>
       )}
@@ -549,12 +550,12 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
   );
 }
 
-function StatCell({ label, value, positive, negative }: { label: string; value: string; positive?: boolean; negative?: boolean }) {
+function StatCell({ label, value, positive, negative, directionValue }: { label: string; value: string; positive?: boolean; negative?: boolean; directionValue?: number }) {
   const color = positive ? "text-green-700" : negative ? "text-red-600" : "";
   return (
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>
-      <div className={`font-mono font-medium ${color}`}>{value}</div>
+      <div className={`font-mono font-medium ${color}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
     </div>
   );
 }

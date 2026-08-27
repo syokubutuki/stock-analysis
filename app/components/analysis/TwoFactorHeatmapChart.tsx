@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { buildStateFn, twoFactorForward, STATE_AXES, StateAxis } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -38,6 +39,13 @@ export default function TwoFactorHeatmapChart({ prices }: Props) {
     const sy = buildStateFn(prices, axisY);
     return twoFactorForward(prices, sx, sy, horizon);
   }, [prices, axisX, axisY, horizon]);
+  const currentCell = useMemo(
+    () => result?.cells.find((cell) => cell.xLabel === result.nowX && cell.yLabel === result.nowY),
+    [result],
+  );
+  const heatmapDescription = currentCell
+    ? `2変数コンディショニング・ヒートマップ。現在は${result?.nowX}と${result?.nowY}の組み合わせで、${horizon}日先平均リターンは${currentCell.meanFwd >= 0 ? "+" : ""}${(currentCell.meanFwd * 100).toFixed(2)}%、標本${currentCell.n}件です。`
+    : "2変数コンディショニング・ヒートマップ。現在条件の計算結果がありません。";
 
   useEffect(() => {
     if (!canvasRef.current || !result) return;
@@ -113,7 +121,7 @@ export default function TwoFactorHeatmapChart({ prices }: Props) {
         ))}
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={heatmapDescription} /></div>
       {result && result.nowX && (
         <div className="text-xs text-blue-700">◆ 現在: {result.nowX} × {result.nowY}</div>
       )}

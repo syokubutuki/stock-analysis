@@ -84,18 +84,20 @@ function drawMfeMae(ctx: CanvasRenderingContext2D, width: number, height: number
   ctx.fillStyle = CHART_COLORS.ink; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
   ctx.fillText(`${(maxV * 100).toFixed(1)}%`, ml - 4, mt + 8);
   ctx.fillText("0", ml - 4, mt + plotH);
-  const line = (key: "meanMFE" | "meanMAE", color: string) => {
+  const line = (key: "meanMFE" | "meanMAE", color: string, dash: number[]) => {
     ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.setLineDash(dash);
     r.mfeMae.forEach((p, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(i), yOf(p[key])));
     ctx.stroke();
   };
-  line("meanMFE", "#16a34a");
-  line("meanMAE", "#dc2626");
+  line("meanMFE", "#16a34a", []);
+  line("meanMAE", "#dc2626", [6, 4]);
+  ctx.setLineDash([]);
   ctx.font = "9px sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = CHART_COLORS.ink;
   for (let i = 0; i < n; i += Math.max(1, Math.round(n / 6))) ctx.fillText(`${r.mfeMae[i].hold}d`, xOf(i), mt + plotH + 14);
   ctx.textAlign = "left";
-  ctx.fillStyle = "#16a34a"; ctx.fillText("■MFE", ml + 4, mt + 10);
-  ctx.fillStyle = "#dc2626"; ctx.fillText("■MAE", ml + 50, mt + 10);
+  ctx.fillStyle = "#16a34a"; ctx.fillText("━ MFE（実線）", ml + 4, mt + 10);
+  ctx.fillStyle = "#dc2626"; ctx.fillText("┄ MAE（破線）", ml + 86, mt + 10);
 }
 
 export default function TpSlOptimizerChart({ prices }: Props) {

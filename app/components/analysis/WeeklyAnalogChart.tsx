@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // 今週の値動きの軌跡アナログ比較(日足)。
 // 今週(直近L営業日)の経路を、①似た形の過去局面(similar) か ②前夜米国ビンで絞った過去局面(usbin)
 // と突き合わせ、「今日(t=0)に至る経路(リードイン)」と「その後H日(フォワード)」を1枚で見る。
@@ -578,7 +580,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                     {mode !== "usbin" && <td className="text-right px-2 text-gray-500 tabular-nums">{s.distance.toFixed(2)}</td>}
                     <td className="text-right px-2 text-green-700 tabular-nums">{fmtPct(s.mfe)}</td>
                     <td className="text-right px-2 text-red-600 tabular-nums">{fmtPct(s.mae)}</td>
-                    <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(s.forwardReturn)}</td>
+                    <td className={`text-right px-2 font-medium tabular-nums ${s.forwardReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.forwardReturn} />{fmtPct(s.forwardReturn)}</td>
                   </tr>
                 ))}
               </tbody>

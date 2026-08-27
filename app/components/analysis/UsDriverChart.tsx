@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useMemo, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
 import { useUsDaily, US_DRIVERS } from "../../hooks/useUsDaily";
@@ -141,12 +143,12 @@ export default function UsDriverChart({ ticker }: Props) {
                   <div className="p-2 rounded border border-gray-200 bg-gray-50">
                     <div className="text-gray-500">同符号日(米国追随)</div>
                     <div className="font-mono">n={divergence.alignedN}</div>
-                    <div className={`font-medium ${divergence.intraAligned >= 0 ? "text-green-700" : "text-red-700"}`}>日中 {fmtSignedPct(divergence.intraAligned)}</div>
+                    <div className={`font-medium ${divergence.intraAligned >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={divergence.intraAligned} />日中 {fmtSignedPct(divergence.intraAligned)}</div>
                   </div>
                   <div className="p-2 rounded border border-purple-200 bg-purple-50">
                     <div className="text-gray-500">逆符号日(米国無視)</div>
                     <div className="font-mono">n={divergence.divergeN}</div>
-                    <div className={`font-medium ${divergence.intraDiverge >= 0 ? "text-green-700" : "text-red-700"}`}>日中 {fmtSignedPct(divergence.intraDiverge)}</div>
+                    <div className={`font-medium ${divergence.intraDiverge >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={divergence.intraDiverge} />日中 {fmtSignedPct(divergence.intraDiverge)}</div>
                   </div>
                   <div className="p-2 rounded border border-amber-200 bg-amber-50">
                     <div className="text-gray-500">逆符号日→米国方向へ修正</div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { useIntraday } from "../../hooks/useIntraday";
@@ -134,10 +136,10 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
                     </td>
                     <td className="text-right px-2 text-gray-600 tabular-nums">{e.n}</td>
                     <td className="text-right px-2 tabular-nums text-gray-700">{fmtSignedPct(e.grossPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(e.openTermPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(e.closeTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={e.openTermPct} />{fmtSignedPct(e.openTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={e.closeTermPct} />{fmtSignedPct(e.closeTermPct / 100)}</td>
                     <td className="text-right px-2 tabular-nums text-gray-500">{fmtSignedPct(e.spreadTermPct / 100)}</td>
-                    <td className={`text-right px-2 font-bold tabular-nums ${e.effPct >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(e.effPct / 100)}</td>
+                    <td className={`text-right px-2 font-bold tabular-nums ${e.effPct >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={e.effPct} />{fmtSignedPct(e.effPct / 100)}</td>
                     <td className="text-center px-2">
                       {e.grossSignificant
                         ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${e.survives ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>{e.survives ? "生存" : "消滅"}</span>

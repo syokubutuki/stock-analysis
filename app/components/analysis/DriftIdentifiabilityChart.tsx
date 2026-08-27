@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // 個別銘柄のドリフトは同定できるか（μ の識別限界）── 系C26。
 //
 // C25（特性ソート・ポートフォリオ）の手前に残る問い「ドリフトの高い個別銘柄を選べばよいのでは？」
@@ -37,13 +39,13 @@ const yearsFmt = (v: number) =>
   !Number.isFinite(v) ? "∞" : v >= 10000 ? `${(v / 1000).toFixed(0)}千年` : v >= 100 ? `${Math.round(v)}年` : `${v.toFixed(1)}年`;
 
 function Stat({
-  label, value, tone, sub,
-}: { label: string; value: string; tone?: "good" | "bad" | "neutral"; sub?: string }) {
+  label, value, tone, sub, directionValue,
+}: { label: string; value: string; tone?: "good" | "bad" | "neutral"; sub?: string; directionValue?: number }) {
   const c = tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
   return (
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
-      <div className={`text-sm font-bold font-mono ${c}`}>{value}</div>
+      <div className={`text-sm font-bold font-mono ${c}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
       {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
@@ -417,7 +419,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                         [{pct(r.ciMuLo, 0)}, {pct(r.ciMuHi, 0)}]
                       </td>
                       <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-700" : "text-red-600"}`}>
-                        {pct(r.excessMu)}
+                        <DirectionGlyph value={r.excessMu} />{pct(r.excessMu)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(r.tExcess)}</td>
                       <td className={`text-right px-2 tabular-nums ${r.qExcess < 0.1 ? "text-green-700" : "text-fg-muted"}`}>
@@ -584,9 +586,9 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                   <Stat label="チルト年率" value={pct(result.wf.annTilt)} />
                   <Stat label="床（等加重）年率" value={pct(result.wf.annFloor)} />
                   <Stat label="床の底上げΔμ" value={pct(result.wf.excessAnn)}
-                    tone={result.wf.excessAnn > 0 ? "good" : "bad"} />
+                    tone={result.wf.excessAnn > 0 ? "good" : "bad"} directionValue={result.wf.excessAnn} />
                   <Stat label="コスト控除後" value={pct(result.wf.netExcessAnn)}
-                    tone={result.wf.netExcessAnn > 0 ? "good" : "bad"} sub={`回転 ${result.wf.turnoverPerYear.toFixed(1)}x/年`} />
+                    tone={result.wf.netExcessAnn > 0 ? "good" : "bad"} directionValue={result.wf.netExcessAnn} sub={`回転 ${result.wf.turnoverPerYear.toFixed(1)}x/年`} />
                   <Stat label="t値" value={num2(result.wf.tExcess)} sub={`p=${result.wf.pExcess.toFixed(3)} / ${result.wf.nPeriods}期`} />
                   <Stat label="判定" value={result.wf.passes ? "床超え" : "床未達"}
                     tone={result.wf.passes ? "good" : "bad"} />

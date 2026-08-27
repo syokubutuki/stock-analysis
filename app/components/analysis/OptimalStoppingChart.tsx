@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeOptimalStopping } from "../../lib/optimal-stopping";
@@ -137,19 +139,19 @@ export default function OptimalStoppingChart({ prices }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">最適停止リターン</div>
-          <div className={`font-mono text-sm font-bold ${result.expectedReturn >= 0 ? "text-green-700" : "text-red-600"}`}>
+          <div className={`font-mono text-sm font-bold ${result.expectedReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.expectedReturn} />
             {result.expectedReturn.toFixed(2)}%
           </div>
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">Secretary法リターン</div>
-          <div className={`font-mono text-sm font-bold ${result.secretaryReturn >= 0 ? "text-green-700" : "text-red-600"}`}>
+          <div className={`font-mono text-sm font-bold ${result.secretaryReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.secretaryReturn} />
             {result.secretaryReturn.toFixed(2)}%
           </div>
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">B&Hリターン</div>
-          <div className={`font-mono text-sm ${result.actualReturn >= 0 ? "text-green-700" : "text-red-600"}`}>
+          <div className={`font-mono text-sm ${result.actualReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.actualReturn} />
             {result.actualReturn.toFixed(2)}%
           </div>
         </div>

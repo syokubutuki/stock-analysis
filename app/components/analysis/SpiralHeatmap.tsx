@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useMemo, useCallback, useRef, useEffect, useState } from "react";
 import {
   createChart,
@@ -1274,8 +1276,8 @@ export default function SpiralHeatmap({ prices }: Props) {
                     <tr key={g.dow} className="border-b border-gray-100">
                       <td className="py-1 px-2 font-medium" style={{ color: g.color }}>{g.label}</td>
                       <td className="py-1 px-2 text-center font-mono text-gray-600">{v.length}</td>
-                      <td className={`py-1 px-2 text-center font-mono ${colorClass(mn)}`}>{pct(mn)}</td>
-                      <td className={`py-1 px-2 text-center font-mono ${colorClass(median(v))}`}>{pct(median(v))}</td>
+                      <td className={`py-1 px-2 text-center font-mono ${colorClass(mn)}`}><DirectionGlyph value={mn} />{pct(mn)}</td>
+                      <td className={`py-1 px-2 text-center font-mono ${colorClass(median(v))}`}><DirectionGlyph value={median(v)} />{pct(median(v))}</td>
                       <td className="py-1 px-2 text-center font-mono text-gray-600">{pct(std(v))}</td>
                       <td className="py-1 px-2 text-center font-mono text-gray-600">{skewness(v).toFixed(2)}</td>
                       <td className="py-1 px-2 text-center font-mono text-gray-600">{kurtosisExcess(v).toFixed(2)}</td>
@@ -1335,7 +1337,7 @@ export default function SpiralHeatmap({ prices }: Props) {
                           if (key === "pValue") { const pv = pValueLabel(fieldStats.pValue); return <td key={i} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; }
                           if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(fieldStats.winRate)}</td>;
                           if (key === "std") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct(fieldStats.std)}</td>;
-                          const v = fieldStats[key]; return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(v)}`}>{pct(v)}</td>;
+                          const v = fieldStats[key]; return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(v)}`}><DirectionGlyph value={v} />{pct(v)}</td>;
                         })}
                       </tr>
                     ))}
@@ -1454,7 +1456,7 @@ export default function SpiralHeatmap({ prices }: Props) {
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="py-1 px-1.5 text-gray-500">平均</td>
-                      {monthStats.map((s, m) => { if (!s) return null; const fs = s[field]; return <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(fs.mean)}`}>{pct2(fs.mean)}</td>; })}
+                      {monthStats.map((s, m) => { if (!s) return null; const fs = s[field]; return <td key={m} className={`py-1 px-1.5 text-center font-mono ${colorClass(fs.mean)}`}><DirectionGlyph value={fs.mean} />{pct2(fs.mean)}</td>; })}
                     </tr>
                     {isFirst && (
                       <>
@@ -1534,7 +1536,7 @@ export default function SpiralHeatmap({ prices }: Props) {
                     if (key === "pValue") { const pv = pValueLabel(s.pValue); return <td key={i} className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>; }
                     if (key === "winRate") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct2(s.winRate)}</td>;
                     if (key === "std") return <td key={i} className="py-1 px-2 text-center font-mono text-gray-600">{pct(s.std)}</td>;
-                    return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(s.mean)}`}>{pct(s.mean)}</td>;
+                    return <td key={i} className={`py-1 px-2 text-center font-mono ${colorClass(s.mean)}`}><DirectionGlyph value={s.mean} />{pct(s.mean)}</td>;
                   })}
                 </tr>
               ))}
@@ -1584,7 +1586,7 @@ export default function SpiralHeatmap({ prices }: Props) {
                     <tr key={key} className="border-b border-gray-100">
                       <td className="py-1 px-2 text-gray-600">{key === "afterUp" ? "前日上昇後" : "前日下落後"}</td>
                       <td className="py-1 px-2 text-center font-mono text-gray-600">{s.n}</td>
-                      <td className={`py-1 px-2 text-center font-mono ${colorClass(s.mean)}`}>{pct(s.mean)}</td>
+                      <td className={`py-1 px-2 text-center font-mono ${colorClass(s.mean)}`}><DirectionGlyph value={s.mean} />{pct(s.mean)}</td>
                       <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(s.winRate)}</td>
                       <td className={`py-1 px-2 text-center font-mono ${pv.cls}`}>{pv.text}</td>
                     </tr>

@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { rollingDensitySurface } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -44,6 +45,18 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
     () => rollingDensitySurface(lr, times, 60, 40, 3),
     [prices, seriesMode]
   );
+  const surfaceDescription = useMemo(() => {
+    const latest = surface.rows[surface.rows.length - 1];
+    if (!latest || surface.binCenters.length === 0) {
+      return "ローリング密度サーフェス。計算できるデータが不足しています。";
+    }
+    let peakIndex = 0;
+    for (let i = 1; i < latest.densities.length; i++) {
+      if (latest.densities[i] > latest.densities[peakIndex]) peakIndex = i;
+    }
+    const peakReturn = surface.binCenters[peakIndex] ?? 0;
+    return `ローリング密度サーフェス。直近${latest.time}の60日分布は、リターン${(peakReturn * 100).toFixed(2)}%付近で密度が最大です。`;
+  }, [surface]);
 
   useEffect(() => {
     if (!surfaceRef.current || surface.rows.length < 2) return;
@@ -137,7 +150,9 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
         60日ローリング窓でKDE推定した密度を時間軸に沿ってヒートマップ表示 (白破線=リターン0%)
       </div>
       {surface.rows.length >= 2 ? (
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={surfaceRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden">
+          <AccessibleCanvas ref={surfaceRef} description={surfaceDescription} />
+        </div>
       ) : (
         <div className="text-xs text-fg-muted py-8 text-center">データが不足しています (最低60日必要)</div>
       )}

@@ -5,10 +5,18 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode } from "../../lib/series-mode";
 import { computeWaveletCoherence } from "../../lib/wavelet-coherence";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
   seriesMode: SeriesMode; // 受け取るが本図は「リターン×出来高変化」固定
+}
+
+function phaseDescription(phase: number): string {
+  const cos = Math.cos(phase);
+  const sin = Math.sin(phase);
+  if (Math.abs(cos) >= Math.abs(sin)) return cos >= 0 ? "同位相" : "逆位相";
+  return sin >= 0 ? "価格が先行" : "出来高が先行";
 }
 
 // コヒーレンス 0..1 の色 (青=低 → 赤=高)
@@ -55,6 +63,21 @@ export default function WaveletCoherenceChart({ prices }: Props) {
     () => computeWaveletCoherence(x, y, times, 32),
     [x, y, times]
   );
+  const coherenceDescription = useMemo(() => {
+    const lastIndex = (result.coherence[0]?.length ?? 0) - 1;
+    if (lastIndex < 0 || result.scales.length === 0) {
+      return "価格リターンと出来高変化のウェーブレットコヒーレンス。計算できるデータが不足しています。";
+    }
+    let peakScaleIndex = 0;
+    for (let i = 1; i < result.coherence.length; i++) {
+      if (result.coherence[i][lastIndex] > result.coherence[peakScaleIndex][lastIndex]) {
+        peakScaleIndex = i;
+      }
+    }
+    const coherence = result.coherence[peakScaleIndex][lastIndex];
+    const phase = result.phase[peakScaleIndex][lastIndex];
+    return `価格リターンと出来高変化のウェーブレットコヒーレンス。直近${result.times[lastIndex] ?? "時点"}は${result.scales[peakScaleIndex].toFixed(1)}日周期で最大${coherence.toFixed(2)}、位相は${phaseDescription(phase)}です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -159,7 +182,7 @@ export default function WaveletCoherenceChart({ prices }: Props) {
         縦軸: 周期(日) / 横軸: 時間 / 色: コヒーレンス(青=無関係 → 赤=強い連動) / 矢印: 位相差
       </p>
       <div className="w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={coherenceDescription} />
       </div>
       <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
         <span>低 (0)</span>

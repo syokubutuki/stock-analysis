@@ -35,7 +35,7 @@ export function directionClass(value: number, eps = 0): string {
 export function DirectionGlyph({ value, eps = 0 }: { value: number; eps?: number }) {
   const d = directionOf(value, eps);
   return (
-    <span aria-label={DIRECTION_LABEL[d]} className="mr-0.5 inline-block">
+    <span role="img" aria-label={DIRECTION_LABEL[d]} className="mr-0.5 inline-block">
       {DIRECTION_GLYPH[d]}
     </span>
   );

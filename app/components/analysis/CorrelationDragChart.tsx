@@ -51,6 +51,7 @@ import {
 } from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import { DirectionGlyph } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // ── 定数 ───────────────────────────────────────────────────────────────────
@@ -683,7 +684,7 @@ export default function CorrelationDragChart({
                         : "text-blue-700"
                   }
                 >
-                  {rhoCI.delta >= 0 ? "+" : "−"}
+                  <DirectionGlyph value={rhoCI.delta} />{rhoCI.delta >= 0 ? "+" : "−"}
                   {Math.abs(rhoCI.delta).toFixed(3)}
                 </strong>
                 <span className="text-gray-500">
@@ -868,9 +869,9 @@ export default function CorrelationDragChart({
                                         : "text-blue-700"
                                   }`}
                                 >
-                                  {p.ci.ok
-                                    ? `${p.ci.delta >= 0 ? "+" : "−"}${Math.abs(p.ci.delta).toFixed(3)}`
-                                    : "—"}
+                                  {p.ci.ok ? (
+                                    <><DirectionGlyph value={p.ci.delta} />{`${p.ci.delta >= 0 ? "+" : "−"}${Math.abs(p.ci.delta).toFixed(3)}`}</>
+                                  ) : "—"}
                                 </td>
                                 <td className="py-1 px-2 text-right text-fg-muted">
                                   {p.ci.ok

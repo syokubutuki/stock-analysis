@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo } from "react";
 import {
   createChart,
@@ -92,6 +94,20 @@ export default function DensityMatrixChart({ prices }: Props) {
         ctx.fill();
       }
 
+      // 色を見分けられなくても系列を対応できるよう、右端に凡例と同じ番号を置く。
+      let finalCum = 0;
+      for (let r = 0; r < nRegimes; r++) {
+        const p = result.data[n - 1].probabilities[r];
+        if (p >= 0.04) {
+          ctx.fillStyle = "#111827";
+          ctx.font = "bold 10px sans-serif";
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${r + 1}`, width - mr - 4, yFrom(finalCum + p / 2));
+        }
+        finalCum += p;
+      }
+
       // Y-axis labels
       ctx.fillStyle = "#666";
       ctx.font = "11px sans-serif";
@@ -142,7 +158,7 @@ export default function DensityMatrixChart({ prices }: Props) {
         ctx.font = "11px sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
-        ctx.fillText(result.regimes[r].label, lx + 16, legendY + 1);
+        ctx.fillText(`${r + 1} ${result.regimes[r].label}`, lx + 16, legendY + 1);
       }
     };
 
@@ -181,7 +197,7 @@ export default function DensityMatrixChart({ prices }: Props) {
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(
-            `${result.regimes[r].label} ${(p * 100).toFixed(1)}%`,
+            `${r + 1} ${result.regimes[r].label} ${(p * 100).toFixed(1)}%`,
             cumX + segW / 2,
             barY + barH / 2
           );
@@ -413,7 +429,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                       r.meanReturn >= 0 ? "text-green-700" : "text-red-600"
                     }`}
                   >
-                    {(r.meanReturn * 100).toFixed(1)}%
+                      <DirectionGlyph value={r.meanReturn} />{(r.meanReturn * 100).toFixed(1)}%
                   </td>
                   <td className="p-1 text-right font-mono text-gray-700">
                     {(r.volatility * 100).toFixed(1)}%

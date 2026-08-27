@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo, useCallback } from "react";
 import {
   createChart,
@@ -535,7 +537,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 text-gray-600 font-medium">{row.label}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{row.n}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(row.intradayMean)}`}>{pctFmt(row.intradayMean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(row.intradayMean)}`}><DirectionGlyph value={row.intradayMean} />{pctFmt(row.intradayMean)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(row.intradayWinRate, 1)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(row.fillRate, 1)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${row.reversalRate > 0.5 ? "text-orange-600 font-medium" : "text-gray-600"}`}>{pctFmt(row.reversalRate, 1)}</td>
@@ -565,11 +567,11 @@ export default function GapAnalysisChart({ prices, period }: Props) {
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 text-gray-500">夜間 平均</td>
-                {dowDecomp.map((s, i) => <td key={i} className={`py-1 px-2 text-center font-mono ${s ? colorClass(s.overnightMean) : ""}`}>{s ? pctFmt(s.overnightMean) : "-"}</td>)}
+                {dowDecomp.map((s, i) => <td key={i} className={`py-1 px-2 text-center font-mono ${s ? colorClass(s.overnightMean) : ""}`}>{s ? <><DirectionGlyph value={s.overnightMean} />{pctFmt(s.overnightMean)}</> : "-"}</td>)}
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 text-gray-500">日中 平均</td>
-                {dowDecomp.map((s, i) => <td key={i} className={`py-1 px-2 text-center font-mono ${s ? colorClass(s.intradayMean) : ""}`}>{s ? pctFmt(s.intradayMean) : "-"}</td>)}
+                {dowDecomp.map((s, i) => <td key={i} className={`py-1 px-2 text-center font-mono ${s ? colorClass(s.intradayMean) : ""}`}>{s ? <><DirectionGlyph value={s.intradayMean} />{pctFmt(s.intradayMean)}</> : "-"}</td>)}
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="py-1 px-2 text-gray-500">夜間 勝率</td>
@@ -612,7 +614,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
                   <tr key={row.label} className="border-b border-gray-100">
                     <td className="py-1 px-2 text-gray-600">{row.label}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{row.data.n}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(row.data.mean)}`}>{pctFmt(row.data.mean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(row.data.mean)}`}><DirectionGlyph value={row.data.mean} />{pctFmt(row.data.mean)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(row.data.winRate, 1)}</td>
                   </tr>
                 ))}

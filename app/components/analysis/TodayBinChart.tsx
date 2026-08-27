@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import {
@@ -341,7 +343,7 @@ function OccurrenceTable({ occ }: { occ: Occurrence[] }) {
               <tr key={i} className="border-b border-gray-50">
                 <td className="px-1.5 py-0.5 text-gray-600">{o.date.slice(0, 10)}</td>
                 <td className="px-1.5 text-right text-gray-500">{fmtPct(o.stateVal)}</td>
-                <td className={`px-1.5 text-right font-medium ${o.fwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(o.fwd)}</td>
+                <td className={`px-1.5 text-right font-medium ${o.fwd >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={o.fwd} />{fmtPct(o.fwd)}</td>
               </tr>
             ))}
           </tbody>
@@ -601,7 +603,7 @@ export default function TodayBinChart({ prices }: Props) {
                         {isNow && <span className="text-blue-600 mr-1">◀今日</span>}{b.label}
                       </td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium ${b.meanFwd >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtPct(b.meanFwd)}</td>
+                      <td className={`text-right px-2 font-medium ${b.meanFwd >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.meanFwd} />{fmtPct(b.meanFwd)}</td>
                       <td className="text-right px-2 text-gray-600">{fmtPct(b.medianFwd)}</td>
                       <td className="px-2"><div className="flex items-center gap-1"><div className="relative h-3 w-12 bg-gray-100 rounded-sm overflow-hidden"><div className={`absolute inset-y-0 left-0 ${b.winRate >= 0.5 ? "bg-green-400" : "bg-red-400"}`} style={{ width: `${b.winRate * 100}%` }} /><div className="absolute inset-y-0 left-1/2 w-px bg-gray-400" /></div><span className="text-gray-600 tabular-nums">{(b.winRate * 100).toFixed(0)}%</span></div></td>
                       <td className="px-2 text-gray-500 whitespace-nowrap">{fmtPct(b.ciLow)}〜{fmtPct(b.ciHigh)}</td>
