@@ -5,8 +5,15 @@
 // 壊れても例外は出ず、画面も壊れないので、テストでしか止められない。
 //
 // この配列は M3（レジストリ化）に着手する直前の `app/page.tsx` から機械的に写した
-// 251件で、**順序も page.tsx の並び順のまま**である。レジストリへ移設した後も
-// `__tests__/page-wiring.test.ts` がこの配列との一致（順序込み）を検査する。
+// 251件で、`__tests__/page-wiring.test.ts` が `app/lib/panel-registry.tsx` との
+// 一致（順序込み）を検査する。
+//
+// 並び順について（2026-08-28・M3 で一度だけ入れ替えた）
+// ----------------------------------------------------
+// 移設前の並びは page.tsx の JSX の出現順で、タブの並び（`SECTIONS`）とは
+// regime / causal / tailrisk と conditional / edge / asof の前後が入れ違っていた。
+// レジストリはタブの並びを唯一の並びにしたので、この配列もそれに合わせてある。
+// **IDの集合は移設前と完全に一致している**（欠落0・追加0を実測して確認済み）。
 //
 // **落ちたときにこの配列を書き換えてはいけない。** IDを変えたほうが誤りである。
 // 意図してパネルを増やす／減らすときだけ、レジストリ上の並び順と同じ位置で更新する。
@@ -147,19 +154,6 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "net-hvg",
   "net-ordinal",
   "net-recurrence",
-  "sa-regime",
-  "regime-main",
-  "regime-technical",
-  "regime-distribution",
-  "regime-transition",
-  "sa-regime-break",
-  "regime-bocpd",
-  "causal-event",
-  "sa-causal",
-  "causal-ccm",
-  "tail-main",
-  "tail-copula",
-  "tail-hill",
   "cond-forward",
   "cond-segment-edge",
   "cond-custom-bucket",
@@ -183,6 +177,19 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "asof-snapshot",
   "asof-analog",
   "asof-scorecard",
+  "sa-regime",
+  "regime-main",
+  "regime-technical",
+  "regime-distribution",
+  "regime-transition",
+  "sa-regime-break",
+  "regime-bocpd",
+  "causal-event",
+  "sa-causal",
+  "causal-ccm",
+  "tail-main",
+  "tail-copula",
+  "tail-hill",
   "cal-weekday-edge",
   "cal-weekday-sim",
   "cal-null-calib",

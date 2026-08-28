@@ -1,24 +1,31 @@
-// `app/page.tsx` の配線が規約から漂流していないかを、ソースを実際に読んで検査する。
+// パネル登録のレジストリが規約から漂流していないかを検査する。
 //
-// なぜソースを読むのか
-// --------------------
-// ここで守りたい2つの規約は、どちらも**型では表現できず、壊れても画面が壊れない**。
+// なぜこのテストが要るのか
+// ------------------------
+// ここで守る規約は、どれも**壊れても画面が壊れない**。例外もログも出ないので、
+// 突き合わせる以外に検知手段が無い。
 //
-//  ① パネルID → 所属セクション（panel-sections.ts）
-//     対応が外れると、共有URL `?panel=…` は 60フレーム DOM を探して無言で諦める。
-//     例外も警告も出ないので、壊れたことに誰も気づかない。
+//  ① パネルID（共有URL `?panel=` と localStorage `sa:open:<id>` の鍵）
+//     1つ変えるだけで、その利用者にとっては「前に見ていた分析が開かない」形で壊れる。
 //
-//  ② SERIES_AWARE_SECTIONS（系列セレクタの有効/無効）
+//  ② パネルID → 所属セクション
+//     解決できないと共有URLは 60フレーム DOM を探して**無言で諦める**（FU25）。
+//
+//  ③ 終値だけの系列（投信）での分類
+//     分類を忘れたパネルは通常表示に落ち、投信で無意味な数字が出る（FU17/FU22）。
+//
+//  ④ 系列セレクタ（seriesMode を消費する節）
 //     宣言と実態がずれても、セレクタが効かない／出ないだけで例外は起きない。
 //
-//  ③ 終値だけの系列（投信）で解釈できるかの分類（panel-data-requirements.ts）
-//     分類を忘れたパネルは**通常表示に落ちる**ので、投信で無意味な数字が出る。
-//     出るのは数字であって例外ではないため、見ている人にも壊れて見えない（FU22）。
+//  ⑤ 結果バッジのパネルID（FU33）
+//     コンポーネント側が文字列で複製しているので、ずれるとバッジが無言で消える。
 //
-// どれも「新しい分析を足したときに、台帳側の更新を忘れる」形で壊れる。
-// M3（レジストリ化）が入るまでは人間の注意力だけが担保だったところを、ここで自動化する。
+// **M3（レジストリ化）で ②③④ は導出になった**ので「台帳の更新を忘れる」形では
+// もう壊れない。それでも検査を残すのは、導出の元になる各レコードの `section` /
+// `closeOnly` / `input` を書き間違える余地が残るからである。
 //
-// 失敗したときは、テストを緩めるのではなく **表と page.tsx のどちらが正しいかを判断**すること。
+// 失敗したときは、テストを緩めるのではなく
+// **レジストリと golden のどちらが正しいかを判断**すること。
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -26,7 +33,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { sectionForPanel } from "../panel-sections";
 import {
   PANEL_IDS_GOLDEN,
   STANDALONE_PANEL_IDS_GOLDEN,
@@ -35,68 +41,66 @@ import {
   CLOSE_ONLY_CAUTION_PANEL_IDS,
   CLOSE_ONLY_SAFE_PANEL_IDS,
   CLOSE_ONLY_UNAVAILABLE_PANEL_IDS,
+  PANELS,
+  SECTIONS,
+  SERIES_AWARE_SECTIONS,
+  STANDALONE_PANELS,
   classifyPanelForCloseOnly,
-} from "../panel-data-requirements";
+  consumesSeriesMode,
+  sectionForPanel,
+} from "../panel-registry";
 
-const PAGE_PATH = fileURLToPath(new URL("../../page.tsx", import.meta.url));
-const SOURCE = readFileSync(PAGE_PATH, "utf8");
-const LINES = SOURCE.split(/\r?\n/);
+const PAGE_SOURCE = readFileSync(
+  fileURLToPath(new URL("../../page.tsx", import.meta.url)),
+  "utf8",
+);
 
-interface PanelRef {
-  section: string;
-  id: string;
-  line: number;
+const COMPONENT_DIR = fileURLToPath(new URL("../../components/analysis/", import.meta.url));
+
+function analysisSources(): { file: string; src: string }[] {
+  return readdirSync(COMPONENT_DIR)
+    .filter((f) => f.endsWith(".tsx"))
+    .map((f) => ({ file: f, src: readFileSync(join(COMPONENT_DIR, f), "utf8") }));
 }
 
-/**
- * セクションブロック（`{activeSection === "x" && (` 〜 次の同種の行）を辿りながら、
- * `AccordionSection` の項目 `{ id: "…", title: …, node: … }` を拾う。
- * 最初のセクションブロックより前に現れるIDは、節に属さないので対象外。
- */
-function scanPage(): { panels: PanelRef[]; seriesModeSections: Set<string> } {
-  const panels: PanelRef[] = [];
-  const seriesModeSections = new Set<string>();
-  let section: string | null = null;
-
-  LINES.forEach((line, i) => {
-    const sec = line.match(/activeSection === "([a-z]+)"/);
-    if (sec) section = sec[1];
-    if (!section) return;
-    if (line.includes("seriesMode")) seriesModeSections.add(section);
-    const id = line.match(/[{ ]id: "([^"]+)"/);
-    if (id) panels.push({ section, id: id[1], line: i + 1 });
+describe("パネルIDの互換契約（共有URL `?panel=` と localStorage `sa:open:<id>`）", () => {
+  test("レジストリの並び順込みで golden と完全一致する", () => {
+    // M3 はIDの**所在**を動かす作業だった。移設で1つでもIDが変わっていればここが落ちる。
+    // 落ちたときに golden を書き換えないこと（理由は fixtures の冒頭）。
+    assert.deepEqual(PANELS.map((p) => p.id), [...PANEL_IDS_GOLDEN]);
   });
 
-  return { panels, seriesModeSections };
-}
+  test("AccordionSection 外のパネルも golden と一致する", () => {
+    assert.deepEqual(STANDALONE_PANELS.map((p) => p.id), [...STANDALONE_PANEL_IDS_GOLDEN]);
+  });
 
-function declaredSeriesAwareSections(): Set<string> {
-  const block = SOURCE.match(/const SERIES_AWARE_SECTIONS = new Set<SectionKey>\(\[([\s\S]*?)\]\)/);
-  assert.ok(block, "SERIES_AWARE_SECTIONS の宣言が見つからない（page.tsx の書き方が変わった）");
-  return new Set(Array.from(block[1].matchAll(/"([a-z]+)"/g), (m) => m[1]));
-}
+  test("IDが重複していない", () => {
+    const seen = new Set<string>();
+    const dup = PANELS.map((p) => p.id).filter((id) => {
+      if (seen.has(id)) return true;
+      seen.add(id);
+      return false;
+    });
+    assert.deepEqual(dup, []);
+  });
 
-const { panels, seriesModeSections } = scanPage();
+  test("パネルの定義が page.tsx から消えている（レジストリへ一本化されたこと）", () => {
+    // 移設前の page.tsx は `{ id: "…", title: "…", node: <X … /> }` を 251件持っていた。
+    // 1件でも残っていれば二重管理が復活している。
+    const leftovers = [...PAGE_SOURCE.matchAll(/\{ id: "([^"]+)", title: "/g)].map((m) => m[1]);
+    assert.deepEqual(leftovers, [], `page.tsx にパネル定義が残っている:\n${leftovers.join("\n")}`);
+  });
+});
 
 describe("パネルID → セクションの解決（共有URL `?panel=` が正しい節を開くこと）", () => {
-  test("page.tsx から十分な数のパネルIDを拾えている（パーサ自身の健全性）", () => {
-    // 2026-08-15 時点で 241件。パーサが壊れて0件になったまま
-    // 「全部通った」と報告する事故を防ぐための下限。
-    assert.ok(panels.length > 200, `拾えたIDが ${panels.length} 件しかない`);
-  });
-
-  test("すべてのパネルIDが、実際に置かれている節へ解決する", () => {
-    const wrong = panels
+  test("レジストリの全パネルが自分の節へ解決する", () => {
+    const wrong = PANELS
       .filter((p) => sectionForPanel(p.id) !== p.section)
-      .map((p) => `page.tsx:${p.line} ${p.id} → ${sectionForPanel(p.id) ?? "null"}（実際は ${p.section}）`);
-    assert.deepEqual(
-      wrong,
-      [],
-      `panel-sections.ts の表に無い、または対応が誤っているIDがある:\n${wrong.join("\n")}`
-    );
+      .map((p) => `${p.id} → ${sectionForPanel(p.id) ?? "null"}（実際は ${p.section}）`);
+    assert.deepEqual(wrong, [], wrong.join("\n"));
   });
 
-  test("節に属さない `data-quality` は基本節へ解決する", () => {
+  test("`data-quality` は基本節へ解決する", () => {
     // 破損点検パネルは全節共通ヘッダから基本節へ移した（FU18）。
     // 共有URLに残っている `?panel=data-quality` を拾えること。
     assert.equal(sectionForPanel("data-quality"), "basic");
@@ -107,101 +111,129 @@ describe("パネルID → セクションの解決（共有URL `?panel=` が正�
     assert.equal(sectionForPanel("no-such-panel"), null);
     assert.equal(sectionForPanel(""), null);
   });
+
+  test("IDの接頭辞が所属節の命名規約に沿っている", () => {
+    // 解決そのものはレジストリの `section` が持つので、この検査は**人間のため**に残す。
+    // `cal-` なのに regime 節にある、のようなIDは共有URLを壊さないが必ず混乱を招く。
+    // 新しいパネルのIDが規約から外れたらここで落ちる（`add-analysis` skill の §4）。
+    const HEAD_TO_SECTION: Record<string, string> = {
+      asof: "asof", basic: "basic", cal: "calendar", causal: "causal", cond: "conditional",
+      deriv: "derivatives", dist: "distribution", distribution: "distribution", edge: "edge",
+      ent: "entropy", entropy: "entropy", frac: "fractal", fractal: "fractal", freq: "frequency",
+      frequency: "frequency", net: "network", network: "network", nl: "nonlinear",
+      nonlinear: "nonlinear", ohlc: "ohlc", quantum: "quantum", regime: "regime", risk: "risk",
+      sim: "simulation", tail: "tailrisk", tech: "technical", technical: "technical",
+      transform: "transform", vol: "volatility", volatility: "volatility",
+    };
+    const off = PANELS
+      .filter((p) => {
+        // 旧アンカー形式 `sa-<節>-…` は先頭の `sa-` を落としてから見る。
+        const body = p.id.startsWith("sa-") ? p.id.slice(3) : p.id;
+        return HEAD_TO_SECTION[body.split("-")[0]] !== p.section;
+      })
+      .map((p) => `${p.id}（${p.section} 節）`);
+    assert.deepEqual(off, [], `命名規約から外れたIDがある:\n${off.join("\n")}`);
+  });
 });
 
 describe("終値だけの系列での分類（FU17/FU22: 投信で無意味な結果を出さない）", () => {
-  const LEDGERS = [
-    ["UNAVAILABLE", CLOSE_ONLY_UNAVAILABLE_PANEL_IDS],
-    ["CAUTION", CLOSE_ONLY_CAUTION_PANEL_IDS],
-    ["SAFE", CLOSE_ONLY_SAFE_PANEL_IDS],
-  ] as const;
-
-  test("page.tsx の全パネルが3分類のいずれかに属する（分類漏れを落とす）", () => {
-    // ここが本題。新しいパネルを足すと、分類するまでこのテストが落ちる。
-    // 落ちたら panel-data-requirements.ts の3つのうち妥当なものへIDを足すこと。
-    // 出来高・OHLC内訳・日中/夜間そのものが対象なら UNAVAILABLE、
-    // 一部のサブ分析だけがそうなら CAUTION、終値だけで成立するなら SAFE。
-    const unclassified = panels
-      .filter((p) => classifyPanelForCloseOnly(p.id) === null)
-      .map((p) => `page.tsx:${p.line} ${p.id}（${p.section} 節）`);
-    assert.deepEqual(unclassified, [], `未分類のパネルがある:\n${unclassified.join("\n")}`);
+  test("全パネルがちょうど1つの分類に属する", () => {
+    // 型が `closeOnly` を必須にしているので分類漏れは構造的に起こらないが、
+    // 導出（`CLOSE_ONLY_*_PANEL_IDS`）が3つ合わせて全件を覆っていることは確かめる。
+    const sum =
+      CLOSE_ONLY_UNAVAILABLE_PANEL_IDS.size +
+      CLOSE_ONLY_CAUTION_PANEL_IDS.size +
+      CLOSE_ONLY_SAFE_PANEL_IDS.size;
+    assert.equal(sum, PANELS.length);
+    assert.deepEqual(PANELS.filter((p) => classifyPanelForCloseOnly(p.id) === null), []);
   });
 
-  test("3分類に重複が無い（1つのIDが2つの扱いを持たない）", () => {
-    const overlaps: string[] = [];
-    for (let i = 0; i < LEDGERS.length; i += 1) {
-      for (let j = i + 1; j < LEDGERS.length; j += 1) {
-        for (const id of LEDGERS[i][1]) {
-          if (LEDGERS[j][1].has(id)) overlaps.push(`${id}: ${LEDGERS[i][0]} と ${LEDGERS[j][0]}`);
-        }
-      }
-    }
-    assert.deepEqual(overlaps, [], `分類が重複している:\n${overlaps.join("\n")}`);
-  });
-
-  test("台帳のIDがすべて page.tsx に実在する（改名・削除で腐るのを検知）", () => {
-    // 分類漏れとは逆向きの腐り方。IDを改名すると台帳側だけが古い名前を持ち続け、
-    // そのパネルは投信で無防備になる（改名先が未分類なら上のテストが拾う）。
-    const live = new Set(panels.map((p) => p.id));
-    const dead = LEDGERS.flatMap(([name, ids]) =>
-      [...ids].filter((id) => !live.has(id)).map((id) => `${name}: ${id}`),
+  test("分類の内訳が意図せず動いていない", () => {
+    // 2026-08-28（第3波 S17 の後）の実測値。**動かすのは判断を伴う変更のときだけ**で、
+    // そのときは理由を残すこと。S17 は tech-adx / tech-breakout / tech-stoch / vol-atr の
+    // 4件を SAFE → UNAVAILABLE へ倒した。
+    assert.deepEqual(
+      {
+        unavailable: CLOSE_ONLY_UNAVAILABLE_PANEL_IDS.size,
+        caution: CLOSE_ONLY_CAUTION_PANEL_IDS.size,
+        safe: CLOSE_ONLY_SAFE_PANEL_IDS.size,
+      },
+      { unavailable: 78, caution: 24, safe: 149 },
     );
-    assert.deepEqual(dead, [], `page.tsx に無いIDが台帳に残っている:\n${dead.join("\n")}`);
   });
 
-  test("UNAVAILABLE と CAUTION が空になっていない（台帳ごと消える退行を止める）", () => {
-    // 空の Set を渡しても画面は普通に動いてしまう。FU17 の対処が丸ごと消えても
-    // 気づけないので、件数の下限だけ置く。
-    assert.ok(CLOSE_ONLY_UNAVAILABLE_PANEL_IDS.size > 50);
-    assert.ok(CLOSE_ONLY_CAUTION_PANEL_IDS.size > 10);
+  test("高安を要する4件が UNAVAILABLE のまま（S17 の判断を戻さない）", () => {
+    // 投信 0331418A で tech-adx が ADX 13.64 ともっともらしい誤解釈を出した事故。
+    for (const id of ["tech-adx", "tech-breakout", "tech-stoch", "vol-atr"]) {
+      assert.equal(classifyPanelForCloseOnly(id), "unavailable", id);
+    }
   });
 });
 
 describe("系列セレクタの対応（U3: 使えないコントロールを出さない）", () => {
-  test("SERIES_AWARE_SECTIONS が、実際に seriesMode を渡す節の集合と一致する", () => {
-    const declared = declaredSeriesAwareSections();
-    const actual = seriesModeSections;
-    const missing = [...actual].filter((s) => !declared.has(s)).sort();
-    const extra = [...declared].filter((s) => !actual.has(s)).sort();
+  test("seriesMode を消費するパネルを持つ節の集合が変わっていない", () => {
+    // 移設前は手で宣言していた（宣言と実態がずれうる）が、いまは各パネルの
+    // `input` からの導出である。ここが落ちるのは、どれかのパネルの `input` を
+    // 変えて節ぜんたいのセレクタの有無が変わったときだけ。
     assert.deepEqual(
-      { missing, extra },
-      { missing: [], extra: [] },
-      "missing = seriesMode を使うのに宣言が無い節（セレクタが出ず操作できない）/ " +
-        "extra = 宣言はあるが誰も seriesMode を使わない節（セレクタが出るのに何も起きない）"
+      [...SERIES_AWARE_SECTIONS].sort(),
+      [
+        "causal", "distribution", "entropy", "fractal", "frequency", "network",
+        "nonlinear", "quantum", "regime", "simulation", "tailrisk", "transform",
+        "volatility",
+      ],
+    );
+  });
+
+  test("節の中で実際に反応するのは一部である（FU24 の実測を固定する）", () => {
+    // セレクタは節単位だが、反応するかはパネル単位である。この差は退行ではなく
+    // 未解決の課題（FU24）なので、数を固定して「いつの間にか変わった」を防ぐ。
+    const ratio = (key: string) => {
+      const inSection = PANELS.filter((p) => p.section === key);
+      return `${inSection.filter((p) => consumesSeriesMode(p.input)).length}/${inSection.length}`;
+    };
+    assert.deepEqual(
+      {
+        distribution: ratio("distribution"),
+        simulation: ratio("simulation"),
+        quantum: ratio("quantum"),
+      },
+      { distribution: "12/16", simulation: "2/17", quantum: "1/6" },
     );
   });
 });
 
-describe("パネルIDの互換契約（共有URL `?panel=` と localStorage `sa:open:<id>`）", () => {
-  // M3（レジストリ化）はIDの**所在**を動かす作業である。移設で1つでもIDが変わると、
-  // 共有されたURLと保存済みの開閉状態が静かに壊れる。壊れても例外は出ないので、
-  // 移設の前後で同じ配列と突き合わせる以外に検知手段が無い。
-  test("並び順込みで golden と完全一致する", () => {
-    assert.deepEqual(panels.map((p) => p.id), [...PANEL_IDS_GOLDEN]);
+describe("AccordionSection 外の節エントリ（FU27: 裁量節はパネルIDを持たない）", () => {
+  test("discretionary は workspace 種別で、パネルを1件も持たない", () => {
+    const discretionary = SECTIONS.find((s) => s.key === "discretionary");
+    assert.ok(discretionary, "discretionary 節が消えている");
+    assert.equal(discretionary.render, "workspace");
+    assert.deepEqual(discretionary.groups, []);
+    assert.ok(discretionary.Workspace, "workspace のコンポーネントが登録されていない");
   });
 
-  test("AccordionSection 外のパネルも所属節へ解決する", () => {
-    for (const id of STANDALONE_PANEL_IDS_GOLDEN) {
-      assert.ok(sectionForPanel(id), `${id} の所属節が解決できない`);
-    }
+  test("裁量節に解決するパネルIDが1つも無い（擬似IDを作らない）", () => {
+    // 複数の入力・検証工程とシナリオ保存を一体で扱う常時表示ワークスペースであり、
+    // 単一の折りたたみ分析ではない。共有URL `?panel=` と結果バッジの対象外である。
+    assert.deepEqual(PANELS.filter((p) => p.section === "discretionary"), []);
+    assert.deepEqual(STANDALONE_PANELS.filter((p) => p.section === "discretionary"), []);
+  });
+
+  test("workspace 以外の全節がパネルを持つ（節ごと空になる退行を止める）", () => {
+    const empty = SECTIONS
+      .filter((s) => s.render === "panels" && s.groups.every((g) => g.panels.length === 0))
+      .map((s) => s.key);
+    assert.deepEqual(empty, []);
   });
 });
 
 describe("結果バッジのパネルID（FU33: 移設でバッジが無言で消えるのを止める）", () => {
-  // `useAnalysisResultSummary("tech-adx", …)` は page.tsx が持つIDを
-  // **コンポーネント側が文字列で複製**している。page.tsx 側でIDを変えると
+  // `useAnalysisResultSummary("tech-adx", …)` は、レジストリが持つべきIDを
+  // **コンポーネント側が文字列で複製**している。レジストリ側でIDを変えると
   // Provider が受け取るキーだけがずれ、**バッジが何も言わずに出なくなる**。
-  // 例外もログも出ないので、突き合わせる以外に検知手段が無い。
-  const componentDir = fileURLToPath(new URL("../../components/analysis/", import.meta.url));
-  const badgeIds = readdirSync(componentDir)
-    .filter((f) => f.endsWith(".tsx"))
-    .flatMap((f) => {
-      const src = readFileSync(join(componentDir, f), "utf8");
-      return [...src.matchAll(/useAnalysisResultSummary\(\s*"([^"]+)"/g)].map((m) => ({
-        file: f,
-        id: m[1],
-      }));
-    });
+  const badgeIds = analysisSources().flatMap(({ file, src }) =>
+    [...src.matchAll(/useAnalysisResultSummary\(\s*"([^"]+)"/g)].map((m) => ({ file, id: m[1] })),
+  );
 
   test("スキャナ自身が生きている（0件のまま「全部通った」と報告しない）", () => {
     // 2026-08-28 時点で7件（S15 がテクニカル節に入れたぶん）。
@@ -209,7 +241,7 @@ describe("結果バッジのパネルID（FU33: 移設でバッジが無言で�
   });
 
   test("バッジのIDがすべて実在するパネルを指している", () => {
-    const live = new Set(panels.map((p) => p.id));
+    const live = new Set(PANELS.map((p) => p.id));
     const dead = badgeIds.filter((b) => !live.has(b.id)).map((b) => `${b.file}: "${b.id}"`);
     assert.deepEqual(dead, [], `実在しないIDでバッジを報告している:\n${dead.join("\n")}`);
   });
@@ -221,5 +253,19 @@ describe("結果バッジのパネルID（FU33: 移設でバッジが無言で�
       .filter((b) => classifyPanelForCloseOnly(b.id) === null)
       .map((b) => `${b.file}: "${b.id}"`);
     assert.deepEqual(missing, [], `台帳に無いIDでバッジを報告している:\n${missing.join("\n")}`);
+  });
+
+  test("バッジに「量」を載せていない（FU34: 判断だけを出す）", () => {
+    // 型（PanelResultSummary）が finding に up/down を必須にしたので
+    // `{ status: "finding", direction: "flat" }` はもう書けない。ここでは
+    // 「N件」のような量をラベルに載せる書き方が復活していないかを見る。
+    const quantityish = analysisSources()
+      .filter(({ src }) =>
+        [...src.matchAll(/useAnalysisResultSummary\([\s\S]{0,800}?\n {2}\);/g)].some((m) =>
+          /label: `[^`]*\$\{[^`]*\}[^`]*件`/.test(m[0]),
+        ),
+      )
+      .map(({ file }) => file);
+    assert.deepEqual(quantityish, [], `バッジに件数を載せている:\n${quantityish.join("\n")}`);
   });
 });

@@ -7,14 +7,20 @@ import {
   DIRECTION_GLYPH,
   DIRECTION_LABEL,
   DIRECTION_TEXT_CLASS,
-  type Direction,
 } from "../../lib/chart-colors";
 
-export interface PanelResultSummary {
-  status: "finding" | "none";
-  direction: Direction;
-  label: string;
-}
+/**
+ * 一度開いて計算済みのパネルが見出しに残す短い所見。
+ *
+ * **バッジは「判断」だけを出す。「量」は出さない**（FU34）。
+ * 移設前は `売られすぎ`（判断）と `標本 231件`（計算できた量）が同じ見た目で
+ * 混在しており、利用者にはどちらも同じ強さの手がかりに見えていた。
+ * `finding` に `up` / `down` を必須にすることで、方向を持たない量を
+ * バッジに載せる書き方そのものを型で塞いでいる。量はパネルを開いた中で示すこと。
+ */
+export type PanelResultSummary =
+  | { status: "finding"; direction: "up" | "down"; label: string }
+  | { status: "none" };
 
 interface Props {
   /** localStorage 永続化・アンカー用の安定ID（銘柄に依存しない） */
@@ -30,12 +36,29 @@ interface Props {
    * 「すべて開く / すべて閉じる」に使う。
    */
   bulk?: { nonce: number; open: boolean };
+  /**
+   * 一括開放の寿命を決める鍵（銘柄＋期間）。値が変わると、保存済みの個別開閉だけを
+   * 残して一括開放ぶんを捨てる（U2）。省略すると寿命の管理をしない。
+   */
+  openScope?: string;
   /** 一度開いて計算済みのパネルだけが提供する短い所見。未計算なら表示しない。 */
   summary?: PanelResultSummary;
   children: React.ReactNode;
 }
 
 const storageKey = (id: string) => `sa:open:${id}`;
+
+/** 保存済みの開閉状態。読めなければ既定値。 */
+function persistedOpen(id: string, defaultOpen: boolean): boolean {
+  try {
+    const saved = localStorage.getItem(storageKey(id));
+    if (saved === "1") return true;
+    if (saved === "0") return false;
+  } catch {
+    // localStorage 利用不可時は既定値
+  }
+  return defaultOpen;
+}
 
 function updatePanelQuery(id: string, open: boolean) {
   const url = new URL(window.location.href);
@@ -63,29 +86,19 @@ export default function CollapsibleAnalysis({
   subtitle,
   defaultOpen = false,
   bulk,
+  openScope,
   summary,
   children,
 }: Props) {
   // 保存済み開閉状態を復元する。この節はデータ取得後にのみクライアント描画され
   // SSRされないため、遅延初期化で localStorage を直接読んでよい（初期フラッシュ無し）。
-  const [open, setOpen] = useState(() => {
-    try {
-      const saved = localStorage.getItem(storageKey(id));
-      if (saved === "1") return true;
-      if (saved === "0") return false;
-    } catch {
-      // localStorage 利用不可時は既定値
-    }
-    return defaultOpen;
-  });
+  const [open, setOpen] = useState(() => persistedOpen(id, defaultOpen));
 
   // 親からの一括開閉命令に追従する。マウント時点の nonce を初期値にしておき、
   // 初回レンダリングでは発火させない（localStorage 復元を上書きしないため）。
-  // 「すべて開く」は重い全パネル計算を伴うため、現在の stateScope 内だけの一時状態にする。
+  // 「すべて開く」は重い全パネル計算を伴うため、現在の openScope 内だけの一時状態にする。
   // 個別開閉は利用者が選んだ分析集合なので従来どおり銘柄をまたいで永続化する一方、
-  // 一括開放は localStorage に書かない。親の AccordionSection は S15 の summaryScope を
-  // React key に含めるため、銘柄・期間・最終足が変わると再マウントされ、個別保存状態だけを
-  // 復元する。バッジも同じ scope で破棄されるので、両者の寿命を揃えている。
+  // 一括開放は localStorage に書かない。
   const lastBulkNonce = useRef<number | null>(bulk ? bulk.nonce : null);
   useEffect(() => {
     if (!bulk) return;
@@ -98,6 +111,20 @@ export default function CollapsibleAnalysis({
       } catch {}
     }
   }, [bulk, id]);
+
+  // 一括開放の寿命。銘柄・期間が変わったら保存済みの個別開閉だけに戻す。
+  //
+  // 以前はこれを親（AccordionSection）の React key に S15 の summaryScope を混ぜて
+  // 実現していたが、summaryScope は**最終足の時刻と終値を含む**ため、データが後から
+  // 確定しただけで全パネルが再マウントされていた（「すべて開く」の直後に全部閉じる
+  // 現象の正体）。バッジの寿命（＝表示中の数字が古くないか）と一括開放の寿命
+  // （＝利用者の操作がどこまで有効か）は別物なので、鍵も別にしてある → FU41。
+  const lastOpenScope = useRef(openScope);
+  useEffect(() => {
+    if (lastOpenScope.current === openScope) return;
+    lastOpenScope.current = openScope;
+    setOpen(persistedOpen(id, defaultOpen));
+  }, [openScope, id, defaultOpen]);
 
   const toggle = () => {
     setOpen((prev) => {
@@ -132,6 +159,8 @@ export default function CollapsibleAnalysis({
     return () => window.removeEventListener(OPEN_PANEL_EVENT, onOpen as EventListener);
   }, [id]);
 
+  const direction = summary?.status === "finding" ? summary.direction : "flat";
+
   return (
     <section
       ref={sectionRef}
@@ -161,10 +190,14 @@ export default function CollapsibleAnalysis({
         </span>
         {summary && (
           <span
-            className={`shrink-0 rounded-full border border-current px-2 py-0.5 text-[11px] font-medium ${DIRECTION_TEXT_CLASS[summary.direction]}`}
-            aria-label={`${summary.status === "finding" ? "所見あり" : "所見なし"}: ${summary.label}（${DIRECTION_LABEL[summary.direction]}）`}
+            className={`shrink-0 rounded-full border border-current px-2 py-0.5 text-[11px] font-medium ${DIRECTION_TEXT_CLASS[direction]}`}
+            aria-label={
+              summary.status === "finding"
+                ? `所見あり: ${summary.label}（${DIRECTION_LABEL[direction]}）`
+                : "所見なし"
+            }
           >
-            <span aria-hidden="true">{DIRECTION_GLYPH[summary.direction]}</span>{" "}
+            <span aria-hidden="true">{DIRECTION_GLYPH[direction]}</span>{" "}
             {summary.status === "finding" ? summary.label : "所見なし"}
           </span>
         )}

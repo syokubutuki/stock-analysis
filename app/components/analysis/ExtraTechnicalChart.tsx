@@ -29,7 +29,7 @@ export default function ExtraTechnicalChart({ prices }: Props) {
       ? { status: "finding", direction: "down", label: "買われすぎ" }
       : result.cci.current < -100 || result.williamsR.current < -80
         ? { status: "finding", direction: "up", label: "売られすぎ" }
-        : { status: "none", direction: "flat", label: "中立ゾーン" },
+        : { status: "none" },
   );
 
   // CCI chart
