@@ -11,6 +11,8 @@
  *
  * ## globals.css の `@theme inline`（Q3 のデザイントークン）との対応
  * Canvas は CSS 変数を読めないので同じ値をここに複製している。**片方だけ変えないこと。**
+ * `__tests__/chart-colors.test.ts` が `ink` と `grid` の一致を検査する（FU29）。
+ * `surface` だけは「相当」であって同値ではないので、そのことを検査している。
  *
  * | ここ | globals.css | 用途 |
  * |---|---|---|
