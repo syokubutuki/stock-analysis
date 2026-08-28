@@ -45,8 +45,8 @@ const panel = page.locator("#panel-cal-today-vs-expected");   // section id = pa
 await panel.locator("canvas").first().waitFor({ timeout: 90000 });
 ```
 
-- 分析IDは `app/page.tsx` の各セクションの `items[].id`
-- セクションタブのラベルは `app/page.tsx` の `SECTIONS`（カレンダー/リスク指標/…）
+- 分析IDは `app/lib/panel-registry.tsx` の各パネルの `id`
+- セクションタブのラベルは `app/lib/panel-registry.tsx` の `SECTIONS`（カレンダー/リスク指標/…）
 - データ取得は Yahoo 実API（`/api/stock`）。ネットワーク必須、日中足は取得に数秒〜十数秒
 - 待つのは canvas の出現 + 2〜3秒（fetch → useMemo計算 → useEffect描画）
 

@@ -1,11 +1,11 @@
 ---
 name: add-analysis
-description: 新しい分析（チャート／パネル）をこのアプリに追加する手順。lib の計算・コンポーネント・AnalysisGuide・page.tsx への配線までの規約。
+description: 新しい分析（チャート／パネル）をこのアプリに追加する手順。lib の計算・コンポーネント・AnalysisGuide・パネルレジストリへの登録までの規約。
 ---
 
 # 分析の追加手順
 
-計算（`app/lib/`）と描画（`app/components/analysis/`）を分け、`app/page.tsx` に配線する。
+計算（`app/lib/`）と描画（`app/components/analysis/`）を分け、`app/lib/panel-registry.tsx` に登録する。
 既存117件が手本。**新規に発明せず、目的の近いものを1つ選んで写す。**
 
 ## 1. 計算を `app/lib/<name>.ts` に置く
@@ -52,33 +52,60 @@ description: 新しい分析（チャート／パネル）をこのアプリに�
 6. **投資判断への活用** — 建玉をどう変えるのかまで踏み込む
 7. **注意点・限界** — 何を仮定していて、いつ壊れるか
 
-## 4. `app/page.tsx` に配線する（5か所）
+## 4. `app/lib/panel-registry.tsx` に1行足す（配線はここだけ）
+
+該当セクションの `groups[].panels[]` に `definePanel({...})` を1つ足す。
+**動的 import・所属節・入力の形・終値だけの系列での扱いが、この1レコードに揃っている。**
 
 ```tsx
-// (a) 動的 import。SSR無効・プレースホルダ必須（~240行目付近の並びに追加）
-const FooChart = dynamic(
-  () => import("./components/analysis/FooChart"),
-  { ssr: false, loading: () => <ChartPlaceholder height={350} /> }
-);
-
-// (b) 該当セクションの groups[].items[] に1行
-{ id: "cal-foo", title: "…（丸括弧で手法を補足）", node: <FooChart prices={filteredPrices} /> },
+definePanel({
+  id: "cal-foo",
+  title: "…（丸括弧で手法を補足）",
+  input: "filtered",
+  closeOnly: "safe",
+  height: 350,
+  load: () => import("../components/analysis/FooChart"),
+}),
 ```
 
-- **`filteredPrices` か `allPrices` か** — `filteredPrices` は PeriodSelector で切った期間、
-  `allPrices` は10年フル。期間を変えて見せたい分析は前者、標本数が要る検定系は後者
-  （`useAnalysisData.ts:53-63`）
-- **`id`** は `<セクション略号>-<名前>`（`cal-` / `pf-` / `sim-` …）。
+- **`id`** は `<セクション略号>-<名前>`（`cal-` / `sim-` / `dist-` …）。
   この id が `CollapsibleAnalysis` の localStorage キー `sa:open:<id>` と
-  DOM の `#panel-<id>` になる。**後から変えると利用者の開閉状態が失われる**
-- (c) 新セクションを足すなら `SECTIONS`
-- (d) `seriesMode` を実際に消費するなら `SERIES_AWARE_SECTIONS` にキーを追加
-- (e) **`app/lib/panel-data-requirements.ts` の3分類のどれかに id を足す**。
-  投信は全バーで `open==high==low==close` かつ `volume==0` なので、
-  出来高・OHLC内訳・日中/夜間そのものが対象なら `UNAVAILABLE`（本体をマウントせず理由を出す）、
-  パネル内の一部のサブ分析だけがそうなら `CAUTION`（注意書きを冒頭に出す）、
-  終値だけで成立するなら `SAFE`。**分類しないと `npm test` が落ちる**
-  （`__tests__/page-wiring.test.ts` が `page.tsx` の全IDを突合する）
+  DOM の `#panel-<id>` と共有URL `?panel=<id>` になる。
+  **後から変えると利用者の開閉状態と共有URLが壊れる。**
+  接頭辞が所属節と食い違うと `npm test` が落ちる
+- **`input`** — どの系列と付随情報を受け取るか。実在するのは9通りだけ。
+  `filtered` は PeriodSelector で切った期間、`all` は10年フル。期間を変えて見せたい
+  分析は前者、標本数が要る検定系は後者（`useAnalysisData.ts:53-63`）。
+  `filtered+series` を選ぶと**その節の系列セレクタが自動的に有効になる**
+  （`SERIES_AWARE_SECTIONS` は導出。手で足す表はもう無い）。
+  **宣言と実際の props が食い違うと型エラーになる**ので、当てずっぽうで書けない
+- **`closeOnly`** — 投信は全バーで `open==high==low==close` かつ `volume==0` である。
+  出来高・OHLC内訳・日中/夜間そのものが対象なら `"unavailable"`（本体をマウントせず
+  理由を出す）、パネル内の一部のサブ分析だけがそうなら `"caution"`（注意書きを冒頭に
+  出す）、終値だけで成立するなら `"safe"`。**型が必須にしているので分類漏れは起こらない**
+- **`height`** — 読み込み中プレースホルダの高さ。実際のチャートに近い値にする
+  （ずれるとレイアウトシフトになる）
+- 新セクションを足すなら `SECTIONS` に1レコード。
+  折りたたみパネル群でなく常時表示のワークスペースなら `render: "workspace"`
+
+### `npm test` が落ちたときに直す場所
+
+| 落ちたテスト | 直すもの |
+|---|---|
+| 並び順込みで golden と完全一致する | パネルを増減したなら `fixtures/panel-ids.golden.ts` を同じ位置で更新。**IDを変えてしまった場合はレジストリのほうを戻す** |
+| 分類の内訳が意図せず動いていない | `closeOnly` を意図して動かしたなら件数を更新し、理由をコミットに残す |
+| IDの接頭辞が所属節の命名規約に沿っている | ID の接頭辞を所属節に合わせる |
+| 節の中で実際に反応するのは一部である | `input` を意図して変えたなら比率を更新する |
+
+### バッジ（見出しに出る所見）を付けるなら
+
+`useAnalysisResultSummary("<id>", …)` をコンポーネント本体から呼ぶ。既に計算した値を
+渡すだけで、**新しい計算を足さないこと**（閉じたままのパネルを事前計算しない規約）。
+
+**バッジは「判断」だけを出す。「量」は出さない。**
+`{ status: "finding", direction: "up" | "down", label: "売られすぎ" }` の形しか書けず、
+標本数や件数のような方向を持たない量は型が受け付けない（`{ status: "none" }` になる）。
+量はパネルを開いた中の表で示すこと。IDは `page-wiring.test.ts` が突き合わせる。
 
 ## 5. 確認
 
