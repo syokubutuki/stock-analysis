@@ -31,6 +31,23 @@ export class StockSourceError extends Error {
   }
 }
 
+/**
+ * BFF から RSC へ退避してよい上流障害だけを判定する。
+ * 404など入力に対する確定応答や、StockSourceError ではない実装例外まで握りつぶすと、
+ * 不要な再取得と障害の見逃しになるため再送出する。
+ */
+function shouldFallbackFromFundBff(error: unknown): error is StockSourceError {
+  if (!(error instanceof StockSourceError)) return false;
+  return (
+    error.status === 401 ||
+    error.status === 403 ||
+    error.status === 408 ||
+    error.status === 425 ||
+    error.status === 429 ||
+    error.status >= 500
+  );
+}
+
 export function parseStockRange(range: string | null): StockRange {
   return range && STOCK_RANGE_SET.has(range) ? (range as StockRange) : "1y";
 }
@@ -252,9 +269,20 @@ async function fetchFundData(ticker: string, range: StockRange): Promise<StockDa
         page: String(page),
       });
       const apiUrl = `https://finance.yahoo.co.jp/bff-quote/v1/ajax/funds/history?${params}`;
-      const response = await fetch(apiUrl, { headers: bffHeaders, cache: "no-store" });
+      let response: Response;
+      try {
+        response = await fetch(apiUrl, { headers: bffHeaders, cache: "no-store" });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") throw error;
+        throw new StockSourceError(`Fund BFF network error for ${ticker}`, 502);
+      }
       if (!response.ok) throw new StockSourceError(`Failed to fetch data for ${ticker}`, response.status);
-      const data = await response.json() as YahooFundHistoryResponse;
+      let data: YahooFundHistoryResponse;
+      try {
+        data = await response.json() as YahooFundHistoryResponse;
+      } catch {
+        throw new StockSourceError("Fund BFF returned invalid JSON", 502);
+      }
       if (!data.isSuccess || !data.response) {
         throw new StockSourceError(data.message || "Fund data source error", 502);
       }
@@ -287,6 +315,7 @@ async function fetchFundData(ticker: string, range: StockRange): Promise<StockDa
     if (prices.length === 0) throw new StockSourceError(`No price data for ${ticker}`, 404);
     return { ticker, name: fundName, currency: "JPY", prices };
   } catch (error) {
+    if (!shouldFallbackFromFundBff(error)) throw error;
     console.warn(
       `[stock-source] fund BFF failed; falling back to RSC ticker=${ticker} range=${range}`,
       error,

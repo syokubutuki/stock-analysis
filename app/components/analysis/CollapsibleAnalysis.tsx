@@ -81,15 +81,22 @@ export default function CollapsibleAnalysis({
 
   // 親からの一括開閉命令に追従する。マウント時点の nonce を初期値にしておき、
   // 初回レンダリングでは発火させない（localStorage 復元を上書きしないため）。
+  // 「すべて開く」は重い全パネル計算を伴うため、現在の stateScope 内だけの一時状態にする。
+  // 個別開閉は利用者が選んだ分析集合なので従来どおり銘柄をまたいで永続化する一方、
+  // 一括開放は localStorage に書かない。親の AccordionSection は S15 の summaryScope を
+  // React key に含めるため、銘柄・期間・最終足が変わると再マウントされ、個別保存状態だけを
+  // 復元する。バッジも同じ scope で破棄されるので、両者の寿命を揃えている。
   const lastBulkNonce = useRef<number | null>(bulk ? bulk.nonce : null);
   useEffect(() => {
     if (!bulk) return;
     if (lastBulkNonce.current === bulk.nonce) return;
     lastBulkNonce.current = bulk.nonce;
     setOpen(bulk.open);
-    try {
-      localStorage.setItem(storageKey(id), bulk.open ? "1" : "0");
-    } catch {}
+    if (!bulk.open) {
+      try {
+        localStorage.setItem(storageKey(id), "0");
+      } catch {}
+    }
   }, [bulk, id]);
 
   const toggle = () => {
