@@ -48,5 +48,7 @@ for (const { id, heading } of targets) {
   console.log(`  ${out}`);
 }
 
-console.log(`\n貼るとき:   Get-Content ${OUT_DIR}/s17.md -Raw | Set-Clipboard`);
+const first = targets[0].id.toLowerCase();
+console.log(`
+貼るとき:   Get-Content ${OUT_DIR}/${first}.md -Raw | Set-Clipboard`);
 console.log(`いまある:   ${readdirSync(OUT_DIR).join(" / ")}`);
