@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
@@ -219,7 +221,7 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 text-gray-600 font-medium">{b.label}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{b.n}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(b.mean)}`}>{pctFmt(b.mean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(b.mean)}`}><DirectionGlyph value={b.mean} />{pctFmt(b.mean)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(b.std)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${Math.abs(b.skewness) > 0.5 ? "text-orange-600" : "text-gray-600"}`}>{b.skewness.toFixed(3)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${b.kurtosis > 1 ? "text-red-600" : "text-gray-600"}`}>{b.kurtosis.toFixed(3)}</td>

@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   progressResample, stratifyBySpeed, ProgressPoint, SpeedGroup,
@@ -59,7 +61,7 @@ function SpeedBar({ g, maxAbs }: { g: SpeedGroup; maxAbs: number }) {
           style={{ width: `${w / 2}%` }}
         />
       </div>
-      <span className={`w-16 text-right font-medium ${g.afternoonMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(g.afternoonMean)}</span>
+      <span className={`w-16 text-right font-medium ${g.afternoonMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={g.afternoonMean} />{fmtSignedPct(g.afternoonMean)}</span>
       <StatBadge n={g.n} p={g.afternoonP} significant={g.afternoonP < 0.05} />
     </div>
   );

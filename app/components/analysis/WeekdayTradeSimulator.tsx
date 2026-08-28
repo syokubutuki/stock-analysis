@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // 曜日トレード・シミュレータ（旧: SpiralHeatmap 内に埋没していた機能を独立コンポーネントへ移設）。
 // 任意の曜日×注文タイミング(始値/終値)×方向(買/売)の売買を編集し、複数レグを週内で1本に連結して
 // バイ&ホールドと公平比較する。初期表示は買+売の非重複最大リターン組合せ(最適プラン)。
@@ -824,12 +826,12 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                         <td className="py-1 px-2 text-right font-mono text-gray-500">{i + 1}</td>
                         <td className="py-1 px-2 font-medium text-gray-700">{specLabel(spec)}</td>
                         <td className="py-1 px-2 text-center font-mono text-gray-600">{result.nTrades}</td>
-                        <td className={`py-1 px-2 text-center font-mono font-semibold ${colorClass(perDayReturn(result))}`}>{result.heldDays > 0 ? bpDay(perDayReturn(result)) : "-"}</td>
-                        <td className={`py-1 px-2 text-center font-mono ${colorClass(result.totalReturn)}`}>{pct2(result.totalReturn)}</td>
-                        <td className={`py-1 px-2 text-center font-mono ${colorClass(result.annualized)}`}>{pct2(result.annualized)}</td>
+                        <td className={`py-1 px-2 text-center font-mono font-semibold ${colorClass(perDayReturn(result))}`}>{result.heldDays > 0 ? <><DirectionGlyph value={perDayReturn(result)} />{bpDay(perDayReturn(result))}</> : "-"}</td>
+                        <td className={`py-1 px-2 text-center font-mono ${colorClass(result.totalReturn)}`}><DirectionGlyph value={result.totalReturn} />{pct2(result.totalReturn)}</td>
+                        <td className={`py-1 px-2 text-center font-mono ${colorClass(result.annualized)}`}><DirectionGlyph value={result.annualized} />{pct2(result.annualized)}</td>
                         <td className="py-1 px-2 text-center font-mono text-gray-600">{result.sharpe.toFixed(2)}</td>
                         <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(result.winRate)}</td>
-                        <td className={`py-1 px-2 text-center font-mono ${colorClass(result.exposure > 0 ? result.totalReturn / result.exposure : 0)}`}>{result.exposure > 0 ? pct2(result.totalReturn / result.exposure) : "-"}</td>
+                        <td className={`py-1 px-2 text-center font-mono ${colorClass(result.exposure > 0 ? result.totalReturn / result.exposure : 0)}`}>{result.exposure > 0 ? <><DirectionGlyph value={result.totalReturn / result.exposure} />{pct2(result.totalReturn / result.exposure)}</> : "-"}</td>
                         <td className="py-1 px-2 text-center">
                           <button
                             onClick={() => addSpecObj(spec)}
@@ -908,55 +910,55 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
                   <tr className="border-b border-gray-200 bg-emerald-50">
                     <td className="py-1 px-2 font-medium" style={{ color: "#059669" }}>逐次WF(前{effFitLen.toLocaleString()}本・{walkForward.nActiveWeeks.toLocaleString()}週){gapFill === "hold" ? "・隙間ロング" : ""}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600" title="ポジション変更回数(週次の建て替え含む)">{walkForward.nTurnovers}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.totalReturn)}`}>{pct2(walkForward.totalReturn)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.annualized)}`}>{pct2(walkForward.annualized)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.totalReturn)}`}><DirectionGlyph value={walkForward.totalReturn} />{pct2(walkForward.totalReturn)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.annualized)}`}><DirectionGlyph value={walkForward.annualized} />{pct2(walkForward.annualized)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{walkForward.sharpe.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(walkForward.maxDD)}</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(walkForward.exposure)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.exposure > 0 ? walkForward.totalReturn / walkForward.exposure : 0)}`}>{walkForward.exposure > 0 ? pct2(walkForward.totalReturn / walkForward.exposure) : "-"}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(walkForward.exposure > 0 ? walkForward.totalReturn / walkForward.exposure : 0)}`}>{walkForward.exposure > 0 ? <><DirectionGlyph value={walkForward.totalReturn / walkForward.exposure} />{pct2(walkForward.totalReturn / walkForward.exposure)}</> : "-"}</td>
                   </tr>
                 )}
                 {!isWF && planMode && (
                   <tr className="border-b border-gray-200 bg-emerald-50">
                     <td className="py-1 px-2 font-medium" style={{ color: "#059669" }}>週内プラン(連結){gapFill === "hold" ? "・隙間ロング" : ""}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600" title="ポジション変更回数">{planResult.nTurnovers}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.totalReturn)}`}>{pct2(planResult.totalReturn)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.annualized)}`}>{pct2(planResult.annualized)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.totalReturn)}`}><DirectionGlyph value={planResult.totalReturn} />{pct2(planResult.totalReturn)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.annualized)}`}><DirectionGlyph value={planResult.annualized} />{pct2(planResult.annualized)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{planResult.sharpe.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(planResult.maxDD)}</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(planResult.exposure)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.exposure > 0 ? planResult.totalReturn / planResult.exposure : 0)}`}>{planResult.exposure > 0 ? pct2(planResult.totalReturn / planResult.exposure) : "-"}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(planResult.exposure > 0 ? planResult.totalReturn / planResult.exposure : 0)}`}>{planResult.exposure > 0 ? <><DirectionGlyph value={planResult.totalReturn / planResult.exposure} />{pct2(planResult.totalReturn / planResult.exposure)}</> : "-"}</td>
                   </tr>
                 )}
                 {!isWF && tradeResults.map((res, i) => (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium" style={{ color: STRAT_COLORS[i % STRAT_COLORS.length] }}>{specLabel(specs[i])}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{res.nTrades}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.totalReturn)}`}>{pct2(res.totalReturn)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.annualized)}`}>{pct2(res.annualized)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.totalReturn)}`}><DirectionGlyph value={res.totalReturn} />{pct2(res.totalReturn)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.annualized)}`}><DirectionGlyph value={res.annualized} />{pct2(res.annualized)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{res.sharpe.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(res.maxDD)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(res.winRate)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.avgTrade)}`}>{pct(res.avgTrade)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.avgTrade)}`}><DirectionGlyph value={res.avgTrade} />{pct(res.avgTrade)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{pct2(res.exposure)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.exposure > 0 ? res.totalReturn / res.exposure : 0)}`}>{res.exposure > 0 ? pct2(res.totalReturn / res.exposure) : "-"}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(res.exposure > 0 ? res.totalReturn / res.exposure : 0)}`}>{res.exposure > 0 ? <><DirectionGlyph value={res.totalReturn / res.exposure} />{pct2(res.totalReturn / res.exposure)}</> : "-"}</td>
                   </tr>
                 ))}
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <td className="py-1 px-2 font-medium text-gray-500">バイ&ホールド</td>
                   <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
-                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}>{pct2(bhMetrics.totalReturn)}</td>
-                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.annualized)}`}>{pct2(bhMetrics.annualized)}</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}><DirectionGlyph value={bhMetrics.totalReturn} />{pct2(bhMetrics.totalReturn)}</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.annualized)}`}><DirectionGlyph value={bhMetrics.annualized} />{pct2(bhMetrics.annualized)}</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">{bhMetrics.sharpe.toFixed(2)}</td>
                   <td className="py-1 px-2 text-center font-mono text-red-600">{pct2(bhMetrics.maxDD)}</td>
                   <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                   <td className="py-1 px-2 text-center font-mono text-fg-muted">-</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">100%</td>
-                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}>{pct2(bhMetrics.totalReturn)}</td>
+                  <td className={`py-1 px-2 text-center font-mono ${colorClass(bhMetrics.totalReturn)}`}><DirectionGlyph value={bhMetrics.totalReturn} />{pct2(bhMetrics.totalReturn)}</td>
                 </tr>
               </tbody>
             </table>

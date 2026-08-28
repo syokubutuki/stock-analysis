@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
 import { computeVwap, VwapResult } from "../../lib/vwap-analysis";
@@ -154,8 +156,8 @@ export default function VwapDeviationChart({ ticker }: Props) {
                       <tr key={b.label} className="border-b border-gray-100">
                         <td className="py-1 font-medium">{b.label}</td>
                         <td className="text-right">{b.n}</td>
-                        <td className={`text-right ${b.meanFwdPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.meanFwdPct / 100)}</td>
-                        <td className={`text-right ${b.medianFwdPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.medianFwdPct / 100)}</td>
+                        <td className={`text-right ${b.meanFwdPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.meanFwdPct} />{fmtSignedPct(b.meanFwdPct / 100)}</td>
+                        <td className={`text-right ${b.medianFwdPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.medianFwdPct} />{fmtSignedPct(b.medianFwdPct / 100)}</td>
                         <td className="text-right">{fmtPct(b.winRate)}</td>
                       </tr>
                     ))}

@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeCWT } from "../../lib/wavelet";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -38,6 +39,22 @@ export default function WaveletChart({ prices, seriesMode }: Props) {
     () => computeCWT(lr, lrTimes, 30),
     [prices, seriesMode]
   );
+  const scalogramDescription = useMemo(() => {
+    const lastIndex = (scalogram.matrix[0]?.length ?? 0) - 1;
+    if (lastIndex < 0 || scalogram.scales.length === 0) {
+      return "ウェーブレットスカログラム。計算できるデータが不足しています。";
+    }
+    let peakScaleIndex = 0;
+    for (let i = 1; i < scalogram.matrix.length; i++) {
+      if (scalogram.matrix[i][lastIndex] > scalogram.matrix[peakScaleIndex][lastIndex]) {
+        peakScaleIndex = i;
+      }
+    }
+    const powerRatio = scalogram.maxPower > 0
+      ? scalogram.matrix[peakScaleIndex][lastIndex] / scalogram.maxPower
+      : 0;
+    return `ウェーブレットスカログラム。直近${lrTimes[lastIndex] ?? "時点"}では${scalogram.scales[peakScaleIndex].toFixed(1)}日周期のパワーが最大で、全期間最大の${(powerRatio * 100).toFixed(0)}%です。`;
+  }, [lrTimes, scalogram]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -106,7 +123,7 @@ export default function WaveletChart({ prices, seriesMode }: Props) {
         縦軸: 周期(日) / 横軸: 時間 / 色: パワー (暗→明 = 低→高)
       </p>
       <div className="w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={scalogramDescription} />
       </div>
       <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
         <span>低パワー</span>

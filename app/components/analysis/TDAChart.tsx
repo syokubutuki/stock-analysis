@@ -121,6 +121,7 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     // β₀
     ctx.strokeStyle = "#3b82f6";
     ctx.lineWidth = 2;
+    ctx.setLineDash([]);
     ctx.beginPath();
     tda.bettiCurve0.forEach((v, i) => {
       const x = margin.left + (i / (nT - 1)) * plotW;
@@ -132,6 +133,7 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     // β₁
     ctx.strokeStyle = "#ef4444";
     ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
     ctx.beginPath();
     tda.bettiCurve1.forEach((v, i) => {
       const x = margin.left + (i / (nT - 1)) * plotW;
@@ -139,6 +141,7 @@ export default function TDAChart({ prices, seriesMode }: Props) {
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
+    ctx.setLineDash([]);
 
     ctx.fillStyle = "#374151";
     ctx.font = "bold 10px sans-serif";
@@ -149,10 +152,17 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     ctx.fillText("ε (threshold)", width / 2, height - 5);
 
     // Legend
-    ctx.fillStyle = "#3b82f6";
-    ctx.fillText("β₀", margin.left + 30, margin.top + 15);
-    ctx.fillStyle = "#ef4444";
-    ctx.fillText("β₁", margin.left + 60, margin.top + 15);
+    ctx.strokeStyle = "#3b82f6";
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(margin.left + 8, margin.top + 12); ctx.lineTo(margin.left + 24, margin.top + 12); ctx.stroke();
+    ctx.fillStyle = "#374151";
+    ctx.textAlign = "left";
+    ctx.fillText("β₀（実線）", margin.left + 28, margin.top + 15);
+    ctx.strokeStyle = "#ef4444";
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(margin.left + 82, margin.top + 12); ctx.lineTo(margin.left + 98, margin.top + 12); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillText("β₁（破線）", margin.left + 102, margin.top + 15);
   }, [tda]);
 
   // Fisher-Rao distance

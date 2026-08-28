@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // 曜日ビン別 TP/SL ─ バリア設計の何が測れて何が測れないか（系C28）
 //
 // 4層。上から順に「確実に正しいこと」→「測れること」→「発見の余地」→「ヌルとの照合」。
@@ -604,7 +606,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
             </div>
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">歪度 (A−B)/√(AB)</div>
-              <div className={`font-bold ${board.skew >= 0 ? "text-green-700" : "text-red-600"}`}>{board.skew.toFixed(2)}</div>
+              <div className={`font-bold ${board.skew >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={board.skew} />{board.skew.toFixed(2)}</div>
               <div className="text-[10px] text-fg-muted">正=大勝ち小負け</div>
             </div>
             <div className="bg-gray-50 rounded p-2">
@@ -810,7 +812,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                       <td className="text-right px-2 text-gray-600">{r.n}</td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{fmtPct(r.timeoutShare, 0)}</td>
                       <td className="text-right px-2 tabular-nums text-gray-800">{fmtPct(r.pHat, 1)}</td>
-                      <td className={`text-right px-2 tabular-nums ${r.pP < 0.05 ? "font-bold" : ""} ${r.pHat >= r.pTheory ? "text-green-700" : "text-red-700"}`}>
+                      <td className={`text-right px-2 tabular-nums ${r.pP < 0.05 ? "font-bold" : ""} ${r.pHat >= r.pTheory ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.pHat - r.pTheory} />
                         {((r.pHat - r.pTheory) * 100).toFixed(1)}pp{r.pP < 0.05 ? "★" : ""}
                       </td>
                       <td className="text-right px-2 tabular-nums text-gray-800">{r.tauHat.toFixed(2)}</td>
@@ -1015,8 +1017,8 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                         <tr key={r.label} className="border-b border-gray-100">
                           <td className="py-1 px-2 text-gray-700">{r.label}</td>
                           <td className="text-right px-2 text-gray-600">{r.n}</td>
-                          <td className={`text-right px-2 tabular-nums ${r.expPerTrade >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(r.expPerTrade, 3)}</td>
-                          <td className={`text-right px-2 tabular-nums ${r.expPerTime >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(r.expPerTime, 3)}</td>
+                          <td className={`text-right px-2 tabular-nums ${r.expPerTrade >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.expPerTrade} />{fmtSignedPct(r.expPerTrade, 3)}</td>
+                          <td className={`text-right px-2 tabular-nums ${r.expPerTime >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.expPerTime} />{fmtSignedPct(r.expPerTime, 3)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-800">{r.sharpePerTrade.toFixed(3)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-600">{fmtPct(r.winRate, 1)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-600">{r.meanTauH.toFixed(2)}H</td>

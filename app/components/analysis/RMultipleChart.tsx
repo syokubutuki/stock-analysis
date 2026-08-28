@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { rMultiples } from "../../lib/execution-stats";
@@ -114,7 +116,7 @@ export default function RMultipleChart({ prices }: Props) {
           <span className="text-gray-500">
             期待値 コスト前 <span className="font-mono">{gross.expectancyR.toFixed(3)}R</span>
             {deduct && (
-              <> → 後 <span className={`font-mono font-medium ${res.expectancyR >= 0 ? "text-green-700" : "text-red-700"}`}>{res.expectancyR.toFixed(3)}R</span></>
+              <> → 後 <span className={`font-mono font-medium ${res.expectancyR >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={res.expectancyR} />{res.expectancyR.toFixed(3)}R</span></>
             )}
           </span>
         )}

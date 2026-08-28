@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
@@ -234,9 +236,9 @@ export default function ProspectiveLedgerChart({ prices, ticker }: Props) {
                     {ev ? (
                       <>
                         <td className="text-right px-1 font-mono">{ev.nOOS}</td>
-                        <td className={`text-right px-1 font-mono ${ev.muOOS > 0 ? "text-green-700" : "text-red-600"}`}>{(ev.muOOS * 100).toFixed(3)}%</td>
+                        <td className={`text-right px-1 font-mono ${ev.muOOS > 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={ev.muOOS} />{(ev.muOOS * 100).toFixed(3)}%</td>
                         <td className="text-right px-1 font-mono">{ev.sharpeOOS.toFixed(2)}</td>
-                        <td className={`text-right px-1 font-mono ${ev.cumOOS > 0 ? "text-green-700" : "text-red-600"}`}>{(ev.cumOOS * 100).toFixed(1)}%</td>
+                        <td className={`text-right px-1 font-mono ${ev.cumOOS > 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={ev.cumOOS} />{(ev.cumOOS * 100).toFixed(1)}%</td>
                         <td className="text-center px-1.5">
                           <span className={`inline-block rounded border px-1.5 py-0.5 ${verdict!.cls}`}>{verdict!.text}</span>
                         </td>

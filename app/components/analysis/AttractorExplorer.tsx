@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { takensEmbedding } from "../../lib/nonlinear";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -64,6 +65,10 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
     const pts = sx.norm.map((_, i) => ({ x: sx.norm[i], y: sy.norm[i], z: sz.norm[i], time: embedding[i].time }));
     return { points: pts, ranges: { xMin: sx.mn, xMax: sx.mx, yMin: sy.mn, yMax: sy.mx, zMin: sz.mn, zMax: sz.mx } };
   }, [embedding, dim]);
+  const latestPoint = embedding[embedding.length - 1];
+  const attractorDescription = latestPoint
+    ? `遅延${tau}日、${dim}次元のアトラクタ。${embedding.length}点を表示し、最新${latestPoint.time}の座標は${latestPoint.x.toFixed(3)}、${latestPoint.y.toFixed(3)}${dim === 3 ? `、${(latestPoint.z ?? 0).toFixed(3)}` : ""}です。`
+    : "アトラクタ。計算できるデータが不足しています。";
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -405,7 +410,8 @@ export default function AttractorExplorer({ prices, seriesMode }: Props) {
 
       {/* Canvas */}
       <div className="flex justify-center">
-        <canvas ref={canvasRef}
+        <AccessibleCanvas ref={canvasRef}
+          description={attractorDescription}
           className="rounded border border-gray-200 cursor-grab active:cursor-grabbing" />
       </div>
 

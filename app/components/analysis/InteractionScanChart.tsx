@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
@@ -217,9 +219,9 @@ export default function InteractionScanChart({ prices }: Props) {
                       <span className="text-fg-muted">{c.axisYLabel}:</span> {c.labelY}
                     </td>
                     <td className="text-right px-1 text-gray-500">{c.n}</td>
-                    <td className={`text-right px-1 font-mono ${colorCls(c.meanFwd)}`}>{pct(c.meanFwd, 2)}</td>
+                    <td className={`text-right px-1 font-mono ${colorCls(c.meanFwd)}`}><DirectionGlyph value={c.meanFwd} />{pct(c.meanFwd, 2)}</td>
                     <td className="text-right px-1 font-mono text-fg-muted">{pct(c.additive, 2)}</td>
-                    <td className={`text-right px-1 font-mono font-medium ${colorCls(c.interaction)}`}>{pct(c.interaction, 2)}</td>
+                    <td className={`text-right px-1 font-mono font-medium ${colorCls(c.interaction)}`}><DirectionGlyph value={c.interaction} />{pct(c.interaction, 2)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{Math.round(c.winRate * 100)}%</td>
                     <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{c.pAdj.toFixed(3)}{star(c.pAdj)}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600 whitespace-nowrap">

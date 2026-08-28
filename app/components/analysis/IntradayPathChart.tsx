@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeIntradayPath } from "../../lib/ohlc-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -27,6 +28,11 @@ const PAT_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
 export default function IntradayPathChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computeIntradayPath(prices), [prices]);
+  const pathDescription = useMemo(() => {
+    if (result.patterns.length === 0) return "日中パス推定。計算できるデータが不足しています。";
+    const mostFrequent = result.patterns.reduce((best, item) => item.pct > best.pct ? item : best);
+    return `日中パス推定。最多は${mostFrequent.name}で${(mostFrequent.pct * 100).toFixed(1)}%、${mostFrequent.count}件。翌日平均リターンは${(mostFrequent.avgNextReturn * 100).toFixed(3)}%、勝率は${(mostFrequent.winRate * 100).toFixed(0)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || result.patterns.length === 0) return;
@@ -77,7 +83,7 @@ export default function IntradayPathChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">日中パス推定</h3>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={pathDescription} /></div>
 
       <AnalysisGuide title="日中パス推定の詳細理論">
         <p className="font-medium text-gray-700">1. 日中パスとは</p>

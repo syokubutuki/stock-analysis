@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
@@ -588,7 +590,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           </span>
           {winStats && (
             <span className="text-fg-muted">
-              窓内 <span className={`font-mono ${colorCls(winStats.ret)}`}>{winStats.ret >= 0 ? "+" : ""}{(winStats.ret * 100).toFixed(1)}%</span>
+              窓内 <span className={`font-mono ${colorCls(winStats.ret)}`}><DirectionGlyph value={winStats.ret} />{winStats.ret >= 0 ? "+" : ""}{(winStats.ret * 100).toFixed(1)}%</span>
               {" "}・年率σ <span className="font-mono text-gray-600">{(winStats.vol * 100).toFixed(1)}%</span>
             </span>
           )}
@@ -866,7 +868,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
                     <td className="py-1 px-1.5 font-mono whitespace-nowrap">{s.label}</td>
                     <td className={`text-center px-1 font-medium ${s.direction === "long" ? "text-green-700" : "text-red-600"}`}>{s.direction === "long" ? "買" : "売"}</td>
                     <td className="text-right px-1 text-gray-500">{s.n}</td>
-                    <td className={`text-right px-1 font-mono ${colorCls(s.annualized)}`}>{pct(s.annualized, 1)}</td>
+                    <td className={`text-right px-1 font-mono ${colorCls(s.annualized)}`}><DirectionGlyph value={s.annualized} />{pct(s.annualized, 1)}</td>
                     <td className="text-right px-1 font-mono text-gray-700">{s.sharpe.toFixed(2)}</td>
                     <td className="text-right px-1 font-mono text-gray-700">{s.t.toFixed(2)}</td>
                     <td className={`text-right px-1 font-mono ${sig ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{s.pAdj.toFixed(3)}{star(s.pAdj)}</td>

@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef } from "react";
 import {
   createChart,
@@ -321,6 +323,7 @@ export default function RealizedVolVrpChart({ prices }: Props) {
           label="VRP"
           value={`${(vs.varianceRiskPremium * 10000).toFixed(1)} bps²`}
           tone={vs.varianceRiskPremium > 0 ? "up" : "down"}
+          directionValue={vs.varianceRiskPremium}
         />
       </div>
 
@@ -408,16 +411,18 @@ function Stat({
   label,
   value,
   tone,
+  directionValue,
 }: {
   label: string;
   value: string;
   tone?: "up" | "down";
+  directionValue?: number;
 }) {
   const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 rounded border border-gray-200 bg-gray-50">
       <div className="text-gray-500">{label}</div>
-      <div className={`font-mono font-medium ${c}`}>{value}</div>
+      <div className={`font-mono font-medium ${c}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
     </div>
   );
 }

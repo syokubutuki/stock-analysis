@@ -105,9 +105,9 @@ export default function RegimeTransitionChart({ prices }: Props) {
 
     // Plot key transitions: stay-in-high (2→2), high-to-low (2→0)
     const traces = [
-      { r: 0, c: 0, label: "低→低", color: "#10b981" },
-      { r: 2, c: 2, label: "高→高", color: "#ef4444" },
-      { r: 2, c: 0, label: "高→低", color: "#3b82f6" },
+      { r: 0, c: 0, label: "低→低", color: "#10b981", dash: [] as number[] },
+      { r: 2, c: 2, label: "高→高", color: "#ef4444", dash: [6, 3] },
+      { r: 2, c: 0, label: "高→低", color: "#3b82f6", dash: [2, 3] },
     ];
 
     // Grid
@@ -121,6 +121,7 @@ export default function RegimeTransitionChart({ prices }: Props) {
 
     for (const trace of traces) {
       ctx.strokeStyle = trace.color; ctx.lineWidth = 1.5;
+      ctx.setLineDash(trace.dash);
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
         const y = mt + plotH - rm[i].matrix[trace.r][trace.c] * plotH;
@@ -128,16 +129,19 @@ export default function RegimeTransitionChart({ prices }: Props) {
       }
       ctx.stroke();
     }
+    ctx.setLineDash([]);
 
     // Legend
     ctx.font = "10px sans-serif";
     for (let i = 0; i < traces.length; i++) {
       const lx = ml + 10 + i * 90;
       ctx.strokeStyle = traces[i].color; ctx.lineWidth = 2;
+      ctx.setLineDash(traces[i].dash);
       ctx.beginPath(); ctx.moveTo(lx, mt + 8); ctx.lineTo(lx + 16, mt + 8); ctx.stroke();
       ctx.fillStyle = "#374151"; ctx.textAlign = "left";
       ctx.fillText(traces[i].label, lx + 20, mt + 12);
     }
+    ctx.setLineDash([]);
 
     ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(ml, mt, plotW, plotH);
     ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";

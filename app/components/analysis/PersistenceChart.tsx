@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { conditionalForwardReturns, buildStateFn, STATE_AXES, StateAxis } from "../../lib/conditional-forward-returns";
@@ -83,7 +85,7 @@ export default function PersistenceChart({ prices }: Props) {
         ))}
       </div>
 
-      <div className={`rounded-md border px-3 py-2 text-xs ${data.corr > 0.5 ? "border-green-200 bg-green-50 text-green-900" : data.corr < 0 ? "border-red-200 bg-red-50 text-red-900" : "border-gray-200 bg-gray-50 text-gray-700"}`}>
+      <div className={`rounded-md border px-3 py-2 text-xs ${data.corr > 0.5 ? "border-green-200 bg-green-50 text-green-900" : data.corr < 0 ? "border-red-200 bg-red-50 text-red-900" : "border-gray-200 bg-gray-50 text-gray-700"}`}><DirectionGlyph value={data.corr} />
         前半・後半の状態別平均の相関 = <span className="font-bold">{data.corr.toFixed(2)}</span>
         ／ 符号一致率 <span className="font-bold">{(data.agree * 100).toFixed(0)}%</span>
         {data.corr > 0.5 ? "（エッジは再現性が高い）" : data.corr < 0 ? "（前半と後半で逆転＝不安定）" : "（再現性は限定的）"}

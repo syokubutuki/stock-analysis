@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // 「月曜は下げて始まる」を条件付き現象として解剖する。
 // 目的変数(月曜ギャップ/寄り後追随/当日/窓埋め)を、前週末(直前の金曜・木曜)の値動き経路・
 // 前夜米国・トレンド/ボラ/需給・カレンダー文脈で層別し、どの経路で顕著か/機能しないかを
@@ -396,7 +398,7 @@ export default function MondayGapChart({ prices }: Props) {
                           <td className="py-1 px-2 font-medium"><span className="inline-block w-2.5 h-2.5 rounded-full mr-1 align-middle" style={{ backgroundColor: b.color }} />{b.label}{cond.nowBin === b.idx && <span className="text-blue-600 ml-1">◀今</span>}</td>
                           <td className="text-right px-2 tabular-nums text-gray-500">{rng}</td>
                           <td className="text-right px-2 tabular-nums">{b.n}</td>
-                          <td className={`text-right px-2 tabular-nums font-medium ${(isRate ? b.posRate - 0.5 : b.mean) >= 0 ? "text-green-700" : "text-red-700"}`}>{isRate ? rateText(b.posRate) : pctText(b.mean)}</td>
+                          <td className={`text-right px-2 tabular-nums font-medium ${(isRate ? b.posRate - 0.5 : b.mean) >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={isRate ? b.posRate - 0.5 : b.mean} />{isRate ? rateText(b.posRate) : pctText(b.mean)}</td>
                           <td className="text-right px-2 tabular-nums">{isRate ? "—" : pctText(b.median)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-600">{rateText(b.negRate)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-500">{isRate ? "—" : `[${pctText(b.ciLo)}, ${pctText(b.ciHi)}]`}</td>
@@ -483,7 +485,7 @@ export default function MondayGapChart({ prices }: Props) {
                       <tr key={r.key} className="border-b border-gray-100">
                         <td className="py-1 px-2">{r.label}{r.needsUs && <span className="text-fg-muted"> (米)</span>}</td>
                         <td className="text-right px-2 tabular-nums">{r.n}</td>
-                        <td className={`text-right px-2 tabular-nums font-medium ${r.corr >= 0 ? "text-green-700" : "text-red-700"}`}>{r.corr.toFixed(3)}</td>
+                        <td className={`text-right px-2 tabular-nums font-medium ${r.corr >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.corr} />{r.corr.toFixed(3)}</td>
                         <td className="text-right px-2 tabular-nums text-gray-600">{r.partialCorr === null ? "—" : r.partialCorr.toFixed(3)}</td>
                         <td className="text-center px-2"><StatBadge n={r.n} p={r.pAdj} significant={r.significant} /></td>
                       </tr>

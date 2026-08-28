@@ -12,10 +12,24 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeHHS, computeSTFT, rollingSpectralEntropy } from "../../lib/hilbert-huang-spectrum";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
   seriesMode: SeriesMode;
+}
+
+function peakPeriodDescription(
+  matrix: number[][],
+  periods: number[],
+  timeIndex: number,
+): { period: number; value: number } | null {
+  if (timeIndex < 0 || matrix.length === 0 || periods.length === 0) return null;
+  let peakIndex = 0;
+  for (let i = 1; i < matrix.length; i++) {
+    if (matrix[i][timeIndex] > matrix[peakIndex][timeIndex]) peakIndex = i;
+  }
+  return { period: periods[peakIndex], value: matrix[peakIndex][timeIndex] };
 }
 
 export default function HilbertHuangChart({ prices, seriesMode }: Props) {
@@ -35,6 +49,21 @@ export default function HilbertHuangChart({ prices, seriesMode }: Props) {
     () => rollingSpectralEntropy(lr, Math.min(64, Math.floor(lr.length / 3))),
     [prices, seriesMode]
   );
+  const hhsDescription = useMemo(() => {
+    const timeIndex = hhs.timeAxis.length - 1;
+    const peak = peakPeriodDescription(hhs.energy, hhs.periodAxis, timeIndex);
+    if (!peak) return "Hilbert-Huangスペクトル。計算できるデータが不足しています。";
+    const relative = hhs.maxEnergy > 0 ? peak.value / hhs.maxEnergy : 0;
+    return `Hilbert-Huangスペクトル。直近${lrTimes[timeIndex] ?? "時点"}は${peak.period.toFixed(1)}日周期のエネルギーが最大で、全期間最大の${(relative * 100).toFixed(0)}%です。`;
+  }, [hhs, lrTimes]);
+  const stftDescription = useMemo(() => {
+    const timeIndex = stft.timeIndices.length - 1;
+    const peak = peakPeriodDescription(stft.magnitude, stft.periodAxis, timeIndex);
+    if (!peak) return "STFTスペクトログラム。計算できるデータが不足しています。";
+    const relative = stft.maxMag > 0 ? peak.value / stft.maxMag : 0;
+    const sourceIndex = stft.timeIndices[timeIndex];
+    return `STFTスペクトログラム。直近${lrTimes[sourceIndex] ?? "時点"}は${peak.period.toFixed(1)}日周期の振幅が最大で、全期間最大の${(relative * 100).toFixed(0)}%です。`;
+  }, [lrTimes, stft]);
 
   // HHS heatmap
   useEffect(() => {
@@ -103,11 +132,19 @@ export default function HilbertHuangChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         <div>
           <div className="text-xs text-gray-500 mb-1">Hilbert-Huang Spectrum（適応的）</div>
-          <canvas ref={hhsCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas
+            ref={hhsCanvasRef}
+            description={hhsDescription}
+            className="w-full rounded border border-gray-100"
+          />
         </div>
         <div>
           <div className="text-xs text-gray-500 mb-1">STFT Spectrogram（固定窓=64日）</div>
-          <canvas ref={stftCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas
+            ref={stftCanvasRef}
+            description={stftDescription}
+            className="w-full rounded border border-gray-100"
+          />
         </div>
       </div>
 

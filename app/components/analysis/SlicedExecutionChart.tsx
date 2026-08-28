@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
 import { computeSlicedExecution, SlicedResult, SliceMethod } from "../../lib/sliced-execution";
@@ -177,10 +179,10 @@ export default function SlicedExecutionChart({ ticker }: Props) {
                         {isBest && <span className="text-green-700 mr-1">◀</span>}{m.label}
                       </td>
                       <td className="text-right px-2 text-gray-600">{m.n}</td>
-                      <td className={`text-right px-2 tabular-nums ${m.meanQPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(m.meanQPct / 100)}</td>
+                      <td className={`text-right px-2 tabular-nums ${m.meanQPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={m.meanQPct} />{fmtSignedPct(m.meanQPct / 100)}</td>
                       <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">{fmtSignedPct(m.qCiLoPct / 100)}〜{fmtSignedPct(m.qCiHiPct / 100)}</td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{m.fillStdPct.toFixed(2)}%</td>
-                      <td className={`text-right px-2 tabular-nums ${m.isMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(m.isMeanPct / 100)}</td>
+                      <td className={`text-right px-2 tabular-nums ${m.isMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={m.isMeanPct} />{fmtSignedPct(m.isMeanPct / 100)}</td>
                     </tr>
                   );
                 })}

@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // as-of アナログ経路リプレイ: 過去の各週末に戻って「そのとき出ていた予測経路」を再現し、
 // 実際に辿った経路を1枚ずつ重ねて並べる。
 //
@@ -74,7 +76,7 @@ function PathCell({ p, H, scale }: { p: OosPredPoint; H: number; scale: number }
       </svg>
       <div className="flex items-center justify-between text-[10px] tabular-nums">
         <span className="text-blue-600">予{pct(p.yhat)}</span>
-        <span className={p.yact >= 0 ? "text-green-700 font-medium" : "text-red-600 font-medium"}>実{pct(p.yact)}</span>
+        <span className={p.yact >= 0 ? "text-green-700 font-medium" : "text-red-600 font-medium"}><DirectionGlyph value={p.yact} />実{pct(p.yact)}</span>
         <span className="text-fg-muted">被{covTot ? `${Math.round((covHit / covTot) * 100)}%` : "—"}</span>
       </div>
     </div>

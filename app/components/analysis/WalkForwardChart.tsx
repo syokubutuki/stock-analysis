@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
@@ -182,7 +184,7 @@ export default function WalkForwardChart({ prices }: Props) {
                     <td className="py-1 px-1.5 font-mono whitespace-nowrap text-gray-600">{f.oosStartDate}〜{f.oosEndDate}</td>
                     <td className="px-1.5">{f.selectedLabel}</td>
                     <td className="text-right px-1 font-mono text-gray-500">{f.isSharpe.toFixed(2)}</td>
-                    <td className={`text-right px-1 font-mono ${f.oosSharpe > 0 ? "text-green-700" : "text-red-600"}`}>{f.oosSharpe.toFixed(2)}</td>
+                    <td className={`text-right px-1 font-mono ${f.oosSharpe > 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={f.oosSharpe} />{f.oosSharpe.toFixed(2)}</td>
                     <td className="text-right px-1.5 font-mono text-gray-600">{Math.round(f.oosRank * 100)}%</td>
                   </tr>
                 ))}

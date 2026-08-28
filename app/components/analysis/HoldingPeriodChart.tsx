@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeHoldingPeriods, type HoldingPeriodStats } from "../../lib/cross-analysis";
@@ -245,7 +247,7 @@ export default function HoldingPeriodChart({ prices }: Props) {
                   </td>
                   <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(s.stdReturn)}</td>
                   <td className={`py-1 px-2 text-center font-mono font-medium ${s.sharpe >= 0 ? "text-blue-600" : "text-red-600"}`}>
-                    {s.sharpe.toFixed(3)}
+                    <DirectionGlyph value={s.sharpe} />{s.sharpe.toFixed(3)}
                   </td>
                   {/* 勝率は 50% を境に向きを判定する（0 ではない） */}
                   <td className="py-1 px-2 text-center font-mono">

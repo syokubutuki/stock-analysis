@@ -12,6 +12,7 @@ import {
 import { PathStat, PairDiff } from "../../lib/intraday-path-core";
 import { fmtSignedPct, drawTimeAxisLabels, initCanvas } from "./intradayShared";
 import StatBadge from "./StatBadge";
+import { DirectionGlyph } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 0..1 の不透明度を #rrggbb に付ける2桁16進に変換。
@@ -402,7 +403,7 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
       <td className={`text-right px-2 tabular-nums ${sig ? "font-bold bg-amber-50" : ""} ${
         sig ? (kind === "peak" ? "text-blue-700" : "text-red-700") : "text-gray-500"
       }`} title={`Spearman ρ=${rho.toFixed(3)} / p=${p.toFixed(3)}${sig ? ` → ${dir}` : ""}`}>
-        {rho >= 0 ? "+" : ""}{rho.toFixed(2)}{sig ? `★${dir}` : ""}
+        <DirectionGlyph value={rho} />{rho >= 0 ? "+" : ""}{rho.toFixed(2)}{sig ? `★${dir}` : ""}
       </td>
     );
   };
@@ -438,9 +439,9 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
                     </span>
                   </td>
                   <td className="text-right px-2 text-gray-500 tabular-nums">{d.nRho}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d.endEarly)}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(d.endLate)}</td>
-                  <td className={`text-right px-2 font-medium tabular-nums ${d.endDiff >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(d.endDiff)}</td>
+                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={d.endEarly} />{fmtSignedPct(d.endEarly)}</td>
+                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={d.endLate} />{fmtSignedPct(d.endLate)}</td>
+                  <td className={`text-right px-2 font-medium tabular-nums ${d.endDiff >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={d.endDiff} />{fmtSignedPct(d.endDiff)}</td>
                   <td className="px-2"><StatBadge n={Math.min(d.nEarly, d.nLate)} p={d.endP} significant={d.endP < 0.05} /></td>
                   {rhoCell(d.peakRho, d.peakP, "peak")}
                   {rhoCell(d.troughRho, d.troughP, "trough")}
@@ -565,8 +566,8 @@ export function PathSummaryTable({
                 </span>
               </td>
               <td className="text-right px-2 text-gray-600">{b.n}</td>
-              <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(b.endMean)}</td>
-              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.endMed)}</td>
+              <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.endMean} />{fmtSignedPct(b.endMean)}</td>
+              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.endMed} />{fmtSignedPct(b.endMed)}</td>
               <td className="text-center px-2 text-gray-600">
                 <span className="text-blue-600">▲</span> {timeLabels[b.peakIdx] ?? "-"} <span className="text-fg-muted">({fmtSignedPct(b.mean[b.peakIdx])})</span>
               </td>
@@ -623,7 +624,7 @@ export function PairDiffMatrix({ stats, pairDiffs }: { stats: PathStat[]; pairDi
                         title={`差 ${fmtSignedPct(diff)} / p=${d.p.toFixed(3)} / FDR ${d.pAdj.toFixed(3)}`}
                         className={`p-1 text-center tabular-nums ${sig ? "font-bold" : ""} ${diff >= 0 ? "text-green-700" : "text-red-700"} ${sig ? "bg-amber-50" : ""}`}
                       >
-                        {fmtSignedPct(diff, 1)}{sig ? "★" : ""}
+                        <DirectionGlyph value={diff} />{fmtSignedPct(diff, 1)}{sig ? "★" : ""}
                       </td>
                     );
                   })}

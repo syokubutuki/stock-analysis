@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
@@ -260,9 +262,9 @@ export default function FuturesCarryChart({ prices }: Props) {
         <Stat label="カーブ形状" value={
           curve.regime === "contango" ? "コンタンゴ" : curve.regime === "backwardation" ? "バック" : "フラット"
         } tone={curve.regime === "contango" ? "down" : curve.regime === "backwardation" ? "up" : undefined} />
-        <Stat label="年率ロールイールド" value={`${((q - r) * 100).toFixed(2)}%`} tone={q - r >= 0 ? "up" : "down"} />
-        {roll && <Stat label="累積ロールドラッグ" value={`${(roll.totalRollDrag * 100).toFixed(1)}%`} tone={roll.totalRollDrag > 0 ? "down" : "up"} />}
-        {roll && <Stat label="年率ドラッグ" value={`${(roll.annualizedRollDrag * 100).toFixed(2)}%`} tone={roll.annualizedRollDrag > 0 ? "down" : "up"} />}
+        <Stat label="年率ロールイールド" value={`${((q - r) * 100).toFixed(2)}%`} tone={q - r >= 0 ? "up" : "down"} directionValue={q - r} />
+        {roll && <Stat label="累積ロールドラッグ" value={`${(roll.totalRollDrag * 100).toFixed(1)}%`} tone={roll.totalRollDrag > 0 ? "down" : "up"} directionValue={roll.totalRollDrag} />}
+        {roll && <Stat label="年率ドラッグ" value={`${(roll.annualizedRollDrag * 100).toFixed(2)}%`} tone={roll.annualizedRollDrag > 0 ? "down" : "up"} directionValue={roll.annualizedRollDrag} />}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -355,16 +357,18 @@ function Stat({
   label,
   value,
   tone,
+  directionValue,
 }: {
   label: string;
   value: string;
   tone?: "up" | "down";
+  directionValue?: number;
 }) {
   const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 rounded border border-gray-200 bg-gray-50">
       <div className="text-gray-500">{label}</div>
-      <div className={`font-mono font-medium ${c}`}>{value}</div>
+      <div className={`font-mono font-medium ${c}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
     </div>
   );
 }

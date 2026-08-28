@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import React, { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeRegimeTechnical, type RegimeTechnicalResult } from "../../lib/cross-analysis";
@@ -169,7 +171,7 @@ export default function RegimeTechnicalChart({ prices }: Props) {
                   </div>
                   <div className="col-span-2">
                     <span className="text-gray-500">年率リターン: </span>
-                    <span className={`font-mono font-medium ${r.avgReturn >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    <span className={`font-mono font-medium ${r.avgReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={r.avgReturn} />
                       {(r.avgReturn * 100).toFixed(1)}%
                     </span>
                   </div>
@@ -218,10 +220,10 @@ export default function RegimeTechnicalChart({ prices }: Props) {
                     {results.map((r, i) => (
                       <React.Fragment key={i}>
                         <td className="py-1.5 px-1 text-center font-mono text-gray-500">{row.getN(r)}</td>
-                        <td className={`py-1.5 px-1 text-center font-mono ${row.getWR(r) >= 0.5 ? "text-green-700 font-medium" : row.getN(r) > 0 ? "text-red-600" : "text-fg-muted"}`}>
+                        <td className={`py-1.5 px-1 text-center font-mono ${row.getWR(r) >= 0.5 ? "text-green-700 font-medium" : row.getN(r) > 0 ? "text-red-600" : "text-fg-muted"}`}><DirectionGlyph value={row.getWR(r) - 0.5} />
                           {row.getN(r) > 0 ? `${(row.getWR(r) * 100).toFixed(0)}%` : "-"}
                         </td>
-                        <td className={`py-1.5 px-1 text-center font-mono ${row.getR(r) >= 0 ? "text-green-700" : "text-red-600"}`}>
+                        <td className={`py-1.5 px-1 text-center font-mono ${row.getR(r) >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={row.getR(r)} />
                           {row.getN(r) > 0 ? pctFmt(row.getR(r)) : "-"}
                         </td>
                       </React.Fragment>

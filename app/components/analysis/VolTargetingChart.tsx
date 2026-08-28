@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 // ボラティリティ・ターゲティング（信用レバ可変 0〜3倍）vs バイ&ホールド。
 // リターン予測を使わず「ボラの予測可能性」だけでSharpe改善を狙う戦略を、
 // JKM Sharpe差検定 / スパニング回帰α(Newey–West) / 置換検定(機構) / MZボラ予測力 で検証する。
@@ -464,9 +466,9 @@ export default function VolTargetingChart({ prices }: Props) {
           <tbody>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">年率リターン</td>
-              <td className={`text-right px-2 ${cls(metrics.strat.annualized)}`}>{pct(metrics.strat.annualized)}</td>
-              <td className={`text-right px-2 ${cls(metrics.bh.annualized)}`}>{pct(metrics.bh.annualized)}</td>
-              <td className={`text-right px-2 font-medium ${cls(annual.delta)}`}>{pct(annual.delta)}</td>
+              <td className={`text-right px-2 ${cls(metrics.strat.annualized)}`}><DirectionGlyph value={metrics.strat.annualized} />{pct(metrics.strat.annualized)}</td>
+              <td className={`text-right px-2 ${cls(metrics.bh.annualized)}`}><DirectionGlyph value={metrics.bh.annualized} />{pct(metrics.bh.annualized)}</td>
+              <td className={`text-right px-2 font-medium ${cls(annual.delta)}`}><DirectionGlyph value={annual.delta} />{pct(annual.delta)}</td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">年率ボラティリティ</td>
@@ -476,15 +478,15 @@ export default function VolTargetingChart({ prices }: Props) {
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">年率Sharpe</td>
-              <td className={`text-right px-2 ${cls(metrics.strat.sharpe)}`}>{num2(metrics.strat.sharpe)}</td>
-              <td className={`text-right px-2 ${cls(metrics.bh.sharpe)}`}>{num2(metrics.bh.sharpe)}</td>
-              <td className={`text-right px-2 font-medium ${cls(sharpe.delta)}`}>{num2(sharpe.delta)}</td>
+              <td className={`text-right px-2 ${cls(metrics.strat.sharpe)}`}><DirectionGlyph value={metrics.strat.sharpe} />{num2(metrics.strat.sharpe)}</td>
+              <td className={`text-right px-2 ${cls(metrics.bh.sharpe)}`}><DirectionGlyph value={metrics.bh.sharpe} />{num2(metrics.bh.sharpe)}</td>
+              <td className={`text-right px-2 font-medium ${cls(sharpe.delta)}`}><DirectionGlyph value={sharpe.delta} />{num2(sharpe.delta)}</td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">最大ドローダウン</td>
-              <td className={`text-right px-2 ${cls(metrics.strat.maxDD)}`}>{pct(metrics.strat.maxDD)}</td>
-              <td className={`text-right px-2 ${cls(metrics.bh.maxDD)}`}>{pct(metrics.bh.maxDD)}</td>
-              <td className={`text-right px-2 font-medium ${cls(metrics.strat.maxDD - metrics.bh.maxDD)}`}>{pct(metrics.strat.maxDD - metrics.bh.maxDD)}</td>
+              <td className={`text-right px-2 ${cls(metrics.strat.maxDD)}`}><DirectionGlyph value={metrics.strat.maxDD} />{pct(metrics.strat.maxDD)}</td>
+              <td className={`text-right px-2 ${cls(metrics.bh.maxDD)}`}><DirectionGlyph value={metrics.bh.maxDD} />{pct(metrics.bh.maxDD)}</td>
+              <td className={`text-right px-2 font-medium ${cls(metrics.strat.maxDD - metrics.bh.maxDD)}`}><DirectionGlyph value={metrics.strat.maxDD - metrics.bh.maxDD} />{pct(metrics.strat.maxDD - metrics.bh.maxDD)}</td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">平均レバ / 実効目標ボラ</td>
@@ -515,7 +517,7 @@ export default function VolTargetingChart({ prices }: Props) {
           </div>
           <p className="text-xs text-gray-500">リスク調整後の優位。Jobson–Korkie–Memmel検定＋ペア・ブロックBootstrap。</p>
           <div className="text-sm space-y-0.5">
-            <div className="flex justify-between"><span className="text-gray-500">Sharpe差（年率）</span><span className={cls(sharpe.delta)}>{num2(sharpe.delta)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Sharpe差（年率）</span><span className={cls(sharpe.delta)}><DirectionGlyph value={sharpe.delta} />{num2(sharpe.delta)}</span></div>
             {sharpe.jkmZ !== null && (
               <div className="flex justify-between"><span className="text-gray-500">JKM統計量 z</span><span className="text-gray-700">{num2(sharpe.jkmZ)}</span></div>
             )}
@@ -538,7 +540,7 @@ export default function VolTargetingChart({ prices }: Props) {
             r<sub>戦略</sub> = α + β·r<sub>B&H</sub> + ε。α&gt;0 なら「B&Hのレバ調整では複製できない付加価値」。Newey–West(ラグ5)。
           </p>
           <div className="text-sm space-y-0.5">
-            <div className="flex justify-between"><span className="text-gray-500">α（年率）</span><span className={cls(alpha.alphaAnn)}>{pct(alpha.alphaAnn)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">α（年率）</span><span className={cls(alpha.alphaAnn)}><DirectionGlyph value={alpha.alphaAnn} />{pct(alpha.alphaAnn)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">β / R²</span><span className="text-gray-700">{num2(alpha.beta)} / {num2(alpha.r2)}</span></div>
             {alpha.tNW !== null && (
               <div className="flex justify-between"><span className="text-gray-500">NW t値</span><span className="text-gray-700">{num2(alpha.tNW)}</span></div>
@@ -576,7 +578,7 @@ export default function VolTargetingChart({ prices }: Props) {
           <div className="text-sm space-y-0.5">
             <div className="flex justify-between"><span className="text-gray-500">MZ傾き b（理想≈1）</span><span className="text-gray-700">{num2(volForecast.mzSlope)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">MZ R²</span><span className="text-gray-700">{volForecast.mzR2.toFixed(3)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Spearman ρ(σ̂, |r|)</span><span className={cls(volForecast.spearman)}>{num2(volForecast.spearman)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Spearman ρ(σ̂, |r|)</span><span className={cls(volForecast.spearman)}><DirectionGlyph value={volForecast.spearman} />{num2(volForecast.spearman)}</span></div>
           </div>
         </div>
       </div>
@@ -607,10 +609,10 @@ export default function VolTargetingChart({ prices }: Props) {
                   onClick={() => extReady[row.source] && setSigmaSource(row.source)}
                 >
                   <td className="py-1 px-2 text-gray-700">{row.label}</td>
-                  <td className={`text-right px-2 ${cls(row.spearman - 0.2)}`}>{num2(row.spearman)}</td>
+                  <td className={`text-right px-2 ${cls(row.spearman - 0.2)}`}><DirectionGlyph value={row.spearman - 0.2} />{num2(row.spearman)}</td>
                   <td className="text-right px-2 text-gray-700">{row.mzR2.toFixed(3)}</td>
-                  <td className={`text-right px-2 ${cls(row.dSharpe)}`}>{num2(row.dSharpe)}</td>
-                  <td className={`text-right px-2 ${cls(row.dMaxDD)}`}>{(row.dMaxDD * 100).toFixed(1)}</td>
+                  <td className={`text-right px-2 ${cls(row.dSharpe)}`}><DirectionGlyph value={row.dSharpe} />{num2(row.dSharpe)}</td>
+                  <td className={`text-right px-2 ${cls(row.dMaxDD)}`}><DirectionGlyph value={row.dMaxDD} />{(row.dMaxDD * 100).toFixed(1)}</td>
                   <td className="text-right px-2 text-gray-700">{row.avgLev.toFixed(2)}</td>
                 </tr>
               ))}

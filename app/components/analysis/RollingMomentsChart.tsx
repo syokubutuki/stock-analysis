@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { rollingMoments } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -100,6 +101,7 @@ export default function RollingMomentsChart({ prices, seriesMode }: Props) {
 
   const { values: lr, times } = extractSeries(prices, seriesMode);
   const rolling = useMemo(() => rollingMoments(lr, times, 60), [prices, seriesMode]);
+  const latest = rolling[rolling.length - 1];
 
   useEffect(() => {
     if (rolling.length < 2) return;
@@ -144,9 +146,24 @@ export default function RollingMomentsChart({ prices, seriesMode }: Props) {
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">ローリング高次モーメント</h3>
 
-      <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={skewRef} /></div>
-      <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={kurtRef} /></div>
-      <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={stdRef} /></div>
+      <div className="w-full rounded border border-gray-100 overflow-hidden">
+        <AccessibleCanvas
+          ref={skewRef}
+          description={latest ? `60日ローリング歪度。直近${latest.time}は${latest.skewness.toFixed(2)}です。` : "60日ローリング歪度。計算できるデータが不足しています。"}
+        />
+      </div>
+      <div className="w-full rounded border border-gray-100 overflow-hidden">
+        <AccessibleCanvas
+          ref={kurtRef}
+          description={latest ? `60日ローリング超過尖度。直近${latest.time}は${latest.kurtosis.toFixed(2)}です。` : "60日ローリング超過尖度。計算できるデータが不足しています。"}
+        />
+      </div>
+      <div className="w-full rounded border border-gray-100 overflow-hidden">
+        <AccessibleCanvas
+          ref={stdRef}
+          description={latest ? `60日ローリング標準偏差。直近${latest.time}は${(latest.std * 100).toFixed(2)}%です。` : "60日ローリング標準偏差。計算できるデータが不足しています。"}
+        />
+      </div>
 
       <AnalysisGuide title="ローリング高次モーメントの詳細理論">
         <p className="font-medium text-gray-700">ローリング窓の意味</p>

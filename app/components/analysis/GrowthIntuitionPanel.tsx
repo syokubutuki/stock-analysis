@@ -41,6 +41,7 @@ import {
 } from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import { DirectionGlyph } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // ── 定数 ───────────────────────────────────────────────────────────────────
@@ -391,7 +392,7 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
                   game.final >= CAPITAL ? "text-green-700" : "text-red-700"
                 }`}
               >
-                {manYen(game.final)}
+                <DirectionGlyph value={game.final - CAPITAL} />{manYen(game.final)}
               </div>
             </div>
             <div>
@@ -401,7 +402,7 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
                   game.final >= CAPITAL ? "text-green-700" : "text-red-700"
                 }`}
               >
-                {game.final >= CAPITAL ? "+" : "−"}
+                <DirectionGlyph value={game.final - CAPITAL} />{game.final >= CAPITAL ? "+" : "−"}
                 {manYen(Math.abs(game.final - CAPITAL))}
               </div>
             </div>
@@ -537,7 +538,7 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
             <p className="mt-1 text-[11px] text-gray-500">
               この人の最終資産は元本の{" "}
               <strong className={coin.final >= 1 ? "text-green-700" : "text-red-700"}>
-                {coin.final >= 0.01 ? `${coin.final.toFixed(3)} 倍` : `${coin.final.toExponential(2)} 倍`}
+                <DirectionGlyph value={coin.final - 1} />{coin.final >= 0.01 ? `${coin.final.toFixed(3)} 倍` : `${coin.final.toExponential(2)} 倍`}
               </strong>
               （表 {coin.heads} 回 / {TOSSES} 回）。1回あたりの実質は理論上{" "}
               <strong className="text-red-700">{signPct(coinTheory.perToss, 2)}</strong>（

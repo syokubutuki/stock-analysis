@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePriceForecast } from "../../lib/simulation";
@@ -275,7 +277,7 @@ export default function PriceForecastChart({ prices }: Props) {
         </div>
         <div className="p-2 bg-blue-50 rounded border border-blue-200">
           <div className="text-gray-500">予測中央値</div>
-          <div className={`font-mono font-bold ${changeP50 >= 0 ? "text-green-700" : "text-red-600"}`}>
+          <div className={`font-mono font-bold ${changeP50 >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={changeP50} />
             {formatPrice(finalStats.median)} ({changeP50 >= 0 ? "+" : ""}{changeP50.toFixed(1)}%)
           </div>
         </div>
@@ -293,7 +295,7 @@ export default function PriceForecastChart({ prices }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded border">
           <div className="text-gray-500">上昇確率</div>
-          <div className={`font-mono font-bold ${finalStats.probUp >= 0.5 ? "text-green-700" : "text-red-600"}`}>
+          <div className={`font-mono font-bold ${finalStats.probUp >= 0.5 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={finalStats.probUp - 0.5} />
             {(finalStats.probUp * 100).toFixed(1)}%
           </div>
         </div>

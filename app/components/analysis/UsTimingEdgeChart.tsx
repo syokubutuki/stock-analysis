@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { computeTiming, binCounts, maxStatPermutation, TimingResult, MaxStatResult } from "../../lib/us-spillover-timing";
 import { BinScheme } from "../../lib/us-spillover-core";
@@ -160,7 +162,7 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
                       <tr key={k} className="border-b border-gray-100">
                         <td className="py-1 px-2 font-mono text-gray-700">{result.timeLabels[c.i]} → {result.timeLabels[c.j]}</td>
                         <td className="px-2">{c.mean >= 0 ? <span className="text-green-700">ロング</span> : <span className="text-red-700">ショート</span>}</td>
-                        <td className={`text-right px-2 font-medium ${c.mean >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtSignedPct(c.mean)}</td>
+                        <td className={`text-right px-2 font-medium ${c.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={c.mean} />{fmtSignedPct(c.mean)}</td>
                         <td className="text-right px-2 text-gray-600">{c.n}</td>
                         <td className="text-right px-2 text-gray-600">{c.stable != null ? `${(c.stable * 100).toFixed(0)}%` : "—"}</td>
                         <td className="px-2"><StatBadge n={c.n} p={c.p} significant={c.significant} /></td>

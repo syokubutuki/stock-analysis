@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
 import { computeGapIntraday, GapIntradayResult } from "../../lib/gap-intraday";
@@ -83,7 +85,7 @@ export default function GapIntradayChart({ ticker }: Props) {
                     <td className="text-right">{fmtPct(b.fillRate)}</td>
                     <td className="text-right">{b.medFillMin ? minuteToLabel(b.medFillMin) : "—"}</td>
                     <td className="text-right">{fmtPct(b.contRate)}</td>
-                    <td className={`text-right ${b.closeMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}>{fmtSignedPct(b.closeMeanPct / 100)}</td>
+                    <td className={`text-right ${b.closeMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.closeMeanPct} />{fmtSignedPct(b.closeMeanPct / 100)}</td>
                   </tr>
                 ))}
               </tbody>

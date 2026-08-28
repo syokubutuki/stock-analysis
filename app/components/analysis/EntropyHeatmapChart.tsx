@@ -9,6 +9,7 @@ import {
   entropyDivergenceMap,
 } from "../../lib/entropy-visualization";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -59,6 +60,29 @@ export default function EntropyHeatmapChart({ prices, seriesMode }: Props) {
   const heatmap = useMemo(() => entropyHeatmap(values, times, 20, 60, 5), [prices, seriesMode]);
   const patterns = useMemo(() => permutationPatternDistribution(values, 3, 1), [prices, seriesMode]);
   const divergence = useMemo(() => entropyDivergenceMap(values, times, 30, 120), [prices, seriesMode]);
+  const heatmapDescription = useMemo(() => {
+    const latest = heatmap.values[heatmap.values.length - 1];
+    if (!latest || latest.length === 0) {
+      return "エントロピーヒートマップ。計算できるデータが不足しています。";
+    }
+    let minIndex = 0;
+    let maxIndex = 0;
+    for (let i = 1; i < latest.length; i++) {
+      if (latest[i] < latest[minIndex]) minIndex = i;
+      if (latest[i] > latest[maxIndex]) maxIndex = i;
+    }
+    return `エントロピーヒートマップ。直近${heatmap.times[heatmap.times.length - 1] ?? "時点"}は、最小がスケール${heatmap.scales[minIndex]}の${latest[minIndex].toFixed(2)}、最大がスケール${heatmap.scales[maxIndex]}の${latest[maxIndex].toFixed(2)}です。`;
+  }, [heatmap]);
+  const patternDescription = useMemo(() => {
+    if (patterns.length === 0) return "順列パターン頻度。計算できるデータが不足しています。";
+    const mostFrequent = patterns.reduce((best, item) => item.frequency > best.frequency ? item : best);
+    return `順列パターン頻度。最多は${mostFrequent.label}で${(mostFrequent.frequency * 100).toFixed(1)}%、一様分布の${(100 / patterns.length).toFixed(1)}%と比較しています。`;
+  }, [patterns]);
+  const divergenceDescription = useMemo(() => {
+    const latest = divergence[divergence.length - 1];
+    if (!latest) return "短期・長期エントロピー乖離。計算できるデータが不足しています。";
+    return `短期・長期エントロピー乖離。直近${latest.time}は短期30日が${latest.shortEntropy.toFixed(2)}、長期120日が${latest.longEntropy.toFixed(2)}、差は${(latest.shortEntropy - latest.longEntropy).toFixed(2)}です。`;
+  }, [divergence]);
 
   // ヒートマップ
   useEffect(() => {
@@ -266,15 +290,15 @@ export default function EntropyHeatmapChart({ prices, seriesMode }: Props) {
       <h3 className="font-bold text-gray-800 mb-3">エントロピーヒートマップ / パターン分布</h3>
 
       <div className="w-full rounded border border-gray-100 overflow-hidden mb-4">
-        <canvas ref={heatmapRef} />
+        <AccessibleCanvas ref={heatmapRef} description={heatmapDescription} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="rounded border border-gray-100 overflow-hidden">
-          <canvas ref={patternRef} />
+          <AccessibleCanvas ref={patternRef} description={patternDescription} />
         </div>
         <div className="rounded border border-gray-100 overflow-hidden">
-          <canvas ref={divRef} />
+          <AccessibleCanvas ref={divRef} description={divergenceDescription} />
         </div>
       </div>
 

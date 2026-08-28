@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
@@ -181,15 +183,15 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
             <Stat label="インプライドσ" value={(result.impliedSigma * 100).toFixed(1) + "%"}
               tone={result.realizedSigma > result.impliedSigma ? "up" : "down"} />
             <Stat label="最終P&L（ロング）" value={fmt(result.finalPnL)}
-              tone={result.finalPnL >= 0 ? "up" : "down"} />
+              tone={result.finalPnL >= 0 ? "up" : "down"} directionValue={result.finalPnL} />
             <Stat label="プレミアム" value={fmt(result.premium)} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-            <Stat label="ガンマ項 Σ½Γ(ΔS)²" value={fmt(result.gammaPnL)} tone="up" />
-            <Stat label="シータ項 ΣΘdt" value={fmt(result.thetaPnL)} tone="down" />
+            <Stat label="ガンマ項 Σ½Γ(ΔS)²" value={fmt(result.gammaPnL)} tone="up" directionValue={result.gammaPnL} />
+            <Stat label="シータ項 ΣΘdt" value={fmt(result.thetaPnL)} tone="down" directionValue={result.thetaPnL} />
             <Stat label="ガンマ+シータ" value={fmt(result.gammaPnL + result.thetaPnL)}
-              tone={result.gammaPnL + result.thetaPnL >= 0 ? "up" : "down"} />
+              tone={result.gammaPnL + result.thetaPnL >= 0 ? "up" : "down"} directionValue={result.gammaPnL + result.thetaPnL} />
           </div>
 
           <div className="text-xs bg-gray-50 rounded p-2">
@@ -275,16 +277,18 @@ function Stat({
   label,
   value,
   tone,
+  directionValue,
 }: {
   label: string;
   value: string;
   tone?: "up" | "down";
+  directionValue?: number;
 }) {
   const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 rounded border border-gray-200 bg-gray-50">
       <div className="text-gray-500">{label}</div>
-      <div className={`font-mono font-medium ${c}`}>{value}</div>
+      <div className={`font-mono font-medium ${c}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { DirectionGlyph } from "./DirectionValue";
+
 import { useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { statePredictability } from "../../lib/state-predictability";
@@ -50,7 +52,7 @@ export default function StatePredictabilityChart({ prices }: Props) {
                     <span className="text-gray-600 tabular-nums">{(r.hitRate * 100).toFixed(0)}%</span>
                   </div>
                 </td>
-                <td className={`text-right px-2 font-medium ${Math.abs(r.ic) >= 0.1 ? (r.ic > 0 ? "text-green-700" : "text-red-600") : "text-fg-muted"}`}>{r.ic.toFixed(3)}</td>
+                <td className={`text-right px-2 font-medium ${Math.abs(r.ic) >= 0.1 ? (r.ic > 0 ? "text-green-700" : "text-red-600") : "text-fg-muted"}`}><DirectionGlyph value={r.ic} />{r.ic.toFixed(3)}</td>
               </tr>
             ))}
           </tbody>
