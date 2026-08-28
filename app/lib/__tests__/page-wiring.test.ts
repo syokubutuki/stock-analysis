@@ -22,10 +22,15 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sectionForPanel } from "../panel-sections";
+import {
+  PANEL_IDS_GOLDEN,
+  STANDALONE_PANEL_IDS_GOLDEN,
+} from "./fixtures/panel-ids.golden";
 import {
   CLOSE_ONLY_CAUTION_PANEL_IDS,
   CLOSE_ONLY_SAFE_PANEL_IDS,
@@ -164,5 +169,57 @@ describe("系列セレクタの対応（U3: 使えないコントロールを出
       "missing = seriesMode を使うのに宣言が無い節（セレクタが出ず操作できない）/ " +
         "extra = 宣言はあるが誰も seriesMode を使わない節（セレクタが出るのに何も起きない）"
     );
+  });
+});
+
+describe("パネルIDの互換契約（共有URL `?panel=` と localStorage `sa:open:<id>`）", () => {
+  // M3（レジストリ化）はIDの**所在**を動かす作業である。移設で1つでもIDが変わると、
+  // 共有されたURLと保存済みの開閉状態が静かに壊れる。壊れても例外は出ないので、
+  // 移設の前後で同じ配列と突き合わせる以外に検知手段が無い。
+  test("並び順込みで golden と完全一致する", () => {
+    assert.deepEqual(panels.map((p) => p.id), [...PANEL_IDS_GOLDEN]);
+  });
+
+  test("AccordionSection 外のパネルも所属節へ解決する", () => {
+    for (const id of STANDALONE_PANEL_IDS_GOLDEN) {
+      assert.ok(sectionForPanel(id), `${id} の所属節が解決できない`);
+    }
+  });
+});
+
+describe("結果バッジのパネルID（FU33: 移設でバッジが無言で消えるのを止める）", () => {
+  // `useAnalysisResultSummary("tech-adx", …)` は page.tsx が持つIDを
+  // **コンポーネント側が文字列で複製**している。page.tsx 側でIDを変えると
+  // Provider が受け取るキーだけがずれ、**バッジが何も言わずに出なくなる**。
+  // 例外もログも出ないので、突き合わせる以外に検知手段が無い。
+  const componentDir = fileURLToPath(new URL("../../components/analysis/", import.meta.url));
+  const badgeIds = readdirSync(componentDir)
+    .filter((f) => f.endsWith(".tsx"))
+    .flatMap((f) => {
+      const src = readFileSync(join(componentDir, f), "utf8");
+      return [...src.matchAll(/useAnalysisResultSummary\(\s*"([^"]+)"/g)].map((m) => ({
+        file: f,
+        id: m[1],
+      }));
+    });
+
+  test("スキャナ自身が生きている（0件のまま「全部通った」と報告しない）", () => {
+    // 2026-08-28 時点で7件（S15 がテクニカル節に入れたぶん）。
+    assert.ok(badgeIds.length >= 7, `拾えたバッジIDが ${badgeIds.length} 件しかない`);
+  });
+
+  test("バッジのIDがすべて実在するパネルを指している", () => {
+    const live = new Set(panels.map((p) => p.id));
+    const dead = badgeIds.filter((b) => !live.has(b.id)).map((b) => `${b.file}: "${b.id}"`);
+    assert.deepEqual(dead, [], `実在しないIDでバッジを報告している:\n${dead.join("\n")}`);
+  });
+
+  test("バッジのIDが終値だけの系列の分類に載っている", () => {
+    // UNAVAILABLE のパネルは本体がマウントされないのでバッジも構造的に出ない（§0.6③）。
+    // どのIDがその状態かを台帳側から引けることを、ここで保証しておく。
+    const missing = badgeIds
+      .filter((b) => classifyPanelForCloseOnly(b.id) === null)
+      .map((b) => `${b.file}: "${b.id}"`);
+    assert.deepEqual(missing, [], `台帳に無いIDでバッジを報告している:\n${missing.join("\n")}`);
   });
 });
