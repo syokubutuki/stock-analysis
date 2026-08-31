@@ -146,6 +146,7 @@ export const CLOSE_ONLY_CAUTION_PANEL_IDS = new Set([
   "cal-session-gap",
   "cal-weekly-analog",
   "cal-weekday-cond",
+  "sim-holding-ledger",
   "sim-regime-cluster",
   "quantum-markettime",
 ]);

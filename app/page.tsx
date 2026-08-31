@@ -1030,6 +1030,10 @@ const KellyChart = dynamic(
   () => import("./components/analysis/KellyChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
 );
+const HoldingLedgerChart = dynamic(
+  () => import("./components/analysis/HoldingLedgerChart"),
+  { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
+);
 const PersistenceChart = dynamic(
   () => import("./components/analysis/PersistenceChart"),
   { ssr: false, loading: () => <ChartPlaceholder height={400} /> }
@@ -2236,6 +2240,7 @@ export default function AnalysisPage() {
                     {
                       group: "売買シミュレーション・予測",
                       items: [
+                        { id: "sim-holding-ledger", title: "持ち方の対数台帳（持ち切り vs 回転）", node: <HoldingLedgerChart prices={allPrices} /> },
                         { id: "sim-custom-return", title: "カスタム売買タイミング累積リターン", node: <CustomReturnChart prices={allPrices} ticker={data.ticker} /> },
                         { id: "sim-analog", title: "ヒストリカル・アナログ（類似局面検索）", node: <HistoricalAnalogChart prices={filteredPrices} /> },
                         { id: "sim-regime-cluster", title: "特徴量クラスタリングによるレジーム分類（k-means）", node: <RegimeClusteringChart prices={filteredPrices} /> },
@@ -2255,10 +2260,10 @@ export default function AnalysisPage() {
                     {
                       group: "資金管理・頑健性",
                       items: [
+                        { id: "sim-kelly", title: "ケリー基準の最適建玉 f*：複利の壁 σ²/2 と μ の誤差棒", node: <KellyChart prices={filteredPrices} /> },
                         { id: "sim-stop-compare", title: "ストップ方式の比較（固定%/ATR/シャンデリア/トレーリング）", node: <StopComparisonChart prices={filteredPrices} /> },
                         { id: "sim-rmultiple", title: "トレード期待値・R倍数分布", node: <RMultipleChart prices={filteredPrices} /> },
                         { id: "sim-block-boot", title: "ブロック・ブートストラップでの頑健性", node: <BlockBootstrapChart prices={filteredPrices} /> },
-                        { id: "sim-kelly", title: "ケリー基準・最適f とサイズ曲線", node: <KellyChart prices={filteredPrices} /> },
                       ],
                     },
                     {
