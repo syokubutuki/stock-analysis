@@ -43,7 +43,7 @@ export default function StochasticsChart({ prices, period }: Props) {
         ? { status: "finding", direction: "up", label: "売られすぎ" }
         : last && last.slowK >= 80
           ? { status: "finding", direction: "down", label: "買われすぎ" }
-          : { status: "none", direction: "flat", label: "中立ゾーン" },
+          : { status: "none" },
   );
 
   useEffect(() => {

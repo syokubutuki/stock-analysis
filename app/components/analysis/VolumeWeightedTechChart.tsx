@@ -21,12 +21,8 @@ export default function VolumeWeightedTechChart({ prices }: Props) {
   const rsiApi = useRef<IChartApi | null>(null);
   const macdApi = useRef<IChartApi | null>(null);
   const result = useMemo(() => computeVWTechnical(prices), [prices]);
-  useAnalysisResultSummary(
-    "tech-vw",
-    result.divergence.length > 0
-      ? { status: "finding", direction: "flat", label: `乖離 ${result.divergence.length}件` }
-      : { status: "none", direction: "flat", label: "乖離なし" },
-  );
+  // 乖離の件数は方向を持たない量なので、バッジではなくパネル内の一覧で示す（FU34）。
+  useAnalysisResultSummary("tech-vw", { status: "none" });
 
   useEffect(() => {
     if (!rsiRef.current || result.dates.length === 0) return;

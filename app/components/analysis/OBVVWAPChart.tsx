@@ -44,7 +44,7 @@ export default function OBVVWAPChart({ prices, period }: Props) {
       ? { status: "finding", direction: "up", label: "強気乖離" }
       : divergence.type === "bearish"
         ? { status: "finding", direction: "down", label: "弱気乖離" }
-        : { status: "none", direction: "flat", label: "乖離なし" },
+        : { status: "none" },
   );
 
   useEffect(() => {

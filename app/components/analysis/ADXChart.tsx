@@ -52,7 +52,7 @@ export default function ADXChart({ prices, period }: Props) {
           direction: judgment.trend === "上昇" ? "up" : "down",
           label: judgment.strength,
         }
-      : { status: "none", direction: "flat", label: "強いトレンドなし" },
+      : { status: "none" },
   );
 
   // Upper chart: candlestick

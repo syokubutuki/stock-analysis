@@ -49,9 +49,9 @@ export default function TechnicalIndicators({ prices, period }: Props) {
           direction: primarySignal.type === "buy" ? "up" : "down",
           label: primarySignal.type === "buy" ? "買い所見" : "売り所見",
         }
-      : signals.length > 0
-        ? { status: "finding", direction: "flat", label: "注意所見" }
-        : { status: "none", direction: "flat", label: "該当シグナルなし" },
+      // 情報シグナルしか無い場合は方向を持たないので「所見なし」に倒す。
+      // バッジは判断（▲▼）だけを載せる（FU34）。
+      : { status: "none" },
   );
 
   useEffect(() => {
