@@ -119,12 +119,19 @@ export default function CollapsibleAnalysis({
   // 確定しただけで全パネルが再マウントされていた（「すべて開く」の直後に全部閉じる
   // 現象の正体）。バッジの寿命（＝表示中の数字が古くないか）と一括開放の寿命
   // （＝利用者の操作がどこまで有効か）は別物なので、鍵も別にしてある → FU41。
-  const lastOpenScope = useRef(openScope);
-  useEffect(() => {
-    if (lastOpenScope.current === openScope) return;
-    lastOpenScope.current = openScope;
+  //
+  // **エフェクトではなくレンダー中に倒すこと**（FU42）。エフェクトで閉じると、
+  // 閉じる前に一度だけ「開いたまま新しいデータで」children が描画される。
+  // 再マウントが無くなったぶん、この1回が丸ごと無駄な計算になり、56件を
+  // 一括開放した節で期間を変えると**メインスレッドが 10.5 秒固まった**
+  // （main の再マウント方式では 1.5 秒。両方を本番ビルドで実測）。
+  // レンダー中の setState は React が子を描く前に同じコンポーネントを描き直すので、
+  // 捨てる結果を計算しなくて済む。
+  const [lastOpenScope, setLastOpenScope] = useState(openScope);
+  if (lastOpenScope !== openScope) {
+    setLastOpenScope(openScope);
     setOpen(persistedOpen(id, defaultOpen));
-  }, [openScope, id, defaultOpen]);
+  }
 
   const toggle = () => {
     setOpen((prev) => {
