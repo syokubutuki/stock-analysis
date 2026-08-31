@@ -27,6 +27,7 @@ import {
   blockBootstrapCI,
 } from "./stats-significance";
 import { StateFn } from "./conditional-forward-returns";
+import { CostModel, ZERO_COST, roundTripCost } from "./strategy-vs-benchmark";
 
 type Timing = "open" | "close";
 type Side = "long" | "short";
@@ -58,6 +59,21 @@ export interface EdgeStat {
   significant: boolean; // pAdj < 0.05
   yearsPositive: number; // 方向調整後リターンが正だった年の割合(0..1)
   nYears: number;
+  // ── コスト（2026-08-31 追加）──────────────────────────────────────────
+  // このスキャンは cadence が 1〜21日の型を**同じ表で順位付けする**。夜間持ち越しは
+  // 年252往復、21日保有は年12往復で、コストを引かないと高回転の型に systematic な
+  // 下駄を履かせたまま比較することになる。実測往復コスト 0.3%（銀行株）でも
+  // 夜間型は年 −75%、1.0%（キオクシア）なら年 −250% で、グロスの順位は意味を失う。
+  /** 年間往復回数 252/cadence。コストの総額はこれで決まるので必ず併記する */
+  roundTripsPerYear: number;
+  /** コスト控除前の1取引平均（方向調整後） */
+  grossMeanTrade: number;
+  /** コスト控除前の年率 */
+  grossAnnualized: number;
+  /** コストが年率で削った量（grossAnnualized − annualized）。0 ならコスト無効 */
+  costDrag: number;
+  /** グロスでは正だった期待値がコストで非正に落ちたか */
+  flippedByCost: boolean;
   halfAgree: boolean; // 前半・後半とも全体と同符号
   ciLo: number | null;
   ciHi: number | null;
@@ -71,6 +87,10 @@ export interface ScanExecResult {
   nTested: number; // 検定数(FDRの母数)
   minTrades: number;
   best: EdgeStat | null; // 有意な中で最も信頼できる(pAdj最小)もの
+  /** 実際に効かせた1往復あたりのコスト率。0 なら未控除 */
+  costRT: number;
+  /** グロスでは期待値が正だったのにコストで非正へ落ちた型の数 */
+  nFlippedByCost: number;
 }
 
 const TRADING_DAYS = 252;
@@ -114,6 +134,12 @@ export interface ScanExecOptions {
   bootstrapB?: number;
   bootstrapTopN?: number;
   sort?: EdgeSort;
+  /**
+   * 往復コスト。既定は無効（ZERO_COST）で、有効にすると**検定を含む全統計量が
+   * ネットで再計算される**（t・p・FDR・CI・Sharpe・最大DD・年次符号すべて）。
+   * 「エッジがあるか」ではなく「**取り出せるエッジがあるか**」を検定するため。
+   */
+  cost?: CostModel;
 }
 
 const TIMING_KANJI: Record<Timing, string> = { open: "寄", close: "引" };
@@ -141,10 +167,18 @@ export function scanExecutionEdges(prices: PricePoint[], opts: ScanExecOptions =
 
   const defs = buildTradeDefs(horizons);
 
+  // 1往復あたりの控除率。富は W *= (1+r)(1−c) で回るので、1取引リターンへの反映は
+  // (1+r)(1−c)−1 が**厳密**（strategy-vs-benchmark.ts の対数空間控除と同じもの）。
+  const costRT = roundTripCost(opts.cost ?? ZERO_COST);
+
   interface Raw {
     def: TradeDef;
-    rets: number[];
+    /** 方向調整後・コスト控除前 */
+    adj: number[];
+    /** 方向調整後・コスト控除後。costRT=0 なら adj と同一 */
+    net: number[];
     years: number[];
+    direction: Side;
     t: number;
     p: number;
   }
@@ -152,9 +186,15 @@ export function scanExecutionEdges(prices: PricePoint[], opts: ScanExecOptions =
   for (const def of defs) {
     const { rets, years } = tradeReturns(prices, def);
     if (rets.length < minTrades) continue;
-    const tt = tTest(rets);
+    // 方向はグロスの符号で決める（コストは方向に依らない定率なので順序を変えない）
+    const direction: Side = mean(rets) >= 0 ? "long" : "short";
+    const adj = direction === "long" ? rets : rets.map((v) => -v);
+    const net = costRT > 0 ? adj.map((v) => (1 + v) * (1 - costRT) - 1) : adj;
+    // 検定はネットで行う。costRT=0 のときは従来と同一の |t|・p になる
+    // （両側検定なので、方向調整で符号が反転しても値は変わらない）。
+    const tt = tTest(net);
     if (!tt) continue;
-    raws.push({ def, rets, years, t: tt.t, p: tt.p });
+    raws.push({ def, adj, net, years, direction, t: tt.t, p: tt.p });
   }
 
   const pAdj = benjaminiHochberg(raws.map((r) => r.p));
@@ -164,13 +204,14 @@ export function scanExecutionEdges(prices: PricePoint[], opts: ScanExecOptions =
   const bootSet = new Set(tOrder.slice(0, bootstrapTopN));
 
   const stats: EdgeStat[] = raws.map((r, i) => {
-    const direction: Side = mean(r.rets) >= 0 ? "long" : "short";
-    const sign = direction === "long" ? 1 : -1;
-    const adj = sign === 1 ? r.rets : r.rets.map((v) => -v);
+    const direction = r.direction;
+    const adj = r.net; // 以降の統計量はすべてネットで計算する
     const m = mean(adj);
     const sd = std(adj);
     const periodsPerYear = TRADING_DAYS / Math.max(1, r.def.cadence);
     const annualized = Math.pow(1 + m, periodsPerYear) - 1;
+    const grossMeanTrade = mean(r.adj);
+    const grossAnnualized = Math.pow(1 + grossMeanTrade, periodsPerYear) - 1;
     const sharpe = sd > 0 ? (m / sd) * Math.sqrt(periodsPerYear) : 0;
     const maxDD = nonOverlapMaxDD(adj, r.def.cadence);
 
@@ -191,7 +232,7 @@ export function scanExecutionEdges(prices: PricePoint[], opts: ScanExecOptions =
 
     return {
       def: r.def,
-      n: r.rets.length,
+      n: r.net.length,
       direction,
       meanTrade: m,
       annualized,
@@ -206,6 +247,11 @@ export function scanExecutionEdges(prices: PricePoint[], opts: ScanExecOptions =
       nYears,
       halfAgree,
       ciLo, ciHi, ciStable,
+      roundTripsPerYear: periodsPerYear,
+      grossMeanTrade,
+      grossAnnualized,
+      costDrag: grossAnnualized - annualized,
+      flippedByCost: grossMeanTrade > 0 && m <= 0,
     };
   });
 
@@ -217,12 +263,22 @@ export function scanExecutionEdges(prices: PricePoint[], opts: ScanExecOptions =
   };
   stats.sort(cmp[sort]);
 
-  // 「最も信頼できる」= 有意かつ年次過半数同符号の中で pAdj 最小
+  // 「最も信頼できる」= 有意かつ年次過半数同符号の中で pAdj 最小。
+  // meanTrade > 0 の条件はコスト導入で必要になった。控除前は方向調整で平均が必ず
+  // 非負だったが、控除後は「有意に負け続ける型」が現れる（両側検定なので、
+  // 大きく負の平均は有意に出る）。それを「最も信頼できるエッジ」に選ばせない。
   const best = stats
-    .filter((s) => s.significant && s.yearsPositive >= 0.5 && s.n >= minTrades)
+    .filter((s) => s.significant && s.meanTrade > 0 && s.yearsPositive >= 0.5 && s.n >= minTrades)
     .sort((a, b) => a.pAdj - b.pAdj || b.t - a.t)[0] ?? null;
 
-  return { stats, nTested: raws.length, minTrades, best };
+  return {
+    stats,
+    nTested: raws.length,
+    minTrades,
+    best,
+    costRT,
+    nFlippedByCost: stats.filter((s) => s.flippedByCost).length,
+  };
 }
 
 export { TIMING_KANJI };

@@ -7,6 +7,7 @@ import {
   EdgeSort,
   EdgeStat,
 } from "../../lib/open-close-edge";
+import { representativeSpread } from "../../lib/spread-estimator";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -32,11 +33,19 @@ function annBg(v: number, maxAbs: number): string {
 
 export default function ExecutionTimingScanChart({ prices }: Props) {
   const [sort, setSort] = useState<EdgeSort>("pAdj");
+  // 既定でコストを控除する。RMultipleChart 等は既定オフだが、この表は
+  // cadence 1〜21日（年252往復〜年12往復）の型を**同じ順位表に並べる**ので、
+  // グロスのままだと高回転の型に systematic な下駄を履かせた比較になる。
+  // 実測（8306.T・往復0.30%）で「夜間持ち越し」はグロス +22.5% → ネット −42.1%。
+  const [deduct, setDeduct] = useState(true);
+  const [feeBps, setFeeBps] = useState(0);
+
+  const spreadRT = useMemo(() => (prices.length < 260 ? 0 : representativeSpread(prices)), [prices]);
 
   const result = useMemo(() => {
     if (prices.length < 250) return null;
-    return scanExecutionEdges(prices, { sort });
-  }, [prices, sort]);
+    return scanExecutionEdges(prices, { sort, cost: { enabled: deduct, spreadRT, feeBps } });
+  }, [prices, sort, deduct, spreadRT, feeBps]);
 
   if (prices.length < 250) return null;
   if (!result || result.stats.length === 0) return null;
@@ -61,6 +70,43 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
           ))}
         </div>
       </div>
+
+      {/* コスト操作子。回転率が型ごとに 252倍違うので、既定で控除して並べる */}
+      <div className="flex items-center flex-wrap gap-2 text-xs">
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />
+          <span className="text-gray-700">往復コストを控除する</span>
+        </label>
+        <span className="text-gray-500">
+          代表スプレッド <span className="font-mono">{(spreadRT * 100).toFixed(2)}%</span>（高安から推定）
+        </span>
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">＋片道手数料</span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={feeBps}
+            onChange={(e) => setFeeBps(Math.max(0, Number(e.target.value)))}
+            className="w-14 border border-gray-300 rounded px-1 py-0.5 font-mono"
+          />
+          <span className="text-gray-500">bps</span>
+        </label>
+        <span className="text-gray-500">
+          → 1往復 <span className="font-mono font-bold">{(result.costRT * 100).toFixed(2)}%</span>
+        </span>
+      </div>
+
+      {/* コストで消えたエッジの件数。これがこのパネルの主役 */}
+      {deduct && result.nFlippedByCost > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 leading-relaxed">
+          <strong>コスト控除で {result.nFlippedByCost}/{result.stats.length} 種の期待値が非正に落ちました。</strong>
+          落ちたのはほぼ高回転の型です。コストの総額は「1往復あたり × 往復回数」で決まるので、
+          年252往復の型（夜間持ち越し・日中デイトレ・1日保有）は 1往復{(result.costRT * 100).toFixed(2)}% でも
+          年 <span className="font-mono">−{((1 - Math.pow(1 - result.costRT, 252)) * 100).toFixed(0)}%</span> を払います。
+          <strong>グロスの順位は、回転率の違う型を比べる用途には使えません。</strong>
+        </div>
+      )}
 
       {/* 現在地サマリー */}
       {result.best ? (
@@ -89,8 +135,10 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
               <th className="text-left py-1 px-2">トレード型</th>
               <th className="text-center px-2">方向</th>
               <th className="text-right px-2">n</th>
+              <th className="text-right px-2" title="年間往復回数 252/cadence">往復/年</th>
               <th className="text-right px-2">1取引平均</th>
               <th className="text-right px-2">年率</th>
+              <th className="text-right px-2" title="コストが年率で削った量">うちコスト</th>
               <th className="text-right px-2">Sharpe</th>
               <th className="text-left px-2">勝率</th>
               <th className="text-right px-2">最大DD</th>
@@ -109,9 +157,18 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
                   </span>
                 </td>
                 <td className="text-right px-2 text-gray-600">{s.n}</td>
+                <td className="text-right px-2 text-gray-500 tabular-nums">{s.roundTripsPerYear.toFixed(0)}</td>
                 <td className="text-right px-2 text-gray-600 tabular-nums">{fmtPct(s.meanTrade)}</td>
                 <td className="text-right px-2 font-medium tabular-nums" style={{ background: annBg(s.annualized, maxAbsAnn) }}>
                   {fmtPct1(s.annualized)}
+                  {s.flippedByCost && (
+                    <span className="ml-1 text-[9px] font-bold text-red-700" title={`コスト控除前は ${fmtPct1(s.grossAnnualized)}`}>
+                      消滅
+                    </span>
+                  )}
+                </td>
+                <td className="text-right px-2 text-red-700 tabular-nums">
+                  {s.costDrag > 0 ? `−${(s.costDrag * 100).toFixed(1)}%` : "—"}
                 </td>
                 <td className="text-right px-2 text-gray-600 tabular-nums">{s.sharpe.toFixed(2)}</td>
                 <td className="px-2">
@@ -133,7 +190,24 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
                 <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">
                   {s.ciLo !== null && s.ciHi !== null ? `${fmtPct(s.ciLo)}〜${fmtPct(s.ciHi)}` : "—"}
                 </td>
-                <td className="px-2"><StatBadge n={s.n} p={s.pAdj} significant={s.significant} /></td>
+                <td className="px-2">
+                  {/*
+                    コスト控除後は「有意に負ける型」が現れる（両側検定なので大きく負の平均も
+                    有意に出る）。StatBadge は有意を緑で描く共有部品なので、そのまま使うと
+                    年率 −49% の行に緑の「有意」が並び、推奨に見えてしまう。ここだけ出し分ける。
+                  */}
+                  {s.significant && s.meanTrade <= 0 ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700"
+                      title={`n=${s.n} / p(FDR)=${s.pAdj < 0.001 ? "<0.001" : s.pAdj.toFixed(3)}｜期待値が有意に負`}
+                    >
+                      有意に負け
+                      <span className="opacity-70">p={s.pAdj < 0.001 ? "<.001" : s.pAdj.toFixed(3)}</span>
+                    </span>
+                  ) : (
+                    <StatBadge n={s.n} p={s.pAdj} significant={s.significant} />
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -168,12 +242,27 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
           <li>上部バナー＝<strong>最も信頼できる型</strong>（有意かつ年次過半数プラス）。まずここを起点に検討。</li>
           <li>「年率が高い」だけでなく<strong>有意バッジが緑</strong>・<strong>年次+が高い</strong>・<strong>CIが0をまたがない</strong>の3点が揃う型を重視。1つでも欠けると過学習を疑う。</li>
           <li>日中が優位＝デイトレ向き／夜間が優位＝引け買い→寄り売りの持ち越し向き。N日保有が優位＝スイング向き。</li>
-          <li>保有日数が短い型ほど年間の取引回数が多く、コスト負けしやすい（年率は理論上限）。</li>
+          <li>
+            保有日数が短い型ほど年間の取引回数が多く、コスト負けしやすい。
+            <strong>「往復/年」の列を必ず年率と一緒に読むこと。</strong>
+            年252往復の型は 1往復0.3% でも年 −53%、1.0% なら年 −92% を払う。
+          </li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">5. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><strong>取引コスト・スリッページ未控除</strong>。短い保有・高頻度の型は実際には大きく目減りする。</li>
+          <li>
+            <strong>往復コストは既定で控除している</strong>（2026-08-31 以降）。控除を有効にすると
+            t・p・FDR・CI・Sharpe・最大DD・年次符号の<strong>すべてがネットで再計算される</strong>。
+            「エッジがあるか」ではなく「取り出せるエッジがあるか」を検定するため。
+            チェックを外せば従来どおりのグロス表示に戻る。
+          </li>
+          <li>
+            コストは高安から推定した代表スプレッド（Corwin-Schultz）で、板情報は使っていない。
+            実際の手数料体系が分かるなら片道手数料の欄に入れること。
+            <strong>スリッページと市場インパクトは依然として未考慮</strong>なので、
+            ここでのネット値もまだ楽観側である。
+          </li>
           <li>窓が重なるため t 値はやや過大評価。CIと年次安定性で補完しているが、過信は禁物。</li>
           <li>始値は寄り付き気配で歪むことがあり、流動性の薄い銘柄では誤差が出る。</li>
           <li>統計的有意≠実用的有意。平均リターンの大きさ（経済的意味）も併せて判断する。</li>
