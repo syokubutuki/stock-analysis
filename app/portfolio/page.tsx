@@ -129,6 +129,10 @@ const DriftIdentifiabilityChart = dynamic(
   () => import("../components/analysis/DriftIdentifiabilityChart"),
   { ssr: false }
 );
+const MuSigmaPersistenceChart = dynamic(
+  () => import("../components/analysis/MuSigmaPersistenceChart"),
+  { ssr: false }
+);
 const SelectionTiltChart = dynamic(
   () => import("../components/analysis/SelectionTiltChart"),
   { ssr: false }
@@ -623,6 +627,15 @@ export default function PortfolioPage() {
               title: "個別銘柄のドリフトは同定できるか：μ の識別限界（株式原論 C26）",
               subtitle: "μ̂±SE(=σ/√T)・95%CI・必要年数T*=(κσ/Δμ)²／勝者の呪い(真のμ同一というヌルでもトップはSE·√(2lnN)上振れ)をブート実測／Merton非対称性(頻度を上げてもμの精度は不変・σは√nで改善)／James-Stein収縮と順位95%CI／「過去ドリフト上位」の前向き検証。既定の結論は同定不能",
               node: <DriftIdentifiabilityChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
+            });
+            // pf-drift-id（1銘柄あたりの推定誤差の理屈）を、横断データで直接確かめる層。
+            // 「μ は測れない」を SE の式ではなく「前半→後半で順位が保たれるか」で見せる。
+            // σ を対照として並べるのが要点で、片方だけでは「推定が難しい」以上を言えない。
+            items.push({
+              id: "pf-mu-sigma-persistence",
+              title: "σ は続くが μ は続かない：前半→後半で銘柄はどう動くか",
+              subtitle: "(σ,μ)平面の前半→後半の矢印＋複利ゼロ線 μ=σ²/2。μ̂とσの順位相関(Spearman)を対比し、Δμが推定誤差√(SE₁²+SE₂²)で説明できるかを比で判定。壁越え判定の反転率は必ず判定余裕 margin=(μ−σ²/2)/(σ/√T)=√T(μ/σ−σ/2) と並べる（反転が少なくてもmargin<1なら頑健ではなく偶然）。marginがσの減少関数であることが「低ボラを選ぶ」の厳密な根拠",
+              node: <MuSigmaPersistenceChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} />,
             });
             // 系C25: 床（C24）の一段先＝特性チルトで床を底上げできるかの前向き検証。
             items.push({
