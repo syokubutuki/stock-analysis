@@ -60,7 +60,11 @@ export default function ConsolidatedScorecardChart({ prices }: Props) {
     const rets: number[] = [];
     for (let i = 1; i < n; i++) rets.push(prices[i].close / prices[i - 1].close - 1);
     const k = kellyOptimal(rets);
-    signals.push({ dim: "ケリー(期待値)", verdict: k.kellyFraction > 0.3 ? "強気" : k.kellyFraction <= 0 ? "弱気" : "中立", score: k.kellyFraction > 0.3 ? 1 : k.kellyFraction <= 0 ? -1 : 0, detail: `f*=${(k.kellyFraction * 100).toFixed(0)}%` });
+    // 閾値は f*>1（現物フルを超える）。旧 0.3 は f*>0.3 ⟺ μ>0.3σ² であり、
+    // σ=30% なら μ>2.7%/年で成立するので、上昇局面ではほぼ常に「強気」を返していた
+    // （実測5銘柄すべて 強気: 8306=333% / 6501=278% / 7203=223% / 285A=251% / 投信=563%）。
+    // f* は μ の点推定に強く依存する（誤差棒は sim-kelly を見ること）。
+    signals.push({ dim: "ケリー(期待値)", verdict: k.kellyFraction > 1 ? "強気" : k.kellyFraction <= 0 ? "弱気" : "中立", score: k.kellyFraction > 1 ? 1 : k.kellyFraction <= 0 ? -1 : 0, detail: `f*=${(k.kellyFraction * 100).toFixed(0)}%` });
 
     const total = signals.reduce((s, x) => s + x.score, 0);
     const maxTotal = signals.length;
