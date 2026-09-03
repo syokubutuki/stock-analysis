@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# レビュー・検証で吐いた使い捨てデータ（/api/stock のダンプ等）。
+# worktree 作成前の `git status --porcelain` ガードを誤って止めるので無視する。
+/tmp-review/
