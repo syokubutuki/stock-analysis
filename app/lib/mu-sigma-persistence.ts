@@ -94,6 +94,15 @@ export interface FlipBucket {
 
 export interface PersistenceResult {
   rows: PersistenceRow[];
+  /**
+   * 共通窓を確保するために除外した銘柄（上場が新しい順に落とす）。
+   *
+   * `alignReturns` は全銘柄の共通日付の積集合を取るので、共通窓は
+   * **いちばん上場が新しい1銘柄**に律速される。以前はそこで EMPTY を返しており、
+   * 285A.T（2024-12上場）を1つ入れるだけで窓が413日に潰れ、画面が
+   * 「見出しだけの空箱」になっていた。落とした銘柄は必ず画面に出すこと。
+   */
+  excluded: string[];
   /** 各半分の年数 */
   halfYears: number;
   from1: string;
@@ -127,7 +136,7 @@ export interface PersistenceResult {
 }
 
 const EMPTY: PersistenceResult = {
-  rows: [], halfYears: 0, from1: "", to1: "", from2: "", to2: "",
+  rows: [], excluded: [], halfYears: 0, from1: "", to1: "", from2: "", to2: "",
   pearsonSigma: NaN, spearmanSigma: NaN, pearsonMu: NaN, spearmanMu: NaN,
   medAbsDSigma: NaN, medAbsDMu: NaN, medDSigma: NaN, noiseRatio: NaN,
   nFlipped: 0, medMargin: NaN, buckets: [],
@@ -198,9 +207,23 @@ export function muSigmaPersistence(
     .map((d) => ({ ticker: d.ticker, prices: d.prices }));
   if (series.length < 3) return EMPTY;
 
-  const aligned = alignReturns(series, Number.MAX_SAFE_INTEGER);
+  // 共通窓は「いちばん上場が新しい銘柄」に律速される。窓が足りない間、開始日が
+  // 遅い銘柄から順に落として残りで成立させる（PersistenceResult.excluded 参照）。
+  const excluded: string[] = [];
+  let pool = [...series];
+  let aligned = alignReturns(pool, Number.MAX_SAFE_INTEGER);
+  while (pool.length > 3 && (aligned.returns[0]?.length ?? 0) < minHalfDays * 2) {
+    let worst = 0;
+    for (let i = 1; i < pool.length; i++) {
+      if (pool[i].prices[0].time > pool[worst].prices[0].time) worst = i;
+    }
+    excluded.push(pool[worst].ticker);
+    pool = pool.filter((_, i) => i !== worst);
+    aligned = alignReturns(pool, Number.MAX_SAFE_INTEGER);
+  }
+
   const T = aligned.returns[0]?.length ?? 0;
-  if (aligned.tickers.length < 3 || T < minHalfDays * 2) return EMPTY;
+  if (aligned.tickers.length < 3 || T < minHalfDays * 2) return { ...EMPTY, excluded };
 
   const mid = Math.floor(T / 2);
   const a1 = annualStats(slice(aligned, 0, mid));
@@ -259,6 +282,7 @@ export function muSigmaPersistence(
 
   return {
     rows,
+    excluded,
     halfYears: years1,
     from1: aligned.dates[0] ?? "",
     to1: aligned.dates[mid - 1] ?? "",

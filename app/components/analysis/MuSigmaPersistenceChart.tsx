@@ -69,6 +69,7 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || res.rows.length < 3) return;
+    const draw = () => {
     const init = initCanvas(canvas, 380);
     if (!init) return;
     const { ctx, width, height } = init;
@@ -236,12 +237,34 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
     ctx.textAlign = "center";
     ctx.fillText("μ̂（年率算術平均）", 0, 0);
     ctx.restore();
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
   }, [res, showErrorBars]);
 
-  if (res.rows.length < 3) return null;
+  if (res.rows.length < 3) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4 text-xs text-gray-600 leading-relaxed">
+        <div className="font-bold text-gray-800 mb-1">σ は続くが μ は続かない：前半→後半で銘柄はどう動くか</div>
+        <p>
+          <strong>この分析は出せません。</strong>前半・後半に割るには
+          <strong>全銘柄に共通する値動きが2年ぶん</strong>必要ですが、ウォッチリストに
+          上場の新しい銘柄が多く、共通期間が足りません。
+          {res.excluded.length > 0 && <>（{res.excluded.join("・")} を除外しても届きませんでした。）</>}
+          上場から2年以上たった銘柄が3つ以上そろうと表示されます。
+        </p>
+      </div>
+    );
+  }
 
-  const muUseless = Math.abs(res.spearmanMu) < 0.25;
-  const sigmaHolds = res.spearmanSigma > 0.3 || res.pearsonSigma > 0.5;
+  // 順位相関そのものの標準誤差 ≈ 1/√(N−1)。N が小さいと 0.4 と 0.0 の差は誤差に
+  // 埋もれるので、断定文を出す前に「この標本で判定できるか」を要求する。
+  // 固定閾値（旧: |ρ|<0.25）だけだと、3銘柄でも同じ強さで言い切ってしまう。
+  const seRho = 1 / Math.sqrt(Math.max(1, res.rows.length - 1));
+  const decisive = res.rows.length >= 9; // seRho ≦ 0.354
+  const muUseless = decisive && Math.abs(res.spearmanMu) < seRho;
+  const sigmaHolds = decisive && res.spearmanSigma > seRho;
   const marginWeak = res.medMargin < 1;
 
   return (
@@ -252,6 +275,11 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
           共通日付で整列した {res.rows.length} 銘柄を、前半（{res.from1}〜{res.to1}）と
           後半（{res.from2}〜{res.to2}）に分割（各 {res.halfYears.toFixed(1)} 年）。
           白丸＝前半、色付き丸＝後半。
+          {res.excluded.length > 0 && (
+            <span className="block mt-1 text-amber-700">
+              上場が新しく共通期間を縮めるため、{res.excluded.join("・")} を除外しています。
+            </span>
+          )}
         </p>
       </div>
 
@@ -280,16 +308,28 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
       </div>
 
       <div className="rounded border border-gray-300 bg-gray-50 p-3 text-xs leading-relaxed space-y-1.5">
+        {!decisive && (
+          <p>
+            <strong className="text-amber-700">
+              銘柄が {res.rows.length} 件しかないため、σ と μ̂ の順位相関を比べられません。
+            </strong>
+            順位相関それ自体の標準誤差が およそ ±{num(seRho)} あり、
+            σ（{num(res.spearmanSigma)}）と μ̂（{num(res.spearmanMu)}）の差はこの誤差に飲まれます。
+            <strong>9銘柄以上</strong>そろえてから読んでください。
+          </p>
+        )}
         {muUseless && (
           <p>
-            <strong className="text-red-700">μ̂ の順位相関は {num(res.spearmanMu)}。</strong>
-            前半で μ が一番高かった銘柄を知っていても、<strong>後半について何も分かりません</strong>。
+            <strong className="text-red-700">
+              μ̂ の順位相関 {num(res.spearmanMu)} は、この銘柄数での誤差 ±{num(seRho)} と区別がつきません。
+            </strong>
+            つまり<strong>前半の μ の順位は、後半の μ について情報を持っていない</strong>ということです。
             「期待リターンの高い銘柄を選ぶ」は、この平面の上では実行できない操作です。
           </p>
         )}
         {sigmaHolds && (
           <p>
-            一方 <strong className="text-blue-700">σ の順位は残っています（{num(res.spearmanSigma)}）</strong>。
+            一方 <strong className="text-blue-700">σ の順位相関 {num(res.spearmanSigma)} は誤差 ±{num(seRho)} より大きい</strong>。
             水準は全体で {pp(res.medDSigma)} 動きましたが、順位は保たれました。
             <strong>全員の身長が伸びても背の順は変わらない</strong>、という形です。
           </p>
@@ -321,8 +361,20 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
         <canvas ref={canvasRef} />
       </div>
       <p className="text-[11px] text-gray-600 -mt-2 leading-relaxed">
-        矢印は<strong>ほぼ垂直に飛びます</strong>（横＝σ はあまり動かず、縦＝μ が大きく動く）。
-        誤差棒を出すと、その縦の移動が<strong>誤差棒とほぼ同じ長さ</strong>であることが分かります。
+        {res.medAbsDMu > res.medAbsDSigma * 1.5 ? (
+          <>
+            縦（μ）の移動が横（σ）の {(res.medAbsDMu / Math.max(res.medAbsDSigma, 1e-9)).toFixed(1)} 倍で、
+            矢印は<strong>縦に長く飛びます</strong>（中央値 |Δμ| {pct(res.medAbsDMu)} 対 |Δσ| {pct(res.medAbsDSigma)}）。
+          </>
+        ) : (
+          <>
+            この期間は<strong>横（σ）も一緒に動いています</strong>
+            （中央値 |Δμ| {pct(res.medAbsDMu)} 対 |Δσ| {pct(res.medAbsDSigma)}）。
+            σ の<strong>水準</strong>が全体でずれた期間なので、矢印は斜めに飛びます。
+            それでも順位が保たれるかは上の順位相関で読んでください。
+          </>
+        )}
+        誤差棒を出すと、縦の移動が<strong>誤差棒とほぼ同じ長さ</strong>であることが分かります。
         紫の線より下は複利で増えない領域です。
       </p>
 
@@ -536,9 +588,11 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
         <p className="font-medium text-gray-700 mt-3">7. 注意点・限界</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
-            <strong>銘柄数がウォッチリストの数しかありません。</strong>10〜20銘柄の順位相関は
-            それ自体の標準誤差が大きく（およそ 1/√(N−1)）、0.4 と 0.0 の差は
-            この標本では有意ではないことがあります。符号と桁で読んでください。
+            <strong>銘柄数がウォッチリストの数しかありません。</strong>順位相関はそれ自体の
+            標準誤差が およそ 1/√(N−1) あり、10〜20銘柄では 0.4 と 0.0 の差が
+            有意にならないことがあります。この標本では <strong>±{num(seRho)}</strong> です。
+            上の結論文はこの誤差を超えたときだけ出し、8銘柄以下では
+            <strong>結論そのものを出しません</strong>。符号と桁で読んでください。
           </li>
           <li>
             <strong>2分割は分割点の選び方に依存します。</strong>異なる点で割れば数値は動きます。
