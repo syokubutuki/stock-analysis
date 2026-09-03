@@ -125,7 +125,9 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
       )}
 
       <div className="text-[11px] text-fg-muted">
-        検定したトレード型 {result.nTested} 種 / 最小取引数 {result.minTrades}。方向は平均の符号で自動選択（買い=ロング, 売り=ショート）。
+        検定したトレード型 {result.nTested} 種 / 最小取引数 {result.minTrades}。
+        方向は<strong>コスト控除前</strong>の平均の符号で自動選択（買い=ロング, 売り=ショート）。
+        {deduct && "控除後の1取引平均が負でも方向は変わらないので、「買い」と「有意に負け」は同時に出ます。"}
       </div>
 
       <div className="overflow-x-auto">
@@ -256,6 +258,14 @@ export default function ExecutionTimingScanChart({ prices }: Props) {
             t・p・FDR・CI・Sharpe・最大DD・年次符号の<strong>すべてがネットで再計算される</strong>。
             「エッジがあるか」ではなく「取り出せるエッジがあるか」を検定するため。
             チェックを外せば従来どおりのグロス表示に戻る。
+          </li>
+          <li>
+            <strong>コストの ON/OFF は、この表の全行の p 値を動かす。</strong>
+            FDR 補正は {result.nTested} 種を1つの族として扱うので、ある型がコストで有意に
+            変われば、他の型の補正後 p も動く（検定の母数 {result.nTested} そのものは変わらない）。
+            実測では 285A.T の「寄→引(日中)」が pAdj 0.389 →
+            0.001（有意に<strong>負け</strong>）へ、「引→翌寄」が 0.000 → 0.615 へ動いた。
+            <strong>ある行の結論を記録するときは、コスト設定も一緒に書くこと。</strong>
           </li>
           <li>
             コストは高安から推定した代表スプレッド（Corwin-Schultz）で、板情報は使っていない。
