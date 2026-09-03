@@ -179,6 +179,15 @@ export interface FrequencyRow {
   sigmaAnn: number;
   /** SE(σ̂) ≈ σ/√(2n)。本数が減るので**集計するほど粗くなる** */
   seSigmaAnn: number;
+  /**
+   * 日次 σ に対する分散比 (σ_k/σ_1)²。1 から離れるほど平均回帰／トレンドがある。
+   *
+   * **SE(μ̂) の列が動いたときは、まずここを見ること。** SE(μ̂)=σ/√T の σ を集計水準
+   * ごとに測り直しているので、分散比が 1 から外れた行では SE も一緒に動く。
+   * これは μ の精度が上がったのではなく別の性質を測っている。実測で 6501.T は
+   * 63日集計で σ 34.2%→25.7%（分散比 0.56）、SE(μ̂) 10.9%→8.2% と動いた。
+   */
+  varianceRatio: number;
 }
 
 /**
@@ -202,7 +211,7 @@ export function frequencyLadder(prices: PricePoint[], blocks = [1, 5, 21, 63]): 
   // σ̂ が 75%〜119% と暴れて SE(μ̂) がむしろ「良く」見える（見かけの改善）。
   // 非対称性を示すための表が、標本不足のノイズで逆の印象を与えてしまう。
   const MIN_BLOCKS = 20;
-  return blocks
+  const rows = blocks
     .filter((k) => Math.floor(logR.length / k) >= MIN_BLOCKS)
     .map((k) => {
       // k 日ごとに畳む。端数は落とす（両端2点の恒等式が崩れない範囲で）。
@@ -231,6 +240,15 @@ export function frequencyLadder(prices: PricePoint[], blocks = [1, 5, 21, 63]): 
         seSigmaAnn: n > 1 ? sigmaAnn / Math.sqrt(2 * n) : Infinity,
       };
     });
+
+  // 分散比は日次行を基準に測る。MIN_BLOCKS を満たしても σ は集計水準で動くので
+  // （平均回帰なら下がる）、SE(μ̂)=σ/√T もそのぶん動く。表の読み手が
+  // 「μ の精度が上がった」と誤読しないよう、動いた理由を同じ行に並べておく。
+  const sigma1 = rows[0]?.sigmaAnn ?? 0;
+  return rows.map((r) => ({
+    ...r,
+    varianceRatio: sigma1 > 0 ? (r.sigmaAnn / sigma1) ** 2 : NaN,
+  }));
 }
 
 // ───────────────────────── f* の感度表 ─────────────────────────

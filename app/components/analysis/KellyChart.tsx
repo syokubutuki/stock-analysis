@@ -88,6 +88,7 @@ export default function KellyChart({ prices }: Props) {
   useEffect(() => {
     const canvas = wallRef.current;
     if (!canvas || !stats || !wall) return;
+    const draw = () => {
     const init = initCanvas(canvas, 132);
     if (!init) return;
     const { ctx, width, height } = init;
@@ -188,12 +189,17 @@ export default function KellyChart({ prices }: Props) {
       ctx.stroke();
       ctx.fillText(`${(v * 100).toFixed(0)}%`, x, padT + (height - padT - padB) + 15);
     }
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
   }, [stats, wall]);
 
   // ── ② g(f) の束 ──────────────────────────────────────────────────
   useEffect(() => {
     const canvas = curveRef.current;
     if (!canvas || !stats || !wall) return;
+    const draw = () => {
     const init = initCanvas(canvas, 290);
     if (!init) return;
     const { ctx, width, height } = init;
@@ -319,6 +325,10 @@ export default function KellyChart({ prices }: Props) {
     ctx.font = "bold 10px sans-serif";
     ctx.fillStyle = "#1d4ed8";
     ctx.fillText("g(f) ＝ 年率成長率。帯は μ̂ の ±2SE", padL, 14);
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
   }, [stats, wall, belief]);
 
   if (!stats || !wall || !rows) return null;
@@ -511,7 +521,7 @@ export default function KellyChart({ prices }: Props) {
                   <td className="border border-gray-200 px-2 py-1 text-center font-mono">{pct(r.point.mu)}</td>
                   <td
                     className={`border border-gray-200 px-2 py-1 text-center font-mono font-bold ${
-                      r.point.fStar > 1 ? "text-red-700" : ""
+                      r.point.fStar > 1 || r.point.fStar < 0 ? "text-red-700" : ""
                     }`}
                   >
                     {pct(r.point.fStar, 0)}
@@ -528,9 +538,10 @@ export default function KellyChart({ prices }: Props) {
           </table>
         </div>
         <p className="text-[11px] text-gray-500">
-          赤字は建玉100%超（＝信用取引が必要）。<strong>実測 μ̂ をそのまま入れると、多くの銘柄で
+          赤字は建玉100%超（＝信用取引が必要）と、負の f*。<strong>実測 μ̂ をそのまま入れると、多くの銘柄で
           レバレッジを推奨する値が出ます</strong>。それは銘柄が良いからではなく、μ̂ が
           「その期間に上がった」以上の意味を持たないからです。
+          f* が負の行は「その前提なら買いではなく売り」という意味で、②の図には縦線を描いていません。
         </p>
       </div>
 
@@ -549,6 +560,9 @@ export default function KellyChart({ prices }: Props) {
                   <th className="border border-gray-200 px-2 py-1">μ（対数・年率）</th>
                   <th className="border border-gray-200 px-2 py-1">SE(μ̂)</th>
                   <th className="border border-gray-200 px-2 py-1">σ（年率）</th>
+                  <th className="border border-gray-200 px-2 py-1" title="日次σに対する (σ_k/σ_1)²。1から離れるほど平均回帰/トレンドがある">
+                    分散比
+                  </th>
                   <th className="border border-gray-200 px-2 py-1">SE(σ̂)</th>
                 </tr>
               </thead>
@@ -560,6 +574,13 @@ export default function KellyChart({ prices }: Props) {
                     <td className="border border-gray-200 px-2 py-1 text-center font-mono">{pct(r.muLogAnn)}</td>
                     <td className="border border-gray-200 px-2 py-1 text-center font-mono font-bold">±{pp(r.seMuAnn)}</td>
                     <td className="border border-gray-200 px-2 py-1 text-center font-mono">{pct(r.sigmaAnn)}</td>
+                    <td
+                      className={`border border-gray-200 px-2 py-1 text-center font-mono ${
+                        isFinite(r.varianceRatio) && Math.abs(r.varianceRatio - 1) > 0.2 ? "text-amber-700 font-bold" : "text-gray-500"
+                      }`}
+                    >
+                      {isFinite(r.varianceRatio) ? r.varianceRatio.toFixed(2) : "—"}
+                    </td>
                     <td className="border border-gray-200 px-2 py-1 text-center font-mono">±{pp(r.seSigmaAnn, 2)}</td>
                   </tr>
                 ))}
@@ -567,11 +588,14 @@ export default function KellyChart({ prices }: Props) {
             </table>
           </div>
           <p className="text-[11px] text-gray-600 leading-relaxed">
-            <strong>SE(μ̂) の列はほとんど動きません。</strong>μ̂ = ln(P<sub>T</sub>/P<sub>0</sub>)/T は
+            <strong>μ の列はほとんど動きません。</strong>μ̂ = ln(P<sub>T</sub>/P<sub>0</sub>)/T は
             途中の経路が全部打ち消し合う<strong>両端2点の恒等式</strong>だからです。
-            粗くなるのは SE(σ̂) の列だけ（本数が減るぶん）。
+            SE(μ̂) = σ/√T の σ は集計水準ごとに測り直しているので、
+            <strong>分散比が 1 から離れた行では SE(μ̂) も一緒に動きます</strong>（琥珀色の行）。
+            平均回帰があると長い集計で σ が下がり、SE も下がって見えます。
+            これは <strong>μ の精度が上がったのではなく、別の性質（分散比）を測っている</strong>だけです。
+            集計を粗くして確実に悪化するのは SE(σ̂) の列で、本数が減るぶんです。
             逆に言えば、日足を分足にしても μ の精度は 1ミリも改善しません。
-            改善するのは σ の精度だけです。
           </p>
         </div>
       )}
@@ -681,8 +705,9 @@ export default function KellyChart({ prices }: Props) {
             それは μ̂ が過去の実現値だからで、将来の期待ではありません。
           </li>
           <li>
-            <strong>④の SE(μ̂) 列が動かないことを確認する。</strong>
-            動かないのが正常です。動くように見えたら、その行は本数不足を疑ってください。
+            <strong>④は μ の列と分散比の列を並べて読む。</strong>
+            μ の列が動かないのが本題です。SE(μ̂) が動いた行は、隣の分散比を見てください。
+            1 から離れていれば原因は平均回帰・トレンドであって、μ の精度ではありません。
           </li>
           <li>
             <strong>期間セレクタを動かしてみる。</strong>σ はあまり変わらないのに
