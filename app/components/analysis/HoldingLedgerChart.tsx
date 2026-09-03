@@ -66,10 +66,16 @@ export default function HoldingLedgerChart({ prices }: Props) {
 
   const stats = useMemo(() => seriesStats(prices), [prices]);
   const rets = useMemo(() => simpleReturns(prices), [prices]);
-  const measuredCost = useMemo(() => {
+  // 終値だけの系列（投信の基準価額）は high==low なので Corwin-Schultz が恒等的に 0 に
+  // なり、既定値へ落ちる。落ちたことを画面に出さないと「実測 0.30%」という表示が
+  // 測っていない数字を測ったように見せる（0331418A で実際にそう出ていた）。
+  const cost = useMemo(() => {
     const cs = representativeSpread(prices, 21, "cs");
-    return cs > 0 && isFinite(cs) ? cs : 0.003;
+    return cs > 0 && isFinite(cs)
+      ? { value: cs, measured: true }
+      : { value: 0.003, measured: false };
   }, [prices]);
+  const measuredCost = cost.value;
   // 終値だけの系列（投信の基準価額など）は open==high==low==close で配信される。
   // このとき「夜間＝日次リターンの全部・日中＝ゼロ」というもっともらしい嘘が出るので、
   // 帰属ブロックごと隠す。往復コストも高安から推定できないので既定値に落ちている。
@@ -165,6 +171,7 @@ export default function HoldingLedgerChart({ prices }: Props) {
     const padB = 28;
     const padL = 96;
     const padR = 12;
+    const draw = () => {
     const init = initCanvas(canvas, padT + padB + rows * rowH);
     if (!init) return;
     const { ctx, width, height } = init;
@@ -178,6 +185,14 @@ export default function HoldingLedgerChart({ prices }: Props) {
       hi = Math.max(hi, from, to);
       return { ...s, from, to };
     });
+    // 誤差棒も定義域に入れる。入れないと μ̂±1SE の端が軸の外で無言に切られ、
+    // 「誤差棒は壁より長い」というこのパネル群の主題が過小に描かれる
+    // （8306.T 既定で μ̂+1SE=36.0% に対し軸上限が 28.6% だった）。
+    if (stats && muOverride === null) {
+      const e = stats.seMu * leverage;
+      lo = Math.min(lo, ledger.expected - e);
+      hi = Math.max(hi, ledger.expected + e);
+    }
     const span = hi - lo || 0.1;
     lo -= span * 0.06;
     hi += span * 0.06;
@@ -292,12 +307,17 @@ export default function HoldingLedgerChart({ prices }: Props) {
     }
     ctx.textAlign = "left";
     ctx.fillText("年率（対数成長率）", padL, height - 4);
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
   }, [ledger, stats, muOverride, leverage]);
 
   // ── プラセボ分布 ──────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = placeboRef.current;
-    if (!canvas || !placebo || !walkBH || placebo.gs.length < 20) return;
+    if (!canvas || !placebo || !walkBH || placebo.gs.length < 20 || placebo.distinct < 5) return;
+    const draw = () => {
     const init = initCanvas(canvas, 200);
     if (!init) return;
     const { ctx, width, height } = init;
@@ -376,10 +396,16 @@ export default function HoldingLedgerChart({ prices }: Props) {
     }
     ctx.textAlign = "left";
     ctx.fillText("年率成長率", padL, height - 4);
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
   }, [placebo, walkBH, ledger]);
 
   if (!stats || !ledger || !params) return null;
 
+  // 比べるのは「ドラッグ」と「売買の実費」だけ。取りこぼしは θ を上げれば消える
+  // 別勘定なので、混ぜると判定がスライダーの位置で決まってしまう。
   const dragShare =
     ledger.dragLoss + ledger.turnoverLoss > 0
       ? ledger.dragLoss / (ledger.dragLoss + ledger.turnoverLoss)
@@ -422,9 +448,11 @@ export default function HoldingLedgerChart({ prices }: Props) {
           <div className="text-gray-500 text-[10px]">倍化 {doublingYearsLabel(doublingYears(stats.gRealized))}</div>
         </div>
         <div className="p-2 rounded border border-gray-200 bg-gray-50">
-          <div className="text-gray-500">往復コスト（実測）</div>
+          <div className="text-gray-500">往復コスト{cost.measured ? "（実測）" : "（既定値）"}</div>
           <div className="font-mono font-bold">{pct(measuredCost, 2)}</div>
-          <div className="text-gray-500 text-[10px]">Corwin-Schultz</div>
+          <div className="text-gray-500 text-[10px]">
+            {cost.measured ? "Corwin-Schultz" : "高安が無く推定不能のため既定 30bps"}
+          </div>
         </div>
         <div className="p-2 rounded border border-gray-200 bg-gray-50">
           <div className="text-gray-500">恒等式の残差</div>
@@ -535,9 +563,10 @@ export default function HoldingLedgerChart({ prices }: Props) {
         <div className="text-xs font-bold text-gray-800">どちらが削ったか（同じスケールで比較）</div>
         {[
           { label: "ボラティリティドラッグ q²σ²/2", v: ledger.dragLoss, color: "bg-purple-500" },
-          { label: "回転（取りこぼし＋コスト＋金利＋税）", v: ledger.turnoverLoss, color: "bg-red-500" },
+          { label: "売買の実費（コスト＋信用金利＋税）", v: ledger.turnoverLoss, color: "bg-red-500" },
+          { label: `市場にいない取りこぼし（θ=${inMarketPct}% の機会損失）`, v: ledger.idleLoss, color: "bg-amber-500" },
         ].map((b) => {
-          const denom = Math.max(ledger.dragLoss, ledger.turnoverLoss, 1e-9);
+          const denom = Math.max(ledger.dragLoss, ledger.turnoverLoss, ledger.idleLoss, 1e-9);
           return (
             <div key={b.label} className="space-y-0.5">
               <div className="flex justify-between text-[11px]">
@@ -553,17 +582,22 @@ export default function HoldingLedgerChart({ prices }: Props) {
         <p className="text-[11px] text-gray-700 leading-relaxed">
           {turnoverWins ? (
             <>
-              この設定では<strong className="text-red-700">回転のほうが大きく削っています</strong>
+              この設定では<strong className="text-red-700">売買の実費のほうが大きく削っています</strong>
               （ドラッグの{(ledger.turnoverLoss / Math.max(ledger.dragLoss, 1e-9)).toFixed(1)}倍）。
               ボラティリティが高いこと自体より、<strong>売買を挟むこと</strong>が効いている状態です。
             </>
           ) : (
             <>
               この設定では<strong className="text-purple-700">ドラッグのほうが大きく削っています</strong>
-              （全体の{(dragShare * 100).toFixed(0)}%）。
+              （実費との合計の{(dragShare * 100).toFixed(0)}%）。
               建玉倍率 q を下げると q² で効くので、最も速く改善します。
             </>
           )}
+        </p>
+        <p className="text-[11px] text-gray-600 leading-relaxed">
+          上2本だけを比べています。<strong>3本目の「取りこぼし」は売買費用ではなく、
+          θ を 100% にすれば消える別勘定</strong>です（コストも税もゼロにしたときにだけ残る項）。
+          混ぜて数えると、この判定が売買の話ではなく θ スライダーの位置で決まってしまいます。
         </p>
       </div>
 
@@ -594,14 +628,26 @@ export default function HoldingLedgerChart({ prices }: Props) {
       </div>
 
       {/* ── プラセボ分布 ────────────────────────────────────────────── */}
-      {placebo && walkBH && placebo.gs.length >= 20 && (
+      {placebo && placebo.gs.length >= 20 && placebo.distinct < 5 ? (
+        <div className="space-y-1">
+          <div className="text-xs font-bold text-gray-800">実測の値動きで検証（プラセボ対照群）</div>
+          <p className="text-[11px] text-gray-600 leading-relaxed rounded border border-gray-200 bg-gray-50 p-3">
+            在場割合 θ が {inMarketPct}% なので、
+            <strong>ランダムに選び直す余地がありません</strong>
+            （どの試行も同じ日を保有するため、400通りが全部同じ結果になります）。
+            対照群として意味を持たせるには θ を下げてください。
+          </p>
+        </div>
+      ) : placebo && walkBH && placebo.gs.length >= 20 ? (
         <div className="space-y-1">
           <div className="text-xs font-bold text-gray-800">実測の値動きで検証（プラセボ対照群）</div>
           <div className="relative">
             <canvas ref={placeboRef} />
           </div>
           <p className="text-[11px] text-gray-600 leading-relaxed">
-            同じ回転率・同じ在場割合で、<strong>いつ建てるかだけを無作為にした</strong> 400 通り。
+            同じ回転率・同じ在場割合で、<strong>いつ建てるかだけを無作為にした</strong> 400 通り
+            （実測の平均 {(placebo.meanRoundTrips / stats.years).toFixed(0)} 往復/年 ＝ 台帳の
+            {ledger.roundTrips.toFixed(0)} 往復/年。ここが揃っていないと比較になりません）。
             上の台帳が仮定した「タイミング技能ゼロ」が、実データでどれだけ散らばるかを示します。
             台帳の予測（{pct(ledger.gNet)}）がこの分布の中に落ちていれば、台帳の前提は妥当です。
             実際の売買がこの分布より<strong>右</strong>に出て初めて「技能」と言えます
@@ -609,7 +655,7 @@ export default function HoldingLedgerChart({ prices }: Props) {
             なおこの分布は実測の値動きを歩くので、上の μ スライダーは効きません。
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* ── H × θ グリッド ─────────────────────────────────────────── */}
       {grid && (
@@ -789,8 +835,12 @@ export default function HoldingLedgerChart({ prices }: Props) {
         <p className="font-medium text-gray-700 mt-3">5. 結果の読み方</p>
         <ul className="list-disc pl-4 space-y-1">
           <li>
-            <strong>「どちらが削ったか」の2本が判定の中心。</strong>回転のほうが長ければ、その銘柄で問題なのは
-            ボラティリティではなく売買頻度です。ドラッグのほうが長ければ、建玉 q を下げるのが最速の改善です。
+            <strong>「どちらが削ったか」の上2本が判定の中心。</strong>売買の実費のほうが長ければ、
+            その銘柄で問題なのはボラティリティではなく売買頻度です。ドラッグのほうが長ければ、
+            建玉 q を下げるのが最速の改善です。
+            <strong>3本目の「取りこぼし」は上2本と混ぜないこと。</strong>あれは θ を上げれば消える
+            機会損失で、売買費用ではありません（コストも税もゼロにしたときにだけ残ります）。
+            混ぜて数えると、判定が θ スライダーの位置で決まってしまいます。
           </li>
           <li>
             <strong>壁 σ²/2 と SE(μ̂) を必ず見比べる。</strong>SE のほうが大きければ、

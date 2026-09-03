@@ -201,9 +201,19 @@ export interface LedgerResult {
   vsBuyHold: number;
   /** ウォーターフォール用の段 */
   steps: LedgerStep[];
-  /** 「ドラッグが削った量」と「回転が削った量」— 同じスケールで並べるための2値 */
+  /**
+   * 「何が削ったか」を同じスケールで並べるための3値。
+   *
+   * **`turnoverLoss` に `inMarketDelta` を混ぜないこと。** 取りこぼしはコストが0でも
+   * 税が0でも発生する θ の機会損失で、売買回数とは無関係である。混ぜると
+   * 「回転のほうがドラッグより効いている」という判定を、実際には UI の θ スライダー
+   * （既定70%）が決めてしまう（8306.T 既定で 14.3pp のうち 6.9pp が取りこぼしだった）。
+   */
   dragLoss: number;
+  /** 売買そのものの実費（コスト＋信用金利＋税）。θ には依存しない */
   turnoverLoss: number;
+  /** 市場にいない期間の取りこぼし。売買費用ではなく θ の機会損失 */
+  idleLoss: number;
 }
 
 /** e^x を年率対数に戻すときの、実現益課税1サイクル分。 */
@@ -277,10 +287,10 @@ export function decomposeLedger(s: SeriesStats, p: LedgerParams): LedgerResult {
     doublingYears: doublingYears(gNet),
     vsBuyHold: gNet - gBuyHoldNet,
     steps,
-    // 「ドラッグの側」と「回転の側」を同じスケールで並べるための2値。
-    // ドラッグは q²σ²/2、回転は在場取りこぼし＋コスト＋キャリー＋税の合計。
+    // 同じスケールで並べるための3値（LedgerResult のコメント参照）。
     dragLoss: drag,
-    turnoverLoss: -(inMarketDelta + costDelta + carryDelta + taxDelta),
+    turnoverLoss: -(costDelta + carryDelta + taxDelta),
+    idleLoss: -inMarketDelta,
   };
 }
 
@@ -310,6 +320,18 @@ export interface WalkParams {
   taxEnabled: boolean;
   taxRate: number;
   marginRate: number;
+  /**
+   * 在場が続いていても blockDays 日ごとに畳んで建て直す。
+   *
+   * これが無いと `randomBlocks` の**隣り合うブロックが1つの建玉に融合**し、
+   * プラセボ群だけが往復コストと実現益課税を払わずに済んでしまう。
+   * 実測（8306.T・H=10・θ=70%）で台帳 17.6往復/年 に対しプラセボ 5.3往復/年、
+   * θ=100% では 25.2 対 0.1（実質バイ&ホールド）まで開いていた。
+   * `randomBlocks` はブロックを `b*H` 始まりで置くので、境界は `i % H === 0` で一致する。
+   *
+   * 未指定なら従来どおり「連続した在場は1つの建玉」（＝バイ&ホールドの経路）。
+   */
+  blockDays?: number;
 }
 
 /**
@@ -329,6 +351,7 @@ export function walkStrategy(
   const legCost = Math.min(MAX_RT_COST, (q * c) / 2);
   const tau = p.taxEnabled ? Math.min(0.9, Math.max(0, p.taxRate)) : 0;
   const dailyCarry = (Math.max(0, q - 1) * p.marginRate) / TRADING_DAYS;
+  const blockDays = Math.max(0, Math.floor(p.blockDays ?? 0));
 
   let w = 1;
   let peak = 1;
@@ -364,6 +387,15 @@ export function walkStrategy(
 
   for (let i = 0; i < returns.length && !ruined; i++) {
     const cur = inMarket[i];
+    // ブロック境界では、在場が続いていても一度畳んで建て直す（WalkParams.blockDays）。
+    // i=0 は prev=false なので、この分岐ではなく下の通常の建玉へ落ちる。
+    if (cur && prev && blockDays > 0 && i % blockDays === 0) {
+      settle();
+      const reFee = w * legCost;
+      w -= reFee;
+      costPaid += reFee;
+      entryW = w;
+    }
     if (cur && !prev) {
       const fee = w * legCost;
       w -= fee;
@@ -421,6 +453,11 @@ export function alwaysIn(n: number): boolean[] {
  * これがプラセボ対照群である。同じ回転率・同じ在場割合で、タイミングの中身だけを
  * 無作為にした群。実際のトレードがこの分布より右に出て初めて「技能」と言える
  * （検定は timing-value.ts の SPA / Reality Check が担当する）。
+ *
+ * **返した在場フラグは必ず `walkStrategy(..., { blockDays: H })` へ渡すこと。**
+ * 隣り合うブロックが両方選ばれると `boolean[]` の上では連続した在場になり、
+ * 渡さないと1つの建玉に融合して往復回数が激減する（＝「同じ回転率」が崩れる）。
+ * θ が大きいほど融合が増えるので、ズレは θ に依存して系統的に出る。
  */
 export function randomBlocks(
   n: number,
@@ -449,6 +486,13 @@ export function randomBlocks(
 
 export interface PlaceboResult {
   gs: number[];
+  /**
+   * 相異なる結果の個数。**θ=100% では 1 になる**（全ブロックが選ばれるので
+   * どの試行も同じ日を保有し、無作為化する余地が無い）。1本だけのヒストグラムを
+   * 「ランダムに在場した400通り」として描くと、台帳の予測がその外に落ちて
+   * 「前提が妥当でない」と読めてしまうので、呼び出し側はこれで分岐すること。
+   */
+  distinct: number;
   q05: number;
   q50: number;
   q95: number;
@@ -471,7 +515,9 @@ export function placeboDistribution(
   let cost = 0;
   for (let it = 0; it < p.iters; it++) {
     const flags = randomBlocks(returns.length, p.holdDays, p.inMarket, rand);
-    const r = walkStrategy(returns, flags, p);
+    // blockDays を渡さないと、隣り合うブロックが融合して往復回数が激減し、
+    // 台帳と「同じ回転率」ではなくなる（WalkParams.blockDays 参照）。
+    const r = walkStrategy(returns, flags, { ...p, blockDays: p.holdDays });
     if (r.ruined || !isFinite(r.g)) {
       ruins++;
       continue;
@@ -487,6 +533,7 @@ export function placeboDistribution(
   const m = gs.length ? gs.reduce((a, b) => a + b, 0) / gs.length : 0;
   return {
     gs,
+    distinct: new Set(gs.map((g) => g.toFixed(8))).size,
     q05: at(0.05),
     q50: at(0.5),
     q95: at(0.95),
