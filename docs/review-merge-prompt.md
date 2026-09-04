@@ -122,18 +122,18 @@ Canvas 150件のうち10件だけ実装し、**受け入れ条件を満たした
 
 **② 母数の数え方の説明があるか**
 
-プロンプトは母数を `getContext("2d")` **151件**（2026-08-31 時点）と与えている。
-`<canvas` を持つファイルは **174件**ある。**この差分の説明が表の前に書かれていること。**
+プロンプトは母数を **2026-09-04 時点の実測**（`getContext("2d")` を持つ .tsx **152件** /
+`<canvas` を持つ .tsx **176件**）で与えている。**この差分の説明が表の前に書かれていること。**
 そして**自分でも数え直すこと**:
 
 ```
-grep -rl 'getContext("2d")' app --include=*.tsx | wc -l      # 151 のはず
-grep -rl '<canvas' app --include=*.tsx | wc -l               # 174 のはず
+grep -rl 'getContext("2d")' app --include=*.tsx | wc -l      # 152 前後
+grep -rl '<canvas' app --include=*.tsx | wc -l               # 176 前後
 ```
 
-第3波の記録（§0.7①）は 150 / 173 と書いていたが、`6330e4d` が Canvas2D を2件増やし、
-`<canvas` の数はレビュー側の実測で 174 だった（§0.8⑥・FU44）。
-**前の波の数字をそのまま信じないこと。**
+**この数字は波をまたぐたびに動いている**（第3波 150/173 → 第4波 151/174 → 現在 152/176）。
+オーナーが幾何リターン層を並行して育てているためで、**前の波の数字をそのまま信じないこと**
+（§0.8⑥・FU44）。**ずれていること自体は問題ではない。説明が無いことが問題である。**
 
 **③ 棚卸し表の全件が「対応した / 対応不要」に決着しているか（★受け入れ条件2）**
 
@@ -152,12 +152,27 @@ S18 は `DirectionGlyph` を184箇所に足したが `eps` を渡した箇所が
 色側には不感帯がある（勝率 0.48–0.52、`signShare`/`posShare` 0.4–0.6、`|ic|<0.1`、
 `PersistenceChart` の相関）。**色が灰色なのに記号だけが方向を主張する。**
 
+> **★ 素の grep で数えないこと。**
+> `grep -rn 'DirectionGlyph' … | grep -c 'eps'` は、FU36 が未着手でも **1** を返す。
+> `DirectionValue.tsx` の**定義側**（`eps = 0` の既定引数と内部の受け渡し）を拾うためである。
+> 同じ理由で `<DirectionGlyph` の単純 grep は 185 を返すが、呼び出しは 184 である。
+> **定義ファイルを除き、複数行にまたがる JSX も拾って数えること。**
+
 ```
-grep -rn 'DirectionGlyph' app/components/analysis/*.tsx | wc -l
-grep -rn 'DirectionGlyph' app/components/analysis/*.tsx | grep -c 'eps'
+node -e '
+const fs=require("fs"),path=require("path");let g=0,ge=0,v=0,ve=0;
+(function w(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);
+ if(e.isDirectory()){if(e.name!=="node_modules")w(p);continue;}
+ if(!e.name.endsWith(".tsx")||e.name==="DirectionValue.tsx")continue;
+ const s=fs.readFileSync(p,"utf8");
+ for(const m of s.matchAll(/<DirectionGlyph[\s\S]*?\/>/g)){g++;if(/eps\s*=/.test(m[0]))ge++;}
+ for(const m of s.matchAll(/<DirectionValue[\s\S]*?>/g)){v++;if(/eps\s*=/.test(m[0]))ve++;}
+}})("app");
+console.log("Glyph",g,"eps",ge,"/ Value",v,"eps",ve);'
 ```
 
-**2つ目が0のままなら FU36 は未着手である。** 数だけでなく、
+**マージ前の main での実測は Glyph 184 / eps 0・Value 36 / eps 0 である。**
+**eps が0のままなら FU36 は未着手。** 数だけでなく、
 **不感帯のある箇所で実際に閾値が一致しているか**を数件そのコードで確かめること。
 
 **⑤ FU37 — 方向を持たない量から記号が外れたか**
@@ -170,10 +185,11 @@ grep -rn 'DirectionGlyph' app/components/analysis/*.tsx | grep -c 'eps'
 
 ```
 grep -rho 'createChart(' app --include=*.tsx --include=*.ts | wc -l      # 142
-grep -rho 'getContext("2d")' app --include=*.tsx --include=*.ts | wc -l  # 173
+grep -rho 'getContext("2d")' app --include=*.tsx --include=*.ts | wc -l  # 175
 ```
 
-**マージ前の main での実測値は createChart 142 / getContext 173 である。**
+**マージ前の main（2026-09-04）での実測値は createChart 142 / getContext 175 である。**
+**投入時に自分で数え直して、それを基準にすること。**
 時間軸の図を Canvas2D に戻していないか、逆に非時系列の静的図を lightweight-charts に
 置き換えていないか。**数が動いていたら理由を聞くこと。**
 
