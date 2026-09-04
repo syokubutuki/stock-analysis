@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computePersistentHomology, fisherRaoDistance } from "../../lib/tda";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -30,6 +31,13 @@ export default function TDAChart({ prices, seriesMode }: Props) {
   const fr = useMemo(() => fisherRaoDistance(lr, Math.min(60, Math.floor(lr.length / 4))), [prices, seriesMode]);
 
   // Persistence diagram
+  const diagramDescription = useMemo(() => {
+    if (tda.diagram.length === 0) return "パーシステンス図。計算できるデータが不足しています。";
+    const top = tda.diagram.reduce((a, b) => (b.persistence > a.persistence ? b : a));
+    const b1 = tda.diagram.filter((d) => d.dimension === 1).length;
+    return `誕生（横軸）と消滅（縦軸）を点で置いたパーシステンス図（${tda.diagram.length}点、うち1次元の穴が${b1}個）。対角線から最も離れた点は次元${top.dimension}のpersistence=${top.persistence.toFixed(4)}で、離れているほど本物の構造です。`;
+  }, [tda]);
+
   useEffect(() => {
     const canvas = diagramCanvasRef.current;
     if (!canvas || tda.diagram.length === 0) return;
@@ -96,6 +104,13 @@ export default function TDAChart({ prices, seriesMode }: Props) {
   }, [tda]);
 
   // Betti curves
+  const bettiDescription = useMemo(() => {
+    if (tda.thresholds.length === 0) return "ベッチ曲線。計算できるデータが不足しています。";
+    let i0 = 0;
+    for (let i = 1; i < tda.bettiCurve1.length; i++) if (tda.bettiCurve1[i] > tda.bettiCurve1[i0]) i0 = i;
+    return `しきい値ε（横軸）に対するβ₀（連結成分・実線）とβ₁（穴・破線）の曲線（${tda.thresholds.length}点）。β₁が最大になるのはε=${tda.thresholds[i0].toFixed(4)}で${tda.bettiCurve1[i0]}個、総persistenceはβ₀が${tda.totalPersistence0.toFixed(3)}・β₁が${tda.totalPersistence1.toFixed(3)}です。`;
+  }, [tda]);
+
   useEffect(() => {
     const canvas = bettiCanvasRef.current;
     if (!canvas || tda.thresholds.length === 0) return;
@@ -229,8 +244,8 @@ export default function TDAChart({ prices, seriesMode }: Props) {
       <div className="text-xs text-gray-500 mb-1">{tda.interpretation}</div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-3">
-        <canvas ref={diagramCanvasRef} className="rounded border border-gray-100" />
-        <canvas ref={bettiCanvasRef} className="rounded border border-gray-100" />
+        <AccessibleCanvas ref={diagramCanvasRef} description={diagramDescription} className="rounded border border-gray-100" />
+        <AccessibleCanvas ref={bettiCanvasRef} description={bettiDescription} className="rounded border border-gray-100" />
       </div>
 
       <div className="text-xs text-gray-500 mb-1">Fisher-Rao距離 — リターン分布の変化速度 (スパイク=レジーム変化)</div>

@@ -10,6 +10,7 @@ import {
   partialInfoDecomposition,
 } from "../../lib/information-flow";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -59,6 +60,16 @@ export default function SymbolicInfoFlowChart({ prices, seriesMode }: Props) {
   );
 
   // フロー図
+  const flowDescription = useMemo(() => {
+    const pairs: [string, number][] = [
+      ["出来高→価格", teVolPrice], ["価格→出来高", tePriceVol],
+      ["出来高→ボラ", teVolVola], ["ボラ→価格", teVolaPrice],
+      ["価格→ボラ", tePriceVola], ["ボラ→出来高", teVolaVol],
+    ];
+    const top = pairs.reduce((a, b) => (b[1] > a[1] ? b : a));
+    return `出来高・価格・ボラの3者間の記号移動エントロピーを矢印の太さで表した情報フロー図。最も強い流れは${top[0]}の${top[1].toFixed(4)}で、出来高→価格${teVolPrice.toFixed(4)}に対し価格→出来高は${tePriceVol.toFixed(4)}です。`;
+  }, [teVolPrice, tePriceVol, teVolVola, teVolaPrice, tePriceVola, teVolaVol]);
+
   useEffect(() => {
     const canvas = flowRef.current;
     if (!canvas) return;
@@ -143,6 +154,15 @@ export default function SymbolicInfoFlowChart({ prices, seriesMode }: Props) {
   }, [teVolPrice, tePriceVol, teVolVola, teVolaPrice, tePriceVola, teVolaVol]);
 
   // PID棒グラフ
+  const pidDescription = useMemo(() => {
+    const parts: [string, number][] = [
+      ["冗長", pid.redundancy], ["固有(出来高)", pid.unique1],
+      ["固有(ボラ)", pid.unique2], ["相乗", pid.synergy],
+    ];
+    const top = parts.reduce((a, b) => (b[1] > a[1] ? b : a));
+    return `2つの情報源が価格について持つ情報を、冗長・固有・相乗に分解した棒グラフ（部分情報分解）。合計${pid.mi_target_joint.toFixed(4)}のうち最大は${top[0]}の${top[1].toFixed(4)}です。`;
+  }, [pid]);
+
   useEffect(() => {
     const canvas = pidRef.current;
     if (!canvas) return;
@@ -228,10 +248,10 @@ export default function SymbolicInfoFlowChart({ prices, seriesMode }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded border border-gray-100 overflow-hidden">
-          <canvas ref={flowRef} />
+          <AccessibleCanvas ref={flowRef} description={flowDescription} />
         </div>
         <div className="rounded border border-gray-100 overflow-hidden">
-          <canvas ref={pidRef} />
+          <AccessibleCanvas ref={pidRef} description={pidDescription} />
         </div>
       </div>
 

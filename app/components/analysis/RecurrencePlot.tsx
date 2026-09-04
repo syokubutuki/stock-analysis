@@ -8,6 +8,7 @@ import {
   estimateLyapunov,
 } from "../../lib/nonlinear";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -25,6 +26,16 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
   const lyap = useMemo(() => estimateLyapunov(lr, 1, 3, 20), [prices, seriesMode]);
 
   // Recurrence Plot描画
+  const rpDescription = useMemo(() => {
+    if (rp.n === 0) return "リカレンスプロット。計算できるデータが不足しています。";
+    return `${rp.n}かける${rp.n}の再帰行列を点で描いたリカレンスプロット。再帰率${(rp.recurrenceRate * 100).toFixed(1)}%、決定性DET=${(rp.determinism * 100).toFixed(1)}%、ラミナリティ${(rp.laminarity * 100).toFixed(1)}%、最長対角線${rp.maxDiagLength}で、対角線が長いほど決定論的です。`;
+  }, [rp]);
+
+  const lyapDescription = useMemo(() => {
+    if (lyap.divergence.length === 0) return "Lyapunov指数の発散曲線。計算できるデータが不足しています。";
+    return `近傍の軌道が離れていく速さ（対数距離）を時間ステップに対して描いた図（${lyap.divergence.length}点）。傾きから推定した最大Lyapunov指数は${lyap.exponent.toFixed(4)}で、正なら初期値鋭敏性（カオス的）を示します。`;
+  }, [lyap]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || rp.n === 0) return;
@@ -246,7 +257,7 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
             Recurrence Plot
           </div>
           <div className="flex justify-center">
-            <canvas ref={canvasRef} className="rounded border border-gray-100" />
+            <AccessibleCanvas ref={canvasRef} description={rpDescription} className="rounded border border-gray-100" />
           </div>
         </div>
 
@@ -301,7 +312,7 @@ export default function RecurrencePlotChart({ prices, seriesMode }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div>
             <div className="flex justify-center">
-              <canvas ref={lyapCanvasRef} className="rounded border border-gray-100" />
+              <AccessibleCanvas ref={lyapCanvasRef} description={lyapDescription} className="rounded border border-gray-100" />
             </div>
             <div className="mt-1 text-[10px] text-fg-muted text-center">
               実線: 近傍軌道の対数発散 / 破線: 線形フィット(傾き = {"\u03BB"})

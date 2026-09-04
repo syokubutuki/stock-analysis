@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeMarketTime } from "../../lib/market-time";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -35,6 +36,12 @@ export default function MarketTimeChart({ prices }: Props) {
   const result = useMemo(() => computeMarketTime(prices), [prices]);
 
   // Chart 1: Time mapping (calendar vs volume/volatility time)
+  const mappingDescription = useMemo(() => {
+    if (result.data.length < 2) return "カレンダー時間と市場時間の対応。計算できるデータが不足しています。";
+    const s = result.stats;
+    return `カレンダー時間（横軸）に対して、出来高時間とボラティリティ時間がどれだけ進んだかを描いた対応図（${result.data.length}点）。Gini係数は出来高時間${s.volumeGini.toFixed(3)}・ボラ時間${s.volatilityGini.toFixed(3)}（大きいほど時間の進み方が不均一）で、カレンダー時間との相関は${s.volumeCorrelation.toFixed(3)}・${s.volatilityCorrelation.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = mappingCanvasRef.current;
     if (!canvas || result.data.length < 2) return;
@@ -488,7 +495,7 @@ export default function MarketTimeChart({ prices }: Props) {
 
       {/* Chart 1: Time mapping */}
       <div>
-        <canvas ref={mappingCanvasRef} />
+        <AccessibleCanvas ref={mappingCanvasRef} description={mappingDescription} />
       </div>
 
       {/* Chart 2: Price in volume time */}

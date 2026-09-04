@@ -12,6 +12,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { rsAnalysis, computeDCCA, correlationDimension } from "../../lib/fractal-ext";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -35,6 +36,22 @@ export default function FractalExtChart({ prices, seriesMode }: Props) {
   const corrDim = useMemo(() => correlationDimension(lr), [prices, seriesMode]);
 
   // R/S plot
+  const rsDescription = useMemo(() => {
+    if (rs.scales.length === 0) return "R/S解析のlog-logプロット。計算できるデータが不足しています。";
+    return `窓長（対数横軸）とR/S統計量（対数縦軸）のプロットと回帰直線（${rs.scales.length}点）。傾き＝Hurst指数は${rs.hurst.toFixed(3)}（95%CI ${rs.confidence[0].toFixed(3)}〜${rs.confidence[1].toFixed(3)}）で、0.5が独立、それより大きければ持続性です。`;
+  }, [rs]);
+
+  const dccaDescription = useMemo(() => {
+    if (dcca.scales.length === 0) return "DCCA相関のスケール依存。計算できるデータが不足しています。";
+    const last = dcca.rho.length - 1;
+    return `スケール（横軸）ごとのDCCA相関係数（${dcca.scales.length}点）。最短スケール${dcca.scales[0]}で${dcca.rho[0].toFixed(3)}、最長スケール${dcca.scales[last]}で${dcca.rho[last].toFixed(3)}、クロスHurstは${dcca.crossHurst.toFixed(3)}です。`;
+  }, [dcca]);
+
+  const corrDimDescription = useMemo(() => {
+    if (corrDim.logR.length === 0) return "相関次元の推定。計算できるデータが不足しています。";
+    return `相関積分C(r)をlog-logで描いた図（${corrDim.logR.length}点）。線形領域の傾き＝相関次元D₂は${corrDim.dimension.toFixed(3)}で、低次元なら決定論的な力学、高次元ならノイズに近いことを示します。`;
+  }, [corrDim]);
+
   useEffect(() => {
     const canvas = rsCanvasRef.current;
     if (!canvas || rs.scales.length === 0) return;
@@ -90,13 +107,13 @@ export default function FractalExtChart({ prices, seriesMode }: Props) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
-          <canvas ref={rsCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={rsCanvasRef} description={rsDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={dccaCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={dccaCanvasRef} description={dccaDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={corrDimCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={corrDimCanvasRef} description={corrDimDescription} className="w-full rounded border border-gray-100" />
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import {
   StateKind,
 } from "../../lib/potential-landscape";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -37,6 +38,12 @@ export default function PotentialLandscapeChart({ prices }: Props) {
   );
 
   // ----- メイン: ポテンシャル地形 -----
+  const mainDescription = useMemo(() => {
+    if (!land) return "ポテンシャル地形。計算できるデータが不足しています。";
+    const regime = land.regime === "meanRevert" ? "平均回帰" : land.regime === "momentum" ? "モメンタム" : "中立";
+    return `状態x（横軸）に対するポテンシャルU(x)の地形（${land.grid.length}格子）。谷は${land.valleys.length}個・丘は${land.hills.length}個で、いまの状態はx=${land.xNow.toFixed(3)}（価格${land.priceNow.toFixed(1)}）、最寄りの谷は${land.nearestValley ? land.nearestValley.price.toFixed(1) : "—"}、レジーム判定は${regime}です。`;
+  }, [land]);
+
   useEffect(() => {
     const canvas = mainRef.current;
     if (!canvas) return;
@@ -155,6 +162,11 @@ export default function PotentialLandscapeChart({ prices }: Props) {
   }, [land]);
 
   // ----- ドリフト μ(x) -----
+  const driftDescription = useMemo(() => {
+    if (!land) return "ドリフト関数。計算できるデータが不足しています。";
+    return `同じ状態軸に対するドリフトμ(x)（=h日先の期待リターン）と有効標本重みを重ねた図。いまの状態でのドリフトは${(land.driftNow * 100).toFixed(3)}%で、ゼロ交差が谷（引き寄せ）に対応します。`;
+  }, [land]);
+
   useEffect(() => {
     const canvas = driftRef.current;
     if (!canvas || !land) return;
@@ -292,8 +304,8 @@ export default function PotentialLandscapeChart({ prices }: Props) {
       )}
 
       <div className="space-y-3">
-        <div><canvas ref={mainRef} className="rounded border border-gray-100" /></div>
-        <div><canvas ref={driftRef} className="rounded border border-gray-100" /></div>
+        <div><AccessibleCanvas ref={mainRef} description={mainDescription} className="rounded border border-gray-100" /></div>
+        <div><AccessibleCanvas ref={driftRef} description={driftDescription} className="rounded border border-gray-100" /></div>
       </div>
 
       <div className="text-xs text-gray-600 space-y-2 mt-3">

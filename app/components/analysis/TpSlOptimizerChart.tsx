@@ -6,6 +6,7 @@ import { TpSlResult } from "../../lib/tp-sl-optimizer";
 import type { TpSlWorkerRequest, TpSlWorkerResponse } from "../../lib/tp-sl-optimizer.worker";
 import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS, DIRECTION_COLORS, DIRECTION_TEXT_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -146,6 +147,20 @@ export default function TpSlOptimizerChart({ prices }: Props) {
 
   const unitLabel = (v: number) => (unit === "atr" ? `${v}×ATR` : `${(v * 100).toFixed(0)}%`);
 
+  const heatDescription = useMemo(() => {
+    if (!result || result.cells.length === 0) return "利確・損切りのヒートマップ。まだ計算していません。";
+    const b = result.best ?? result.cells.reduce((a, c) => (c.expReturn > a.expReturn ? c : a));
+    const u = result.unit === "atr" ? "ATR倍" : "%";
+    return `利確幅（縦）×損切り幅（横）の全組合せ${result.cells.length}通りの1トレード平均リターンを色で並べたヒートマップ（エントリー${result.nEntries}回）。最良は利確${b.tp}${u}・損切り${b.sl}${u}の${(b.expReturn * 100).toFixed(3)}%（勝率${(b.winRate * 100).toFixed(0)}%、期待R=${b.expR.toFixed(2)}）です。`;
+  }, [result]);
+
+  const mfeDescription = useMemo(() => {
+    if (!result || result.mfeMae.length === 0) return "保有日数別のMFE・MAE。まだ計算していません。";
+    const last = result.mfeMae[result.mfeMae.length - 1];
+    const peak = result.mfeMae.reduce((a, b) => (b.meanMFE - b.meanMAE > a.meanMFE - a.meanMAE ? b : a));
+    return `保有日数（横軸）に対する平均最大含み益MFE（実線）と平均最大含み損MAE（破線）の推移（${result.mfeMae.length}点）。MFE−MAEが最大なのは${peak.hold}日保有で、MFE${(peak.meanMFE * 100).toFixed(2)}%・MAE${(peak.meanMAE * 100).toFixed(2)}%。最長${last.hold}日ではMFE${(last.meanMFE * 100).toFixed(2)}%・MAE${(last.meanMAE * 100).toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!heatRef.current || !result) return;
     const ul = (v: number) => (result.unit === "atr" ? `${v}×ATR` : `${(v * 100).toFixed(0)}%`);
@@ -197,8 +212,8 @@ export default function TpSlOptimizerChart({ prices }: Props) {
         </div>
       )}
 
-      <div className="relative"><canvas ref={heatRef} /></div>
-      <div className="relative"><canvas ref={mfeRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={heatRef} description={heatDescription} /></div>
+      <div className="relative"><AccessibleCanvas ref={mfeRef} description={mfeDescription} /></div>
 
       <AnalysisGuide title="最適TP/SL・MFE/MAEの詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

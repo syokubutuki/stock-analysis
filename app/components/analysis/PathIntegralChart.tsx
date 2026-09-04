@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePathIntegral } from "../../lib/path-integral";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -32,6 +33,14 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function PathIntegralChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computePathIntegral(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.paths.length === 0) return "経路積分のシミュレーション。計算できるデータが不足しています。";
+    const b = result.bands;
+    const i = b.p50.length - 1;
+    const f = result.finalStats;
+    return `GARCHブートストラップで${result.paths.length}本の経路を${result.horizon}日先まで生成し、5〜95%のバンドと代表経路を描いた図。最終日の中央値は${(b.p50[i] * 100).toFixed(2)}%、5〜95%は${(b.p5[i] * 100).toFixed(2)}%から${(b.p95[i] * 100).toFixed(2)}%で、上昇確率は${(f.upProb * 100).toFixed(1)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     const draw = () => {
@@ -211,7 +220,7 @@ export default function PathIntegralChart({ prices }: Props) {
         経路積分 (GARCH Bootstrap Monte Carlo)
       </h3>
       <div className="relative">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

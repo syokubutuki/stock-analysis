@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeSSA } from "../../lib/ssa";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -89,6 +90,14 @@ export default function SSAChart({ prices, seriesMode }: Props) {
   }, [result, times]);
 
   // Scree plot
+  const screeDescription = useMemo(() => {
+    const c = result.components;
+    if (c.length === 0) return "SSAのスクリープロット。計算できるデータが不足しています。";
+    const trend = c.filter((x) => x.category === "trend").length;
+    const per = c.filter((x) => x.category === "periodic").length;
+    return `特異値の寄与率を大きい順に並べたスクリープロット（${c.length}成分）。第1成分が${c[0].contribution.toFixed(1)}%、上位3成分で${c.slice(0, 3).reduce((a, b) => a + b.contribution, 0).toFixed(1)}%を占め、内訳はトレンド${trend}・周期${per}・残りノイズです。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = screeRef.current;
     if (!canvas || result.components.length === 0) return;
@@ -185,7 +194,7 @@ export default function SSAChart({ prices, seriesMode }: Props) {
       </div>
 
       <div ref={chartRef} />
-      <canvas ref={screeRef} className="mt-3" />
+      <AccessibleCanvas ref={screeRef} description={screeDescription} className="mt-3" />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

@@ -10,6 +10,7 @@ import {
   kolmogorovApprox,
 } from "../../lib/complexity";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -42,6 +43,13 @@ export default function ComplexityEntropyChart({ prices, seriesMode }: Props) {
   const lz = useMemo(() => normalizedLZComplexity(values), [prices, seriesMode]);
   const kolm = useMemo(() => kolmogorovApprox(values), [prices, seriesMode]);
   const cePlane = useMemo(() => rollingCEPlane(values, times, 3, 60), [prices, seriesMode]);
+
+  const ceDescription = useMemo(() => {
+    if (cePlane.length === 0) return "複雑度-エントロピー平面。計算できるデータが不足しています。";
+    const last = cePlane[cePlane.length - 1];
+    const hi = cePlane.reduce((a, b) => (b.sc > a.sc ? b : a));
+    return `順列エントロピー（横軸）と統計的複雑度（縦軸）の平面に、60日窓の軌跡を描いた図（${cePlane.length}点）。直近${last.time}はPE=${last.pe.toFixed(3)}・SC=${last.sc.toFixed(3)}、複雑度が最大だったのは${hi.time}の${hi.sc.toFixed(3)}です（全期間ではPE=${sc.toFixed(3)}、正規化LZ複雑度${lz.toFixed(3)}）。`;
+  }, [cePlane, sc, lz]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -185,7 +193,7 @@ export default function ComplexityEntropyChart({ prices, seriesMode }: Props) {
       </div>
 
       <div className="w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={ceDescription} />
       </div>
 
       <AnalysisGuide title="複雑度-エントロピー平面の理論">

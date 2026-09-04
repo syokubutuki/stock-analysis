@@ -12,6 +12,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeAnalyticSignal, analyticSignalStats } from "../../lib/analytic-signal";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -135,6 +136,11 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
       freqChartRef.current = null;
     };
   }, [prices, result]);
+
+  const phaseDescription = useMemo(() => {
+    if (result.amplitude.length === 0) return "解析信号の極座標表現。計算できるデータが不足しています。";
+    return `解析信号 z(t)=A(t)e^{iφ(t)} を極座標に描いた図（${result.amplitude.length}点）。平均振幅は${stats.meanAmplitude.toFixed(4)}（標準偏差${stats.stdAmplitude.toFixed(4)}）、瞬時周期の中央値は${stats.medianPeriod.toFixed(1)}日で、周波数の安定度は${stats.freqStability.toFixed(3)}です。`;
+  }, [result, stats]);
 
   // 位相の極座標プロット (Canvas)
   useEffect(() => {
@@ -266,8 +272,9 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
           <div className="text-xs text-gray-500 mb-1">
             解析信号の極座標表現 z(t) = A(t)e^(i*phi(t))
           </div>
-          <canvas
+          <AccessibleCanvas
             ref={phaseCanvasRef}
+            description={phaseDescription}
             className="rounded border border-gray-100"
           />
           <div className="text-xs text-fg-muted mt-1">

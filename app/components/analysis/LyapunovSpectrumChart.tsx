@@ -20,6 +20,7 @@ import {
   type LyapunovVectorResult,
 } from "../../lib/lyapunov-spectrum";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -69,6 +70,12 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
 
   // ---- Spectrum bar chart (static) ----
   const spectrumCanvasRef = useRef<HTMLCanvasElement>(null);
+  const spectrumDescription = useMemo(() => {
+    if (spectrum.exponents.length === 0) return "Lyapunovスペクトル。計算できるデータが不足しています。";
+    const pos = spectrum.exponents.filter((v) => v > 0).length;
+    return `埋め込み次元${spectrum.dim}のLyapunov指数を大きい順に並べた棒グラフ（${spectrum.exponents.length}本、うち正が${pos}本）。最大指数は${spectrum.exponents[0].toFixed(4)}、Kaplan-Yorke次元は${spectrum.kaplanYorkeDim.toFixed(2)}、KSエントロピーは${spectrum.kolmogorovSinaiEntropy.toFixed(4)}、体積収縮率は${spectrum.attractorVolume.toFixed(4)}です。`;
+  }, [spectrum]);
+
   useEffect(() => {
     const canvas = spectrumCanvasRef.current;
     if (!canvas || spectrum.exponents.length === 0) return;
@@ -391,8 +398,9 @@ export default function LyapunovSpectrumChart({ prices, seriesMode }: Props) {
           <div className="text-xs text-gray-500 mb-1">
             リアプノフスペクトル — <span className="text-red-600">正: 不安定方向</span> / <span className="text-blue-600">負: 安定方向</span>
           </div>
-          <canvas
+          <AccessibleCanvas
             ref={spectrumCanvasRef}
+            description={spectrumDescription}
             className="w-full border border-gray-100 rounded"
             style={{ height: 180 }}
           />

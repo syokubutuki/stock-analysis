@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { fitARPoles, selectARByAic, ARFit } from "../../lib/z-plane";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -30,6 +31,12 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
     () => (auto ? selectARByAic(series, 20) : fitARPoles(series, order)),
     [series, auto, order]
   );
+
+  const chartDescription = useMemo(() => {
+    if (fit.poles.length === 0) return "z平面の極配置。計算できるデータが不足しています。";
+    const d = fit.dominant;
+    return `AR(${fit.order})モデルの極を単位円とともにz平面に描いた図（極${fit.poles.length}個、AIC=${fit.aic.toFixed(1)}）。全極が単位円の内側かは${fit.stationary ? "はい（定常）" : "いいえ（非定常）"}で、単位円に最も近い極は|z|=${d ? d.modulus.toFixed(3) : "—"}${d && isFinite(d.period) ? `・周期${d.period.toFixed(1)}本・半減期${isFinite(d.halfLife) ? d.halfLife.toFixed(1) : "∞"}本` : ""}です。`;
+  }, [fit]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -188,7 +195,7 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
       {/* z平面 Canvas + 極テーブル */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div>
-          <canvas ref={canvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={canvasRef} description={chartDescription} className="rounded border border-gray-100" />
           <div className="text-xs text-fg-muted mt-1">
             破線=単位円(定常境界), ×=極, 色=単位円への近さ(青→赤), 横=実部, 縦=虚部
           </div>

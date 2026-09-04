@@ -21,6 +21,7 @@ import {
   WEEKDAY_COLORS,
 } from "../../lib/weekly-phase-attractor";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -167,6 +168,11 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [prices, seriesMode, tau, dim, phaseMode, phaseWeight, seed]
   );
+
+  const scatterDescription = useMemo(() => {
+    if (!result.ok) return "週内位相アトラクタの散布図。標本が不足しています。";
+    return `遅延埋め込みした点を曜日（週内位相）で色分けし、曜日重心を巡回パスで結んだ散布図（${result.n}点）。位相ロッキング指標PL=${result.PL.toFixed(3)}に対しサロゲート95%点は${result.surrogateQ95.toFixed(3)}、p=${result.pValue.toFixed(3)}です。`;
+  }, [result]);
 
   // 散布図 + 重心巡回パス (2Dモード: 従来の固定平面投影)
   useEffect(() => {
@@ -938,7 +944,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
 
           {/* 散布図 */}
           <div className="flex justify-center">
-            <canvas ref={scatterRef}
+            <AccessibleCanvas ref={scatterRef} description={scatterDescription}
               className={`rounded border border-gray-200 ${is3D ? "cursor-grab active:cursor-grabbing" : ""}`} />
           </div>
           {is3D && (

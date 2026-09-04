@@ -16,6 +16,7 @@ import {
   rollingConditionalEntropy,
 } from "../../lib/entropy-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -94,6 +95,12 @@ export default function ConditionalEntropyChart({ prices, seriesMode }: Props) {
   }, [rollingCond]);
 
   // エントロピー率曲線
+  const rateDescription = useMemo(() => {
+    if (rates.length < 2) return "ブロック長ごとのエントロピー率。計算できるデータが不足しています。";
+    const first = rates[0], last = rates[rates.length - 1];
+    return `ブロック長（横軸）を伸ばしたときのエントロピー率の減り方（${rates.length}点）。ブロック${first.blockSize}で${first.rate.toFixed(3)}、ブロック${last.blockSize}で${last.rate.toFixed(3)}まで下がり、この落差が過去から得られる情報＝超過エントロピー${excess.toFixed(3)}です。出来高で条件付けた条件付きエントロピーは${condEnt.toFixed(3)}です。`;
+  }, [rates, excess, condEnt]);
+
   useEffect(() => {
     const canvas = rateCanvasRef.current;
     if (!canvas || rates.length < 2) return;
@@ -191,7 +198,7 @@ export default function ConditionalEntropyChart({ prices, seriesMode }: Props) {
         </div>
         <div>
           <div className="w-full rounded border border-gray-100 overflow-hidden">
-            <canvas ref={rateCanvasRef} />
+            <AccessibleCanvas ref={rateCanvasRef} description={rateDescription} />
           </div>
         </div>
       </div>

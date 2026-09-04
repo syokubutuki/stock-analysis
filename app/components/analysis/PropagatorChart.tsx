@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePropagator } from "../../lib/propagator";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -194,6 +195,14 @@ export default function PropagatorChart({ prices }: Props) {
     ctx.fillText("··· P5/P95", legX + 150, legY);
   }, [result]);
 
+  const chartDescription = useMemo(() => {
+    if (result.bins.length === 0) return "遷移確率のヒートマップ。計算できるデータが不足しています。";
+    const hs = result.horizons;
+    const p = result.percentiles;
+    const i = hs.length - 1;
+    return `先行き日数（横軸）×価格変化率のビン（縦軸）の遷移確率をヒートマップで描いた図（${hs.length}ホライズン×${result.bins.length}ビン）。${hs[i]}日先の中央値は${p.p50[i].toFixed(2)}%、5〜95%は${p.p5[i].toFixed(2)}%から${p.p95[i].toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     draw();
     const handleResize = () => draw();
@@ -247,7 +256,7 @@ export default function PropagatorChart({ prices }: Props) {
 
       {/* ヒートマップ */}
       <div className="w-full">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       {/* AnalysisGuide */}

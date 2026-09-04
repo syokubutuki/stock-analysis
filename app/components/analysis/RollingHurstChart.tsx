@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeRollingHurst, RollingHurstResult } from "../../lib/rolling-hurst";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -172,6 +173,20 @@ export default function RollingHurstChart({ prices, seriesMode }: Props) {
     [prices, seriesMode, window_, reroll]
   );
 
+  const mainDescription = useMemo(() => {
+    if (result.series.length === 0) return "ローリングHurst指数。計算できるデータが不足しています。";
+    const last = result.series[result.series.length - 1];
+    const hi = result.series.reduce((a, b) => (b.hurst > a.hurst ? b : a));
+    return `${result.window}日窓のHurst指数の時系列に、サロゲート（同じ分布のランダム列）の帯を重ねた図（${result.series.length}点）。直近${last.time}は${last.hurst.toFixed(3)}、最大は${hi.time}の${hi.hurst.toFixed(3)}で、帯の上（有意な持続性）に出た割合は${(result.aboveRatio * 100).toFixed(0)}%、下（反持続性）は${(result.belowRatio * 100).toFixed(0)}%です。`;
+  }, [result]);
+
+  const histDescription = useMemo(() => {
+    if (result.series.length === 0) return "Hurst指数の分布。計算できるデータが不足しています。";
+    const vals = result.series.map((s) => s.hurst).sort((a, b) => a - b);
+    const med = vals[Math.floor(vals.length / 2)];
+    return `同じHurst指数のヒストグラム（${vals.length}点）。中央値は${med.toFixed(3)}、範囲は${vals[0].toFixed(3)}から${vals[vals.length - 1].toFixed(3)}で、0.5より右に寄るほど持続的な期間が多かったことを表します。`;
+  }, [result]);
+
   useEffect(() => {
     if (mainRef.current) drawRolling(mainRef.current, result);
     if (histRef.current) drawHistogram(histRef.current, result);
@@ -218,7 +233,7 @@ export default function RollingHurstChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={mainRef} /></div>
+      <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={mainRef} description={mainDescription} /></div>
 
       {/* 統計サマリ */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
@@ -240,7 +255,7 @@ export default function RollingHurstChart({ prices, seriesMode }: Props) {
         </div>
       </div>
 
-      <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={histRef} /></div>
+      <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={histRef} description={histDescription} /></div>
 
       <AnalysisGuide title="ローリングHurst + サロゲート帯の詳細理論">
         <p className="font-medium text-gray-700">1. 静的指標のローリング化とは</p>
