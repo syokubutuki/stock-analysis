@@ -27,6 +27,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -210,6 +211,17 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
     });
   }, [binning, data, usMode, leadLen, k, cond, metric, weight]);
 
+  const overlayDescription = useMemo(() => {
+    if (!result) return "類似日の日中パス重ね書き。整合できた標本が不足しています。";
+    return `今日に似た過去の日の日中パスを重ねた図（候補${result.nCand}日から近傍を選抜、新規性${(result.novelty * 100).toFixed(0)}%）。引けの代表値はアナログ${fmtSignedPct(result.analog.end)}（n=${result.analog.n}）、条件セル${fmtSignedPct(result.cell.end)}（n=${result.cell.n}）、無条件${fmtSignedPct(result.uncond.end)}（n=${result.uncond.n}）です。`;
+  }, [result]);
+
+  const nullDescription = useMemo(() => {
+    const o = result?.oos;
+    if (!o) return "ランダム近傍ヌルとの比較。検証できる標本が不足しています。";
+    return `ランダムにk本選んだヌルのIC分布に、実測のICを重ねた図。アナログのIC=${o.analog.ic.toFixed(3)}に対しヌル平均は${o.nullIcMean.toFixed(3)}で、上側p=${o.icNullP.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (view !== "overlay" || !result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 300);
@@ -379,7 +391,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                 <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5" style={{ backgroundColor: C_CELL }} /><span className="text-gray-600">条件セル平均</span></span>
                 <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5 border-t border-dashed" style={{ borderColor: C_UNCOND }} /><span className="text-gray-600">無条件平均</span></span>
               </div>
-              <div className="relative"><canvas ref={canvasRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={canvasRef} description={overlayDescription} /></div>
               <p className="text-[11px] text-gray-500">
                 {"縦軸はすべて「前日終値=0」の累積対数リターン。左半分は前日までの日足経路（寄り前に確定＝距離の計算に使った部分）、境界の点が寄り付き（夜間ギャップ）、右半分が当日の日内。対数なので ギャップ+日中=当日 が足し算で繋がる。"}
                 {" 黒が今日、青が「似た経路をたどった過去日」の中央値。青と黒が寄り付き以降で離れていくなら、今日は前例と違う動きをしている。"}
@@ -503,7 +515,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                   </div>
                 </div>
 
-                <div className="relative"><canvas ref={nullRef} /></div>
+                <div className="relative"><AccessibleCanvas ref={nullRef} description={nullDescription} /></div>
                 <p className="text-[11px] text-gray-500">
                   {"ヌルは「同じ条件セルから距離を無視してk本を無作為抽出し、同じ集計をする」を200回繰り返した分布。近傍選抜という手続きだけを壊しているので、実測ICがこの山の中に埋もれていれば、形の近さは何も足していない。"}
                   {" 損失差は 二乗誤差(条件セル平均) − 二乗誤差(アナログ) の平均で、正ならアナログが正確。CIはブロックブートストラップ（連続する日の相関を保存）。"}

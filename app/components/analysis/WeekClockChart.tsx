@@ -19,6 +19,7 @@ import {
   IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -291,6 +292,17 @@ export default function WeekClockChart({ prices, ticker }: Props) {
     [gran, resp, binMinutes, anchorMode]
   );
 
+  const clockDescription = useMemo(() => {
+    if (gran === "intraday") {
+      if (!intra || intra.points.length === 0) return "週内の時計プロット（日中足）。標本が不足しています。";
+      return `週の始まりを0として、時間帯ごとの値動きを${intra.binMinutes}分刻みで並べた図（${intra.nWeeks}週・点${intra.points.length}個）。`;
+    }
+    if (!daily || daily.slots.length === 0) return "週内の時計プロット。標本が不足しています。";
+    const hi = daily.slots.reduce((a, b) => (b.meanClose > a.meanClose ? b : a));
+    const lo = daily.slots.reduce((a, b) => (b.meanClose < a.meanClose ? b : a));
+    return `週初を0とした曜日別の累積リターン（${daily.nWeeks}週）。平均が最も高いのは${hi.label}の${(hi.meanClose * 100).toFixed(2)}%、最も低いのは${lo.label}の${(lo.meanClose * 100).toFixed(2)}%です。`;
+  }, [gran, daily, intra]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const init = initCanvas(canvasRef.current, H);
@@ -400,8 +412,9 @@ export default function WeekClockChart({ prices, ticker }: Props) {
       {gran === "intraday" && <LoadingError loading={loading} error={error} />}
 
       <div className="relative">
-        <canvas
+        <AccessibleCanvas
           ref={canvasRef}
+          description={clockDescription}
           className={gran === "intraday" ? "cursor-grab active:cursor-grabbing touch-none" : ""}
         />
         {gran === "intraday" && intra && (

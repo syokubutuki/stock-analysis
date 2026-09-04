@@ -25,6 +25,7 @@ import type { BarrierWorkerRequest, BarrierWorkerResponse } from "../../lib/week
 import { initCanvas, fmtPct, fmtSignedPct, ViewTabs } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
@@ -429,6 +430,10 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
     A: boardA, B: boardB, H: hUnit, mu: muPerDay, sigma: sigPerDay, T: 250, cost: 0,
   });
 
+  const boardDescription = useMemo(() => {
+    return `利確幅A・損切り幅Bをσ単位で動かしたときの設計曲線。いまの設定（A=${board.A.toFixed(2)}・B=${board.B.toFixed(2)}・H=${board.H}日）では、利確に先に届く確率${(board.hitProbExact * 100).toFixed(1)}%（μ=0の理論値${(board.hitProbZeroMu * 100).toFixed(1)}%）、期待滞在${board.eTauH.toFixed(1)}日、暦時間シャープはコスト前${board.sharpeCal.toFixed(3)}・コスト後${board.sharpeAfterCost.toFixed(3)}です。`;
+  }, [board]);
+
   useEffect(() => {
     if (view !== "board") return;
     if (boardCanvas.current) {
@@ -640,7 +645,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div>
               <div className="text-xs font-medium text-gray-700 mb-1">A を動かしたときの3量（B={boardB.toFixed(2)} 固定）</div>
-              <div className="relative"><canvas ref={boardCanvas} /></div>
+              <div className="relative"><AccessibleCanvas ref={boardCanvas} description={boardDescription} /></div>
             </div>
             <div>
               <div className="text-xs font-medium text-gray-700 mb-1">コスト後 暦時間シャープの (A,B) 平面</div>

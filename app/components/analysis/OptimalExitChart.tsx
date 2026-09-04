@@ -11,6 +11,7 @@ import {
   StratStat,
 } from "../../lib/optimal-exit";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -209,6 +210,19 @@ export default function OptimalExitChart({ prices }: Props) {
     [prices, side, entryTiming],
   );
 
+  const policyDescription = useMemo(() => {
+    if (!result.ok) return "後退帰納で求めた手仕舞い方策の図。計算できるデータが不足しています。";
+    const tp = result.policy.tpBoundary.findIndex((v) => v !== null);
+    const sl = result.policy.slBoundary.findIndex((v) => v !== null);
+    return `保有日（縦）×建値からのz（横）の各マスで、降りるか持ち続けるかを色分けした方策の図（${result.policy.nWeeksFit}週で学習）。利確側の停止境界が最初に現れるのは${tp >= 0 ? `${tp + 1}日目のz=${result.policy.tpBoundary[tp]!.toFixed(2)}` : "なし"}、損切り側は${sl >= 0 ? `${sl + 1}日目のz=${result.policy.slBoundary[sl]!.toFixed(2)}` : "なし"}です。`;
+  }, [result]);
+
+  const exitByDayDescription = useMemo(() => {
+    if (!result.ok || result.fixedExitByDay.length === 0) return "固定日エグジットの比較。計算できるデータが不足しています。";
+    const best = result.fixedExitByDay[result.bestFixedDay - 1];
+    return `建ててから何日目の引けで必ず降りるかを1日ずつ変えたときのシャープを並べた棒グラフ。最良は${result.bestFixedDay}日目のシャープ${best.sharpe.toFixed(2)}（平均${(best.meanRet * 100).toFixed(2)}%、勝率${(best.winRate * 100).toFixed(0)}%、n=${best.n}）で、金曜まで持つ場合は${result.holdToEnd.sharpe.toFixed(2)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !result.ok) return;
@@ -317,7 +331,7 @@ export default function OptimalExitChart({ prices }: Props) {
           })()}
 
           <div className="mt-2">
-            <canvas ref={dayRef} />
+            <AccessibleCanvas ref={dayRef} description={exitByDayDescription} />
           </div>
 
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -328,7 +342,7 @@ export default function OptimalExitChart({ prices }: Props) {
           </div>
 
           <div className="mt-3">
-            <canvas ref={canvasRef} />
+            <AccessibleCanvas ref={canvasRef} description={policyDescription} />
           </div>
 
           <p className="mt-1 text-[10px] text-fg-muted leading-relaxed">

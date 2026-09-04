@@ -26,6 +26,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -328,6 +329,33 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
     return Math.min(Math.max(g, 0), G - 2);
   }, [result, selGRaw]);
 
+  const overlayDescription = useMemo(() => {
+    if (!result) return "今日の経路と条件付き平均パスの重ね書き。整合できた標本が不足しています。";
+    const done = result.lastIdx >= 0 ? result.timeLabels[result.lastIdx] : "未到達";
+    return `${result.targetDate}の実測パスに、同じ条件（前夜米国ビン・曜日）の過去${result.n}日の平均パスと分布帯を重ねた図。実測は${done}まで到達しており、条件セルの寄り→引け平均は${fmtSignedPct(result.endMean)}（中央値${fmtSignedPct(result.endMed)}）です。`;
+  }, [result]);
+
+  const betaDescription = useMemo(() => {
+    if (!result) return "時間ビン別の追随β。整合できた標本が不足しています。";
+    const ok = result.betas.filter((b) => b.ok);
+    if (ok.length === 0) return "時間ビン別の追随β。回帰が成立する時間ビンがありません。";
+    const top = ok.reduce((a, b) => (Math.abs(b.beta) > Math.abs(a.beta) ? b : a));
+    const sig = ok.filter((b) => b.pAdj < 0.05).length;
+    return `各時間ビンで「その時点の乖離z」から「引けまでの残余リターン」を回帰したβの推移。|β|が最大なのは${result.timeLabels[result.betas.indexOf(top)]}の${top.beta.toFixed(3)}（95%ブートCI ${top.bootLo.toFixed(2)}〜${top.bootHi.toFixed(2)}）で、FDR補正後に有意な時間ビンは${sig}個です。`;
+  }, [result]);
+
+  const scatterDescription = useMemo(() => {
+    if (!result || !result.betas[selG]?.ok) return "乖離zと残余リターンの散布図。この時刻では回帰が成立していません。";
+    const b = result.betas[selG];
+    return `${result.timeLabels[selG]}時点の乖離z（横軸）と、そこから引けまでの残余リターン（縦軸）の散布図と回帰直線（n=${b.n}）。β=${b.beta.toFixed(3)}、R²=${b.r2.toFixed(3)}、FDR補正p=${b.pAdj.toFixed(3)}です。`;
+  }, [result, selG]);
+
+  const trackDescription = useMemo(() => {
+    if (!result || result.track.length === 0) return "台本追随の記録。整合できた標本が不足しています。";
+    const signOk = result.track.filter((t) => t.endSign).length;
+    return `過去${result.track.length}日について、その日のパスが条件付き平均パス（台本）とどれだけ一致したかを並べた図。終端の符号が一致したのは${signOk}日（${((signOk / result.track.length) * 100).toFixed(0)}%）です。`;
+  }, [result]);
+
   useEffect(() => {
     if (view !== "overlay" || !result || !overlayRef.current) return;
     const init = initCanvas(overlayRef.current, 280);
@@ -500,7 +528,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   <span className="text-gray-600">過去日の分布帯</span>
                 </span>
               </div>
-              <div className="relative"><canvas ref={overlayRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={overlayRef} description={overlayDescription} /></div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -558,7 +586,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   β&gt;0＝上振れがさらに伸びる（継続）、β&lt;0＝上振れが引けにかけて剥がれる（フェード）。
                 </span>
               </div>
-              <div className="relative"><canvas ref={betaRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={betaRef} description={betaDescription} /></div>
               <p className="text-[11px] text-fg-muted">
                 縦棒＝β（乖離1σあたりの残余リターン）、ヒゲ＝95%ブートCI、★＝時間ビン横断でFDR補正後も有意。
                 最終ビンは残余が定義上ゼロのため対象外。
@@ -584,7 +612,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
 
               {result.betas[selG]?.ok ? (
                 <>
-                  <div className="relative"><canvas ref={scatterRef} /></div>
+                  <div className="relative"><AccessibleCanvas ref={scatterRef} description={scatterDescription} /></div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="bg-gray-50 rounded p-2">
                       <div className="text-gray-500">β（{result.timeLabels[selG]}）</div>
@@ -631,7 +659,7 @@ export default function TodayVsExpectedPathChart({ ticker }: Props) {
                   『上に張り付いた日＝＋1／下に垂れた日＝−1』へ割れるのが普通で、だから中央値ではなく<strong>符号がどちらに偏るか</strong>で読む。
                 </span>
               </div>
-              <div className="relative"><canvas ref={trackRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={trackRef} description={trackDescription} /></div>
               {(() => {
                 const corrs = result.track.map((t) => t.corr).filter(isFinite);
                 const slopes = result.track.map((t) => t.slope).filter(isFinite);

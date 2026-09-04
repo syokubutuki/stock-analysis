@@ -45,6 +45,7 @@ import {
   type RatePlan,
 } from "../../lib/rakuten-margin";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import WeekSlotGrid, { type SlotSide, AVOID_WEEKEND } from "./WeekSlotGrid";
 import { CHART_COLORS } from "../../lib/chart-colors";
@@ -209,6 +210,11 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
 
   // === ローリング差の分布(Canvas2D ヒストグラム) ===
   const histRef = useRef<HTMLCanvasElement>(null);
+  const histDescription = useMemo(() => {
+    if (!rolling || rolling.points.length === 0) return "ローリング1年窓での差の分布。標本が不足しています。";
+    return `ローリング1年窓${rolling.points.length}本について「戦略 − NISA」の税引後リターン差を並べたヒストグラム。戦略が勝った窓は${(rolling.winRate * 100).toFixed(0)}%で、差の中央値は${(rolling.medianEdge * 100).toFixed(2)}%、5〜95%点は${(rolling.p5 * 100).toFixed(2)}%から${(rolling.p95 * 100).toFixed(2)}%です。`;
+  }, [rolling]);
+
   useEffect(() => {
     if (view !== "rolling" || !rolling || !histRef.current || rolling.points.length === 0) return;
     const c = initCanvas(histRef.current, 200);
@@ -257,6 +263,19 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
   // === レバレッジ探索: リターン曲線 + リスク曲線(Canvas2D) ===
   const retCanvasRef = useRef<HTMLCanvasElement>(null);
   const riskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const retSweepDescription = useMemo(() => {
+    if (!sweep || sweep.points.length === 0) return "レバレッジ掃引の税引後リターン。標本が不足しています。";
+    const best = sweep.points.reduce((a, b) => (b.afterTaxReturn > a.afterTaxReturn ? b : a));
+    return `信用レバレッジを横軸に、戦略の税引後リターン中央値を描いた曲線。NISA持ち切りの${(sweep.nisaAfterTax * 100).toFixed(2)}%を上回る最小レバは${sweep.kStar === null ? "無し" : `${sweep.kStar.toFixed(2)}倍`}で、最大は${best.leverage.toFixed(2)}倍のときの${(best.afterTaxReturn * 100).toFixed(2)}%です。`;
+  }, [sweep]);
+
+  const riskSweepDescription = useMemo(() => {
+    if (!sweep || sweep.points.length === 0) return "レバレッジ掃引のリスク。標本が不足しています。";
+    const last = sweep.points[sweep.points.length - 1];
+    const first = sweep.points[0];
+    return `同じレバレッジ軸で、リスクの代償（最大ドローダウンと追証・破産の確率）を描いた図。レバ${first.leverage.toFixed(2)}倍で最大DD${(first.maxDD * 100).toFixed(1)}%、レバ${last.leverage.toFixed(2)}倍で${(last.maxDD * 100).toFixed(1)}%です。`;
+  }, [sweep]);
+
   useEffect(() => {
     if (view !== "leverage" || !sweep || sweep.points.length === 0) return;
     const pts = sweep.points;
@@ -541,7 +560,7 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
         <>
           <div>
             <div className="text-xs text-gray-500 mb-1">ローリング1年窓での「戦略 − NISA」税引後リターン差の分布（青=戦略勝ち / 赤=NISA勝ち, {rolling.points.length}窓）</div>
-            <canvas ref={histRef} />
+            <AccessibleCanvas ref={histRef} description={histDescription} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
             <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" color={rolling.winRate > 0.5 ? "text-blue-600" : "text-emerald-700"} directionValue={rolling.winRate - 0.5} />
@@ -584,11 +603,11 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <div className="text-xs text-gray-500 mb-1">① 税引後リターン（中央値） vs レバ（緑破線=NISA / 橙=k*）</div>
-              <canvas ref={retCanvasRef} />
+              <AccessibleCanvas ref={retCanvasRef} description={retSweepDescription} />
             </div>
             <div>
               <div className="text-xs text-gray-500 mb-1">② リスクの代償 vs レバ（レバに比例して拡大）</div>
-              <canvas ref={riskCanvasRef} />
+              <AccessibleCanvas ref={riskCanvasRef} description={riskSweepDescription} />
             </div>
           </div>
 

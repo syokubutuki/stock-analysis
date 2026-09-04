@@ -20,6 +20,7 @@ import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import { AnalogFreezeButton } from "./AnalogLedgerPanel";
 import type { AnalogLedgerSettings } from "../../lib/analog-ledger";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // C1: 信頼度バッジ。実効n・ベースライン差p・novelty棄却の3条件から緑/黄/赤。
@@ -313,6 +314,11 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
   // align="week" では窓長はコア側が今週の経過日数に決める
   const effL = result?.L ?? L;
 
+  const analogDescription = useMemo(() => {
+    if (!result) return "類似週の重ね書き。標本が不足しています。";
+    return `今週の軌跡（左）と、それに似た過去${result.selected.length}週のフォワード経路（右）を重ねた図（候補${result.totalCandidates}週から選抜）。フォワード終端の中央値は${(result.medianFinal * 100).toFixed(2)}%（平均${(result.meanFinal * 100).toFixed(2)}%）で、上げが${result.upCount}週・下げが${result.downCount}週です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!canvasRef.current || !result) return;
     const init = initCanvas(canvasRef.current, 280);
@@ -326,6 +332,14 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
     () => (showIntraday && intraResp ? buildIntraWeek(intraResp, effL) : null),
     [showIntraday, intraResp, effL]
   );
+  const intraWeekDescription = useMemo(() => {
+    if (!intraWeek || intraWeek.cum.length === 0) return "今週の日中足の軌跡。日中足を取得できていません。";
+    const last = intraWeek.cum[intraWeek.cum.length - 1];
+    let pi = 0;
+    for (let i = 1; i < intraWeek.cum.length; i++) if (Math.abs(intraWeek.cum[i]) > Math.abs(intraWeek.cum[pi])) pi = i;
+    return `今週の日中足を${intraWeek.labels.length}日ぶんつないだ累積リターンの折れ線。最大の振れは${(intraWeek.cum[pi] * 100).toFixed(2)}%、直近は${(last * 100).toFixed(2)}%です。`;
+  }, [intraWeek]);
+
   useEffect(() => {
     if (!intraCanvasRef.current || !intraWeek) return;
     const init = initCanvas(intraCanvasRef.current, 150);
@@ -520,7 +534,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
 
           <AnalogFreezeButton ticker={ticker ?? ""} res={result} settings={ledgerSettings} />
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={analogDescription} /></div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-fg-muted">
             <span><span className="inline-block w-4 h-0.5 align-middle" style={{ background: "#0f172a" }} /> 今週の経路(縦バー=日中高安)</span>
@@ -543,7 +557,7 @@ export default function WeeklyAnalogChart({ prices, ticker }: Props) {
                 <>
                   {intraLoading && <div className="text-xs text-fg-muted">日中足を取得中…</div>}
                   {intraError && <div className="text-xs text-red-500">{intraError}</div>}
-                  {intraWeek && <div className="relative"><canvas ref={intraCanvasRef} /></div>}
+                  {intraWeek && <div className="relative"><AccessibleCanvas ref={intraCanvasRef} description={intraWeekDescription} /></div>}
                   <p className="text-[10px] text-fg-muted">
                     日足では1日=1点に潰れる今週の値動きを、日中足で拡大表示（縦点線=日境界）。上のアナログ(過去局面)は日足のまま——
                     日中足は取得期間が短く(60分足≈2年)、何年も前のアナログ週は日中では再現できないため。

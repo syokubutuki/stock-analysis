@@ -13,6 +13,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -1015,6 +1016,19 @@ export default function SpiralHeatmap({ prices }: Props) {
     return { labels, arrays, colors };
   }, []);
 
+  const dowBarDescription = useMemo(() => {
+    if (days.length === 0) return "曜日別の平均リターン比較。標本が不足しています。";
+    const rawArr = DOW_TRADING.map((dow) => dowRaw[dow]);
+    const { barData, barDefs } = getBarData(rawArr, returnTab);
+    if (barData.length === 0 || barData[0].length === 0) return "曜日別の平均リターン比較。標本が不足しています。";
+    // 先頭系列（既定は 前C→当C）の最大・最小曜日を言う。残りの系列は棒の色で並ぶ。
+    const series = barData[0];
+    let hi = 0, lo = 0;
+    for (let i = 1; i < series.length; i++) { if (series[i] > series[hi]) hi = i; if (series[i] < series[lo]) lo = i; }
+    const labels = DOW_TRADING.map((d) => DOW_LABELS[d]);
+    return `曜日別の平均リターンを${barDefs.length}系列（${barDefs.map((d) => d.label).join("・")}）の棒で並べた図（全${days.length}営業日）。${barDefs[0].label}が最も高いのは${labels[hi]}曜の${(series[hi] * 100).toFixed(3)}%、最も低いのは${labels[lo]}曜の${(series[lo] * 100).toFixed(3)}%です。`;
+  }, [days, dowRaw, returnTab, getBarData]);
+
   // === Draw all canvases ===
   useEffect(() => {
     if (days.length === 0) return;
@@ -1164,7 +1178,7 @@ export default function SpiralHeatmap({ prices }: Props) {
       {/* ===== 1. Weekday grouped bar ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">曜日別 平均リターン比較 ({tabDef.barDefs.map(d => d.label).join(" / ")})</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={dowBarRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={dowBarRef} description={dowBarDescription} /></div>
         <AnalysisGuide title="解説: 曜日別 平均リターン比較">
           <p><span className="font-medium">何を明らかにするか:</span> 各曜日(月〜金)に、選択中のリターン種別の平均がプラスかマイナスか、どの曜日が強い/弱いかを比較します。曜日アノマリー(例: 月曜が弱い、金曜が強い)の有無を一目で把握する出発点です。</p>
           <p><span className="font-medium">使う数字・数式:</span> 各曜日に属する全営業日のリターン r を集め、算術平均 μ = (1/N)Σr を棒の高さにします。棒のグループ=曜日、棒の色=リターン種別(前C→当C / 当O→当C(日中) / 前C→当O(夜間) 等。タブで切替)。縦軸は%。</p>

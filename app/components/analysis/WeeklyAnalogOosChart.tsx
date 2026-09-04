@@ -20,6 +20,7 @@ import { OosResult, OosCatalog, OosSetting, OosPathScore } from "../../lib/weekl
 import { AnalogMode, DistMetric, WindowAlign, WeightMode } from "../../lib/weekly-analog";
 import { UsDriverButtons, BinSchemeButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -258,6 +259,29 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
     setCatalog(resp.catalog ?? null); setRunning(null);
   };
 
+  const scatterDescription = useMemo(() => {
+    if (!result) return "予測と実測の散布図。まだ検証を実行していません。";
+    return `予測ŷ（横軸）と実測y（縦軸）の散布図（${result.n}週、実効${result.nEff.toFixed(0)}週）。IC=${result.ic.toFixed(3)}（95%CI ${result.icLo.toFixed(3)}〜${result.icHi.toFixed(3)}）、方向的中率${(result.hit * 100).toFixed(0)}%（無条件${(result.baseHit * 100).toFixed(0)}%）です。`;
+  }, [result]);
+
+  const quintDescription = useMemo(() => {
+    if (!result || result.quintiles.length === 0) return "予測五分位ごとの実測平均。まだ検証を実行していません。";
+    const q = result.quintiles;
+    return `予測ŷを五分位に分け、各分位の実測平均を棒で並べた図。最下位は${(q[0].yactMean * 100).toFixed(2)}%、最上位は${(q[q.length - 1].yactMean * 100).toFixed(2)}%で、分位と実測の単調性は${result.monotone.toFixed(2)}です。`;
+  }, [result]);
+
+  const covDescription = useMemo(() => {
+    const p = result?.path;
+    if (!p) return "予測帯の被覆率。経路を採点できていません。";
+    return `先行き日ごとの予測帯（P25〜P75）の被覆率（名目${(p.coverageNominal * 100).toFixed(0)}%）。全体では${(p.coverage * 100).toFixed(0)}%（95%CI ${(p.coverageLo * 100).toFixed(0)}〜${(p.coverageHi * 100).toFixed(0)}%）で、平均バンド幅は${(p.bandWidth * 100).toFixed(2)}%です。`;
+  }, [result]);
+
+  const extDescription = useMemo(() => {
+    const p = result?.path;
+    if (!p) return "高値・安値到達の当否。経路を採点できていません。";
+    return `予測した高値到達(MFE)・安値到達(MAE)と実測の対応（${p.n}週）。MFEのIC=${p.mfeIC.toFixed(3)}・到達率${(p.mfeTouch * 100).toFixed(0)}%、MAEのIC=${p.maeIC.toFixed(3)}・到達率${(p.maeTouch * 100).toFixed(0)}%です（較正が取れていれば到達率は50%前後）。`;
+  }, [result]);
+
   useEffect(() => {
     if (!scatterRef.current || !result) return;
     const init = initCanvas(scatterRef.current, 240);
@@ -371,8 +395,8 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
                 : <span className="text-gray-500">IC が 0 近辺／CI が 0 を跨ぐ＝先読みには使わず「文脈提示」に留める</span>}
             </span>
           </div>
-          <div className="relative"><canvas ref={scatterRef} /></div>
-          <div className="relative"><canvas ref={quintRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={scatterRef} description={scatterDescription} /></div>
+          <div className="relative"><AccessibleCanvas ref={quintRef} description={quintDescription} /></div>
 
           {/* 改善A: 経路レベルの採点。上の IC/方向は終点1点だけの採点なので、経路そのものを別に採点する。 */}
           <div className="pt-2 border-t border-gray-200 space-y-3">
@@ -449,8 +473,8 @@ export default function WeeklyAnalogOosChart({ prices }: Props) {
                     <span className="font-medium text-gray-700">終点が当たらなくても帯と高安が較正されていれば、ストップ幅・利確目標の設定には使える</span>。
                     逆も然り（終点だけ当たっても経路が荒ければ途中で振り落とされる）。
                   </div>
-                  <div className="relative"><canvas ref={covRef} /></div>
-                  <div className="relative"><canvas ref={extRef} /></div>
+                  <div className="relative"><AccessibleCanvas ref={covRef} description={covDescription} /></div>
+                  <div className="relative"><AccessibleCanvas ref={extRef} description={extDescription} /></div>
                   {covDev > 0.2 && (
                     <div className="text-[11px] text-red-600">
                       被覆率が名目から {(covDev * 100).toFixed(0)}pt 乖離。25–75%帯を「5割の確率で収まる範囲」として読むのは誤りになる。

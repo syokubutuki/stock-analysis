@@ -23,6 +23,7 @@ import type {
   NullCalibWorkerResponse,
 } from "../../lib/null-calibration.worker";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -216,6 +217,12 @@ export default function NullCalibrationChart({ prices }: Props) {
     worker.postMessage(req);
   }, [prices, params]);
 
+  const histDescription = useMemo(() => {
+    if (!result || !result.ok) return "ヌル分布のヒストグラム。まだ較正を実行していません。";
+    const st = result.stats[metric];
+    return `${METRIC_LABEL[metric]}について、エッジがゼロの合成系列${result.nIter}本で同じ最適化をしたときの分布（ヌル）に、実測値を重ねたヒストグラム。実測${st.actual.toFixed(3)}はヌル中央値${st.p50.toFixed(3)}の${(st.pctile * 100).toFixed(0)}パーセンタイルで、p=${st.pValue.toFixed(3)}（95%点を${st.exceeds95 ? "超えています" : "超えていません"}）。`;
+  }, [result, metric]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !result || !result.ok) return;
@@ -383,7 +390,7 @@ export default function NullCalibrationChart({ prices }: Props) {
       )}
 
       <div className="mt-3">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={histDescription} />
       </div>
 
       {result?.ok && (

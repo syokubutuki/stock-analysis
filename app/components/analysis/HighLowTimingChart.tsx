@@ -19,6 +19,7 @@ import {
   WeekdayHLProb,
 } from "../../lib/highlow-timing";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -469,6 +470,26 @@ export default function HighLowTimingChart({ ticker }: Props) {
     return computeWeekdayHLProb(analysis);
   }, [analysis]);
 
+  const chartDescription = useMemo(() => {
+    if (!analysis) return "高値・安値の時間帯分析。日中足を取得できていません。";
+    const label = VIEWS.find((v) => v.value === view)?.label ?? "";
+    const toLabel = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const head = `${label}（対象${analysis.nDays}営業日・${analysis.binMinutes}分ビン）。`;
+    if (view === "dist") {
+      let hi = 0, lo = 0;
+      for (let i = 1; i < analysis.highCounts.length; i++) {
+        if (analysis.highCounts[i] > analysis.highCounts[hi]) hi = i;
+        if (analysis.lowCounts[i] > analysis.lowCounts[lo]) lo = i;
+      }
+      return `${head}高値が最も出やすいのは${analysis.bins[hi]?.label ?? ""}（${analysis.highCounts[hi]}日）、安値は${analysis.bins[lo]?.label ?? ""}（${analysis.lowCounts[lo]}日）で、中央値は高値${toLabel(analysis.highMedianMinute)}・安値${toLabel(analysis.lowMedianMinute)}です。`;
+    }
+    if (view === "hazard") {
+      const mid = Math.floor(analysis.highCdf.length / 2);
+      return `${head}前場の終わり（${analysis.bins[mid]?.label ?? ""}）までに高値が出ている確率は${(analysis.highCdf[mid] * 100).toFixed(0)}%、安値は${(analysis.lowCdf[mid] * 100).toFixed(0)}%です。`;
+    }
+    return `${head}高値の中央時刻は${toLabel(analysis.highMedianMinute)}、安値は${toLabel(analysis.lowMedianMinute)}で、高安が同じ足で出た日は${analysis.sameBarDays}日です。`;
+  }, [analysis, view]);
+
   useEffect(() => {
     if (!canvasRef.current || !analysis || !CANVAS_VIEWS.has(view)) return;
     const H = 360;
@@ -597,7 +618,7 @@ export default function HighLowTimingChart({ ticker }: Props) {
 
           {/* キャンバス系ビュー */}
           {CANVAS_VIEWS.has(view) && (
-            <div className="relative"><canvas ref={canvasRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
           )}
 
           {/* 曜日別の凡例・引け平均（曜日色モードのみ） */}

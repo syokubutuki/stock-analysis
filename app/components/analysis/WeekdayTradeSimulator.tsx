@@ -18,6 +18,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { type SlotSide } from "./WeekSlotGrid";
 import {
   computeStrategy,
@@ -523,6 +524,22 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
   }, [bhEquity, equitySeriesData]);
 
   // === Draw 全組合せヒートマップ ===
+  const matrixDescription = useMemo(() => {
+    let best: { m: typeof tradeMatrices[number]; e: number; x: number; v: number } | null = null;
+    let nCells = 0;
+    for (const m of tradeMatrices) {
+      m.grid.forEach((row, e) => row.forEach((v, x) => {
+        if (v == null) return;
+        nCells++;
+        if (!best || v > best.v) best = { m, e, x, v };
+      }));
+    }
+    if (!best) return "曜日×売買時刻のマトリクス。標本が不足しています。";
+    const wd = ["月", "火", "水", "木", "金"];
+    const b = best as { m: typeof tradeMatrices[number]; e: number; x: number; v: number };
+    return `建て曜日（縦）×手仕舞い曜日（横）を、寄り・引けの組合せ${tradeMatrices.length}面ぶん並べたマトリクス（有効セル${nCells}個）。最も良いのは${b.m.entryTiming === "open" ? "寄り" : "引け"}建て→${b.m.exitTiming === "open" ? "寄り" : "引け"}手仕舞いの面の${wd[b.e]}曜→${wd[b.x]}曜で、値は${(b.v * 100).toFixed(3)}%です。`;
+  }, [tradeMatrices]);
+
   useEffect(() => {
     if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
   }, [tradeMatrices, matrixMetric, drawTimingMatrices]);
@@ -1002,7 +1019,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               ))}
             </div>
           </div>
-          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><canvas ref={tradeMatrixRef} onClick={addSpecFromMatrix} className="cursor-pointer" /></div>
+          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><AccessibleCanvas ref={tradeMatrixRef} description={matrixDescription} onClick={addSpecFromMatrix} className="cursor-pointer" /></div>
         </div>
       </div>
 

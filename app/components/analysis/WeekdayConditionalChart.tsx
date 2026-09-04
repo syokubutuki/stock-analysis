@@ -23,6 +23,7 @@ import {
 } from "../../lib/weekday-conditional";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -460,6 +461,34 @@ export default function WeekdayConditionalChart({ prices }: Props) {
   const matrix = useMemo(() => (prices.length < 120 || view !== "matrix" ? null : weekdayMatrixAll(prices, sig, scheme, exit)), [prices, sig, scheme, exit, view]);
 
   // 描画
+  const pathDescription = useMemo(() => {
+    if (!result || result.bins.length === 0) return "条件ビン別の累積パス。標本が不足しています。";
+    const live = result.bins.filter((b) => b.n > 0);
+    if (live.length === 0) return "条件ビン別の累積パス。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
+    const lo = live.reduce((a, b) => (b.meanFwd < a.meanFwd ? b : a));
+    const sig = live.filter((b) => b.significant).length;
+    return `条件ビン別に、建て日から${result.exitLabel}までの平均経路を重ねた図（全${result.totalN}回、無条件平均${(result.baselineMean * 100).toFixed(3)}%）。終端が最も高いのは${hi.label}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.meanFwd * 100).toFixed(3)}%（n=${lo.n}）で、有意なビンは${sig}個です。`;
+  }, [result]);
+
+  const pivotDescription = useMemo(() => {
+    if (!pivot || pivot.cells.length === 0) return "2条件のピボット。標本が不足しています。";
+    const live = pivot.cells.filter((c) => c.n > 0);
+    if (live.length === 0) return "2条件のピボット。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
+    const sig = live.filter((c) => c.significant).length;
+    return `${pivot.xLabel}（横${pivot.xOrder.length}区分）×${pivot.yLabel}（縦${pivot.yOrder.length}区分）のピボット・ヒートマップ。最大は${pivot.xOrder[hi.xi]}×${pivot.yOrder[hi.yi]}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）で、有意なセルは${sig}個、無条件平均は${(pivot.baselineMean * 100).toFixed(3)}%です。`;
+  }, [pivot]);
+
+  const matrixDescription = useMemo(() => {
+    if (!matrix || matrix.cells.length === 0) return "曜日×条件ビンのマトリクス。標本が不足しています。";
+    const live = matrix.cells.filter((c) => c.n > 0);
+    if (live.length === 0) return "曜日×条件ビンのマトリクス。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
+    const sig = live.filter((c) => c.significant).length;
+    return `建て曜日（縦${matrix.dows.length}行）×条件ビン（横${matrix.binLabels.length}列）の平均リターンを色で並べたマトリクス（${matrix.exitLabel}まで保有）。最大は${hi.dow}曜×${matrix.binLabels[hi.binIdx]}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）で、有意なセルは${sig}個です。`;
+  }, [matrix]);
+
   useEffect(() => {
     hotspotsRef.current = [];
     if (view === "path" && result && pathRef.current) {
@@ -607,7 +636,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
 
           <ZoomBar zoom={zoom} setZoom={setZoom} />
           <div className="relative overflow-auto">
-            <canvas ref={pathRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
+            <AccessibleCanvas ref={pathRef} description={pathDescription} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[280px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
 
@@ -669,7 +698,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         <>
           <ZoomBar zoom={zoom} setZoom={setZoom} />
           <div className="relative overflow-auto">
-            <canvas ref={pivotRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
+            <AccessibleCanvas ref={pivotRef} description={pivotDescription} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[300px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
           <p className="text-[11px] text-fg-muted">緑=上昇/赤=下落、✓=有意(n≥10)、青枠=直近{WD_LABELS[entryDow]}曜の該当セル。「{pivot.yLabel}は小さいのに{pivot.xLabel}は大きい」等の2条件の組合せで先行きが変わるかを読む。セルクリックで深掘り。</p>
@@ -696,7 +725,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
         <>
           <ZoomBar zoom={zoom} setZoom={setZoom} />
           <div className="relative overflow-auto">
-            <canvas ref={matrixRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
+            <AccessibleCanvas ref={matrixRef} description={matrixDescription} onMouseMove={onMove} onMouseLeave={() => setTip(null)} onClick={onClickCanvas} />
             {tip && <div className="pointer-events-none absolute z-10 max-w-[300px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
           </div>
           <p className="text-[11px] text-fg-muted">行=曜日、列=「{sigLabel}」のビンランク（分位境界は曜日ごとに算出）。色=平均、✓=有意(n≥10)、青枠=各曜日の直近該当ビン。気になるセルをクリックすると「ビン別パス&EV」でその曜日を深掘り。</p>
