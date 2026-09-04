@@ -109,9 +109,29 @@ FU44 が指摘したとおり、この母数は測るたびに動いており、
 **残件は 90 個**（△ の副次図 169 − 79）。理由は「同じパネル内の表に数値が併記されており、
 **読み上げが一切届かない状態ではない**ため」。**残件0ではない。件数と理由を上に書いた。**
 
-残件 90 個の内訳（ファイル別・上位）は本表の「今回の扱い」列に1件ずつ書いてある。
-`WeekdayBarrierChart.tsx` 10 / `SpiralHeatmap.tsx` 10 / `WeeklyPhaseAttractorChart.tsx` 6 /
-`SectorFactorStabilityPanel.tsx` 5 / `WeeklyAllocationChart.tsx` 3 …
+残件の内訳（ファイル別）は本表の「今回の扱い」列に1件ずつ書いてある。
+
+### 2.2 実績（2026-09-04 の作業後に測り直した値）
+
+| | 着手前 | 着手後 |
+|---|---|---|
+| `<AccessibleCanvas` の出現数（= 代替テキストのある図） | 15 | **260** |
+| 素の `<canvas` の出現数 | 306 | **61** |
+| うちラッパ自身と未配線（対応不要） | 2 | 2 |
+| **代替テキストの無い図** | **304** | **59** |
+| `createChart(` | 142 | **142**（不変） |
+| `getContext("2d")` の出現数 / ファイル数 | 175 / 152 | **175 / 152**（不変） |
+
+**入れた代替テキストは 245 図。** 対象184ファイルのうち **164ファイルは全図が済み**、
+残る20ファイルは主図だけを入れて副次図 **59図** を見送った（すべて表併記あり）。
+
+予定（214図）より多いのは、**view で排他表示される canvas を全枚対応に切り替えた**ため。
+`MondayGapChart`(5) や `WeeklyAnalogOosChart`(4) のように、タブで1枚ずつ出る図は
+表示中はどれも「唯一の情報源」になるので、主図1枚では足りないと判断した。
+
+見送り59図の内訳（多い順）: `SpiralHeatmap` 10 / `WeekdayBarrierChart` 10 /
+`WeeklyPhaseAttractorChart` 6 / `SectorFactorStabilityPanel` 5 / `ArimaChart` 4 /
+`CrashSurgeStreakChart` 4 / `WeeklyAllocationChart` 3 / 以下 2図以下が13ファイル。
 
 ---
 
@@ -122,193 +142,193 @@ FU44 が指摘したとおり、この母数は測るたびに動いており、
 
 | コンポーネント | パネルID | 節 | 図が唯一の情報源か | S18 で対応済みか | 今回の扱い |
 |---|---|---|---|---|---|
-| `AsOfScorecardChart.tsx` | asof-scorecard | as-of | △ 一部併記（canvas 3） | — | 対応する（主図1個 `relRef`）／残 2個は表併記のため今回見送り |
-| `AccessibleCanvas.tsx` | basic-rolling-anim, ohlc-intra-path ほか計10 | 基本/OHLC/分布/周波数/非線形/エントロピー/条件付き | —（canvas 1） | 済（10件の1つ） | 対応不要（S18 のラッパ自身。`description` を受けて `role=img` を付ける側） |
-| `GapAnalysisChart.tsx` | basic-gap | 基本 | △ 一部併記（canvas 3） | — | 対応する（主図1個 `gapDistRef`）／残 2個は表併記のため今回見送り |
-| `HoldingPeriodChart.tsx` | basic-holding | 基本 | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `RelativeStrengthExtChart.tsx` | basic-relstrength-ext | 基本 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RollingAnimationChart.tsx` | basic-rolling-anim | 基本 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・RollingAnimationChart.tsx） |
-| `VolumeLeadChart.tsx` | basic-volume-lead | 基本 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolumeProfileChart.tsx` | basic-volume-profile | 基本 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolumeProfileExtChart.tsx` | basic-volume-profile-ext | 基本 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolumeReturnChart.tsx` | basic-volume-return | 基本 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `CandleSeasonalityChart.tsx` | cal-candle-season | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `EdgeDiscountChart.tsx` | cal-edge-discount | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `EventCalendarChart.tsx` | cal-event-calendar | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ExecutionTimingChart.tsx` | cal-exec-timing | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `GapIntradayChart.tsx` | cal-gap-intra | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `HighLowTimingChart.tsx` | cal-highlow-timing | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `IntradayAnalogPathChart.tsx` | cal-intraday-analog | カレンダー | △ 一部併記（canvas 2） | — | 対応する（主図1個 `canvasRef`）／残 1個は表併記のため今回見送り |
-| `IntradayExcursionChart.tsx` | cal-intra-excursion | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `intradayPathShared.tsx` | cal-weekday-intra-path, cal-tom-path ほか計6 | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `IntradayProfileChart.tsx` | cal-intra-profile | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `IntradayRegimeChart.tsx` | cal-intra-regime | カレンダー | △ 一部併記（canvas 3） | — | 対応する（主図1個 `canvasRef`）／残 2個は表併記のため今回見送り |
-| `intradayShared.tsx` | cal-weekday-barrier, cal-weekclock ほか計35 | カレンダー | —（canvas 0） | — | 対応不要（`initCanvas()` を提供する描画ヘルパ。JSX の canvas を持たない） |
-| `IntradayWindowChart.tsx` | cal-intra-window | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `MondayGapChart.tsx` | cal-monday-gap | カレンダー | △ 一部併記（canvas 5） | — | 対応する（主図1個 `condRef`）／残 4個は表併記のため今回見送り |
-| `NisaVsTaxableChart.tsx` | cal-nisa-vs-taxable | カレンダー | △ 一部併記（canvas 3） | — | 対応する（主図1個 `histRef`）／残 2個は表併記のため今回見送り |
-| `NullAnatomyChart.tsx` | cal-null-anatomy | カレンダー | △ 一部併記（canvas 2） | — | 対応する（主図1個 `tRef`）／残 1個は表併記のため今回見送り |
-| `NullCalibrationChart.tsx` | cal-null-calib | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `OptimalExitChart.tsx` | cal-optimal-exit | カレンダー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `RealizedVolChart.tsx` | cal-realized-vol | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RegimeUsPathChart.tsx` | cal-regime-us-path | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `SectorBasketWeekdayChart.tsx` | cal-sector-basket | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `SessionGapChart.tsx` | cal-session-gap | カレンダー | △ 一部併記（canvas 2） | — | 対応する（主図1個 `stripRef`）／残 1個は表併記のため今回見送り |
-| `SignalExecutionChart.tsx` | cal-signal-exec | カレンダー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `SignalIntradayChart.tsx` | cal-signal-intra | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `SlicedExecutionChart.tsx` | cal-sliced-exec | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `SpiralHeatmap.tsx` | cal-spiral | カレンダー | △ 一部併記（canvas 11） | — | 対応する（主図1個 `dowBarRef`）／残 10個は表併記のため今回見送り |
-| `TodayBinChart.tsx` | cal-today-bin | カレンダー | △ 一部併記（canvas 3） | — | 対応する（主図1個 `distRef`）／残 2個は表併記のため今回見送り |
-| `TodayVsExpectedPathChart.tsx` | cal-today-vs-expected | カレンダー | △ 一部併記（canvas 4） | — | 対応する（主図1個 `overlayRef`）／残 3個は表併記のため今回見送り |
-| `TurnOfMonthPathChart.tsx` | cal-tom-path | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `UsAbsorptionChart.tsx` | cal-us-absorption | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `UsBetaChart.tsx` | cal-us-beta | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `UsBinEventStudyChart.tsx` | cal-us-bin-event | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `UsDigestionBoundaryChart.tsx` | cal-us-digestion | カレンダー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `UsEventTimeChart.tsx` | cal-us-eventtime | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `UsHoldingPeriodChart.tsx` | cal-us-holding | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `UsJpLinkedPathChart.tsx` | cal-us-jp-linked | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `UsLeadLagChart.tsx` | cal-us-leadlag | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `UsPathChart.tsx` | cal-us-path | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `UsTimingEdgeChart.tsx` | cal-us-timing | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `UsVolSpilloverChart.tsx` | cal-us-vol | カレンダー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `VwapDeviationChart.tsx` | cal-vwap-dev | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `WeekClockChart.tsx` | cal-weekclock | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `WeekdayBarrierChart.tsx` | cal-weekday-barrier | カレンダー | △ 一部併記（canvas 11） | — | 対応する（主図1個 `boardCanvas`）／残 10個は表併記のため今回見送り |
-| `WeekdayConditionalChart.tsx` | cal-weekday-cond | カレンダー | △ 一部併記（canvas 3） | — | 対応する（主図1個 `pathRef`）／残 2個は表併記のため今回見送り |
-| `WeekdayEdgeScanChart.tsx` | cal-weekday-edge | カレンダー | △ 一部併記（canvas 4） | — | 対応する（主図1個 `overviewRef`）／残 3個は表併記のため今回見送り |
-| `WeekdayIntradayEdgeChart.tsx` | cal-weekday-intra-edge | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `WeekdayIntradayPathChart.tsx` | cal-weekday-intra-path | カレンダー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `WeekdayTradeSimulator.tsx` | cal-weekday-sim | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `WeekdayUsInteractionChart.tsx` | cal-weekday-us-interaction | カレンダー | △ 一部併記（canvas 2） | — | 対応する（主図1個 `betaRef`）／残 1個は表併記のため今回見送り |
-| `WeekEmbeddingChart.tsx` | cal-week-embed | カレンダー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `WeekendPremiumChart.tsx` | cal-weekend-premium | カレンダー | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `WeeklyAnalogChart.tsx` | cal-weekly-analog | カレンダー | △ 一部併記（canvas 2） | — | 対応する（主図1個 `canvasRef`）／残 1個は表併記のため今回見送り |
-| `WeeklyAnalogOosChart.tsx` | cal-weekly-analog-oos | カレンダー | △ 一部併記（canvas 4） | — | 対応する（主図1個 `scatterRef`）／残 3個は表併記のため今回見送り |
-| `CausalChart.tsx` | sa-causal | 因果 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `CCMChart.tsx` | causal-ccm | 因果 | △ 一部併記（canvas 3） | — | 対応する（主図1個 `convergenceRef`）／残 2個は表併記のため今回見送り |
-| `EventStudyChart.tsx` | causal-event | 因果 | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ConditionalSegmentEdgeChart.tsx` | cond-segment-edge | 条件付き | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `PersistenceChart.tsx` | cond-persistence | 条件付き | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `TwoFactorHeatmapChart.tsx` | cond-2factor | 条件付き | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・TwoFactorHeatmapChart.tsx） |
-| `BlackScholesLabChart.tsx` | deriv-bs-lab | デリバティブ | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `DeltaHedgeSimChart.tsx` | deriv-delta-hedge | デリバティブ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `FuturesCarryChart.tsx` | deriv-futures-carry | デリバティブ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RealizedVolVrpChart.tsx` | deriv-rv-vrp | デリバティブ | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `ACFChart.tsx` | dist-acf | 分布 | ○ 併記なし（canvas 3） | — | 対応する（canvas 3個すべて） |
-| `ACFExtendedChart.tsx` | dist-acf-ext | 分布 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `ConditionalViolinChart.tsx` | dist-violin | 分布 | △ 一部併記（canvas 3） | — | 対応する（主図1個 `condRef`）／残 2個は表併記のため今回見送り |
-| `CrossCorrelogramChart.tsx` | dist-crosscorr | 分布 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `DistributionShapeChart.tsx` | dist-shape | 分布 | ○ 併記なし（canvas 5） | — | 対応する（canvas 5個すべて） |
-| `DistributionSurfaceChart.tsx` | dist-surface | 分布 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・DistributionSurfaceChart.tsx） |
-| `InfoRatioDashboard.tsx` | dist-inforatio | 分布 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `LagDependenceChart.tsx` | dist-lag | 分布 | ○ 併記なし（canvas 4） | — | 対応する（canvas 4個すべて） |
-| `ReturnDistribution.tsx` | sa-distribution | 分布 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `RollingMomentsChart.tsx` | dist-rolling-moments | 分布 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・RollingMomentsChart.tsx） |
-| `StylizedFactsChart.tsx` | dist-stylized | 分布 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VarianceRatioChart.tsx` | dist-vr | 分布 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `EdgeBookChart.tsx` | edge-book | エッジ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `EdgeCapacityChart.tsx` | edge-capacity | エッジ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `InteractionScanChart.tsx` | edge-interaction | エッジ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `SignalStackingChart.tsx` | edge-signal-stack | エッジ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ComplexityEntropyChart.tsx` | ent-complexity | エントロピー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `ConditionalEntropyChart.tsx` | ent-conditional | エントロピー | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `EntropyHeatmapChart.tsx` | ent-heatmap | エントロピー | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・EntropyHeatmapChart.tsx） |
-| `MultiscaleEntropyChart.tsx` | ent-multiscale | エントロピー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `SymbolicInfoFlowChart.tsx` | ent-symbolic | エントロピー | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `DFAChart.tsx` | sa-fractal | フラクタル | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `FractalExtChart.tsx` | frac-ext | フラクタル | ○ 併記なし（canvas 3） | — | 対応する（canvas 3個すべて） |
-| `RollingHurstChart.tsx` | frac-rolling-hurst | フラクタル | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `AnalyticSignalChart.tsx` | freq-analytic | 周波数 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `ComplexPlaneChart.tsx` | freq-complex | 周波数 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `HilbertHuangChart.tsx` | freq-hhs | 周波数 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・HilbertHuangChart.tsx） |
-| `PhaseClockChart.tsx` | freq-phaseclock | 周波数 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `SSAChart.tsx` | sa-frequency-ssa | 周波数 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `WaveletChart.tsx` | freq-wavelet | 周波数 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・WaveletChart.tsx） |
-| `WaveletCoherenceChart.tsx` | sa-frequency-coherence | 周波数 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・WaveletCoherenceChart.tsx） |
-| `ZPlanePoleChart.tsx` | freq-zplane | 周波数 | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `HVGChart.tsx` | net-hvg | ネットワーク | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `OrdinalNetwork.tsx` | net-ordinal | ネットワーク | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VisibilityGraphChart.tsx` | sa-network | ネットワーク | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `AttractorExplorer.tsx` | nl-attractor | 非線形 | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・AttractorExplorer.tsx） |
-| `EmbeddingOptimizer.tsx` | nl-embedding | 非線形 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `KramersMoyalChart.tsx` | nl-km | 非線形 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `LyapunovSpectrumChart.tsx` | nl-lyap-spectrum | 非線形 | △ 一部併記（canvas 2） | — | 対応する（主図1個 `spectrumCanvasRef`）／残 1個は表併記のため今回見送り |
-| `PeriodicPhaseAttractorChart.tsx` | nl-periodic-phase | 非線形 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `PotentialLandscapeChart.tsx` | nl-potential | 非線形 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `RecurrencePlot.tsx` | nl-recurrence | 非線形 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `SimplexPredictionChart.tsx` | nl-simplex | 非線形 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `TDAChart.tsx` | sa-nonlinear-tda | 非線形 | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `WeeklyPhaseAttractorChart.tsx` | nl-weekly-phase | 非線形 | △ 一部併記（canvas 7） | — | 対応する（主図1個 `scatterRef`）／残 6個は表併記のため今回見送り |
-| `WeeklyPhaseSyncChart.tsx` | nl-phase-sync | 非線形 | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ConditionalForwardChart.tsx` | ohlc-candle-run, cond-forward ほか計5 | OHLC/条件付き/カレンダー | △ 一部併記（canvas 3） | — | 対応する（主図1個 `indRef`）／残 2個は表併記のため今回見送り |
-| `CrashSurgeStreakChart.tsx` | ohlc-crash-surge | OHLC | △ 一部併記（canvas 5） | — | 対応する（主図1個 `tsRef`）／残 4個は表併記のため今回見送り |
-| `GapScatterChart.tsx` | sa-ohlc-gap | OHLC | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `IntradayPathChart.tsx` | ohlc-intra-path | OHLC | ○（canvas 0） | 済（10件の1つ） | 対応済み（S18・IntradayPathChart.tsx） |
-| `MFEMAEChart.tsx` | ohlc-mfemae | OHLC | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `OHLCVolatilityChart.tsx` | ohlc-ohlc-vol | OHLC | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `TpSlOptimizerChart.tsx` | ohlc-tpsl | OHLC | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `TrueRangeDecompChart.tsx` | ohlc-true-range | OHLC | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `DensityMatrixChart.tsx` | quantum-density | 量子 | △ 一部併記（canvas 2） | — | 対応する（主図1個 `barRef`）／残 1個は表併記のため今回見送り |
-| `MarketTimeChart.tsx` | quantum-markettime | 量子 | ○ 併記なし（canvas 3） | — | 対応する（canvas 3個すべて） |
-| `PathIntegralChart.tsx` | quantum-pathintegral | 量子 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `PropagatorChart.tsx` | quantum-propagator | 量子 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `BOCPDChart.tsx` | regime-bocpd | レジーム | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RegimeChart.tsx` | regime-main | レジーム | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RegimeDistributionChart.tsx` | regime-distribution | レジーム | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RegimeTechnicalChart.tsx` | regime-technical | レジーム | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `RegimeTransitionChart.tsx` | regime-transition | レジーム | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `CornishFisherChart.tsx` | risk-cornish | リスク | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `DrawdownDistChart.tsx` | risk-dd-dist | リスク | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `ForecastRangeChart.tsx` | risk-forecast-range | リスク | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `GarchVarChart.tsx` | risk-garch-var | リスク | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolSmileChart.tsx` | risk-volsmile | リスク | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `ArimaChart.tsx` | sa-sim-arima | シミュ | △ 一部併記（canvas 5） | — | 対応する（主図1個 `seriesAcfRef`）／残 4個は表併記のため今回見送り |
-| `BlockBootstrapChart.tsx` | sim-block-boot | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `CustomReturnChart.tsx` | sim-custom-return | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `FBMChart.tsx` | sim-fbm | シミュ | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `HistoricalAnalogChart.tsx` | sim-analog | シミュ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `HoldingLedgerChart.tsx` | sim-holding-ledger | シミュ | △ 一部併記（canvas 2） | — | 対応する（主図1個 `waterfallRef`）／残 1個は表併記のため今回見送り |
-| `JumpDiffusionChart.tsx` | sim-jump | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `KellyChart.tsx` | sim-kelly | シミュ | △ 一部併記（canvas 2） | — | 対応する（主図1個 `wallRef`）／残 1個は表併記のため今回見送り |
-| `MeanReversionChart.tsx` | sa-sim-meanrev | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `MultivarSimplexChart.tsx` | sim-multivar-simplex | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `OptimalStoppingChart.tsx` | sim-optstop | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `PriceForecastChart.tsx` | sim-forecast | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RegimeClusteringChart.tsx` | sim-regime-cluster | シミュ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `RMultipleChart.tsx` | sim-rmultiple | シミュ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `SimpleBacktestChart.tsx` | sim-backtest | シミュ | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `VarianceGammaChart.tsx` | sim-vg | シミュ | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `VolTargetingChart.tsx` | sim-vol-target | シミュ | △ 一部併記（canvas 2） | — | 対応する（主図1個 `permRef`）／残 1個は表併記のため今回見送り |
-| `CopulaChart.tsx` | tail-copula | テールリスク | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `HillEstimatorChart.tsx` | tail-hill | テールリスク | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `TailRiskChart.tsx` | tail-main | テールリスク | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `WeekdayDecompChart.tsx` | transform-weekday-decomp | 変換 | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `GarchChart.tsx` | vol-garch | ボラ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `HestonChart.tsx` | vol-heston | ボラ | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `RangeContractionChart.tsx` | vol-range-contract | ボラ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `RangeVolConeChart.tsx` | vol-range-cone | ボラ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolConeChart.tsx` | vol-cone | ボラ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolLeverageChart.tsx` | vol-leverage | ボラ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `VolTermStructureChart.tsx` | vol-term | ボラ | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `CapmSmlChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `CorrelationDragChart.tsx` | — | （節外） | △ 一部併記（canvas 3） | — | 対応する（主図1個 `profileCanvas`）／残 2個は表併記のため今回見送り |
-| `DriftIdentifiabilityChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `EfficientFrontierChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `EntryVsBenchmarkChart.tsx` | — | （節外） | △ 一部併記（canvas 2） | — | 対応する（主図1個 `eqRef`）／残 1個は表併記のため今回見送り |
-| `ExceedanceCorrelationChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ExitCrossChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `GrowthIntuitionPanel.tsx` | — | （節外） | △ 一部併記（canvas 3） | — | 対応する（主図1個 `gameCanvas`）／残 2個は表併記のため今回見送り |
-| `MuSigmaPersistenceChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ParticipationCrossChart.tsx` | — | （節外） | △ 一部併記（canvas 1） | — | 対応する（主図1個） |
-| `ParticipationPremiumChart.tsx` | — | （節外） | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `ResampledFrontierChart.tsx` | — | （節外） | ○ 併記なし（canvas 1） | — | 対応する（canvas 1個すべて） |
-| `SectorFactorSelectChart.tsx` | — | （節外） | △ 一部併記（canvas 2） | — | 対応する（主図1個 `scatRef`）／残 1個は表併記のため今回見送り |
-| `SectorFactorStabilityPanel.tsx` | — | （節外） | △ 一部併記（canvas 6） | — | 対応する（主図1個 `decayRef`）／残 5個は表併記のため今回見送り |
-| `SimexChart.tsx` | — | （節外） | —（canvas 1） | — | 対応不要（**どこからも import されていない未配線コンポーネント**。§5 に記録） |
-| `StrategyCharts.tsx` | — | （節外） | ○ 併記なし（canvas 2） | — | 対応する（canvas 2個すべて） |
-| `WeeklyAllocationChart.tsx` | — | （節外） | △ 一部併記（canvas 4） | — | 対応する（主図1個 `allocRef`）／残 3個は表併記のため今回見送り |
-| `YourPortfolioDragPanel.tsx` | — | （節外） | △ 一部併記（canvas 2） | — | 対応する（主図1個 `wfCanvas`）／残 1個は表併記のため今回見送り |
+| `AsOfScorecardChart.tsx` | asof-scorecard | as-of | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `AccessibleCanvas.tsx` | basic-rolling-anim, ohlc-intra-path ほか計10 | 基本/OHLC/分布/周波数/非線形/エントロピー/条件付き | —（図 1） | — | 対応不要（S18 のラッパ自身。`description` を受けて `role="img"` を付ける側） |
+| `GapAnalysisChart.tsx` | basic-gap | 基本 | △ 一部併記（図 3） | — | **対応した**（主図 1図）／残 2図は表併記のため見送り |
+| `HoldingPeriodChart.tsx` | basic-holding | 基本 | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `RelativeStrengthExtChart.tsx` | basic-relstrength-ext | 基本 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RollingAnimationChart.tsx` | basic-rolling-anim | 基本 | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `VolumeLeadChart.tsx` | basic-volume-lead | 基本 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolumeProfileChart.tsx` | basic-volume-profile | 基本 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolumeProfileExtChart.tsx` | basic-volume-profile-ext | 基本 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolumeReturnChart.tsx` | basic-volume-return | 基本 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `CandleSeasonalityChart.tsx` | cal-candle-season | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `EdgeDiscountChart.tsx` | cal-edge-discount | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `EventCalendarChart.tsx` | cal-event-calendar | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ExecutionTimingChart.tsx` | cal-exec-timing | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `GapIntradayChart.tsx` | cal-gap-intra | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `HighLowTimingChart.tsx` | cal-highlow-timing | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `IntradayAnalogPathChart.tsx` | cal-intraday-analog | カレンダー | △ 一部併記（図 2） | — | **対応した**（全 2図） |
+| `IntradayExcursionChart.tsx` | cal-intra-excursion | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `intradayPathShared.tsx` | cal-weekday-intra-path, cal-tom-path ほか計6 | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `IntradayProfileChart.tsx` | cal-intra-profile | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `IntradayRegimeChart.tsx` | cal-intra-regime | カレンダー | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `intradayShared.tsx` | cal-weekday-barrier, cal-weekclock ほか計35 | カレンダー | —（図 0） | — | 対応不要（`initCanvas()` を提供する描画ヘルパ。JSX の canvas を持たない） |
+| `IntradayWindowChart.tsx` | cal-intra-window | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `MondayGapChart.tsx` | cal-monday-gap | カレンダー | △ 一部併記（図 5） | — | **対応した**（全 5図） |
+| `NisaVsTaxableChart.tsx` | cal-nisa-vs-taxable | カレンダー | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `NullAnatomyChart.tsx` | cal-null-anatomy | カレンダー | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `NullCalibrationChart.tsx` | cal-null-calib | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `OptimalExitChart.tsx` | cal-optimal-exit | カレンダー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `RealizedVolChart.tsx` | cal-realized-vol | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RegimeUsPathChart.tsx` | cal-regime-us-path | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `SectorBasketWeekdayChart.tsx` | cal-sector-basket | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `SessionGapChart.tsx` | cal-session-gap | カレンダー | △ 一部併記（図 2） | — | **対応した**（全 2図） |
+| `SignalExecutionChart.tsx` | cal-signal-exec | カレンダー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `SignalIntradayChart.tsx` | cal-signal-intra | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `SlicedExecutionChart.tsx` | cal-sliced-exec | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `SpiralHeatmap.tsx` | cal-spiral | カレンダー | △ 一部併記（図 11） | — | **対応した**（主図 1図）／残 10図は表併記のため見送り |
+| `TodayBinChart.tsx` | cal-today-bin | カレンダー | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `TodayVsExpectedPathChart.tsx` | cal-today-vs-expected | カレンダー | △ 一部併記（図 4） | — | **対応した**（全 4図） |
+| `TurnOfMonthPathChart.tsx` | cal-tom-path | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `UsAbsorptionChart.tsx` | cal-us-absorption | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `UsBetaChart.tsx` | cal-us-beta | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `UsBinEventStudyChart.tsx` | cal-us-bin-event | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `UsDigestionBoundaryChart.tsx` | cal-us-digestion | カレンダー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `UsEventTimeChart.tsx` | cal-us-eventtime | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `UsHoldingPeriodChart.tsx` | cal-us-holding | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `UsJpLinkedPathChart.tsx` | cal-us-jp-linked | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `UsLeadLagChart.tsx` | cal-us-leadlag | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `UsPathChart.tsx` | cal-us-path | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `UsTimingEdgeChart.tsx` | cal-us-timing | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `UsVolSpilloverChart.tsx` | cal-us-vol | カレンダー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `VwapDeviationChart.tsx` | cal-vwap-dev | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `WeekClockChart.tsx` | cal-weekclock | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `WeekdayBarrierChart.tsx` | cal-weekday-barrier | カレンダー | △ 一部併記（図 11） | — | **対応した**（主図 1図）／残 10図は表併記のため見送り |
+| `WeekdayConditionalChart.tsx` | cal-weekday-cond | カレンダー | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `WeekdayEdgeScanChart.tsx` | cal-weekday-edge | カレンダー | △ 一部併記（図 4） | — | **対応した**（全 4図） |
+| `WeekdayIntradayEdgeChart.tsx` | cal-weekday-intra-edge | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `WeekdayIntradayPathChart.tsx` | cal-weekday-intra-path | カレンダー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `WeekdayTradeSimulator.tsx` | cal-weekday-sim | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `WeekdayUsInteractionChart.tsx` | cal-weekday-us-interaction | カレンダー | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `WeekEmbeddingChart.tsx` | cal-week-embed | カレンダー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `WeekendPremiumChart.tsx` | cal-weekend-premium | カレンダー | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `WeeklyAnalogChart.tsx` | cal-weekly-analog | カレンダー | △ 一部併記（図 2） | — | **対応した**（全 2図） |
+| `WeeklyAnalogOosChart.tsx` | cal-weekly-analog-oos | カレンダー | △ 一部併記（図 4） | — | **対応した**（全 4図） |
+| `CausalChart.tsx` | sa-causal | 因果 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `CCMChart.tsx` | causal-ccm | 因果 | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `EventStudyChart.tsx` | causal-event | 因果 | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ConditionalSegmentEdgeChart.tsx` | cond-segment-edge | 条件付き | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `PersistenceChart.tsx` | cond-persistence | 条件付き | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `TwoFactorHeatmapChart.tsx` | cond-2factor | 条件付き | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `BlackScholesLabChart.tsx` | deriv-bs-lab | デリバティブ | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `DeltaHedgeSimChart.tsx` | deriv-delta-hedge | デリバティブ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `FuturesCarryChart.tsx` | deriv-futures-carry | デリバティブ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RealizedVolVrpChart.tsx` | deriv-rv-vrp | デリバティブ | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `ACFChart.tsx` | dist-acf | 分布 | ○ 併記なし（図 3） | — | **対応した**（全 3図） |
+| `ACFExtendedChart.tsx` | dist-acf-ext | 分布 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `ConditionalViolinChart.tsx` | dist-violin | 分布 | △ 一部併記（図 3） | — | **対応した**（全 3図） |
+| `CrossCorrelogramChart.tsx` | dist-crosscorr | 分布 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `DistributionShapeChart.tsx` | dist-shape | 分布 | ○ 併記なし（図 5） | — | **対応した**（全 5図） |
+| `DistributionSurfaceChart.tsx` | dist-surface | 分布 | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `InfoRatioDashboard.tsx` | dist-inforatio | 分布 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `LagDependenceChart.tsx` | dist-lag | 分布 | ○ 併記なし（図 4） | — | **対応した**（全 4図） |
+| `ReturnDistribution.tsx` | sa-distribution | 分布 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `RollingMomentsChart.tsx` | dist-rolling-moments | 分布 | ○ 併記なし（図 3） | 済（10件の1つ） | **対応した**（全 3図） |
+| `StylizedFactsChart.tsx` | dist-stylized | 分布 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VarianceRatioChart.tsx` | dist-vr | 分布 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `EdgeBookChart.tsx` | edge-book | エッジ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `EdgeCapacityChart.tsx` | edge-capacity | エッジ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `InteractionScanChart.tsx` | edge-interaction | エッジ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `SignalStackingChart.tsx` | edge-signal-stack | エッジ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ComplexityEntropyChart.tsx` | ent-complexity | エントロピー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `ConditionalEntropyChart.tsx` | ent-conditional | エントロピー | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `EntropyHeatmapChart.tsx` | ent-heatmap | エントロピー | ○ 併記なし（図 3） | 済（10件の1つ） | **対応した**（全 3図） |
+| `MultiscaleEntropyChart.tsx` | ent-multiscale | エントロピー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `SymbolicInfoFlowChart.tsx` | ent-symbolic | エントロピー | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `DFAChart.tsx` | sa-fractal | フラクタル | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `FractalExtChart.tsx` | frac-ext | フラクタル | ○ 併記なし（図 3） | — | **対応した**（全 3図） |
+| `RollingHurstChart.tsx` | frac-rolling-hurst | フラクタル | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `AnalyticSignalChart.tsx` | freq-analytic | 周波数 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `ComplexPlaneChart.tsx` | freq-complex | 周波数 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `HilbertHuangChart.tsx` | freq-hhs | 周波数 | ○ 併記なし（図 2） | 済（10件の1つ） | **対応した**（全 2図） |
+| `PhaseClockChart.tsx` | freq-phaseclock | 周波数 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `SSAChart.tsx` | sa-frequency-ssa | 周波数 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `WaveletChart.tsx` | freq-wavelet | 周波数 | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `WaveletCoherenceChart.tsx` | sa-frequency-coherence | 周波数 | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `ZPlanePoleChart.tsx` | freq-zplane | 周波数 | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `HVGChart.tsx` | net-hvg | ネットワーク | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `OrdinalNetwork.tsx` | net-ordinal | ネットワーク | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VisibilityGraphChart.tsx` | sa-network | ネットワーク | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `AttractorExplorer.tsx` | nl-attractor | 非線形 | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `EmbeddingOptimizer.tsx` | nl-embedding | 非線形 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `KramersMoyalChart.tsx` | nl-km | 非線形 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `LyapunovSpectrumChart.tsx` | nl-lyap-spectrum | 非線形 | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `PeriodicPhaseAttractorChart.tsx` | nl-periodic-phase | 非線形 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `PotentialLandscapeChart.tsx` | nl-potential | 非線形 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `RecurrencePlot.tsx` | nl-recurrence | 非線形 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `SimplexPredictionChart.tsx` | nl-simplex | 非線形 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `TDAChart.tsx` | sa-nonlinear-tda | 非線形 | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `WeeklyPhaseAttractorChart.tsx` | nl-weekly-phase | 非線形 | △ 一部併記（図 7） | — | **対応した**（主図 1図）／残 6図は表併記のため見送り |
+| `WeeklyPhaseSyncChart.tsx` | nl-phase-sync | 非線形 | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ConditionalForwardChart.tsx` | ohlc-candle-run, cond-forward ほか計5 | OHLC/条件付き/カレンダー | △ 一部併記（図 3） | — | **対応した**（主図 1図）／残 2図は表併記のため見送り |
+| `CrashSurgeStreakChart.tsx` | ohlc-crash-surge | OHLC | △ 一部併記（図 5） | — | **対応した**（主図 1図）／残 4図は表併記のため見送り |
+| `GapScatterChart.tsx` | sa-ohlc-gap | OHLC | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `IntradayPathChart.tsx` | ohlc-intra-path | OHLC | ○ 併記なし（図 1） | 済（10件の1つ） | **対応した**（全 1図） |
+| `MFEMAEChart.tsx` | ohlc-mfemae | OHLC | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `OHLCVolatilityChart.tsx` | ohlc-ohlc-vol | OHLC | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `TpSlOptimizerChart.tsx` | ohlc-tpsl | OHLC | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `TrueRangeDecompChart.tsx` | ohlc-true-range | OHLC | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `DensityMatrixChart.tsx` | quantum-density | 量子 | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `MarketTimeChart.tsx` | quantum-markettime | 量子 | ○ 併記なし（図 3） | — | **対応した**（全 3図） |
+| `PathIntegralChart.tsx` | quantum-pathintegral | 量子 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `PropagatorChart.tsx` | quantum-propagator | 量子 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `BOCPDChart.tsx` | regime-bocpd | レジーム | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RegimeChart.tsx` | regime-main | レジーム | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RegimeDistributionChart.tsx` | regime-distribution | レジーム | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RegimeTechnicalChart.tsx` | regime-technical | レジーム | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `RegimeTransitionChart.tsx` | regime-transition | レジーム | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `CornishFisherChart.tsx` | risk-cornish | リスク | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `DrawdownDistChart.tsx` | risk-dd-dist | リスク | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `ForecastRangeChart.tsx` | risk-forecast-range | リスク | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `GarchVarChart.tsx` | risk-garch-var | リスク | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolSmileChart.tsx` | risk-volsmile | リスク | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `ArimaChart.tsx` | sa-sim-arima | シミュ | △ 一部併記（図 5） | — | **対応した**（主図 1図）／残 4図は表併記のため見送り |
+| `BlockBootstrapChart.tsx` | sim-block-boot | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `CustomReturnChart.tsx` | sim-custom-return | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `FBMChart.tsx` | sim-fbm | シミュ | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `HistoricalAnalogChart.tsx` | sim-analog | シミュ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `HoldingLedgerChart.tsx` | sim-holding-ledger | シミュ | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `JumpDiffusionChart.tsx` | sim-jump | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `KellyChart.tsx` | sim-kelly | シミュ | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `MeanReversionChart.tsx` | sa-sim-meanrev | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `MultivarSimplexChart.tsx` | sim-multivar-simplex | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `OptimalStoppingChart.tsx` | sim-optstop | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `PriceForecastChart.tsx` | sim-forecast | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RegimeClusteringChart.tsx` | sim-regime-cluster | シミュ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `RMultipleChart.tsx` | sim-rmultiple | シミュ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `SimpleBacktestChart.tsx` | sim-backtest | シミュ | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `VarianceGammaChart.tsx` | sim-vg | シミュ | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `VolTargetingChart.tsx` | sim-vol-target | シミュ | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `CopulaChart.tsx` | tail-copula | テールリスク | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `HillEstimatorChart.tsx` | tail-hill | テールリスク | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `TailRiskChart.tsx` | tail-main | テールリスク | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `WeekdayDecompChart.tsx` | transform-weekday-decomp | 変換 | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `GarchChart.tsx` | vol-garch | ボラ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `HestonChart.tsx` | vol-heston | ボラ | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `RangeContractionChart.tsx` | vol-range-contract | ボラ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `RangeVolConeChart.tsx` | vol-range-cone | ボラ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolConeChart.tsx` | vol-cone | ボラ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolLeverageChart.tsx` | vol-leverage | ボラ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `VolTermStructureChart.tsx` | vol-term | ボラ | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `CapmSmlChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `CorrelationDragChart.tsx` | — | （節外） | △ 一部併記（図 3） | — | **対応した**（主図 1図）／残 2図は表併記のため見送り |
+| `DriftIdentifiabilityChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `EfficientFrontierChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `EntryVsBenchmarkChart.tsx` | — | （節外） | △ 一部併記（図 2） | — | **対応した**（全 2図） |
+| `ExceedanceCorrelationChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ExitCrossChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `GrowthIntuitionPanel.tsx` | — | （節外） | △ 一部併記（図 3） | — | **対応した**（主図 1図）／残 2図は表併記のため見送り |
+| `MuSigmaPersistenceChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ParticipationCrossChart.tsx` | — | （節外） | △ 一部併記（図 1） | — | **対応した**（全 1図） |
+| `ParticipationPremiumChart.tsx` | — | （節外） | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `ResampledFrontierChart.tsx` | — | （節外） | ○ 併記なし（図 1） | — | **対応した**（全 1図） |
+| `SectorFactorSelectChart.tsx` | — | （節外） | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
+| `SectorFactorStabilityPanel.tsx` | — | （節外） | △ 一部併記（図 6） | — | **対応した**（主図 1図）／残 5図は表併記のため見送り |
+| `SimexChart.tsx` | — | （節外） | —（図 1） | — | 対応不要（**どこからも import されていない未配線コンポーネント**。§5① に記録） |
+| `StrategyCharts.tsx` | — | （節外） | ○ 併記なし（図 2） | — | **対応した**（全 2図） |
+| `WeeklyAllocationChart.tsx` | — | （節外） | △ 一部併記（図 4） | — | **対応した**（主図 1図）／残 3図は表併記のため見送り |
+| `YourPortfolioDragPanel.tsx` | — | （節外） | △ 一部併記（図 2） | — | **対応した**（主図 1図）／残 1図は表併記のため見送り |
 ---
 
 ## 4. 代替テキストの書き方（S18 の10件を手本にする）
@@ -362,3 +382,4 @@ A3 の対象からは外さない（`app/components/analysis/` にある分析�
 | 日付 | 内容 |
 |---|---|
 | 2026-09-04 | 初版（S20 第1コミット）。母数の数え方・判定基準・全187ファイルの分類。実装は含まない |
+| 2026-09-04 | 実装後に §2.2 実績と表の「今回の扱い」列を実測で置き換えた。245図を追加し、残 59図。**FU36 の副産物**として、`DirectionGlyph` の呼び出し 184 + `DirectionValue` 36 = 220箇所を1件ずつ見直し、色の三項演算子 94箇所とローカル色ヘルパ11個を `directionClass` に寄せた（色と記号が同じ `directionOf` を通る） |
