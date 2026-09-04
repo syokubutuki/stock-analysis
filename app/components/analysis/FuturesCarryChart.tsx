@@ -16,7 +16,7 @@ import {
   minVarianceHedgeRatio,
 } from "../../lib/futures-carry";
 import AnalysisGuide from "./AnalysisGuide";
-import { CHART_COLORS } from "../../lib/chart-colors";
+import { CHART_COLORS, withSign } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -263,8 +263,11 @@ export default function FuturesCarryChart({ prices }: Props) {
           curve.regime === "contango" ? "コンタンゴ" : curve.regime === "backwardation" ? "バック" : "フラット"
         } tone={curve.regime === "contango" ? "down" : curve.regime === "backwardation" ? "up" : undefined} />
         <Stat label="年率ロールイールド" value={`${((q - r) * 100).toFixed(2)}%`} tone={q - r >= 0 ? "up" : "down"} directionValue={q - r} />
-        {roll && <Stat label="累積ロールドラッグ" value={`${(roll.totalRollDrag * 100).toFixed(1)}%`} tone={roll.totalRollDrag > 0 ? "down" : "up"} directionValue={roll.totalRollDrag} />}
-        {roll && <Stat label="年率ドラッグ" value={`${(roll.annualizedRollDrag * 100).toFixed(2)}%`} tone={roll.annualizedRollDrag > 0 ? "down" : "up"} directionValue={roll.annualizedRollDrag} />}
+        {/* ドラッグは「正＝ロールで劣後」なので、色は上下ではなく good/bad を表す。
+            方向記号を重ねると「▲＝上昇」と「赤＝悪い」が同じセルで衝突するため、
+            第2の手がかりは記号ではなく**符号の明示**にする（FU36/FU37） */}
+        {roll && <Stat label="累積ロールドラッグ" value={withSign(roll.totalRollDrag * 100, 1, "%")} tone={roll.totalRollDrag > 0 ? "down" : "up"} />}
+        {roll && <Stat label="年率ドラッグ" value={withSign(roll.annualizedRollDrag * 100, 2, "%")} tone={roll.annualizedRollDrag > 0 ? "down" : "up"} />}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

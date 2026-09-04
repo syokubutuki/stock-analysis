@@ -484,8 +484,8 @@ export default function VolTargetingChart({ prices }: Props) {
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">最大ドローダウン</td>
-              <td className={`text-right px-2 ${cls(metrics.strat.maxDD)}`}><DirectionGlyph value={metrics.strat.maxDD} />{pct(metrics.strat.maxDD)}</td>
-              <td className={`text-right px-2 ${cls(metrics.bh.maxDD)}`}><DirectionGlyph value={metrics.bh.maxDD} />{pct(metrics.bh.maxDD)}</td>
+              <td className="text-right px-2 text-gray-700">{pct(metrics.strat.maxDD)}</td>
+              <td className="text-right px-2 text-gray-700">{pct(metrics.bh.maxDD)}</td>
               <td className={`text-right px-2 font-medium ${cls(metrics.strat.maxDD - metrics.bh.maxDD)}`}><DirectionGlyph value={metrics.strat.maxDD - metrics.bh.maxDD} />{pct(metrics.strat.maxDD - metrics.bh.maxDD)}</td>
             </tr>
             <tr className="border-b border-gray-100">

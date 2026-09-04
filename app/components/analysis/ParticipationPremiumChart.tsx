@@ -300,11 +300,11 @@ export default function ParticipationPremiumChart() {
               />
               <Stat label="年率リターン(幾何)" value={pct(part.annualReturn)} />
               <Stat label="シャープ(rf=0)" value={part.sharpe.toFixed(2)} />
+              {/* 定義上つねに ≤0 で方向を持たないので記号は付けない（FU37） */}
               <Stat
                 label="最大ドローダウン"
                 value={pct(part.maxDrawdown)}
                 tone="bad"
-                directionValue={part.maxDrawdown}
                 sub="床を得る対価の谷"
               />
               <Stat label="累積リターン" value={pct(part.totalReturn, 0)} />

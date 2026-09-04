@@ -505,7 +505,8 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
             <StatCell label="日次標準偏差" value={pctFmt(stats.stdev, 4)} />
             <StatCell label="平均利益" value={pctFmt(stats.avgWin, 4)} />
             <StatCell label="平均損失" value={pctFmt(stats.avgLoss, 4)} />
-            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative directionValue={stats.maxDD} />
+            {/* 最大DDは peak−cum の大きさで定義上つねに ≥0。方向を持たないので記号は付けない（FU37） */}
+            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative />
             <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} directionValue={stats.profitFactor - 1} />
           </div>
         </>

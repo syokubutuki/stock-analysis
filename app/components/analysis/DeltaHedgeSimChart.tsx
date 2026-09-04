@@ -188,8 +188,10 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-            <Stat label="ガンマ項 Σ½Γ(ΔS)²" value={fmt(result.gammaPnL)} tone="up" directionValue={result.gammaPnL} />
-            <Stat label="シータ項 ΣΘdt" value={fmt(result.thetaPnL)} tone="down" directionValue={result.thetaPnL} />
+            {/* ガンマ項は ½Γ(ΔS)² で定義上つねに ≥0、シータ項は Θ<0・dt>0 で ≤0。
+                方向を持たないので記号は付けない（FU37）。tone は「効いている向き」を表す固定色 */}
+            <Stat label="ガンマ項 Σ½Γ(ΔS)²" value={fmt(result.gammaPnL)} tone="up" />
+            <Stat label="シータ項 ΣΘdt" value={fmt(result.thetaPnL)} tone="down" />
             <Stat label="ガンマ+シータ" value={fmt(result.gammaPnL + result.thetaPnL)}
               tone={result.gammaPnL + result.thetaPnL >= 0 ? "up" : "down"} directionValue={result.gammaPnL + result.thetaPnL} />
           </div>
