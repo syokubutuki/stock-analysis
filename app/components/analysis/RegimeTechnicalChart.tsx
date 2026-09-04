@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeRegimeTechnical, type RegimeTechnicalResult } from "../../lib/cross-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -38,6 +39,12 @@ export default function RegimeTechnicalChart({ prices }: Props) {
   const results = useMemo(() => computeRegimeTechnical(prices), [prices]);
 
   // Win rate comparison bar chart
+  const chartDescription = useMemo(() => {
+    if (results.length === 0) return "レジーム別のテクニカル勝率。計算できるデータが不足しています。";
+    const best = results.reduce((a, b) => (b.rsiBuyWinRate > a.rsiBuyWinRate ? b : a));
+    return `レジーム${results.length}区分ごとに、RSIとMACDの売買シグナルの勝率を横棒で並べた図。RSI買いの勝率が最も高いのは${best.regime}の${(best.rsiBuyWinRate * 100).toFixed(0)}%（シグナル${best.rsiBuySignals}回、平均${(best.rsiBuyAvgReturn * 100).toFixed(2)}%）です。`;
+  }, [results]);
+
   useEffect(() => {
     if (!canvasRef.current || results.length === 0) return;
     const canvasH = 280;
@@ -182,7 +189,7 @@ export default function RegimeTechnicalChart({ prices }: Props) {
 
           {/* 勝率バーチャート */}
           <div className="relative">
-            <canvas ref={canvasRef} />
+            <AccessibleCanvas ref={canvasRef} description={chartDescription} />
           </div>
 
           {/* 詳細テーブル */}

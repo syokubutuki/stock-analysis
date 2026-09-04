@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeVarianceRatio } from "../../lib/variance-ratio";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -26,6 +27,13 @@ export default function VarianceRatioChart({ prices, seriesMode }: Props) {
   }, [values, seriesMode]);
 
   const result = useMemo(() => computeVarianceRatio(returns), [returns]);
+
+  const chartDescription = useMemo(() => {
+    if (result.points.length === 0) return "分散比 VR(q)。計算できるデータが不足しています。";
+    const far = result.points[result.points.length - 1];
+    const sig = result.points.filter((p) => p.significant).length;
+    return `集計期間qごとの分散比VR(q)を並べた図（1が完全なランダムウォーク）。q=${far.q}でVR=${far.vr.toFixed(3)}（z=${far.zStat.toFixed(2)}、p=${far.pValue.toFixed(3)}）、有意に1から離れたqは${result.points.length}点中${sig}点で、判定は「${result.interpretation}」です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -180,7 +188,7 @@ export default function VarianceRatioChart({ prices, seriesMode }: Props) {
           ))}
       </div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

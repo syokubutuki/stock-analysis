@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeRegimeDistribution } from "../../lib/regime-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -25,6 +26,13 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function RegimeDistributionChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computeRegimeDistribution(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.regimes.length === 0) return "レジーム別の分布。計算できるデータが不足しています。";
+    const hi = result.regimes.reduce((a, b) => (b.mean > a.mean ? b : a));
+    const fat = result.regimes.reduce((a, b) => (b.kurtosis > a.kurtosis ? b : a));
+    return `レジーム${result.regimes.length}区分ごとにリターン分布（KDE）を重ねた図。平均が最も高いのは${hi.label}の${(hi.mean * 100).toFixed(3)}%（σ=${(hi.std * 100).toFixed(2)}%、n=${hi.n}）、尖度が最も高いのは${fat.label}の${fat.kurtosis.toFixed(2)}です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || result.regimes.length === 0) return;
@@ -109,7 +117,7 @@ export default function RegimeDistributionChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">レジーム別分布特性</h3>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className="grid grid-cols-3 gap-3">
         {result.regimes.map((r, i) => (

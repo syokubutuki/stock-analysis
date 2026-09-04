@@ -11,6 +11,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { analyzeRangeContraction, TriggerStat } from "../../lib/range-contraction";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS, CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
 
 interface Props {
@@ -114,6 +115,13 @@ export default function RangeContractionChart({ prices }: Props) {
     };
   }, [prices, result]);
 
+  const barDescription = useMemo(() => {
+    if (result.stats.length === 0) return "レンジ収縮トリガーの翌日の放れ。計算できるデータが不足しています。";
+    const top = result.stats.reduce((a, b) => (b.meanAbsNext > a.meanAbsNext ? b : a));
+    const g = result.gauge;
+    return `レンジ収縮・拡大のトリガー${result.stats.length}種について、翌日の|リターン|平均を棒で並べた図（全日の基準は${(top.baselineAbs * 100).toFixed(2)}%）。最も大きく放れるのは${top.label}のあとで${(top.meanAbsNext * 100).toFixed(2)}%（n=${top.n}、翌日上昇率${(top.upRate * 100).toFixed(0)}%）です。${g ? `現在のBB幅は過去の${(g.bbPctile * 100).toFixed(0)}パーセンタイルで、スクイーズ${g.isSqueeze ? "中" : "ではありません"}。` : ""}`;
+  }, [result]);
+
   useEffect(() => {
     if (!barRef.current || result.stats.length === 0) return;
     const rows = result.stats.filter((s) => s.n > 0).length;
@@ -155,7 +163,7 @@ export default function RangeContractionChart({ prices }: Props) {
         マーカー: <span style={{ color: COLORS.NR7 }}>▲NR7</span> / <span style={{ color: COLORS.inside }}>▲inside</span> / <span style={{ color: COLORS.squeeze }}>▲squeeze</span>（直近{result.markers.length}件）
       </div>
 
-      <div className="relative"><canvas ref={barRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={barRef} description={barDescription} /></div>
 
       <AnalysisGuide title="レンジ収縮→ブレイクの詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

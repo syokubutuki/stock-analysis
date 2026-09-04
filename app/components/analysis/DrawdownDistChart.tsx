@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { drawdownEpisodes } from "../../lib/risk-extra";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -59,6 +60,20 @@ export default function DrawdownDistChart({ prices }: Props) {
     [0, Math.floor(h.length / 2), h.length - 1].forEach((i) => h[i] && ctx.fillText(fmt(h[i].x0), ml + i * slot + slot / 2, mt + plotH + 12));
   };
 
+  const depthDescription = useMemo(() => {
+    if (eps.length < 3) return "ドローダウン深さの分布。標本が不足しています。";
+    const worst = eps.reduce((a, b) => (b.depth < a.depth ? b : a));
+    const med = [...eps].sort((a, b) => a.depth - b.depth)[Math.floor(eps.length / 2)];
+    return `2%を超えたドローダウン${eps.length}回の深さの分布（ヒストグラム）。最深は${(worst.depth * 100).toFixed(1)}%、中央値は${(med.depth * 100).toFixed(1)}%です。`;
+  }, [eps]);
+
+  const durDescription = useMemo(() => {
+    if (eps.length < 3) return "回復日数の分布。標本が不足しています。";
+    const longest = eps.reduce((a, b) => (b.recovery > a.recovery ? b : a));
+    const recovered = eps.filter((e) => e.recovered).length;
+    return `同じ${eps.length}回について、高値を回復するまでの日数の分布（ヒストグラム）。最長は${longest.recovery}日で、回復済みは${recovered}回（${((recovered / eps.length) * 100).toFixed(0)}%）です。`;
+  }, [eps]);
+
   useEffect(() => {
     draw(depthRef.current, eps.map((e) => e.depth * 100), "DDの深さ分布(%)", "#dc2626", (v) => v.toFixed(0));
     draw(durRef.current, eps.map((e) => e.recovery), "回復日数の分布", "#2563eb", (v) => v.toFixed(0));
@@ -79,8 +94,8 @@ export default function DrawdownDistChart({ prices }: Props) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="relative"><canvas ref={depthRef} /></div>
-        <div className="relative"><canvas ref={durRef} /></div>
+        <div className="relative"><AccessibleCanvas ref={depthRef} description={depthDescription} /></div>
+        <div className="relative"><AccessibleCanvas ref={durRef} description={durDescription} /></div>
       </div>
 
       <AnalysisGuide title="ドローダウン分布の詳細理論">

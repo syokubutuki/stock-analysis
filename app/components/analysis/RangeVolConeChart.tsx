@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { rangeVolCone } from "../../lib/vol-cone-range";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -31,6 +32,13 @@ export default function RangeVolConeChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rows = useMemo(() => rangeVolCone(prices), [prices]);
   const latest = rows.length ? rows[Math.min(2, rows.length - 1)] : null;
+
+  const chartDescription = useMemo(() => {
+    if (rows.length < 2) return "レンジ・ボラコーン。計算できるデータが不足しています。";
+    const last = rows[rows.length - 1];
+    const hot = rows.reduce((a, b) => (b.pctile > a.pctile ? b : a));
+    return `窓長${rows[0].window}日から${last.window}日までのボラの分位帯（中央値・25〜75%・最小最大）に、現在値を点で重ねたコーン。現在値のパーセンタイルが最も高いのは${hot.window}日窓の${(hot.pctile * 100).toFixed(0)}%（現在${(hot.current * 100).toFixed(1)}%・中央値${(hot.median * 100).toFixed(1)}%）です。`;
+  }, [rows]);
 
   useEffect(() => {
     if (!canvasRef.current || rows.length < 2) return;
@@ -83,7 +91,7 @@ export default function RangeVolConeChart({ prices }: Props) {
         </div>
       )}
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
       <div className="text-xs text-gray-500">● 現在値（緑=割安/橙=中庸/赤=割高）／ 青線=中央値 / 帯=25-75% / 点線=最小・最大</div>
 
       <AnalysisGuide title="ボラコーンの詳細理論">

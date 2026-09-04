@@ -7,6 +7,7 @@ import {
   lagScatterHeatmap, copulaScatter, mutualInfoByLag, scatterMatrix,
 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -55,6 +56,33 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
   const scatterPairs = useMemo(() => scatterMatrix(lr, times, volumes), [prices, seriesMode]);
 
   // 16. ラグ散布ヒートマップ
+  const heatmapDescription = useMemo(() => {
+    if (heatmap.data.length < 1) return "ラグ散布ヒートマップ。計算できるデータが不足しています。";
+    const peak = heatmap.data.reduce((a, b) => (b.count > a.count ? b : a));
+    const nb = Math.max(1, Math.round(Math.sqrt(heatmap.data.length)));
+    const at = (i: number) => heatmap.minVal + ((i + 0.5) / nb) * (heatmap.maxVal - heatmap.minVal);
+    return `r[t-1]（横軸）とr[t]（縦軸）の同時密度をセルの色で表したヒートマップ（値域${(heatmap.minVal * 100).toFixed(2)}%〜${(heatmap.maxVal * 100).toFixed(2)}%）。最も濃いセルは約(${(at(peak.xIdx) * 100).toFixed(2)}%, ${(at(peak.yIdx) * 100).toFixed(2)}%)の${peak.count}件で、原点付近に集まるほど無相関です。`;
+  }, [heatmap]);
+
+  const copulaDescription = useMemo(() => {
+    if (copula.length < 5) return "コピュラ散布図。計算できるデータが不足しています。";
+    const bothLo = copula.filter((p) => p.u < 0.1 && p.v < 0.1).length;
+    const bothHi = copula.filter((p) => p.u > 0.9 && p.v > 0.9).length;
+    return `順位変換した(u,v)平面の散布図（${copula.length}点）。左下すみ（両方が下位10%）に${bothLo}点、右上すみ（両方が上位10%）に${bothHi}点あり、独立ならどちらも約${(copula.length * 0.01).toFixed(0)}点になります。`;
+  }, [copula]);
+
+  const miDescription = useMemo(() => {
+    if (miLag.length < 2) return "相互情報量とACF²の比較。計算できるデータが不足しています。";
+    const top = miLag.reduce((a, b) => (b.mi > a.mi ? b : a));
+    return `ラグごとの相互情報量MI（非線形も拾う）とACF²（線形のみ）を並べた図（ラグ1〜${miLag.length}）。MIが最大なのはラグ${top.lag}の${top.mi.toFixed(4)}で、同じラグのACF²は${top.acfAbs.toFixed(4)}です。`;
+  }, [miLag]);
+
+  const scatterDescription = useMemo(() => {
+    if (scatterPairs.length === 0) return "散布図行列。計算できるデータが不足しています。";
+    const top = scatterPairs.reduce((a, b) => (Math.abs(b.correlation) > Math.abs(a.correlation) ? b : a));
+    return `${scatterPairs.length}組の散布図を並べた行列。相関が最も強い組は${top.labelX}と${top.labelY}の${top.correlation.toFixed(3)}です。`;
+  }, [scatterPairs]);
+
   useEffect(() => {
     if (!heatmapRef.current || heatmap.data.length < 1) return;
     const r = initCanvas(heatmapRef.current, 300); if (!r) return;
@@ -288,26 +316,26 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
       {/* ラグ散布ヒートマップ */}
       <div>
         <div className="text-xs text-gray-500 mb-1">ラグ散布図ヒートマップ: r[t] vs r[t-1] の同時密度</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={heatmapRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={heatmapRef} description={heatmapDescription} /></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* コピュラ散布図 */}
         <div>
           <div className="text-xs text-gray-500 mb-1">コピュラ散布図 (順位変換後、赤=テール領域)</div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={copulaRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={copulaRef} description={copulaDescription} /></div>
         </div>
         {/* 相互情報量ラグプロット */}
         <div>
           <div className="text-xs text-gray-500 mb-1">相互情報量 vs ACF² (非線形依存の検出)</div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={miRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={miRef} description={miDescription} /></div>
         </div>
       </div>
 
       {/* 散布図行列 */}
       <div>
         <div className="text-xs text-gray-500 mb-1">散布図行列 (線形/非線形依存の可視化)</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={scatterRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={scatterRef} description={scatterDescription} /></div>
       </div>
 
       <AnalysisGuide title="ラグ構造・非線形依存性分析の詳細理論">

@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeGarchVar } from "../../lib/simulation";
 import GuideEntryPanel from "./GuideEntryPanel";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -25,6 +26,11 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function GarchVarChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computeGarchVar(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.dates.length === 0) return "GARCH VaRのバックテスト。計算できるデータが不足しています。";
+    return `日次リターンにGARCHの95%・99%VaR予測線を重ね、突破した日を点で示した図（${result.dates.length}日）。95%VaRの突破は${result.violations95}回（期待${result.expectedViolations95.toFixed(1)}回、Kupiec p=${result.kupiecTest95.pValue.toFixed(3)}で${result.kupiecTest95.pass ? "合格" : "不合格"}）、99%は${result.violations99}回（期待${result.expectedViolations99.toFixed(1)}回、p=${result.kupiecTest99.pValue.toFixed(3)}）です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || result.dates.length === 0) return;
@@ -136,7 +142,7 @@ export default function GarchVarChart({ prices }: Props) {
         <h3 className="font-bold text-gray-800">GARCH VaR予測 — リスク損失の限界線</h3>
         <p className="text-xs text-gray-500 mt-0.5">条件付き異分散モデルによるテールリスクの動的推定とバックテスト検証</p>
       </div>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       {/* 総合判定サマリー */}
       <div className={`p-3 rounded border ${summaryBg} flex items-start gap-2`}>

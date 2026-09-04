@@ -9,6 +9,7 @@ import {
   analyzeTails, ppPlot, ksTest, adTest,
 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -57,6 +58,34 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
   }, [lr, m]);
 
   // 1. CDF比較プロット
+  const cdfDescription = useMemo(() => {
+    if (cdfData.length < 2) return "経験的CDFと正規CDFの比較。計算できるデータが不足しています。";
+    return `経験的CDFと正規分布のCDFを重ねた図（${cdfData.length}点）。最大乖離はKS統計量D=${ks.D.toFixed(4)}（p=${ks.pValue.toFixed(4)}）で、位置は${(ks.maxDeviationAt * 100).toFixed(2)}%付近。Anderson-Darlingは A²*=${ad.A2star.toFixed(3)}（p=${ad.pValue.toFixed(4)}）です。`;
+  }, [cdfData, ks, ad]);
+
+  const kdeDescription = useMemo(() => {
+    if (kdeData.length < 2) return "カーネル密度推定。計算できるデータが不足しています。";
+    const peak = kdeData.reduce((a, b) => (b.density > a.density ? b : a));
+    return `カーネル密度推定に正規分布とt分布フィットを重ねた図。密度のピークは${(peak.x * 100).toFixed(2)}%付近で、t分布フィットの自由度νは${isFinite(tFit.nu) ? tFit.nu.toFixed(1) : "∞"}（νが小さいほど裾が厚い）です。`;
+  }, [kdeData, tFit]);
+
+  const logHistDescription = useMemo(() => {
+    if (lr.length < 10) return "対数スケール密度。計算できるデータが不足しています。";
+    return `密度を対数スケールで描き、裾の部分を拡大した図（${lr.length}点）。正規分布なら放物線になり、直線に近いほど指数的な裾（＝厚い裾）を表します。標準偏差は${(s * 100).toFixed(3)}%です。`;
+  }, [lr, s]);
+
+  const ppDescription = useMemo(() => {
+    if (pp.length < 5) return "P-Pプロット。計算できるデータが不足しています。";
+    const worst = pp.reduce((a, b) => (Math.abs(b.empirical - b.theoretical) > Math.abs(a.empirical - a.theoretical) ? b : a));
+    return `正規分布に対するP-Pプロット（${pp.length}点）。対角線からの最大乖離は理論${worst.theoretical.toFixed(3)}に対し実測${worst.empirical.toFixed(3)}で、差は${(worst.empirical - worst.theoretical).toFixed(3)}です。`;
+  }, [pp]);
+
+  const tailDescription = useMemo(() => {
+    if (lr.length < 20) return "上側・下側テールの比較。計算できるデータが不足しています。";
+    const u = tails.upper, d = tails.lower;
+    return `上側テールと下側テールのヒストグラムを重ねた図。上側は${u.n}件で条件付き期待値${(u.conditionalMean * 100).toFixed(3)}%・最大${(u.max * 100).toFixed(2)}%、下側は${d.n}件で${(d.conditionalMean * 100).toFixed(3)}%・最大${(d.max * 100).toFixed(2)}%です。`;
+  }, [lr, tails]);
+
   useEffect(() => {
     if (!cdfRef.current || cdfData.length < 2) return;
     const r = initCanvas(cdfRef.current, 220); if (!r) return;
@@ -383,32 +412,32 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
       {/* CDF比較 */}
       <div>
         <div className="text-xs text-gray-500 mb-1">経験的CDF vs 正規CDF (黄色=KS最大乖離点)</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={cdfRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={cdfRef} description={cdfDescription} /></div>
       </div>
 
       {/* KDE + t分布 + 正規分布 */}
       <div>
         <div className="text-xs text-gray-500 mb-1">カーネル密度推定 (KDE) vs 正規分布 vs t分布フィット</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={kdeRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={kdeRef} description={kdeDescription} /></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 対数スケールヒストグラム */}
         <div>
           <div className="text-xs text-gray-500 mb-1">対数スケール密度 (テール部分の拡大)</div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={logHistRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={logHistRef} description={logHistDescription} /></div>
         </div>
         {/* PPプロット */}
         <div>
           <div className="text-xs text-gray-500 mb-1">P-Pプロット (確率-確率プロット)</div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={ppRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={ppRef} description={ppDescription} /></div>
         </div>
       </div>
 
       {/* テール分析 */}
       <div>
         <div className="text-xs text-gray-500 mb-1">上側/下側テール個別分析</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={tailRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={tailRef} description={tailDescription} /></div>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="p-2 bg-green-50 rounded">

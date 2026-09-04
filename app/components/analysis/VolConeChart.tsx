@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolCone } from "../../lib/cornish-fisher";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -23,6 +24,13 @@ export default function VolConeChart({ prices }: Props) {
   }, [prices]);
 
   const cone = useMemo(() => computeVolCone(returns), [returns]);
+
+  const chartDescription = useMemo(() => {
+    if (cone.windows.length === 0) return "ボラティリティ・コーン。計算できるデータが不足しています。";
+    let hot = 0;
+    for (let i = 1; i < cone.currentPercentile.length; i++) if (cone.currentPercentile[i] > cone.currentPercentile[hot]) hot = i;
+    return `窓長${cone.windows[0]}日から${cone.windows[cone.windows.length - 1]}日までの年率ボラの分位帯（p10/p25/p50/p75/p90）に現在値を重ねたコーン。現在値のパーセンタイルが最も高いのは${cone.windows[hot]}日窓の${(cone.currentPercentile[hot] * 100).toFixed(0)}%（現在${(cone.currentVol[hot] * 100).toFixed(1)}%・中央値${(cone.percentiles[hot].p50 * 100).toFixed(1)}%）です。`;
+  }, [cone]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -172,7 +180,7 @@ export default function VolConeChart({ prices }: Props) {
 
       <div className="text-xs text-gray-600 mb-3">{cone.interpretation}</div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       <AnalysisGuide title="ボラティリティ・コーンの詳細理論">
         <p className="font-medium text-gray-700">1. ボラティリティ・コーンとは</p>

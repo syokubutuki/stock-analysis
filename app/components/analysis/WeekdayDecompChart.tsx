@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { decomposeByWeekday } from "../../lib/overnight-intraday";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { countRoundTrips } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
@@ -65,6 +66,13 @@ export default function WeekdayDecompChart({ prices }: Props) {
   }, [prices, seg, stratDow]);
   const spreadRT = useMemo(() => (prices.length === 0 ? 0 : representativeSpread(prices)), [prices]);
 
+  const chartDescription = useMemo(() => {
+    if (rows.length === 0) return "曜日別の夜間・日中分解。計算できるデータが不足しています。";
+    const on = rows.reduce((a, b) => (b.cumOvernight > a.cumOvernight ? b : a));
+    const id = rows.reduce((a, b) => (b.cumIntraday > a.cumIntraday ? b : a));
+    return `曜日別に、夜間（前日終値→当日始値）と日中（当日始値→終値）の累積リターンを分けて並べた図。夜間の累積が最も大きいのは${on.label}曜の${(on.cumOvernight * 100).toFixed(1)}%、日中は${id.label}曜の${(id.cumIntraday * 100).toFixed(1)}%です。`;
+  }, [rows]);
+
   useEffect(() => {
     if (!canvasRef.current || rows.length === 0) return;
     const init = initCanvas(canvasRef.current, 240);
@@ -119,7 +127,7 @@ export default function WeekdayDecompChart({ prices }: Props) {
         </div>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       {/* 曜日×区間の戦略を B&H と比較（選択日1日＝1往復でコストを実額控除） */}
       {decompStrategy.strategyDaily.length > 0 && (

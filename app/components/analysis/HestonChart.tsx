@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { fitHeston, simulateHeston } from "../../lib/heston";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -30,6 +31,19 @@ export default function HestonChart({ prices }: Props) {
   }, [returns, prices]);
 
   // Price fan chart
+  const priceDescription = useMemo(() => {
+    const p = result.percentiles;
+    if (p.p50.length === 0) return "Hestonモデルの価格予測ファンチャート。計算できるデータが不足しています。";
+    const i = p.p50.length - 1;
+    return `Hestonモデルで${p.p50.length}日先まで${result.paths.length}本シミュレートした価格のファンチャート。最終日の中央値は${p.p50[i].toFixed(1)}、5〜95%は${p.p5[i].toFixed(1)}から${p.p95[i].toFixed(1)}です。`;
+  }, [result]);
+
+  const volDescription = useMemo(() => {
+    if (result.paths.length === 0) return "Hestonモデルのボラ経路。計算できるデータが不足しています。";
+    const pr = result.params;
+    return `シミュレートしたボラティリティ経路${result.paths.length}本。平均回帰速度κ=${pr.kappa.toFixed(3)}・長期水準θ=${pr.theta.toFixed(4)}・ボラのボラξ=${pr.xi.toFixed(3)}・相関ρ=${pr.rho.toFixed(2)}で、ボラの半減期は${result.halfLifeVol.toFixed(1)}日、Feller条件は${result.fellerCondition ? "満たしています" : "満たしていません"}。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = priceCanvasRef.current;
     if (!canvas) return;
@@ -146,9 +160,9 @@ export default function HestonChart({ prices }: Props) {
 
       <div className="text-xs text-gray-600 mb-3">{result.interpretation}</div>
 
-      <canvas ref={priceCanvasRef} />
+      <AccessibleCanvas ref={priceCanvasRef} description={priceDescription} />
       <div className="mt-2">
-        <canvas ref={volCanvasRef} />
+        <AccessibleCanvas ref={volCanvasRef} description={volDescription} />
       </div>
 
       <AnalysisGuide title="Hestonモデルの詳細理論">

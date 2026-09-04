@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { computeVolTermStructure, type VolTermPoint } from "../../lib/cross-analysis";
 
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -95,6 +96,13 @@ export default function VolTermStructureChart({ prices }: Props) {
   }, [volData]);
 
   // Ratio chart (canvas)
+  const ratioDescription = useMemo(() => {
+    if (volData.length === 0) return "ボラの期間構造の比率。計算できるデータが不足しています。";
+    const last = volData[volData.length - 1];
+    const inverted = volData.filter((d) => d.ratio_5_20 > 1).length;
+    return `短期/中期（5日÷20日）と中期/長期（20日÷60日）のボラ比率の時系列（${volData.length}点）。直近${last.time}は5/20が${last.ratio_5_20.toFixed(2)}、20/60が${last.ratio_20_60.toFixed(2)}で、1を超える（＝短期のほうが荒い＝逆転）日は全体の${((inverted / volData.length) * 100).toFixed(0)}%です。`;
+  }, [volData]);
+
   useEffect(() => {
     if (!ratioCanvasRef.current || volData.length === 0) return;
     const canvasH = 200;
@@ -205,7 +213,7 @@ export default function VolTermStructureChart({ prices }: Props) {
         <>
           <div ref={volChartRef} />
           <div className="relative">
-            <canvas ref={ratioCanvasRef} />
+            <AccessibleCanvas ref={ratioCanvasRef} description={ratioDescription} />
           </div>
 
           {/* 現在の状態 */}

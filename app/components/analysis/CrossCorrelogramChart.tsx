@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { crossCorrelogram } from "../../lib/distribution-extended";
 import { confidenceBound } from "../../lib/autocorrelation";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -45,6 +46,14 @@ export default function CrossCorrelogramChart({ prices }: Props) {
 
   const ccf = useMemo(() => crossCorrelogram(overnight, intraday, 20), [overnight, intraday]);
   const bound = confidenceBound(n);
+
+  const ccfDescription = useMemo(() => {
+    if (ccf.length < 2) return "夜間と日中のクロスコレログラム。標本が不足しています。";
+    const top = ccf.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
+    const bound = confidenceBound(n);
+    const lead = top.lag < 0 ? "日中が先行" : top.lag > 0 ? "夜間が先行" : "同時点";
+    return `夜間リターンと日中リターンの相互相関をラグ${ccf[0].lag}から${ccf[ccf.length - 1].lag}まで棒で並べた図（n=${n}）。相関が最も強いのはラグ${top.lag}（${lead}）の${top.value.toFixed(3)}で、95%信頼帯±${bound.toFixed(3)}を${Math.abs(top.value) > bound ? "超えています" : "超えていません"}。`;
+  }, [ccf, n]);
 
   useEffect(() => {
     if (!chartRef.current || ccf.length < 2) return;
@@ -136,7 +145,7 @@ export default function CrossCorrelogramChart({ prices }: Props) {
         </div>
       </div>
 
-      <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={chartRef} /></div>
+      <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={chartRef} description={ccfDescription} /></div>
 
       <AnalysisGuide title="クロスコレログラムの詳細理論">
         <p className="font-medium text-gray-700">クロスコレログラム (CCF) の定義</p>

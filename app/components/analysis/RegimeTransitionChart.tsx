@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeRegimeTransition } from "../../lib/regime-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -31,6 +32,21 @@ export default function RegimeTransitionChart({ prices }: Props) {
   const result = useMemo(() => computeRegimeTransition(prices), [prices]);
 
   // Transition matrix heatmap
+  const matrixDescription = useMemo(() => {
+    const m = result.overallMatrix;
+    if (m.length === 0) return "レジーム遷移行列。計算できるデータが不足しています。";
+    const stay = m.map((row, i) => row[i]);
+    let si = 0;
+    for (let i = 1; i < stay.length; i++) if (stay[i] > stay[si]) si = i;
+    return `レジーム${m.length}区分の遷移確率行列（縦=いまの状態、横=次の状態）。自分に留まる確率が最も高いのは状態${si + 1}の${(stay[si] * 100).toFixed(0)}%で、平均継続日数は${result.avgDuration.map((d) => d.toFixed(1)).join(" / ")}日です。`;
+  }, [result]);
+
+  const timeDescription = useMemo(() => {
+    if (result.rollingMatrix.length === 0) return "遷移確率の時系列。計算できるデータが不足しています。";
+    const first = result.rollingMatrix[0], last = result.rollingMatrix[result.rollingMatrix.length - 1];
+    return `ローリング窓で推定した遷移確率の時系列（${first.date}から${last.date}の${result.rollingMatrix.length}点）。線が上下するほどレジームの粘りが時期で変わっていることを表します。`;
+  }, [result]);
+
   useEffect(() => {
     if (!matrixRef.current || result.overallMatrix.length === 0) return;
     const H = 220;
@@ -153,8 +169,8 @@ export default function RegimeTransitionChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">レジーム遷移分析</h3>
-      <div className="relative"><canvas ref={matrixRef} /></div>
-      <div className="relative"><canvas ref={timeRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={matrixRef} description={matrixDescription} /></div>
+      <div className="relative"><AccessibleCanvas ref={timeRef} description={timeDescription} /></div>
 
       <div className="p-3 bg-blue-50 rounded text-xs text-gray-700">
         <div className="font-medium text-blue-800 mb-1">遷移構造の判定</div>

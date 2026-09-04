@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeInfoRatio } from "../../lib/predictability";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; seriesMode?: string; }
@@ -25,6 +26,13 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function InfoRatioDashboard({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const items = useMemo(() => computeInfoRatio(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (items.length === 0) return "指標の予測情報量ランキング。標本が不足しています。";
+    const top = items[0];
+    const last = items[items.length - 1];
+    return `${items.length}個の指標が翌日リターンについて持つ相互情報量MIを横棒で並べたランキング。首位は${top.indicator}のMI=${top.mi.toFixed(4)}（相関${top.correlation.toFixed(3)}）、最下位は${last.indicator}のMI=${last.mi.toFixed(4)}です。`;
+  }, [items]);
 
   useEffect(() => {
     if (!canvasRef.current || items.length === 0) return;
@@ -85,7 +93,7 @@ export default function InfoRatioDashboard({ prices }: Props) {
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">情報比率ダッシュボード</h3>
       <p className="text-xs text-gray-500">各指標が翌日リターンについて持つ予測情報量 (相互情報量 MI) のランキング。</p>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className="p-3 bg-blue-50 rounded text-xs text-gray-700">
         <div className="font-medium text-blue-800 mb-1">最も情報量の多い指標</div>
