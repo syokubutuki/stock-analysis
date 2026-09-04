@@ -6,7 +6,7 @@ import { TpSlResult } from "../../lib/tp-sl-optimizer";
 import type { TpSlWorkerRequest, TpSlWorkerResponse } from "../../lib/tp-sl-optimizer.worker";
 import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
-import { CHART_COLORS } from "../../lib/chart-colors";
+import { CHART_COLORS, DIRECTION_COLORS, DIRECTION_TEXT_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -90,14 +90,15 @@ function drawMfeMae(ctx: CanvasRenderingContext2D, width: number, height: number
     r.mfeMae.forEach((p, i) => ctx[i === 0 ? "moveTo" : "lineTo"](xOf(i), yOf(p[key])));
     ctx.stroke();
   };
-  line("meanMFE", "#16a34a", []);
-  line("meanMAE", "#dc2626", [6, 4]);
+  line("meanMFE", DIRECTION_COLORS.up, []);
+  line("meanMAE", DIRECTION_COLORS.down, [6, 4]);
   ctx.setLineDash([]);
   ctx.font = "9px sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = CHART_COLORS.ink;
   for (let i = 0; i < n; i += Math.max(1, Math.round(n / 6))) ctx.fillText(`${r.mfeMae[i].hold}d`, xOf(i), mt + plotH + 14);
   ctx.textAlign = "left";
-  ctx.fillStyle = "#16a34a"; ctx.fillText("━ MFE（実線）", ml + 4, mt + 10);
-  ctx.fillStyle = "#dc2626"; ctx.fillText("┄ MAE（破線）", ml + 86, mt + 10);
+  // 凡例は文字なので、図形用の DIRECTION_COLORS ではなく AA を満たす文字用を使う
+  ctx.fillStyle = DIRECTION_TEXT_COLORS.up; ctx.fillText("━ MFE（実線）", ml + 4, mt + 10);
+  ctx.fillStyle = DIRECTION_TEXT_COLORS.down; ctx.fillText("┄ MAE（破線）", ml + 86, mt + 10);
 }
 
 export default function TpSlOptimizerChart({ prices }: Props) {

@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computePersistentHomology, fisherRaoDistance } from "../../lib/tda";
 import AnalysisGuide from "./AnalysisGuide";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -68,12 +69,12 @@ export default function TDAChart({ prices, seriesMode }: Props) {
       ctx.fill();
     }
 
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Persistence Diagram", size / 2, 12);
     ctx.font = "9px sans-serif";
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = CHART_COLORS.axis;
     ctx.fillText("birth", size / 2, size - 5);
     ctx.save();
     ctx.translate(10, margin.top + plotH / 2);
@@ -84,13 +85,13 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     // Legend
     ctx.fillStyle = "#3b82f6";
     ctx.fillRect(margin.left + 5, margin.top + 5, 8, 8);
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("H₀ (成分)", margin.left + 16, margin.top + 13);
     ctx.fillStyle = "#ef4444";
     ctx.fillRect(margin.left + 5, margin.top + 18, 8, 8);
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText("H₁ (ループ)", margin.left + 16, margin.top + 26);
   }, [tda]);
 
@@ -143,19 +144,19 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Betti Curves", width / 2, 12);
     ctx.font = "9px sans-serif";
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = CHART_COLORS.axis;
     ctx.fillText("ε (threshold)", width / 2, height - 5);
 
     // Legend
     ctx.strokeStyle = "#3b82f6";
     ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(margin.left + 8, margin.top + 12); ctx.lineTo(margin.left + 24, margin.top + 12); ctx.stroke();
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.textAlign = "left";
     ctx.fillText("β₀（実線）", margin.left + 28, margin.top + 15);
     ctx.strokeStyle = "#ef4444";
