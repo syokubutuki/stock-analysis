@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -401,7 +401,7 @@ function OccurrenceTable({ occ, xLabel, yLabel }: { occ: Occurrence[]; xLabel: s
                 <td className="px-1.5 py-0.5 text-gray-600">{o.date.slice(0, 10)}</td>
                 <td className="px-1.5 text-right text-gray-500">{fmtPct(o.sigVal)}</td>
                 {yLabel && <td className="px-1.5 text-right text-gray-500">{fmtPct(o.yVal ?? 0)}</td>}
-                <td className={`px-1.5 text-right font-medium ${o.fwd >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={o.fwd} />{fmtPct(o.fwd)}</td>
+                <td className={`px-1.5 text-right font-medium ${directionClass(o.fwd)}`}><DirectionGlyph value={o.fwd} />{fmtPct(o.fwd)}</td>
               </tr>
             ))}
           </tbody>

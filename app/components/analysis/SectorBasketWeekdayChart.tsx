@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { groupByDay, buildBinGrid, IntradayBar } from "../../lib/intraday-core";
@@ -285,11 +285,11 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                       <tr key={s.ticker} className="border-b border-gray-100">
                         <td className="py-1 px-2 text-gray-700 font-medium" title={s.name}>{s.ticker}</td>
                         <td className="text-right px-2 text-gray-500">{s.nDays}</td>
-                        <td className={`text-right px-2 font-medium ${s.endMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={s.endMean} />{fmtSignedPct(s.endMean)}</td>
+                        <td className={`text-right px-2 font-medium ${directionClass(s.endMean)}`}><DirectionGlyph value={s.endMean} />{fmtSignedPct(s.endMean)}</td>
                         {pathResult.bins.map((b) => {
                           const v = s.perWeekday[b.weekday];
                           return (
-                            <td key={b.key} className={`text-right px-2 tabular-nums ${isNaN(v) ? "text-fg-muted" : v >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={v} />
+                            <td key={b.key} className={`text-right px-2 tabular-nums ${directionClass(v)}`}><DirectionGlyph value={v} />
                               {isNaN(v) ? "-" : fmtSignedPct(v, 1)}
                             </td>
                           );
@@ -379,7 +379,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
                           <td className="text-center px-2 font-medium text-gray-700 tabular-nums">{b.entryLabel}</td>
                           <td className="text-center px-2 font-medium text-gray-700 tabular-nums">{b.exitLabel}</td>
                           <td className="text-right px-2 text-gray-500">{fmtHold(b.holdBins, binMin)}</td>
-                          <td className={`text-right px-2 font-medium ${b.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.mean} />{fmtSignedPct(b.mean)}</td>
+                          <td className={`text-right px-2 font-medium ${directionClass(b.mean)}`}><DirectionGlyph value={b.mean} />{fmtSignedPct(b.mean)}</td>
                           <td className="px-2 text-gray-600 tabular-nums">
                             {w.ci ? (
                               <span title={`同符号率 ${(w.ci.stable * 100).toFixed(0)}%`}>

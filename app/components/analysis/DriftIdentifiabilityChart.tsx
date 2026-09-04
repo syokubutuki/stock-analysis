@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 個別銘柄のドリフトは同定できるか（μ の識別限界）── 系C26。
 //
@@ -41,7 +41,8 @@ const yearsFmt = (v: number) =>
 function Stat({
   label, value, tone, sub, directionValue,
 }: { label: string; value: string; tone?: "good" | "bad" | "neutral"; sub?: string; directionValue?: number }) {
-  const c = tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
+  const c = directionValue !== undefined ? directionClass(directionValue) : tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
   return (
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
@@ -418,7 +419,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                       <td className="text-right px-2 tabular-nums text-gray-500 whitespace-nowrap">
                         [{pct(r.ciMuLo, 0)}, {pct(r.ciMuHi, 0)}]
                       </td>
-                      <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-700" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${directionClass(r.excessMu)}`}>
                         <DirectionGlyph value={r.excessMu} />{pct(r.excessMu)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(r.tExcess)}</td>

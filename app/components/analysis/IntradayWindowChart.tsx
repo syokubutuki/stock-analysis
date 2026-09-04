@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -243,7 +243,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
                   <tr key={r.weekday} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium text-gray-700">{WD_NAMES[r.weekday]}曜</td>
                     <td className="text-right px-2 text-gray-600">{r.n}</td>
-                    <td className={`text-right px-2 font-medium ${r.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.mean} />{fmtSigned(r.mean)}</td>
+                    <td className={`text-right px-2 font-medium ${directionClass(r.mean)}`}><DirectionGlyph value={r.mean} />{fmtSigned(r.mean)}</td>
                     <td className="text-right px-2 text-gray-600">{fmtSigned(r.median)}</td>
                     <td className="px-2">
                       <div className="flex items-center gap-1">
@@ -332,7 +332,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
                           </td>
                           <td className="text-right px-2 text-gray-500 tabular-nums">{fmtSigned(b.loR, 2)}〜{fmtSigned(b.hiR, 2)}</td>
                           <td className="text-right px-2 text-gray-600">{b.n}</td>
-                          <td className={`text-right px-2 font-medium ${b.meanR >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.meanR} />{fmtSigned(b.meanR)}</td>
+                          <td className={`text-right px-2 font-medium ${directionClass(b.meanR)}`}><DirectionGlyph value={b.meanR} />{fmtSigned(b.meanR)}</td>
                           <td className="px-2 text-gray-600 tabular-nums">{b.firstDate}〜{b.lastDate}</td>
                           <td className="text-right px-2 text-gray-600 tabular-nums">{fmtYM(b.centroidMs)}</td>
                           <td className="px-2">

@@ -684,7 +684,7 @@ export default function CorrelationDragChart({
                         : "text-blue-700"
                   }
                 >
-                  <DirectionGlyph value={rhoCI.delta} />{rhoCI.delta >= 0 ? "+" : "−"}
+                  <DirectionGlyph value={rhoCI.delta} eps={rhoCI.crossesZero ? Infinity : 0} />{rhoCI.delta >= 0 ? "+" : "−"}
                   {Math.abs(rhoCI.delta).toFixed(3)}
                 </strong>
                 <span className="text-gray-500">
@@ -870,7 +870,7 @@ export default function CorrelationDragChart({
                                   }`}
                                 >
                                   {p.ci.ok ? (
-                                    <><DirectionGlyph value={p.ci.delta} />{`${p.ci.delta >= 0 ? "+" : "−"}${Math.abs(p.ci.delta).toFixed(3)}`}</>
+                                    <><DirectionGlyph value={p.ci.delta} eps={p.ci.ok ? 0 : Infinity} />{`${p.ci.delta >= 0 ? "+" : "−"}${Math.abs(p.ci.delta).toFixed(3)}`}</>
                                   ) : "—"}
                                 </td>
                                 <td className="py-1 px-2 text-right text-fg-muted">

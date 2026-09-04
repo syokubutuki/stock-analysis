@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // as-of スナップショット: 過去のある1日に戻り、その日の画面に出ていた判断を再現して、
 // その後に実際に起きたことと突き合わせる。
@@ -259,7 +259,7 @@ export default function AsOfSnapshotChart({ prices, ticker }: Props) {
                 return (
                   <tr key={h} className="border-b border-gray-100">
                     <td className="py-1 px-1.5 text-gray-600">{h}日後</td>
-                    <td className={`text-right px-1.5 font-mono font-semibold ${f.ret >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={f.ret} />{pct(f.ret)}</td>
+                    <td className={`text-right px-1.5 font-mono font-semibold ${directionClass(f.ret)}`}><DirectionGlyph value={f.ret} />{pct(f.ret)}</td>
                     <td className="text-center px-1.5">
                       {dirOk === null ? <span className="text-fg-muted">中立</span>
                         : dirOk ? <span className="text-green-700">○</span> : <span className="text-red-500">×</span>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -203,7 +203,7 @@ function diffCells(row: StrategyRow) {
   const sig = d.p < 0.05;
   return (
     <>
-      <td className={`py-1 px-2 text-right font-medium ${d.annualDiff >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+      <td className={`py-1 px-2 text-right font-medium ${directionClass(d.annualDiff)}`}>
                       <DirectionGlyph value={d.annualDiff} />{pct(d.annualDiff)}
       </td>
       <td className="py-1 px-2 text-right text-gray-500 whitespace-nowrap">

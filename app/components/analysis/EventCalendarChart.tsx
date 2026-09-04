@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -235,7 +235,7 @@ export default function EventCalendarChart({ prices }: Props) {
                       </td>
                       <td className="py-1 px-2 text-right text-gray-500">{b.n}</td>
                       <td className="py-1 px-2 text-right font-medium text-gray-900">{pct(b.meanFwd)}</td>
-                      <td className={`py-1 px-2 text-right ${excess >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={excess} />
+                      <td className={`py-1 px-2 text-right ${directionClass(excess)}`}><DirectionGlyph value={excess} />
                         {excess >= 0 ? "+" : ""}
                         {pct(excess)}
                       </td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
@@ -113,7 +113,7 @@ export default function SignalIntradayChart({ ticker }: Props) {
                   <tr key={rule.label} className="border-b border-gray-100">
                     <td className="py-1 font-medium">{rule.label}</td>
                     <td className="text-right">{rule.n}</td>
-                    <td className={`text-right ${rule.meanRetPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={rule.meanRetPct} />{fmtSignedPct(rule.meanRetPct / 100)}</td>
+                    <td className={`text-right ${directionClass(rule.meanRetPct)}`}><DirectionGlyph value={rule.meanRetPct} />{fmtSignedPct(rule.meanRetPct / 100)}</td>
                     <td className="text-right">{fmtPct(rule.winRate)}</td>
                   </tr>
                 ))}

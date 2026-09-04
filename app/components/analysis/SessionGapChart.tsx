@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -273,7 +273,7 @@ export default function SessionGapChart({ prices }: Props) {
                     <td className="py-1 pr-2 font-medium" style={{ color: CONTEXT_META[c.context].color }}>{CONTEXT_META[c.context].label}</td>
                     <td className="text-right px-2">{c.n}</td>
                     <td className="text-right px-2">{fmtPct(c.mean)}</td>
-                    <td className={`text-right px-2 font-medium ${c.diffVsNormal >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={c.diffVsNormal} />{fmtPct(c.diffVsNormal)}</td>
+                    <td className={`text-right px-2 font-medium ${directionClass(c.diffVsNormal)}`}><DirectionGlyph value={c.diffVsNormal} />{fmtPct(c.diffVsNormal)}</td>
                     <td className="text-right px-2">{(c.win * 100).toFixed(0)}%</td>
                     <td className="text-right px-2 text-gray-500">{fmtPct(c.ciLo)}〜{fmtPct(c.ciHi)}</td>
                     <td className="text-right px-2 text-gray-500">{(c.stable * 100).toFixed(0)}%</td>

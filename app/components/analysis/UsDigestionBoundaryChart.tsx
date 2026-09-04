@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -102,8 +102,8 @@ const RevRow = ({ label, rev }: { label: string; rev: ReversalSplit }) => (
   <div className={`p-2 rounded border text-xs ${rev.reversed ? "border-purple-200 bg-purple-50" : "border-gray-200 bg-gray-50"}`}>
     <div className="text-gray-500">{label}{rev.reversed && <span className="ml-1 text-purple-700 font-bold">反転あり</span>}</div>
     <div className="flex gap-3 mt-0.5">
-      <span>前 <span className={`font-medium ${rev.preMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={rev.preMean} />{fmtSignedPct(rev.preMean)}</span> <span className="text-fg-muted">p={rev.preP < 0.001 ? "<.001" : rev.preP.toFixed(3)}</span></span>
-      <span>後 <span className={`font-medium ${rev.postMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={rev.postMean} />{fmtSignedPct(rev.postMean)}</span> <span className="text-fg-muted">p={rev.postP < 0.001 ? "<.001" : rev.postP.toFixed(3)}</span></span>
+      <span>前 <span className={`font-medium ${directionClass(rev.preMean)}`}><DirectionGlyph value={rev.preMean} />{fmtSignedPct(rev.preMean)}</span> <span className="text-fg-muted">p={rev.preP < 0.001 ? "<.001" : rev.preP.toFixed(3)}</span></span>
+      <span>後 <span className={`font-medium ${directionClass(rev.postMean)}`}><DirectionGlyph value={rev.postMean} />{fmtSignedPct(rev.postMean)}</span> <span className="text-fg-muted">p={rev.postP < 0.001 ? "<.001" : rev.postP.toFixed(3)}</span></span>
     </div>
   </div>
 );

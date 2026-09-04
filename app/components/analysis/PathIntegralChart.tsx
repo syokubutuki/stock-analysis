@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
@@ -218,9 +218,7 @@ export default function PathIntegralChart({ prices }: Props) {
         <div className="p-2 bg-gray-50 rounded border">
           <div className="text-gray-500">上昇確率</div>
           <div
-            className={`font-mono font-bold ${
-              finalStats.upProb >= 0.5 ? "text-green-700" : "text-red-600"
-            }`}
+            className={`font-mono font-bold ${directionClass(finalStats.upProb - 0.5)}`}
           >
             <DirectionGlyph value={finalStats.upProb - 0.5} />{(finalStats.upProb * 100).toFixed(1)}%
           </div>
@@ -228,9 +226,7 @@ export default function PathIntegralChart({ prices }: Props) {
         <div className="p-2 bg-gray-50 rounded border">
           <div className="text-gray-500">期待リターン</div>
           <div
-            className={`font-mono font-bold ${
-              finalStats.mean >= 0 ? "text-green-700" : "text-red-600"
-            }`}
+            className={`font-mono font-bold ${directionClass(finalStats.mean)}`}
           >
             <DirectionGlyph value={finalStats.mean} />{(finalStats.mean * 100).toFixed(2)}%
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // as-of スコアカード: 過去の多数の時点で判断を再現し、型ごとに正しい採点則で採点する。
 //
@@ -377,7 +377,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                         <td className="text-right px-1.5 font-mono">{pctS(ps.obsRate)}</td>
                         <td className="text-right px-1.5 font-mono font-semibold">{fmt(ps.brier, 4)}</td>
                         <td className="text-right px-1.5 font-mono text-gray-500">{fmt(ps.brierClim, 4)}</td>
-                        <td className={`text-right px-1.5 font-mono font-semibold ${ps.bss > 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={ps.bss} />{fmt(ps.bss, 4)}</td>
+                        <td className={`text-right px-1.5 font-mono font-semibold ${directionClass(ps.bss)}`}><DirectionGlyph value={ps.bss} />{fmt(ps.bss, 4)}</td>
                         <td className="text-right px-1.5 font-mono text-gray-500">{fmt(ps.reliability, 4)}</td>
                         <td className="text-right px-1.5 font-mono text-gray-500">{fmt(ps.resolution, 4)}</td>
                       </tr>
@@ -527,7 +527,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                           const sig = isFinite(r.icLo) && (r.icLo > 0 || r.icHi < 0);
                           return (
                             <td key={i} className="text-center px-1.5 font-mono">
-                              <span className={sig ? (r.ic > 0 ? "text-green-700 font-semibold" : "text-red-600 font-semibold") : "text-gray-600"}><DirectionGlyph value={r.ic} />
+                              <span className={`${directionClass(r.ic, sig ? 0 : Infinity)}${sig ? " font-semibold" : ""}`}><DirectionGlyph value={r.ic} eps={sig ? 0 : Infinity} />
                                 {fmt(r.ic, 3)}
                               </span>
                               <span className="text-fg-muted text-[10px]"> ({fmt(r.icLo, 2)},{fmt(r.icHi, 2)})</span>
@@ -574,7 +574,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                       <td className="text-right px-1.5 font-mono text-gray-500">{fmt(e.volNon, 2)}%</td>
                       <td className="text-right px-1.5 font-mono">{fmt(e.tStat, 2)}</td>
                       <td className="text-right px-1.5 font-mono">{fmtP(e.p)}</td>
-                      <td className={`text-right px-1.5 font-mono ${e.retEvent >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={e.retEvent} />{fmt(e.retEvent, 2)}%</td>
+                      <td className={`text-right px-1.5 font-mono ${directionClass(e.retEvent)}`}><DirectionGlyph value={e.retEvent} />{fmt(e.retEvent, 2)}%</td>
                     </tr>
                   ))}
                 </tbody>

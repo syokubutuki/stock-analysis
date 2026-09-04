@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
@@ -33,7 +33,7 @@ function initCanvas(canvas: HTMLCanvasElement, height: number): { ctx: CanvasRen
 
 function pct(v: number, d = 3): string { return (v * 100).toFixed(d) + "%"; }
 function star(p: number): string { return p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : ""; }
-function colorCls(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorCls(v: number): string { return directionClass(v); }
 
 const SORT_LABELS: Record<InteractionSort, string> = {
   pAdj: "FDR補正p値",

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useCallback } from "react";
 import {
@@ -49,7 +49,7 @@ function quantile(sorted: number[], q: number): number {
   return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
 }
 function pctFmt(v: number, d = 4): string { return (v * 100).toFixed(d) + "%"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return directionClass(v); }
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
   const parent = canvas.parentElement;

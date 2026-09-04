@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 曜日トレード・シミュレータ（旧: SpiralHeatmap 内に埋没していた機能を独立コンポーネントへ移設）。
 // 任意の曜日×注文タイミング(始値/終値)×方向(買/売)の売買を編集し、複数レグを週内で1本に連結して
@@ -166,7 +166,7 @@ function hitTestTimingMatrix(width: number, x: number, y: number): { idx: number
 function pct(v: number): string { return (v * 100).toFixed(3) + "%"; }
 function pct2(v: number): string { return (v * 100).toFixed(2) + "%"; }
 function bpDay(v: number): string { return (v * 10000).toFixed(2) + "bp"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return directionClass(v); }
 function initCanvas(canvas: HTMLCanvasElement, height: number): { ctx: CanvasRenderingContext2D; width: number; height: number } | null {
   const parent = canvas.parentElement;
   if (!parent) return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
@@ -113,12 +113,12 @@ export default function SimpleBacktestChart({ prices }: Props) {
             {results.map((r, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 px-2 font-medium" style={{ color: STRAT_COLORS[i] }}>{r.strategy}</td>
-                <td className={`py-1 px-2 text-center font-mono ${r.totalReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={r.totalReturn} />{(r.totalReturn * 100).toFixed(1)}%</td>
-                <td className={`py-1 px-2 text-center font-mono ${r.annualReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={r.annualReturn} />{(r.annualReturn * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${directionClass(r.totalReturn)}`}><DirectionGlyph value={r.totalReturn} />{(r.totalReturn * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${directionClass(r.annualReturn)}`}><DirectionGlyph value={r.annualReturn} />{(r.annualReturn * 100).toFixed(1)}%</td>
                 <td className="py-1 px-2 text-center font-mono text-gray-600">{(r.annualVol * 100).toFixed(1)}%</td>
-                <td className={`py-1 px-2 text-center font-mono font-medium ${r.sharpe >= 0 ? "text-blue-600" : "text-red-600"}`}><DirectionGlyph value={r.sharpe} />{r.sharpe.toFixed(3)}</td>
+                <td className={`py-1 px-2 text-center font-mono font-medium ${directionClass(r.sharpe)}`}><DirectionGlyph value={r.sharpe} />{r.sharpe.toFixed(3)}</td>
                 <td className="py-1 px-2 text-center font-mono text-red-600">{(r.maxDrawdown * 100).toFixed(1)}%</td>
-                <td className={`py-1 px-2 text-center font-mono ${r.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={r.winRate - 0.5} />{(r.winRate * 100).toFixed(1)}%</td>
+                <td className={`py-1 px-2 text-center font-mono ${directionClass(r.winRate - 0.5)}`}><DirectionGlyph value={r.winRate - 0.5} />{(r.winRate * 100).toFixed(1)}%</td>
                 <td className="py-1 px-2 text-center font-mono text-gray-500">{r.nTrades}</td>
               </tr>
             ))}

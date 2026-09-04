@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import {
@@ -425,9 +425,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                     {r.label}
                   </td>
                   <td
-                    className={`p-1 text-right font-mono ${
-                      r.meanReturn >= 0 ? "text-green-700" : "text-red-600"
-                    }`}
+                    className={`p-1 text-right font-mono ${directionClass(r.meanReturn)}`}
                   >
                       <DirectionGlyph value={r.meanReturn} />{(r.meanReturn * 100).toFixed(1)}%
                   </td>

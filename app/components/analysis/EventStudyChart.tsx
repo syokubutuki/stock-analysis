@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -314,7 +314,7 @@ export default function EventStudyChart({ prices }: Props) {
           <span>中央値: <span className="font-mono">{pct(finalStat.median)}</span></span>
           <span>上昇確率: <span className="font-mono">{(finalStat.winRate * 100).toFixed(0)}%</span></span>
           <span>無条件平均: <span className="font-mono text-gray-500">{pct(baselineFinal)}</span></span>
-          <span>超過(エッジ): <span className={`font-mono font-medium ${edge > 0 ? "text-green-700" : edge < 0 ? "text-red-700" : ""}`}><DirectionGlyph value={edge} />{pct(edge)}</span></span>
+          <span>超過(エッジ): <span className={`font-mono font-medium ${directionClass(edge)}`}><DirectionGlyph value={edge} />{pct(edge)}</span></span>
         </div>
       )}
 
@@ -355,12 +355,12 @@ export default function EventStudyChart({ prices }: Props) {
                 return (
                   <tr key={s.k} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium text-gray-700">{s.k}日後</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.mean >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.mean} />{pct(s.mean)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.median >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.median} />{pct(s.median)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${directionClass(s.mean)}`}><DirectionGlyph value={s.mean} />{pct(s.mean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${directionClass(s.median)}`}><DirectionGlyph value={s.median} />{pct(s.median)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{(s.std * 100).toFixed(2)}%</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.winRate - 0.5} />{(s.winRate * 100).toFixed(0)}%</td>
+                    <td className={`py-1 px-2 text-center font-mono ${directionClass(s.winRate - 0.5)}`}><DirectionGlyph value={s.winRate - 0.5} />{(s.winRate * 100).toFixed(0)}%</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{pct(base)}</td>
-                    <td className={`py-1 px-2 text-center font-mono font-medium ${ex > 0 ? "text-green-700" : ex < 0 ? "text-red-700" : ""}`}><DirectionGlyph value={ex} />{pct(ex)}</td>
+                    <td className={`py-1 px-2 text-center font-mono font-medium ${directionClass(ex)}`}><DirectionGlyph value={ex} />{pct(ex)}</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">{s.n}</td>
                   </tr>
                 );

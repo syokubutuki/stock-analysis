@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
@@ -220,7 +220,7 @@ export default function SymbolicInfoFlowChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">Net(Vol→Price)</div>
-          <div className={`font-mono font-medium ${teVolPrice > tePriceVol ? "text-green-700" : "text-red-600"}`}>
+          <div className={`font-mono font-medium ${directionClass(teVolPrice - tePriceVol)}`}>
             <DirectionGlyph value={teVolPrice - tePriceVol} />{(teVolPrice - tePriceVol).toFixed(4)}
           </div>
         </div>

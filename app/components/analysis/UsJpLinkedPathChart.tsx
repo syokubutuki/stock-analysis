@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 前夜米国の「日中経路」→ 当日日本の「日内経路」を連結して見る。
 //
@@ -272,8 +272,8 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
                       </td>
                       <td className="text-right px-2 text-gray-600">{s.n}</td>
                       <td className="px-2 text-gray-500 text-[11px]">{g.desc}</td>
-                      <td className={`text-right px-2 tabular-nums ${result.gapMeans[i] >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.gapMeans[i]} />{fmtSignedPct(result.gapMeans[i])}</td>
-                      <td className={`text-right px-2 font-medium tabular-nums ${s.endMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={s.endMean} />{fmtSignedPct(s.endMean)}</td>
+                      <td className={`text-right px-2 tabular-nums ${directionClass(result.gapMeans[i])}`}><DirectionGlyph value={result.gapMeans[i]} />{fmtSignedPct(result.gapMeans[i])}</td>
+                      <td className={`text-right px-2 font-medium tabular-nums ${directionClass(s.endMean)}`}><DirectionGlyph value={s.endMean} />{fmtSignedPct(s.endMean)}</td>
                       <td className="text-center px-2 text-gray-600">{result.jpLabels[s.peakIdx] ?? "-"}</td>
                       <td className="px-2"><StatBadge n={s.n} p={s.endP} significant={s.endP < 0.05} /></td>
                     </tr>

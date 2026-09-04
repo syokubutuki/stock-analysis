@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -141,7 +141,7 @@ export default function HistoricalAnalogChart({ prices }: Props) {
                 <tr key={nb.endIndex} className="border-b border-gray-100">
                   <td className="py-1 px-2 text-gray-700">{nb.endTime}</td>
                   <td className="text-right px-2 text-gray-500">{nb.distance.toFixed(2)}</td>
-                  <td className={`text-right px-2 font-medium ${nb.futureReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={nb.futureReturn} />
+                  <td className={`text-right px-2 font-medium ${directionClass(nb.futureReturn)}`}><DirectionGlyph value={nb.futureReturn} />
                     {nb.futureReturn >= 0 ? "+" : ""}{(nb.futureReturn * 100).toFixed(1)}%
                   </td>
                 </tr>

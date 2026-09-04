@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
@@ -39,7 +39,7 @@ function star(p: number | null): string {
   if (p === null) return "";
   return p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "";
 }
-function colorCls(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorCls(v: number): string { return directionClass(v); }
 
 const SORT_LABELS: Record<ScanSort, string> = {
   pAdj: "FDR補正p値",

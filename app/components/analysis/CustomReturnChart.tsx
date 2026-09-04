@@ -13,7 +13,7 @@ import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStra
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 import { CHART_COLORS } from "../../lib/chart-colors";
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -551,7 +551,8 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
 }
 
 function StatCell({ label, value, positive, negative, directionValue }: { label: string; value: string; positive?: boolean; negative?: boolean; directionValue?: number }) {
-  const color = positive ? "text-green-700" : negative ? "text-red-600" : "";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ positive/negative を使う
+  const color = directionValue !== undefined ? directionClass(directionValue) : positive ? "text-green-700" : negative ? "text-red-600" : "";
   return (
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>

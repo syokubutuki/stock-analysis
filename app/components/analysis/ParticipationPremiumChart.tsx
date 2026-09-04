@@ -23,7 +23,7 @@ import {
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 市場代理プリセット。1321=日経225連動ETF（分配金込みadjClose→総収益の床・データ良好）。
@@ -56,8 +56,10 @@ function Stat({
   sub?: string;
   directionValue?: number;
 }) {
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
   const c =
-    tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
+    directionValue !== undefined ? directionClass(directionValue)
+      : tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
   return (
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -1277,7 +1277,7 @@ export default function WeeklyPhaseAttractorChart({ prices, seriesMode }: Props)
                           {l}
                         </td>
                         <td className="py-1 px-2">{kmResult.counts[k]}</td>
-                        <td className={`py-1 px-2 font-mono ${kmResult.drift[k] >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={kmResult.drift[k]} />
+                        <td className={`py-1 px-2 font-mono ${directionClass(kmResult.drift[k])}`}><DirectionGlyph value={kmResult.drift[k]} />
                           {(kmResult.drift[k] * 100).toFixed(3)}%
                         </td>
                         <td className={`py-1 px-2 font-mono ${k === kmResult.highVolPhase ? "text-red-600 font-bold" : k === kmResult.lowVolPhase ? "text-blue-600" : ""}`}>

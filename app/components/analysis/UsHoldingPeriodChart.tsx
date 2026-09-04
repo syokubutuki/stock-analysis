@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BinScheme } from "../../lib/us-spillover-core";
@@ -201,7 +201,7 @@ export default function UsHoldingPeriodChart({ ticker }: Props) {
                   <tr key={h.dt} className={`border-b border-gray-100 ${best && h.dt === best.dt ? "bg-indigo-50" : ""}`}>
                     <td className="py-1 px-2 font-mono text-gray-700">{h.label}</td>
                     <td className="text-right px-2 text-gray-500">{h.dt}本</td>
-                    <td className={`text-right px-2 font-medium ${h.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={h.mean} />{fmtSignedPct(h.mean)}</td>
+                    <td className={`text-right px-2 font-medium ${directionClass(h.mean)}`}><DirectionGlyph value={h.mean} />{fmtSignedPct(h.mean)}</td>
                     <td className="text-right px-2 font-mono text-gray-700">{h.ir.toFixed(2)}</td>
                     <td className="text-right px-2 text-gray-600">{h.n}</td>
                     <td className="px-2"><StatBadge n={h.n} p={h.p} significant={h.p < 0.05} /></td>

@@ -6,7 +6,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { conditionalForwardReturns, buildStateFn, STATE_AXES, StateAxis } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
-import { CHART_COLORS } from "../../lib/chart-colors";
+import { CHART_COLORS, directionOf } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
 
@@ -75,6 +75,13 @@ export default function PersistenceChart({ prices }: Props) {
 
   if (prices.length < 600 || !data) return null;
 
+  // 色・記号・語句を1つの判定から出す（FU36）。相関は 0.5 超で「再現性が高い」、
+  // 0 未満で「逆転」、その間は中立という**非対称な**不感帯なので、
+  // 中心 0.25・半幅 0.25 に平行移動して eps ひとつで表す。
+  const corrShift = data.corr - 0.25;
+  const CORR_EPS = 0.25;
+  const corrDir = directionOf(corrShift, CORR_EPS);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
       <h3 className="font-bold text-gray-800">持続性・サンプル外検証（前半/後半の再現性）</h3>
@@ -85,10 +92,10 @@ export default function PersistenceChart({ prices }: Props) {
         ))}
       </div>
 
-      <div className={`rounded-md border px-3 py-2 text-xs ${data.corr > 0.5 ? "border-green-200 bg-green-50 text-green-900" : data.corr < 0 ? "border-red-200 bg-red-50 text-red-900" : "border-gray-200 bg-gray-50 text-gray-700"}`}><DirectionGlyph value={data.corr} />
+      <div className={`rounded-md border px-3 py-2 text-xs ${corrDir === "up" ? "border-green-200 bg-green-50 text-green-900" : corrDir === "down" ? "border-red-200 bg-red-50 text-red-900" : "border-gray-200 bg-gray-50 text-gray-700"}`}><DirectionGlyph value={corrShift} eps={CORR_EPS} />
         前半・後半の状態別平均の相関 = <span className="font-bold">{data.corr.toFixed(2)}</span>
         ／ 符号一致率 <span className="font-bold">{(data.agree * 100).toFixed(0)}%</span>
-        {data.corr > 0.5 ? "（エッジは再現性が高い）" : data.corr < 0 ? "（前半と後半で逆転＝不安定）" : "（再現性は限定的）"}
+        {corrDir === "up" ? "（エッジは再現性が高い）" : corrDir === "down" ? "（前半と後半で逆転＝不安定）" : "（再現性は限定的）"}
       </div>
 
       <div className="relative"><canvas ref={canvasRef} /></div>

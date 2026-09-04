@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -77,9 +77,9 @@ export default function RegimeClusteringChart({ prices }: Props) {
               <tr key={c.id} className={`border-b border-gray-100 ${c.id === res.currentCluster ? "bg-blue-50" : ""}`}>
                 <td className="py-1 px-2 font-medium"><span className="inline-block w-2 h-2 rounded-sm mr-1 align-middle" style={{ background: clusterColor(c.id) }} />{c.label}</td>
                 <td className="text-right px-2 text-gray-600">{c.n}</td>
-                <td className={`text-right px-2 ${c.meanRet >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={c.meanRet} />{(c.meanRet * 100).toFixed(2)}%</td>
+                <td className={`text-right px-2 ${directionClass(c.meanRet)}`}><DirectionGlyph value={c.meanRet} />{(c.meanRet * 100).toFixed(2)}%</td>
                 <td className="text-right px-2 text-gray-500">{(c.meanVol * 100).toFixed(1)}%</td>
-                <td className={`text-right px-2 font-medium ${c.fwdMean >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={c.fwdMean} />{c.fwdMean >= 0 ? "+" : ""}{(c.fwdMean * 100).toFixed(2)}%</td>
+                <td className={`text-right px-2 font-medium ${directionClass(c.fwdMean)}`}><DirectionGlyph value={c.fwdMean} />{c.fwdMean >= 0 ? "+" : ""}{(c.fwdMean * 100).toFixed(2)}%</td>
               </tr>
             ))}
           </tbody>

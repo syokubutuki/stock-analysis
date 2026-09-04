@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import {
@@ -609,7 +609,7 @@ export default function HighLowTimingChart({ ticker }: Props) {
                     <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: WD_COLORS[wm.weekday] }} />
                     <span className="text-gray-600">{WD_NAMES[wm.weekday]}曜（{wm.count}日）</span>
                   </div>
-                  <div className={`font-bold ${wm.endMean >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={wm.endMean} />
+                  <div className={`font-bold ${directionClass(wm.endMean)}`}><DirectionGlyph value={wm.endMean} />
                     引け平均 {wm.endMean >= 0 ? "+" : ""}{wm.endMean.toFixed(2)}%
                   </div>
                 </div>
@@ -696,9 +696,9 @@ export default function HighLowTimingChart({ ticker }: Props) {
                           <div className="text-fg-muted">{p.desc}</div>
                         </td>
                         <td className="text-right">{pct(p.share)}<br /><span className="text-fg-muted">{p.count}日</span></td>
-                        <td className={`text-right ${p.avgDayRet >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={p.avgDayRet} />{signedPct(p.avgDayRet)}</td>
-                        <td className={`text-right ${p.avgNextRet >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={p.avgNextRet} />{signedPct(p.avgNextRet)}</td>
-                        <td className={`text-right ${p.winRateNext > 0.52 ? "text-green-700" : p.winRateNext < 0.48 ? "text-red-600" : "text-gray-600"}`}><DirectionGlyph value={p.winRateNext - 0.5} />{pct(p.winRateNext)}</td>
+                        <td className={`text-right ${directionClass(p.avgDayRet)}`}><DirectionGlyph value={p.avgDayRet} />{signedPct(p.avgDayRet)}</td>
+                        <td className={`text-right ${directionClass(p.avgNextRet)}`}><DirectionGlyph value={p.avgNextRet} />{signedPct(p.avgNextRet)}</td>
+                        <td className={`text-right ${directionClass(p.winRateNext - 0.5, 0.02)}`}><DirectionGlyph value={p.winRateNext - 0.5} eps={0.02} />{pct(p.winRateNext)}</td>
                       </tr>
                     ))}
                   </tbody>

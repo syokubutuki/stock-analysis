@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // レジーム(相場基調) × 前夜米国 の交互作用: 日内平均累積パス。
 // 「可変累積トレンド」(直近K日の累積対数リターン)で上昇/中立/下落基調に日を層別し、
@@ -278,7 +278,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
                           </span>
                         </td>
                         <td className="text-right px-2 text-gray-600">{b.n}</td>
-                        <td className={`text-right px-2 font-medium ${b.spilloverSpread >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.spilloverSpread} />{fmtSignedPct(b.spilloverSpread)}</td>
+                        <td className={`text-right px-2 font-medium ${directionClass(b.spilloverSpread)}`}><DirectionGlyph value={b.spilloverSpread} />{fmtSignedPct(b.spilloverSpread)}</td>
                         <td className="px-2"><StatBadge n={b.n} p={b.spreadPAdj} significant={b.spreadPAdj < 0.05} /></td>
                         <td className="text-center px-2">
                           <button

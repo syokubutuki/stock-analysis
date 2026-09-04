@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PortfolioData } from "../../hooks/usePortfolioData";
@@ -344,7 +344,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                               <span className="text-fg-muted ml-1 hidden sm:inline truncate">{names[a.ticker]}</span>
                             </td>
                             <td className="py-1 px-2 text-right text-gray-700">{a.beta.toFixed(2)}</td>
-                            <td className={`py-1 px-2 text-right ${a.alphaAnnual >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                            <td className={`py-1 px-2 text-right ${directionClass(a.alphaAnnual)}`}>
                         <DirectionGlyph value={a.alphaAnnual} />{a.alphaAnnual >= 0 ? "+" : ""}
                               {(a.alphaAnnual * 100).toFixed(1)}%
                             </td>
@@ -363,7 +363,7 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
                     <tr className="border-t-2 border-gray-300 text-gray-700 font-medium">
                       <td className="py-1 pr-2">等加重PF</td>
                       <td className="py-1 px-2 text-right">{result.portfolioBeta.toFixed(2)}</td>
-                      <td className={`py-1 px-2 text-right ${result.portfolioAlphaAnnual >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                      <td className={`py-1 px-2 text-right ${directionClass(result.portfolioAlphaAnnual)}`}>
                       <DirectionGlyph value={result.portfolioAlphaAnnual} />{result.portfolioAlphaAnnual >= 0 ? "+" : ""}
                         {(result.portfolioAlphaAnnual * 100).toFixed(1)}%
                       </td>

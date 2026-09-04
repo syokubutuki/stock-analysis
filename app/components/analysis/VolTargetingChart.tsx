@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // ボラティリティ・ターゲティング（信用レバ可変 0〜3倍）vs バイ&ホールド。
 // リターン予測を使わず「ボラの予測可能性」だけでSharpe改善を狙う戦略を、
@@ -37,7 +37,7 @@ interface Props {
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const pct1 = (v: number) => `${(v * 100).toFixed(1)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => directionClass(v);
 
 const ESTIMATOR_LABEL: Record<VolEstimator, string> = {
   ewma: "EWMA (λ=0.94)",

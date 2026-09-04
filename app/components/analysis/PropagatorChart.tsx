@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
@@ -226,9 +226,7 @@ export default function PropagatorChart({ prices }: Props) {
             >
               <div className="text-[10px] text-gray-500">{h}日後</div>
               <div
-                className={`text-sm font-bold ${
-                  med >= 0 ? "text-green-700" : "text-red-600"
-                }`}
+                className={`text-sm font-bold ${directionClass(med)}`}
               >
             <DirectionGlyph value={med} />{med >= 0 ? "+" : ""}
                 {med.toFixed(2)}%

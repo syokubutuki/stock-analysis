@@ -48,7 +48,7 @@ import AnalysisGuide from "./AnalysisGuide";
 import AxiomPlacement from "./AxiomPlacement";
 import WeekSlotGrid, { type SlotSide, AVOID_WEEKEND } from "./WeekSlotGrid";
 import { CHART_COLORS } from "../../lib/chart-colors";
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -60,7 +60,7 @@ type ViewMode = "single" | "rolling" | "leverage";
 
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => directionClass(v);
 const yen = (v: number) => `${Math.round(v).toLocaleString()}円`;
 
 function initCanvas(canvas: HTMLCanvasElement, height: number) {
@@ -742,7 +742,7 @@ function Stat({ label, value, sub, color, directionValue }: { label: string; val
   return (
     <div className="rounded-lg border border-gray-200 p-2">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-lg font-bold ${color ?? "text-gray-800"}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
+      <div className={`text-lg font-bold ${directionValue !== undefined ? directionClass(directionValue) : color ?? "text-gray-800"}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
       {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );

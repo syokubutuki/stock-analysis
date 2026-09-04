@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 合成ブック: 弱いエッジN本を束ねたときの Sharpe・テール相関・総容量の食い合い。
 // 同一銘柄で複数エッジを回すと同じオークション流動性を食い合い、総容量は個別の和にならない。
@@ -163,7 +163,7 @@ export default function EdgeBookChart({ prices }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">合成Sharpe(逆ボラ加重)</div>
-              <div className={`text-sm font-bold font-mono ${result.bookSharpe > 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={result.bookSharpe} />{num2(result.bookSharpe)}</div>
+              <div className={`text-sm font-bold font-mono ${directionClass(result.bookSharpe)}`}><DirectionGlyph value={result.bookSharpe} />{num2(result.bookSharpe)}</div>
               <div className="text-[10px] text-fg-muted">単体最良 +{num2(divGain)} / 無相関上限 {num2(result.sumSharpeIfIndep)}</div>
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
@@ -178,7 +178,7 @@ export default function EdgeBookChart({ prices }: Props) {
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">合成の年率 / 最大DD</div>
-              <div className={`text-sm font-bold font-mono ${result.bookAnn > 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={result.bookAnn} />{pct(result.bookAnn)}</div>
+              <div className={`text-sm font-bold font-mono ${directionClass(result.bookAnn)}`}><DirectionGlyph value={result.bookAnn} />{pct(result.bookAnn)}</div>
               <div className="text-[10px] text-fg-muted">DD {pct(result.bookMaxDD)} / 日次CVaR5% {pct(result.bookCVaR5)}</div>
             </div>
           </div>

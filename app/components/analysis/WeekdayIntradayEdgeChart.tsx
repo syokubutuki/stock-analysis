@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -235,7 +235,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                           <td className="text-center px-2 font-medium text-gray-700 tabular-nums">{b.entryLabel}</td>
                           <td className="text-center px-2 font-medium text-gray-700 tabular-nums">{b.exitLabel}</td>
                           <td className="text-right px-2 text-gray-500">{fmtHold(b.holdBins, binMin)}</td>
-                          <td className={`text-right px-2 font-medium ${b.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.mean} />{fmtSignedPct(b.mean)}</td>
+                          <td className={`text-right px-2 font-medium ${directionClass(b.mean)}`}><DirectionGlyph value={b.mean} />{fmtSignedPct(b.mean)}</td>
                           <td className="px-2 text-gray-600 tabular-nums">{(b.win * 100).toFixed(0)}%</td>
                           <td className="px-2"><StatBadge n={b.n} p={b.pAdj} significant={b.pAdj < 0.05} minN={12} /></td>
                         </>
@@ -279,7 +279,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                   <span className="font-bold text-gray-800"> {selected.best.entryLabel}</span> に買い建て →
                   <span className="font-bold text-gray-800"> {selected.best.exitLabel}</span> に手仕舞い
                   （保有 {fmtHold(selected.best.holdBins, binMin)}）。
-                  平均 <span className={`font-bold ${selected.best.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={selected.best.mean} />{fmtSignedPct(selected.best.mean)}</span>
+                  平均 <span className={`font-bold ${directionClass(selected.best.mean)}`}><DirectionGlyph value={selected.best.mean} />{fmtSignedPct(selected.best.mean)}</span>
                   ・勝率 {(selected.best.win * 100).toFixed(0)}%・n={selected.best.n}日
                   {ci && (
                     <>（95%CI {fmtSignedPct(ci.lo)}〜{fmtSignedPct(ci.hi)}・同符号 {(ci.stable * 100).toFixed(0)}%）</>

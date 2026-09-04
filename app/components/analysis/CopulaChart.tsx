@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
@@ -409,13 +409,7 @@ export default function CopulaChart({ prices }: Props) {
             <div className="p-2 bg-gray-50 rounded">
               <div className="text-gray-500">テール非対称</div>
               <div
-                className={`font-mono font-medium ${
-                  result.tailAsymmetry > 0
-                    ? "text-green-700"
-                    : result.tailAsymmetry < 0
-                    ? "text-red-700"
-                    : "text-gray-700"
-                }`}
+                className={`font-mono font-medium ${directionClass(result.tailAsymmetry)}`}
               ><DirectionGlyph value={result.tailAsymmetry} />
                 {result.tailAsymmetry >= 0 ? "+" : ""}
                 {fmtPct(result.tailAsymmetry)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -364,7 +364,8 @@ function Stat({
   tone?: "up" | "down";
   directionValue?: number;
 }) {
-  const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
+  const c = directionValue !== undefined ? directionClass(directionValue) : tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 rounded border border-gray-200 bg-gray-50">
       <div className="text-gray-500">{label}</div>

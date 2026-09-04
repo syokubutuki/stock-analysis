@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 参加の価値（床）の銘柄横断比較 ── 系C24 の横断版。
 //
@@ -337,9 +337,7 @@ export default function ParticipationCrossChart({ tickers, pricesByTicker, names
                           <span className="ml-1 text-fg-muted">{row.name}</span>
                         )}
                       </td>
-                      <td className={`px-2 py-1 text-right font-mono font-semibold ${
-                        p.premium >= 0 ? "text-green-700" : "text-red-700"
-                      }`}>
+                      <td className={`px-2 py-1 text-right font-mono font-semibold ${directionClass(p.premium)}`}>
                       <DirectionGlyph value={p.premium} />{pct(p.premium)}
                         {above && <span className="ml-0.5 text-blue-500" title="市場の床を上回る">▲</span>}
                       </td>
