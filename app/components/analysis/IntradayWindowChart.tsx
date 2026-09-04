@@ -69,6 +69,8 @@ function drawWeekdayBars(ctx: CanvasRenderingContext2D, W: number, H: number, re
 
 const TL_HEIGHT = 240;
 
+const WD_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
 export default function IntradayWindowChart({ ticker }: Props) {
   const [interval, setInterval] = useState("15m");
   const { resp, loading, error } = useIntraday(ticker, interval);
@@ -110,7 +112,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
     const hi = result.rows.reduce((a, b) => (b.mean > a.mean ? b : a));
     const lo = result.rows.reduce((a, b) => (b.mean < a.mean ? b : a));
     const sig = result.rows.filter((r) => r.signif).length;
-    return `選んだ時間窓のリターンを曜日別に横棒で並べた図（全${result.totalDays}日、全曜日まとめの平均は${(result.all.mean * 100).toFixed(3)}%）。最も高いのは曜日${hi.weekday}の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}、勝率${(hi.win * 100).toFixed(0)}%）、最も低いのは曜日${lo.weekday}の${(lo.mean * 100).toFixed(3)}%で、FDR補正後に有意なのは${sig}曜です。`;
+    return `選んだ時間窓のリターンを曜日別に横棒で並べた図（全${result.totalDays}日、全曜日まとめの平均は${(result.all.mean * 100).toFixed(3)}%）。最も高いのは${WD_JA[hi.weekday]}曜の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}、勝率${(hi.win * 100).toFixed(0)}%）、最も低いのは${WD_JA[lo.weekday]}曜の${(lo.mean * 100).toFixed(3)}%で、FDR補正後に有意なのは${sig}曜です。`;
   }, [result]);
 
   useEffect(() => {

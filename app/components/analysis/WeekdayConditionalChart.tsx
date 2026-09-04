@@ -428,6 +428,8 @@ function actionTag(action: WeekdayBin["action"]) {
   return <span className="inline-block rounded bg-gray-100 text-gray-500 px-1.5 py-0.5 text-[10px]">エッジ薄</span>;
 }
 
+const WD_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
 export default function WeekdayConditionalChart({ prices }: Props) {
   const pathRef = useRef<HTMLCanvasElement>(null);
   const pivotRef = useRef<HTMLCanvasElement>(null);
@@ -486,7 +488,7 @@ export default function WeekdayConditionalChart({ prices }: Props) {
     if (live.length === 0) return "曜日×条件ビンのマトリクス。標本が不足しています。";
     const hi = live.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
     const sig = live.filter((c) => c.significant).length;
-    return `建て曜日（縦${matrix.dows.length}行）×条件ビン（横${matrix.binLabels.length}列）の平均リターンを色で並べたマトリクス（${matrix.exitLabel}まで保有）。最大は${hi.dow}曜×${matrix.binLabels[hi.binIdx]}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）で、有意なセルは${sig}個です。`;
+    return `建て曜日（縦${matrix.dows.length}行）×条件ビン（横${matrix.binLabels.length}列）の平均リターンを色で並べたマトリクス（${matrix.exitLabel}まで保有）。最大は${WD_JA[hi.dow] ?? hi.dow}曜×${matrix.binLabels[hi.binIdx]}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）で、有意なセルは${sig}個です。`;
   }, [matrix]);
 
   useEffect(() => {

@@ -117,7 +117,7 @@ export default function WeekendPremiumChart({ prices }: Props) {
     const v = result.verdict;
     const bs = Object.values(result.buckets);
     const hi = bs.reduce((a, b) => (b.annualRet > a.annualRet ? b : a));
-    return `日中・平日夜間・週末ギャップの3区間について、選んだ指標を棒で並べた図（${result.nDays}日・${result.nWeeks}週、${result.from}から${result.to}）。年率寄与が最も大きいのは${hi.key}の${(hi.annualRet * 100).toFixed(2)}%で、μ/σ²は週末${v.retPerVarWeekend.toFixed(2)}に対し週内${v.retPerVarWeekday.toFixed(2)}、週末を飛ばすとシャープは${v.sharpeDiff >= 0 ? "+" : ""}${v.sharpeDiff.toFixed(3)}（95%CI ${v.sharpeDiffCI[0].toFixed(3)}〜${v.sharpeDiffCI[1].toFixed(3)}）動きます。`;
+    return `日中・平日夜間・週末ギャップの3区間について、選んだ指標を棒で並べた図（${result.nDays}日・${result.nWeeks}週、${result.from}から${result.to}）。年率寄与が最も大きいのは${BUCKET_LABEL[hi.key]}の${(hi.annualRet * 100).toFixed(2)}%で、μ/σ²は週末${v.retPerVarWeekend.toFixed(2)}に対し週内${v.retPerVarWeekday.toFixed(2)}、週末を飛ばすとシャープは${v.sharpeDiff >= 0 ? "+" : ""}${v.sharpeDiff.toFixed(3)}（95%CI ${v.sharpeDiffCI[0].toFixed(3)}〜${v.sharpeDiffCI[1].toFixed(3)}）動きます。`;
   }, [result]);
 
   useEffect(() => {
