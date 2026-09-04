@@ -257,6 +257,7 @@ export default function WeekdayUsPathChart({ ticker }: Props) {
           <PathLegend stats={result.bins} />
           <PathEvolutionControls stats={result.bins} evo={evo} />
           <PathCanvas
+            title="曜日×前夜米国の日内パス"
             stats={result.bins}
             timeLabels={result.timeLabels}
             maxAbs={result.maxAbs}

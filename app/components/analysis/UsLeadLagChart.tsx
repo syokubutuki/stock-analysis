@@ -7,6 +7,7 @@ import {
   initCanvas, IntervalButtons, LoadingError, IntradayCaveat, drawTimeAxisLabels,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -52,6 +53,13 @@ export default function UsLeadLagChart({ ticker }: Props) {
     [data]
   );
 
+  const corrDescription = useMemo(() => {
+    if (!result || result.timeLabels.length === 0) return "米国連動の相関推移。整合できた標本が不足しています。";
+    let pi = 0;
+    for (let i = 1; i < result.corrMarg.length; i++) if (Math.abs(result.corrMarg[i]) > Math.abs(result.corrMarg[pi])) pi = i;
+    return `前夜米国との相関の日内推移。累積相関は寄付${result.gapCorr.toFixed(2)}から引け${result.endCorr.toFixed(2)}へ動き、限界相関(その時間帯の新規流入)が最大なのは${result.timeLabels[pi]}の${result.corrMarg[pi].toFixed(2)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 220);
@@ -85,7 +93,7 @@ export default function UsLeadLagChart({ ticker }: Props) {
             <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5 border-t-2 border-dashed" style={{ borderColor: "#ea580c" }} /><span className="text-gray-600">限界相関(その時間帯の新規流入)</span></span>
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={corrDescription} /></div>
           <p className="text-[11px] text-fg-muted">
             限界相関が寄り(寄付〜寄り直後)で高く、その後0へ落ちるほど「米国は寄りで吸収」。日中まで正のままなら「米国順張りが日中も有効」。
             累積相関が寄付から伸びず横ばいなら、米国の影響は寄りギャップで完結している。

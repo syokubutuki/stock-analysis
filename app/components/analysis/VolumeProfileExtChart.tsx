@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeProfile } from "../../lib/volume-profile-ext";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -30,6 +31,13 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function VolumeProfileExtChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const res = useMemo(() => computeVolumeProfile(prices, 44), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (!res) return "期間ボリュームプロファイル。計算できるデータが不足しています。";
+    const where = res.currentPrice > res.vaHigh ? "バリューエリアの上"
+      : res.currentPrice < res.vaLow ? "バリューエリアの下" : "バリューエリアの中";
+    return `期間ボリュームプロファイル。価格帯${res.bins.length}本の横棒グラフで、出来高が最大の価格帯POCは${res.poc.toFixed(0)}、バリューエリア(70%)は${res.vaLow.toFixed(0)}から${res.vaHigh.toFixed(0)}です。現在値${res.currentPrice.toFixed(0)}は${where}にあります。`;
+  }, [res]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -81,7 +89,7 @@ export default function VolumeProfileExtChart({ prices }: Props) {
         <div className="p-2 rounded border border-gray-300 bg-gray-50"><div className="text-gray-500">現在値</div><div className="font-mono font-medium">{res.currentPrice.toFixed(0)}</div></div>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
       <div className="text-xs text-gray-500">赤=POC / 青=バリューエリア(70%) / 枠=HVN(厚い節) / 薄灰=LVN(薄い節)</div>
 
       <AnalysisGuide title="ボリュームプロファイルの詳細理論">

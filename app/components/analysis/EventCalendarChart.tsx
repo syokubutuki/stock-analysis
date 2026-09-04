@@ -12,6 +12,7 @@ import {
 } from "../../lib/event-calendar";
 import { conditionalForwardReturns, ForwardResult } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -122,6 +123,14 @@ export default function EventCalendarChart({ prices }: Props) {
     return conditionalForwardReturns(prices, state, horizon, { entry });
   }, [prices, market, selected, horizon, entry]);
 
+  const chartDescription = useMemo(() => {
+    if (!result || result.buckets.length === 0) return "イベント反応日の先行きリターン。標本が不足しています。";
+    const hi = result.buckets.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
+    const lo = result.buckets.reduce((a, b) => (b.meanFwd < a.meanFwd ? b : a));
+    const sig = result.buckets.filter((b) => b.significant).length;
+    return `イベント別に${result.horizon}日先の平均リターンを棒で並べ、全体平均${(result.baselineMean * 100).toFixed(2)}%を点線で引いた図。最も高いのは${hi.label}の${(hi.meanFwd * 100).toFixed(2)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.meanFwd * 100).toFixed(2)}%（n=${lo.n}）で、FDR補正後に有意なのは${sig}件です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !result || result.buckets.length === 0) return;
@@ -208,7 +217,7 @@ export default function EventCalendarChart({ prices }: Props) {
           </div>
 
           <div className="mt-3">
-            <canvas ref={canvasRef} />
+            <AccessibleCanvas ref={canvasRef} description={chartDescription} />
           </div>
 
           <div className="mt-3 overflow-x-auto">

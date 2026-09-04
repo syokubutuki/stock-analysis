@@ -12,6 +12,7 @@ import {
   drawTimeAxisLabels,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -65,6 +66,14 @@ export default function SignalIntradayChart({ ticker }: Props) {
     [resp, signal, binMin]
   );
 
+  const pathDescription = useMemo(() => {
+    if (!res || res.avgPathPct.length === 0) return "シグナル翌日の日中経路。標本が不足しています。";
+    let pi = 0;
+    for (let i = 1; i < res.avgPathPct.length; i++) if (Math.abs(res.avgPathPct[i]) > Math.abs(res.avgPathPct[pi])) pi = i;
+    const end = res.avgPathPct[res.avgPathPct.length - 1];
+    return `${SIGNAL_LABELS[res.signal]}が出た翌日${res.nSignals}日ぶんの日中経路（始値比%）。平均は${res.binLabels[pi]}で最大の${res.avgPathPct[pi].toFixed(2)}%に達し、引けは${end.toFixed(2)}%です。`;
+  }, [res]);
+
   useEffect(() => {
     if (!canvasRef.current || !res) return;
     const H = 320;
@@ -96,7 +105,7 @@ export default function SignalIntradayChart({ ticker }: Props) {
       {!loading && !error && res && (
         <>
           <div className="text-xs text-gray-500">{SIGNAL_LABELS[res.signal]} の翌日: {res.nSignals}日 / 最良エントリー: <strong>{res.bestEntryLabel}</strong></div>
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={pathDescription} /></div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

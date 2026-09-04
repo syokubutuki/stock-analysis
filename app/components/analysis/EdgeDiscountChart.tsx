@@ -10,6 +10,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, LoadingError, IntradayCaveat, StatCell,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
@@ -64,6 +65,12 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
 
   const sigRows = useMemo(() => (res ? res.edges.filter((e) => e.grossSignificant) : []), [res]);
 
+  const discountDescription = useMemo(() => {
+    if (sigRows.length === 0) return "コスト控除後のエッジ。粗利で有意なエッジがまだありません。";
+    const top = sigRows.reduce((a, b) => (b.effPct > a.effPct ? b : a));
+    return `粗利で有意なエッジ${sigRows.length}本について、粗利から寄り・引けの約定コストを引いた残りを横棒で並べた図。最も残るのは${top.label}で、粗利${top.grossPct.toFixed(3)}%が実効${top.effPct.toFixed(3)}%になり、${top.survives ? "生存" : "消滅"}です。`;
+  }, [sigRows]);
+
   useEffect(() => {
     if (!canvasRef.current || sigRows.length === 0) return;
     const init = initCanvas(canvasRef.current, 36 + sigRows.length * 26);
@@ -108,7 +115,7 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
             <StatCell label="計測日数" value={`${res.gaps.nDays}日`} />
           </div>
 
-          {sigRows.length > 0 && <div className="relative"><canvas ref={canvasRef} /></div>}
+          {sigRows.length > 0 && <div className="relative"><AccessibleCanvas ref={canvasRef} description={discountDescription} /></div>}
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

@@ -14,6 +14,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
@@ -129,6 +130,21 @@ export default function SignalExecutionChart({ prices, ticker }: Props) {
     return computeSignalExecution(prices, resp.bars, resp.gmtoffset, resp.interval, stateFn, effectiveBucket, side);
   }, [resp, stateFn, effectiveBucket, side, prices]);
 
+  const heatDescription = useMemo(() => {
+    if (!res || res.cells.length === 0) return "建て時刻×手仕舞い時刻のヒートマップ。時刻最適化の標本が不足しています。";
+    const top = res.best ?? res.cells.reduce((a, b) => (b.meanPct > a.meanPct ? b : a));
+    const naive = res.naive;
+    return `シグナル翌日について、建て時刻（縦）×手仕舞い時刻（横）の全組合せ${res.cells.length}通りの平均リターンを色で並べたヒートマップ。最良は${res.entryLabels[top.ei]}建て→${res.exitLabels[top.xi]}手仕舞いの${top.meanPct.toFixed(3)}%（n=${top.n}、勝率${(top.winRate * 100).toFixed(0)}%）で、寄成→引成の${naive ? `${naive.meanPct.toFixed(3)}%` : "—"}との差は${res.improvePct === null ? "—" : `${res.improvePct.toFixed(3)}%`}です。`;
+  }, [res]);
+
+  const pathDescription = useMemo(() => {
+    if (!res || res.avgPathPct.length < 2) return "シグナル翌日の日中経路。標本が不足しています。";
+    let pi = 0;
+    for (let i = 1; i < res.avgPathPct.length; i++) if (Math.abs(res.avgPathPct[i]) > Math.abs(res.avgPathPct[pi])) pi = i;
+    const end = res.avgPathPct[res.avgPathPct.length - 1];
+    return `シグナル翌日${res.nWithIntraday}日ぶんの日中経路（寄り比%）。平均は${res.binLabels[pi]}で最大の${res.avgPathPct[pi].toFixed(2)}%に達し、引けは${end.toFixed(2)}%です。`;
+  }, [res]);
+
   useEffect(() => {
     if (heatRef.current && res) {
       const init = initCanvas(heatRef.current, 40 + res.entryLabels.length * 38);
@@ -205,8 +221,8 @@ export default function SignalExecutionChart({ prices, ticker }: Props) {
             </div>
           )}
 
-          <div className="relative"><canvas ref={heatRef} /></div>
-          <div className="relative"><canvas ref={pathRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={heatRef} description={heatDescription} /></div>
+          <div className="relative"><AccessibleCanvas ref={pathRef} description={pathDescription} /></div>
 
           <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">
             {"緑＝平均プラス（その売買方向に有利）・赤＝マイナス。濃いほど大きい。緑枠＝95%CIが0をまたがないセル、太枠＝最適。『成行』印のセル（寄成→引成）が基準で、そこより濃い緑のセルが約定時刻の改善余地。n が小さいセルは参考に留める。"}

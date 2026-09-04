@@ -14,11 +14,12 @@ import {
   initCanvas, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat, fmtSignedPct,
 } from "./intradayShared";
 import {
-  drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  describePathStats, drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
   usePathEvolution, PathEvolutionControls, PathDriftTable,
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -212,7 +213,7 @@ export default function SectorBasketWeekdayChart({ ticker }: Props) {
             </label>
           </div>
           <PathEvolutionControls stats={pathResult.bins} evo={evo} />
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={describePathStats("業種バスケットの曜日別 日内パス", pathResult.bins, pathResult.timeLabels)} /></div>
 
           <PathSummaryTable stats={pathResult.bins} timeLabels={pathResult.timeLabels} groupHeader="曜日" />
           <p className="text-[11px] text-fg-muted">

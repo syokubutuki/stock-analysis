@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeHoldingPeriods, type HoldingPeriodStats } from "../../lib/cross-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 import DirectionValue from "./DirectionValue";
@@ -36,6 +37,13 @@ export default function HoldingPeriodChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const stats = useMemo(() => computeHoldingPeriods(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (stats.length === 0) return "保有期間別のリターンとシャープ。計算できるデータが不足しています。";
+    const best = stats.reduce((a, b) => (b.sharpe > a.sharpe ? b : a));
+    const first = stats[0], last = stats[stats.length - 1];
+    return `保有期間${first.days}日から${last.days}日までの平均リターンとシャープを並べた図。シャープが最大なのは${best.days}日保有で${best.sharpe.toFixed(2)}、そのときの平均リターンは${pctFmt(best.meanReturn)}・勝率${(best.winRate * 100).toFixed(0)}%です。`;
+  }, [stats]);
 
   useEffect(() => {
     if (!canvasRef.current || stats.length === 0) return;
@@ -215,7 +223,7 @@ export default function HoldingPeriodChart({ prices }: Props) {
       <h3 className="font-bold text-gray-800">最適保有期間分析</h3>
 
       <div className="relative">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       {/* 詳細テーブル */}

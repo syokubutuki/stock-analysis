@@ -22,6 +22,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -106,6 +107,15 @@ export default function UsPathChart({ ticker }: Props) {
     [data, scheme, usMode]
   );
   const showResult = !!result;
+
+  const pathDescription = useMemo(() => {
+    if (!result || result.bins.length === 0) return "前夜米国ビン別の日中パス。整合できた標本が不足しています。";
+    const live = result.bins.filter((b) => b.n > 0);
+    if (live.length === 0) return "前夜米国ビン別の日中パス。整合できた標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.endMean > a.endMean ? b : a));
+    const lo = live.reduce((a, b) => (b.endMean < a.endMean ? b : a));
+    return `前夜米国リターンのビン別に描いた当日の日中累積パス（寄り＝0）。引けが最も高いのは${hi.label}の${fmtSignedPct(hi.endMean)}（n=${hi.n}）、最も低いのは${lo.label}の${fmtSignedPct(lo.endMean)}（n=${lo.n}）です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!result || !canvasRef.current) return;
@@ -261,7 +271,7 @@ export default function UsPathChart({ ticker }: Props) {
             })}
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={pathDescription} /></div>
 
           {/* 寄り→引け サマリー */}
           <div className="overflow-x-auto">

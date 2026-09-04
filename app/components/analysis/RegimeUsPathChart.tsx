@@ -14,12 +14,13 @@ import { useAlignedDays, UsDriverButtons } from "./usSpilloverShared";
 import { US_DRIVERS } from "../../hooks/useUsDaily";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import {
-  drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  describePathStats, drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
   usePathEvolution, PathEvolutionControls, PathDriftTable,
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -313,7 +314,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
             </div>
             <PathLegend stats={selected.usStats} />
             <PathEvolutionControls stats={selected.usStats} evo={evo} />
-            <div className="relative"><canvas ref={canvasRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={canvasRef} description={describePathStats("相場基調×前夜米国の日内パス", selected.usStats, result.timeLabels)} /></div>
             {(evo.showEras || evo.showSpaghetti) && (
               <p className="text-[11px] text-fg-muted">
                 {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}

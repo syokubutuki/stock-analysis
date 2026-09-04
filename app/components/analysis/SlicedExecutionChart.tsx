@@ -10,6 +10,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -108,6 +109,13 @@ export default function SlicedExecutionChart({ ticker }: Props) {
     [resp, side, leg]
   );
 
+  const chartDescription = useMemo(() => {
+    if (!res || res.methods.length === 0) return "分割約定の品質とタイミングリスク。標本が不足しています。";
+    const best = res.best ?? res.methods.reduce((a, b) => (b.meanQPct > a.meanQPct ? b : a));
+    const single = res.single;
+    return `${res.markLabel}を基準に、単発約定と分割約定の「当日VWAP比の約定品質」と「約定価格のばらつき」を並べた図（対象${res.nDays}営業日）。最良は${best.label}で品質${best.meanQPct.toFixed(3)}%・ばらつき${best.fillStdPct.toFixed(3)}%、単発は${single ? `${single.meanQPct.toFixed(3)}%・${single.fillStdPct.toFixed(3)}%` : "—"}です。`;
+  }, [res]);
+
   useEffect(() => {
     if (!canvasRef.current || !res) return;
     const H = 300;
@@ -156,7 +164,7 @@ export default function SlicedExecutionChart({ ticker }: Props) {
             </div>
           )}
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

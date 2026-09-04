@@ -11,6 +11,7 @@ import {
 } from "lightweight-charts";
 import { PathStat, PairDiff } from "../../lib/intraday-path-core";
 import { fmtSignedPct, drawTimeAxisLabels, initCanvas } from "./intradayShared";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StatBadge from "./StatBadge";
 import { DirectionGlyph, directionClass } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
@@ -208,13 +209,15 @@ interface HoverInfo {
 //   ・個別日: 「個別日」表示中はカーソルに最も近い1本を特定し、日付と終端を表示する
 // 個別日を重ねると線が数十本になり、目で追えても「どの日か」が分からなくなるのを解消する。
 export function PathCanvas({
-  stats, timeLabels, maxAbs, opts, height = 260,
+  stats, timeLabels, maxAbs, opts, height = 260, title = "日内の平均パス",
 }: {
   stats: PathStat[];
   timeLabels: string[];
   maxAbs: number;
   opts: PathDrawOpts;
   height?: number;
+  /** 代替テキストの見出し。読み上げで「何の図か」を最初に伝える */
+  title?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<HoverInfo | null>(null);
@@ -278,7 +281,12 @@ export function PathCanvas({
 
   return (
     <div className="relative">
-      <canvas ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)} />
+      <AccessibleCanvas
+        ref={canvasRef}
+        description={describePathStats(title, stats, timeLabels)}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+      />
       {hover && (
         <div
           className="pointer-events-none absolute z-10 rounded border border-gray-200 bg-white/95 px-2 py-1 text-[10px] shadow-sm"
@@ -522,6 +530,21 @@ export function PathDriftGuideSection() {
       </ul>
     </>
   );
+}
+
+// Canvas の代替テキスト（A3）。**固定文言ではなく PathStat の計算結果から作る。**
+// 日内パスの図はどれも「どの群が一番伸びたか」「その群はいつ最大になるか」を読む図なので、
+// 群の数・終端の最大/最小・ピーク時刻の3点に絞る。手法の説明は AnalysisGuide にある。
+export function describePathStats(title: string, stats: PathStat[], timeLabels: string[]): string {
+  const live = stats.filter((s) => s.n > 0);
+  if (live.length === 0 || timeLabels.length === 0) return `${title}。集計できる立会日が不足しています。`;
+  const best = live.reduce((a, b) => (b.endMean > a.endMean ? b : a));
+  const worst = live.reduce((a, b) => (b.endMean < a.endMean ? b : a));
+  const peak = timeLabels[best.peakIdx] ?? "";
+  const head = `${title}。${live.length}群の日内累積リターン（寄り＝0）。`;
+  const tail = peak ? `${best.label}の平均パスは${peak}で最大になります。` : "";
+  if (live.length === 1) return `${head}終端は${fmtSignedPct(best.endMean)}（n=${best.n}）。${tail}`;
+  return `${head}引けが最も高いのは${best.label}の${fmtSignedPct(best.endMean)}（n=${best.n}）、最も低いのは${worst.label}の${fmtSignedPct(worst.endMean)}（n=${worst.n}）です。${tail}`;
 }
 
 // 群の色凡例。

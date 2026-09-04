@@ -23,6 +23,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -103,6 +104,13 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
   const selected = result?.weekdays.find((w) => w.weekday === selectedWd) ?? null;
 
   // ヒートマップ描画
+  const heatDescription = useMemo(() => {
+    if (!selected || !result) return "日内タイミングのヒートマップ。標本が不足しています。";
+    const b = selected.best;
+    if (!b) return `${selected.label}曜の建て時刻×手仕舞い時刻のヒートマップ（対象${selected.nDays}日）。有効なウィンドウがありません。`;
+    return `${selected.label}曜について、何時に建てて何時に手仕舞うかの全組合せを色で並べたヒートマップ（対象${selected.nDays}日、検定したウィンドウ${result.nTested}本）。最良は${b.entryLabel}建て→${b.exitLabel}手仕舞いで平均${(b.mean * 100).toFixed(3)}%です。`;
+  }, [selected, result]);
+
   useEffect(() => {
     if (!selected || !canvasRef.current) return;
     const G = result!.timeLabels.length;
@@ -287,7 +295,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                 </div>
 
                 <div className="text-xs text-gray-500">日内タイミング俯瞰（ヒートマップ）</div>
-                <div className="relative"><canvas ref={canvasRef} /></div>
+                <div className="relative"><AccessibleCanvas ref={canvasRef} description={heatDescription} /></div>
 
                 <div className="text-xs text-gray-500">
                   最良ウィンドウの累積リターン（％・暦時間軸、ホイールでズーム／ドラッグでパン）

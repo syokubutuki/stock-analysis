@@ -11,6 +11,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -118,6 +119,12 @@ export default function UsBetaChart({ ticker }: Props) {
     ? target === "gap" ? result.gap : target === "intra" ? result.intra : result.full
     : null;
 
+  const scatterDescription = useMemo(() => {
+    if (!result || !activeLine) return "前夜米国リターンに対する当日の反応の散布図。整合できた標本が不足しています。";
+    const kind = result.reaction === "momentum" ? "順張り" : result.reaction === "fade" ? "逆張り" : "中立";
+    return `前夜の米国リターン（横軸）と当日の反応（縦軸）の散布図と回帰直線。標本${result.n}日でβ=${activeLine.reg.beta.toFixed(3)}（95%CI ${activeLine.ci.lo.toFixed(2)}〜${activeLine.ci.hi.toFixed(2)}、R²=${activeLine.reg.r2.toFixed(3)}）。寄りで消化される割合は${(result.absorption * 100).toFixed(0)}%、日中に漏れるのは${(result.leak * 100).toFixed(0)}%で、日中の反応は${kind}です。`;
+  }, [result, activeLine]);
+
   useEffect(() => {
     if (!result || !activeLine || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 240);
@@ -179,7 +186,7 @@ export default function UsBetaChart({ ticker }: Props) {
               <ViewTabs value={target} onChange={setTarget} views={TARGETS} />
               <span className="text-[11px] text-fg-muted">緑=プラス日 / 赤=マイナス日・青線=OLS回帰</span>
             </div>
-            <div className="relative"><canvas ref={canvasRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={canvasRef} description={scatterDescription} /></div>
             <p className="text-[11px] text-fg-muted">
               回帰の傾き=β（相関 {activeLine.reg.corr.toFixed(2)} / R² {activeLine.reg.r2.toFixed(2)} / n={activeLine.reg.n}）。
               点が右上・左下に集まるほど正の感応、右下・左上に散るほど逆行。

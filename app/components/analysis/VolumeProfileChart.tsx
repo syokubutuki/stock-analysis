@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeProfile } from "../../lib/cross-analysis";
 import GuideEntryPanel from "./GuideEntryPanel";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -34,6 +35,15 @@ export default function VolumeProfileChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const profile = useMemo(() => computeVolumeProfile(prices, 50), [prices]);
+
+  const profileDescription = useMemo(() => {
+    const bins = profile.bins;
+    if (bins.length === 0) return "出来高プロファイル。計算できるデータが不足しています。";
+    const total = bins.reduce((a, b) => a + b.volume, 0);
+    const peak = bins.reduce((a, b) => (b.volume > a.volume ? b : a));
+    const buyShare = total > 0 ? bins.reduce((a, b) => a + b.buyVolume, 0) / total : 0;
+    return `価格帯別の出来高を横棒で積んだ図。価格帯${bins.length}本のうち出来高が最大なのは${peak.priceCenter.toFixed(0)}付近で全体の${((peak.volume / (total || 1)) * 100).toFixed(1)}%を占め、買い出来高の割合は全体で${(buyShare * 100).toFixed(0)}%です。`;
+  }, [profile]);
 
   useEffect(() => {
     if (!canvasRef.current || profile.bins.length === 0) return;
@@ -155,7 +165,7 @@ export default function VolumeProfileChart({ prices }: Props) {
       <h3 className="font-bold text-gray-800">出来高プロファイル (Volume at Price)</h3>
 
       <div className="relative">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={profileDescription} />
       </div>
 
       {/* 統計サマリー */}

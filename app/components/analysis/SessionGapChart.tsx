@@ -17,6 +17,7 @@ import {
   type Metric,
 } from "../../lib/session-gap";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { countRoundTrips } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
@@ -80,6 +81,20 @@ export default function SessionGapChart({ prices }: Props) {
   };
 
   // ストリップ描画
+  const stripDescription = useMemo(() => {
+    if (days.length === 0) return "曜日×休場コンテキストの散布図。標本が不足しています。";
+    return `各立会日を曜日（横軸）ごとに縦に並べ、休場コンテキスト（連休明け・連休前・挟まれ）で色分けした散布図。全${days.length}日の無条件平均は${(summary.baselineMean * 100).toFixed(3)}%（勝率${(summary.baselineWin * 100).toFixed(0)}%、n=${summary.baselineN}）です。`;
+  }, [days, summary]);
+
+  const matrixDescription = useMemo(() => {
+    if (summary.matrix.length === 0) return "曜日×休場コンテキストのヒートマップ。標本が不足しています。";
+    const live = summary.matrix.filter((c) => c.n > 0);
+    if (live.length === 0) return "曜日×休場コンテキストのヒートマップ。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.mean > a.mean ? b : a));
+    const lo = live.reduce((a, b) => (b.mean < a.mean ? b : a));
+    return `曜日（横）×休場コンテキスト（縦）のヒートマップ。無条件平均${(summary.baselineMean * 100).toFixed(3)}%に対し、最も高いセルは${(hi.mean * 100).toFixed(3)}%（n=${hi.n}）、最も低いセルは${(lo.mean * 100).toFixed(3)}%（n=${lo.n}）です。`;
+  }, [summary]);
+
   useEffect(() => {
     if (mode !== "weekday" || !stripRef.current || days.length === 0) return;
     const H = 360;
@@ -234,7 +249,7 @@ export default function SessionGapChart({ prices }: Props) {
 
       {mode === "weekday" && (
         <>
-          <div className="relative"><canvas ref={stripRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={stripRef} description={stripDescription} /></div>
           <p className="text-xs text-gray-500">
             {"各点が1日の値動き。灰=通常日、それ以外は連休・祝日に隣接した日。太い横線が各コンテキストの平均。色付きの点・線が灰色の雲から外れていれば、その曜日は前後の休場で普段と違う動きをしている。"}
           </p>
@@ -283,7 +298,7 @@ export default function SessionGapChart({ prices }: Props) {
               </tbody>
             </table>
           </div>
-          <div className="relative"><canvas ref={matrixRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={matrixRef} description={matrixDescription} /></div>
           {summary.contexts.length === 0 && (
             <p className="text-xs text-amber-600">{"標本が少なく、連休前後の日を十分に集計できません（より長い期間を選択してください）。"}</p>
           )}

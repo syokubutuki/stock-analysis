@@ -30,6 +30,7 @@ import {
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -136,6 +137,16 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
   const inc = useMemo(() => (rows.length ? incrementalShapeTest(rows, target) : null), [rows, target]);
   const evo = usePathEvolution(result?.jpStats);
 
+  const usPathDescription = useMemo(() => {
+    if (!result || result.groups.length === 0) return "前夜の米国セッションの平均経路。整合できた標本が不足しています。";
+    const live = result.groups.filter((g) => g.usMean.length > 0);
+    if (live.length === 0) return "前夜の米国セッションの平均経路。整合できた標本が不足しています。";
+    const endOf = (g: typeof live[number]) => g.usMean[g.usMean.length - 1];
+    const hi = live.reduce((a, b) => (endOf(b) > endOf(a) ? b : a));
+    const lo = live.reduce((a, b) => (endOf(b) < endOf(a) ? b : a));
+    return `前夜の米国セッションの平均経路（米国の寄り＝0）を${live.length}群に分けた図。引けが最も高いのは${hi.label}の${fmtSignedPct(endOf(hi))}、最も低いのは${lo.label}の${fmtSignedPct(endOf(lo))}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result || !usCanvasRef.current) return;
     const init = initCanvas(usCanvasRef.current, 170);
@@ -213,7 +224,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
 
           <div className="space-y-1">
             <div className="text-xs font-medium text-gray-700">① 前夜の米国セッション（米国の寄り＝0）</div>
-            <div className="relative"><canvas ref={usCanvasRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={usCanvasRef} description={usPathDescription} /></div>
           </div>
 
           <div className="space-y-1">
@@ -230,6 +241,7 @@ export default function UsJpLinkedPathChart({ ticker }: Props) {
             </div>
             <PathEvolutionControls stats={result.jpStats} evo={evo} />
             <PathCanvas
+              title="当日の日本の日内パス（前夜米国ビン別）"
               stats={result.jpStats}
               timeLabels={result.jpLabels}
               maxAbs={result.maxAbsJp}
