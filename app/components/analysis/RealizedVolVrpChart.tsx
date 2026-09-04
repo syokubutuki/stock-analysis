@@ -14,6 +14,7 @@ import { rollingOHLCVol } from "../../lib/ohlc-volatility";
 import { varianceSwapAnalysis } from "../../lib/kelly-bs";
 import { logReturns, normalCdf } from "../../lib/derivatives-core";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StatBadge from "./StatBadge";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -192,6 +193,17 @@ export default function RealizedVolVrpChart({ prices }: Props) {
   }, [shortVol, longVol]);
 
   // ターム構造 Canvas
+  const termDescription = useMemo(() => {
+    if (termStructure.length === 0) return "ボラのターム構造。計算できるデータが不足しています。";
+    const s = termStructure[0], l = termStructure[termStructure.length - 1];
+    return `窓幅別に測った現在のボラを並べたターム構造（${termStructure.length}点）。最短${s.w}日窓は${(s.vol * 100).toFixed(1)}%、最長${l.w}日窓は${(l.vol * 100).toFixed(1)}%で、短期のほうが高ければ足もとが荒れていることを表します。`;
+  }, [termStructure]);
+
+  const scatterDescription = useMemo(() => {
+    if (meanRev.n === 0) return "ボラの平均回帰。計算できるデータが不足しています。";
+    return `現在のボラ水準（横軸）と21日後のボラ変化（縦軸）の散布図（${meanRev.n}点）。相関は${meanRev.r.toFixed(3)}（p=${meanRev.p.toFixed(3)}）で、負なら高いボラは下がり低いボラは上がる＝平均回帰します。`;
+  }, [meanRev]);
+
   useEffect(() => {
     const cv = termRef.current;
     if (!cv) return;
@@ -339,14 +351,14 @@ export default function RealizedVolVrpChart({ prices }: Props) {
           <p className="text-xs font-medium text-gray-600 mb-1">
             現在のボラ・ターム構造（窓幅別、VIX風）
           </p>
-          <canvas ref={termRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={termRef} description={termDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
           <div className="flex items-center gap-2 mb-1">
             <p className="text-xs font-medium text-gray-600">ボラの平均回帰</p>
             <StatBadge n={meanRev.n} p={meanRev.p} significant={meanRev.p < 0.05} />
           </div>
-          <canvas ref={scatterRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={scatterRef} description={scatterDescription} className="w-full rounded border border-gray-100" />
         </div>
       </div>
 

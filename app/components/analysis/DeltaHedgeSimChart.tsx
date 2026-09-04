@@ -12,6 +12,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { simulateDeltaHedge } from "../../lib/delta-hedge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -103,6 +104,14 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
   }, [result]);
 
   // リバランス頻度スキャン
+  const freqDescription = useMemo(() => {
+    const fs = result?.freqScan ?? [];
+    if (fs.length === 0) return "リバランス頻度とヘッジ誤差。計算できるデータが不足しています。";
+    const best = fs.reduce((a, b) => (b.rmsError < a.rmsError ? b : a));
+    const rich = fs.reduce((a, b) => (b.finalPnL > a.finalPnL ? b : a));
+    return `リバランス間隔（横軸）に対するヘッジ誤差RMSと最終P&Lのトレードオフ曲線（${fs.length}点）。誤差が最小なのは${best.every}日ごとのRMS=${best.rmsError.toFixed(4)}、最終P&Lが最大なのは${rich.every}日ごとの${rich.finalPnL.toFixed(2)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const cv = freqRef.current;
     if (!cv || !result || result.freqScan.length === 0) return;
@@ -220,7 +229,7 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
             <p className="text-xs font-medium text-gray-600 mb-1">
               リバランス頻度 vs ヘッジ誤差（頻度↑で誤差↓・コスト↑のトレードオフ）
             </p>
-            <canvas ref={freqRef} className="w-full rounded border border-gray-100" />
+            <AccessibleCanvas ref={freqRef} description={freqDescription} className="w-full rounded border border-gray-100" />
           </div>
         </>
       )}

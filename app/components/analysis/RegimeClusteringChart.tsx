@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { clusterRegimes, clusterColor } from "../../lib/regime-clustering";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -29,6 +30,13 @@ export default function RegimeClusteringChart({ prices }: Props) {
   const stripRef = useRef<HTMLCanvasElement>(null);
   const [k, setK] = useState(4);
   const res = useMemo(() => (prices.length < 80 ? null : clusterRegimes(prices, k)), [prices, k]);
+
+  const stripDescription = useMemo(() => {
+    if (!res) return "レジーム・クラスタの帯。標本が不足しています。";
+    const cur = res.clusters.find((c) => c.id === res.currentCluster);
+    const hi = res.clusters.reduce((a, b) => (b.fwdMean > a.fwdMean ? b : a));
+    return `k-meansで${res.k}個に分けたレジームを時系列の帯として色分けした図（${res.assignTimes.length}日）。いまは${cur ? cur.label : "—"}に属し、翌日リターンの平均が最も高いのは${hi.label}の${(hi.fwdMean * 100).toFixed(3)}%（n=${hi.n}）です。`;
+  }, [res]);
 
   useEffect(() => {
     if (!stripRef.current || !res) return;
@@ -67,7 +75,7 @@ export default function RegimeClusteringChart({ prices }: Props) {
         </div>
       )}
 
-      <div className="relative"><canvas ref={stripRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={stripRef} description={stripDescription} /></div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">

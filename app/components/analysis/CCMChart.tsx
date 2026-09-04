@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { fullCCMAnalysis, type CCMPoint, type CCMResult } from "../../lib/ccm";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -345,6 +346,23 @@ export default function CCMChart({ prices }: Props) {
 
   const result = useMemo(() => fullCCMAnalysis(prices), [prices]);
 
+  const lastRho = (pts: { rho: number }[]) => (pts.length ? pts[pts.length - 1].rho : NaN);
+  const convergenceDescription = useMemo(() => {
+    const rv = lastRho(result.returnToVol), vr = lastRho(result.volToReturn);
+    return `ライブラリ長を伸ばしたときの交差写像スキルρの収束曲線。最長時点でリターン→ボラのρ=${rv.toFixed(3)}、ボラ→リターンのρ=${vr.toFixed(3)}で、収束判定はリターン⇔ボラが${result.convergenceReturnVol ? "成立" : "不成立"}、リターン⇔出来高が${result.convergenceReturnVolume ? "成立" : "不成立"}です。`;
+  }, [result]);
+
+  const scatterDescription = useMemo(() => {
+    const d = result.detailed[selectedCurve];
+    if (!d) return "交差写像の予測と実測の散布図。計算できるデータが不足しています。";
+    return `選択中の方向について、交差写像の予測（横軸）と実測（縦軸）の散布図（${d.scatter.actual.length}点）。相関ρ=${d.scatter.rho.toFixed(3)}で、対角線に沿うほど因果的な写像が成り立ちます。`;
+  }, [result, selectedCurve]);
+
+  const inputDescription = useMemo(() => {
+    const s = result.inputSeries;
+    return `交差写像に入れた3系列（リターン${s.returns.length}点・ボラ代理|リターン|${s.absReturns.length}点・出来高変化${s.volumeChanges.length}点）の時系列を並べた図。`;
+  }, [result]);
+
   useEffect(() => {
     if (convergenceRef.current) drawConvergencePlot(convergenceRef.current, result);
     if (inputRef.current) drawInputSeries(inputRef.current, result);
@@ -387,7 +405,7 @@ export default function CCMChart({ prices }: Props) {
       </div>
 
       {/* Main convergence plot */}
-      <canvas ref={convergenceRef} />
+      <AccessibleCanvas ref={convergenceRef} description={convergenceDescription} />
 
       {/* Scatter plot selector */}
       <div className="mt-4">
@@ -414,12 +432,12 @@ export default function CCMChart({ prices }: Props) {
             </button>
           ))}
         </div>
-        <canvas ref={scatterRef} />
+        <AccessibleCanvas ref={scatterRef} description={scatterDescription} />
       </div>
 
       {/* Input series */}
       <div className="mt-4">
-        <canvas ref={inputRef} />
+        <AccessibleCanvas ref={inputRef} description={inputDescription} />
       </div>
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>

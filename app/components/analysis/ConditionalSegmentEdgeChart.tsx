@@ -13,6 +13,7 @@ import {
 import { conditionalSegmentEdge, SegBucket } from "../../lib/open-close-edge";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -117,6 +118,13 @@ export default function ConditionalSegmentEdgeChart({ prices }: Props) {
     return conditionalSegmentEdge(prices, st);
   }, [prices, axis]);
 
+  const chartDescription = useMemo(() => {
+    if (!result || result.buckets.length === 0) return "条件別の日中・夜間エッジ。標本が不足しています。";
+    const hi = result.buckets.reduce((a, b) => (b.diff > a.diff ? b : a));
+    const lo = result.buckets.reduce((a, b) => (b.diff < a.diff ? b : a));
+    return `条件ビンごとに日中（当日始値→終値）と夜間（前日終値→当日始値）の平均を対の横棒で並べた図（全${result.totalN}日、無条件は日中${(result.baseIntraday * 100).toFixed(3)}%・夜間${(result.baseOvernight * 100).toFixed(3)}%）。日中が夜間を最も上回るのは${hi.label}の${(hi.diff * 100).toFixed(3)}%（n=${hi.n}）、最も下回るのは${lo.label}の${(lo.diff * 100).toFixed(3)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result || result.buckets.length === 0 || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 44 + result.buckets.length * 34);
@@ -219,7 +227,7 @@ export default function ConditionalSegmentEdgeChart({ prices }: Props) {
         </table>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <AnalysisGuide title="条件付き 日中/夜間エッジの詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

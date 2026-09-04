@@ -5,6 +5,7 @@ import { DirectionGlyph, directionClass } from "./DirectionValue";
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import {
   scanInteractions,
   buildPairGrid,
@@ -129,6 +130,15 @@ export default function InteractionScanChart({ prices }: Props) {
       }
     }
   }, [grid]);
+
+  const heatDescription = useMemo(() => {
+    if (!grid || !activePair) return "2軸の交互作用ヒートマップ。標本が不足しています。";
+    let best: { k: string; v: { mean: number; interaction: number; n: number; p: number } } | null = null;
+    grid.meanCells.forEach((v, k) => { if (!best || Math.abs(v.interaction) > Math.abs(best.v.interaction)) best = { k, v }; });
+    if (!best) return "2軸の交互作用ヒートマップ。標本が不足しています。";
+    const b = best as { k: string; v: { mean: number; interaction: number; n: number; p: number } };
+    return `${axisLabel(activePair.x)}（横${grid.xOrder.length}区分）×${axisLabel(activePair.y)}（縦${grid.yOrder.length}区分）の交互作用ヒートマップ（無条件平均${(grid.baseline * 100).toFixed(3)}%）。交互作用が最大のセルは${b.k}で、平均${(b.v.mean * 100).toFixed(3)}%・交互作用${(b.v.interaction * 100).toFixed(3)}%（n=${b.v.n}、p=${b.v.p.toFixed(3)}）です。`;
+  }, [grid, activePair, axisLabel]);
 
   useEffect(() => {
     if (heatRef.current) drawHeat(heatRef.current);
@@ -257,7 +267,7 @@ export default function InteractionScanChart({ prices }: Props) {
               ｜列={axisLabel(activePair.x)} / 行={axisLabel(activePair.y)}、全体平均 {pct(grid.baseline, 2)}
             </span>
           </div>
-          <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={heatRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><AccessibleCanvas ref={heatRef} description={heatDescription} /></div>
           <p className="text-[10px] text-fg-muted mt-1">
             緑=プラス/赤=マイナス、濃さ=絶対値。★=交互作用のp値(セルが加法予測から乖離)。青枠=現在の状態が属するセル。空白=N不足。
           </p>

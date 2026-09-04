@@ -16,6 +16,7 @@ import {
   minVarianceHedgeRatio,
 } from "../../lib/futures-carry";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS, withSign } from "../../lib/chart-colors";
 
 interface Props {
@@ -131,6 +132,14 @@ export default function FuturesCarryChart({ prices }: Props) {
   }, [prices, benchPrices]);
 
   // 先物カーブ Canvas
+  const curveDescription = useMemo(() => {
+    const pts = curve.points;
+    if (pts.length === 0) return "理論先物カーブ。計算できるデータが不足しています。";
+    const near = pts[0], far = pts[pts.length - 1];
+    const regime = curve.regime === "contango" ? "コンタンゴ（期先が高い）" : curve.regime === "backwardation" ? "バックワーデーション（期先が安い）" : "フラット";
+    return `限月別の理論先物価格を並べたカーブ（現物${curve.spot.toFixed(1)}）。${near.months}か月先は${near.forward.toFixed(1)}（ベーシス${near.basis.toFixed(2)}）、${far.months}か月先は${far.forward.toFixed(1)}で、形状は${regime}です。`;
+  }, [curve]);
+
   useEffect(() => {
     const cv = curveRef.current;
     if (!cv) return;
@@ -273,7 +282,7 @@ export default function FuturesCarryChart({ prices }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <p className="text-xs font-medium text-gray-600 mb-1">理論先物カーブ（限月別）</p>
-          <canvas ref={curveRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={curveRef} description={curveDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
           <p className="text-xs font-medium text-gray-600 mb-1">

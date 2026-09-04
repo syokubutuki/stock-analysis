@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePriceForecast } from "../../lib/simulation";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -54,6 +55,13 @@ export default function PriceForecastChart({ prices }: Props) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("price");
 
   const result = useMemo(() => computePriceForecast(prices, horizon), [prices, horizon]);
+
+  const chartDescription = useMemo(() => {
+    const p = result.percentiles;
+    if (result.paths.length === 0 || p.p50.length === 0) return "価格予測のファンチャート。計算できるデータが不足しています。";
+    const i = p.p50.length - 1;
+    return `現在値${result.lastPrice.toFixed(1)}を起点に${result.horizon}日先まで${result.paths.length}本シミュレートした価格のファンチャート。最終日の中央値は${p.p50[i].toFixed(1)}、5〜95%は${p.p5[i].toFixed(1)}から${p.p95[i].toFixed(1)}です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || result.paths.length === 0) return;
@@ -268,7 +276,7 @@ export default function PriceForecastChart({ prices }: Props) {
         </div>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded border">

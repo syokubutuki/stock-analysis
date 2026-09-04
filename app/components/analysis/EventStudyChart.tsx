@@ -10,6 +10,7 @@ import {
   type EventStudyResult,
 } from "../../lib/event-study";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { positionsFromSignals } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
@@ -119,6 +120,13 @@ export default function EventStudyChart({ prices }: Props) {
   const spreadRT = useMemo(() => (prices.length === 0 ? 0 : representativeSpread(prices)), [prices]);
 
   // 描画
+  const chartDescription = useMemo(() => {
+    if (!result) return "イベント・スタディの平均経路。トリガーが見つかっていません。";
+    const k = result.perK.length - 1;
+    const fin = result.perK[k];
+    return `トリガー${result.nTrigger}回（うち完全な窓を確保できた${result.nUsable}回）の前後の平均経路を、無条件平均と並べて描いた図。${k}日後の条件付き平均は${(fin.mean * 100).toFixed(2)}%（中央値${(fin.median * 100).toFixed(2)}%、上昇確率${(fin.winRate * 100).toFixed(0)}%）で、無条件平均${(result.baselineMean[k] * 100).toFixed(2)}%との差は${((fin.mean - result.baselineMean[k]) * 100).toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const h = 380;
@@ -320,7 +328,7 @@ export default function EventStudyChart({ prices }: Props) {
 
       {/* チャート */}
       <div className="relative w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       {/* 凡例 */}

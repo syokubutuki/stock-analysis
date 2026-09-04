@@ -10,6 +10,7 @@ import {
 } from "../../lib/derivatives-core";
 import { wholePeriodVol } from "../../lib/ohlc-volatility";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -78,6 +79,15 @@ export default function BlackScholesLabChart({ prices }: Props) {
   );
 
   // ペイオフ図 & 現在価値曲線
+  const payoffDescription = useMemo(() => {
+    return `原資産価格（横軸）に対する満期ペイオフと現在価値の2本の曲線。行使価格${K.toFixed(1)}・残存${days}日・σ=${(sigma * 100).toFixed(1)}%の${type === "call" ? "コール" : "プット"}で、現在値${S0.toFixed(1)}でのオプション価格は${cur.price.toFixed(2)}、時間価値は${(cur.price - Math.max(0, type === "call" ? S0 - K : K - S0)).toFixed(2)}です。`;
+  }, [K, days, sigma, type, S0, cur]);
+
+  const greekDescription = useMemo(() => {
+    const g = cur.greeks;
+    return `原資産価格を横軸に、デルタ・ガンマ・ベガ・シータの形を比較のため個別正規化して重ねた図。現在値${S0.toFixed(1)}でのGreeksはデルタ${g.delta.toFixed(3)}・ガンマ${g.gamma.toFixed(5)}・ベガ${g.vega.toFixed(3)}・シータ${g.theta.toFixed(3)}です。`;
+  }, [cur, S0]);
+
   useEffect(() => {
     const cv = payoffRef.current;
     if (!cv) return;
@@ -343,13 +353,13 @@ export default function BlackScholesLabChart({ prices }: Props) {
 
       <div>
         <p className="text-xs font-medium text-gray-600 mb-1">損益図（満期ペイオフ vs 現在価値）</p>
-        <canvas ref={payoffRef} className="w-full rounded border border-gray-100" />
+        <AccessibleCanvas ref={payoffRef} description={payoffDescription} className="w-full rounded border border-gray-100" />
       </div>
       <div>
         <p className="text-xs font-medium text-gray-600 mb-1">
           Greeks曲線（横軸=原資産価格。各Greekは形状比較のため個別正規化）
         </p>
-        <canvas ref={greekRef} className="w-full rounded border border-gray-100" />
+        <AccessibleCanvas ref={greekRef} description={greekDescription} className="w-full rounded border border-gray-100" />
       </div>
 
       {/* パリティ検証 */}

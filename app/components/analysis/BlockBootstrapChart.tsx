@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { blockBootstrap } from "../../lib/block-bootstrap";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -27,6 +28,11 @@ const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)}%`;
 export default function BlockBootstrapChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const res = useMemo(() => (prices.length < 80 ? null : blockBootstrap(prices, 1000)), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (!res) return "ブロック・ブートストラップの分布。標本が不足しています。";
+    return `系列相関を保ったブロック・ブートストラップ${res.samples}本の最終資産倍率の分布（ヒストグラム）。中央値は${res.terminalMedian.toFixed(2)}倍（90%区間${res.terminalLo.toFixed(2)}〜${res.terminalHi.toFixed(2)}）、実測は${res.actualTerminal.toFixed(2)}倍で、プラスで終わる確率は${(res.pPositive * 100).toFixed(0)}%です。`;
+  }, [res]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -75,7 +81,7 @@ export default function BlockBootstrapChart({ prices }: Props) {
         <div className="p-2 rounded border border-gray-200 bg-gray-50"><div className="text-gray-500">シャープ中央値</div><div className="font-mono font-bold">{res.sharpeMedian.toFixed(2)}</div></div>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <AnalysisGuide title="ブロック・ブートストラップの詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

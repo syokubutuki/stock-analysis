@@ -12,6 +12,7 @@ import { DirectionGlyph, directionClass } from "./DirectionValue";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { Horizon, HORIZONS, HORIZON_CONFIG } from "../../lib/signal-digest";
 import {
   AsOfReplayResult, AsOfReplayParams, FWD_HORIZONS,
@@ -229,6 +230,24 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
     if (mzRef.current) drawMz(mzRef.current, res, mzH);
   }, [res, mzH]);
 
+  const relDescription = useMemo(() => {
+    if (!res?.ok || res.probability.length === 0) return "確率予測の較正図。まだ再現を実行していません。";
+    const p = res.probability[0];
+    return `「上げると言った確率」（横軸）と「実際に上がった割合」（縦軸）を対角線と比べる較正図（${p.h}日先、n=${p.n}）。平均予測確率${(p.meanP * 100).toFixed(1)}%に対し実測${(p.obsRate * 100).toFixed(1)}%、ブライアスコア${p.brier.toFixed(4)}は気候値${p.brierClim.toFixed(4)}に対しBSS=${p.bss.toFixed(4)}です。`;
+  }, [res]);
+
+  const covDescription = useMemo(() => {
+    if (!res?.ok || res.intervals.length === 0) return "区間予測の被覆率。まだ再現を実行していません。";
+    const worst = res.intervals.reduce((a, b) => (Math.abs(b.coverage - b.nominal) > Math.abs(a.coverage - a.nominal) ? b : a));
+    return `予測区間の被覆率を名目値と並べた図（${res.intervals.length}通りの水準×ホライズン）。名目からの乖離が最大なのは${worst.h}日先の${(worst.level * 100).toFixed(0)}%区間で、実測被覆${(worst.coverage * 100).toFixed(1)}%（95%CI ${(worst.covLo * 100).toFixed(1)}〜${(worst.covHi * 100).toFixed(1)}%、Christoffersen p=${worst.lrCcP.toFixed(3)}）です。`;
+  }, [res]);
+
+  const mzDescription = useMemo(() => {
+    if (!res?.ok || res.vol.length === 0) return "ボラ予測のMincer–Zarnowitz散布図。まだ再現を実行していません。";
+    const v = res.vol[Math.min(mzH, res.vol.length - 1)];
+    return `ボラ予測（横軸）と実現ボラ（縦軸）の散布図とMincer–Zarnowitz回帰（${v.h}日先、n=${v.n}）。a=${v.a.toFixed(4)}・b=${v.b.toFixed(3)}で、(a,b)=(0,1)のWald検定はp=${v.waldP.toFixed(3)}、R²=${v.r2.toFixed(3)}です。`;
+  }, [res, mzH]);
+
   useEffect(() => { redraw(); }, [redraw]);
   useEffect(() => {
     window.addEventListener("resize", redraw);
@@ -391,7 +410,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
               </div>
               <div>
                 <div className="text-[11px] text-gray-500 mb-0.5">較正図（点が対角線に乗れば「50%と言った時に5割上げた」）</div>
-                <canvas ref={relRef} />
+                <AccessibleCanvas ref={relRef} description={relDescription} />
               </div>
             </div>
           </div>
@@ -444,7 +463,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
               </div>
               <div>
                 <div className="text-[11px] text-gray-500 mb-0.5">被覆率 vs 名目（黒破線＝名目・横棒＝95%CI）</div>
-                <canvas ref={covRef} />
+                <AccessibleCanvas ref={covRef} description={covDescription} />
               </div>
             </div>
           </div>
@@ -499,7 +518,7 @@ export default function AsOfScorecardChart({ prices, ticker }: Props) {
                     {FWD_HORIZONS.map((h, i) => <option key={h} value={i}>{h}日先</option>)}
                   </select>
                 </div>
-                <canvas ref={mzRef} />
+                <AccessibleCanvas ref={mzRef} description={mzDescription} />
               </div>
             </div>
           </div>

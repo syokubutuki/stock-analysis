@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeOptimalStopping } from "../../lib/optimal-stopping";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
@@ -17,6 +18,11 @@ export default function OptimalStoppingChart({ prices }: Props) {
 
   const closePrices = useMemo(() => prices.map((p) => p.close), [prices]);
   const result = useMemo(() => computeOptimalStopping(closePrices), [closePrices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.exerciseBoundary.length === 0) return "最適停止の行使境界。計算できるデータが不足しています。";
+    return `後退帰納で求めた「これ以上なら売る」水準（行使境界）の推移に、実際の価格を重ねた図（${result.exerciseBoundary.length}点）。最適停止の期待リターンは${(result.expectedReturn * 100).toFixed(2)}%、秘書問題の1/e戦略は${(result.secretaryReturn * 100).toFixed(2)}%、実測は${(result.actualReturn * 100).toFixed(2)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -161,7 +167,7 @@ export default function OptimalStoppingChart({ prices }: Props) {
         </div>
       </div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

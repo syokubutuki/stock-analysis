@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeBacktest, type BacktestResult } from "../../lib/predictability";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -29,6 +30,13 @@ const STRAT_COLORS = ["#6b7280", "#3b82f6", "#10b981", "#f59e0b"];
 export default function SimpleBacktestChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const results = useMemo(() => computeBacktest(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (results.length === 0) return "戦略別の累積リターン。計算できるデータが不足しています。";
+    const best = results.reduce((a, b) => (b.totalReturn > a.totalReturn ? b : a));
+    const worst = results.reduce((a, b) => (b.totalReturn < a.totalReturn ? b : a));
+    return `${results.length}戦略の累積リターン曲線を重ねた図。最も伸びたのは${best.strategy}の${(best.totalReturn * 100).toFixed(1)}%（シャープ${best.sharpe.toFixed(2)}、最大DD${(best.maxDrawdown * 100).toFixed(1)}%、${best.nTrades}回）、最も悪いのは${worst.strategy}の${(worst.totalReturn * 100).toFixed(1)}%です。`;
+  }, [results]);
 
   useEffect(() => {
     if (!canvasRef.current || results.length === 0) return;
@@ -95,7 +103,7 @@ export default function SimpleBacktestChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">シンプルバックテスト</h3>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">

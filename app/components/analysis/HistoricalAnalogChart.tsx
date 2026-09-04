@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { findAnalogs, AnalogResult } from "../../lib/historical-analog";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -92,6 +93,12 @@ export default function HistoricalAnalogChart({ prices }: Props) {
 
   const result = useMemo(() => findAnalogs(prices, L, M, K), [prices, L, M, K]);
 
+  const chartDescription = useMemo(() => {
+    if (!result) return "類似局面の先行き経路。標本が不足しています。";
+    const last = result.medianPath.length - 1;
+    return `直近${L}日の形に似た過去${result.neighbors.length}局面を選び、その後${M}日の経路を重ねた図。中央値パスの終端は${(result.medianFinal * 100).toFixed(2)}%（25〜75%は${(result.p25[last] * 100).toFixed(2)}%〜${(result.p75[last] * 100).toFixed(2)}%）で、上げが${result.upCount}件・下げが${result.downCount}件です。`;
+  }, [result, L, M]);
+
   useEffect(() => {
     if (!canvasRef.current || !result) return;
     const init = initCanvas(canvasRef.current, 260);
@@ -124,7 +131,7 @@ export default function HistoricalAnalogChart({ prices }: Props) {
         <div className="text-xs text-fg-muted">データ不足（期間を長くしてください）</div>
       )}
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       {result && (
         <div className="overflow-x-auto">

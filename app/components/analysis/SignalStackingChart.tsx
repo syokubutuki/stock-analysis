@@ -12,6 +12,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { stackSignals, STACK_SCHEMES, type StackScheme, type StackResult } from "../../lib/signal-stacking";
 import { buildSignalCatalog } from "../../lib/edge-signals";
 
@@ -91,6 +92,15 @@ export default function SignalStackingChart({ prices }: Props) {
         ctx.fillText(v.toFixed(2), x + cell / 2, y + cell / 2 + 3);
       }
     }
+  }, [result]);
+
+  const corrDescription = useMemo(() => {
+    if (!result || result.corr.length < 2) return "シグナル間の相関行列。標本が不足しています。";
+    let hi = { i: 0, j: 1, v: -2 };
+    for (let i = 0; i < result.corr.length; i++)
+      for (let j = i + 1; j < result.corr.length; j++)
+        if (result.corr[i][j] > hi.v) hi = { i, j, v: result.corr[i][j] };
+    return `シグナル${result.labels.length}本の日次リターン相関行列（赤=正で冗長・青=負で分散に有利）。最も相関が高いのは${result.labels[hi.i]}と${result.labels[hi.j]}の${hi.v.toFixed(2)}で、合成シャープ${result.combinedSharpe.toFixed(2)}は単体最良${result.bestSingleSharpe.toFixed(2)}に対し分散化比率${result.diversification.toFixed(2)}です。`;
   }, [result]);
 
   useEffect(() => { if (corrRef.current) drawCorr(corrRef.current); }, [drawCorr]);
@@ -205,7 +215,7 @@ export default function SignalStackingChart({ prices }: Props) {
           {/* 相関行列 */}
           <div>
             <div className="text-xs text-gray-500 mb-1">シグナル間の相関(赤=正で冗長 / 青=負で分散に有利)</div>
-            <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={corrRef} /></div>
+            <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><AccessibleCanvas ref={corrRef} description={corrDescription} /></div>
           </div>
 
           {/* 合成エクイティ */}

@@ -28,6 +28,7 @@ import {
 } from "../../lib/vol-targeting";
 import { useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -270,6 +271,12 @@ export default function VolTargetingChart({ prices }: Props) {
     ctx.fillText(num2(sMax), width - padR + 4, yOfS(sMax) + 4);
     ctx.fillText(num2(sMin), width - padR + 4, yOfS(sMin) + 4);
     ctx.fillText("Sharpe", width - padR + 4, 10);
+  }, [result]);
+
+  const permDescription = useMemo(() => {
+    const p = result?.perm;
+    if (!p) return "置換検定のヌル分布。まだ計算していません。";
+    return `σ̂とリターンの対応を壊した置換${p.dist.length}回のΔSharpeのヌル分布に、実測${p.actualDelta.toFixed(3)}を赤線で重ねたヒストグラム。片側p=${p.pOneSided.toFixed(3)}で、実測が右端に寄るほど改善が予測情報に由来します。`;
   }, [result]);
 
   // === 置換検定ヒストグラム（横軸=ΔSharpe なので Canvas2D）===
@@ -562,7 +569,7 @@ export default function VolTargetingChart({ prices }: Props) {
             )}
             実測（赤線）が分布の右端なら、改善は予測情報に由来する本物。
           </p>
-          <div className="w-full"><canvas ref={permRef} /></div>
+          <div className="w-full"><AccessibleCanvas ref={permRef} description={permDescription} /></div>
         </div>
 
         {/* 4. ボラ予測力 */}

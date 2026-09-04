@@ -6,6 +6,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { conditionalForwardReturns, buildStateFn, STATE_AXES, StateAxis } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS, directionOf } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -48,6 +49,11 @@ export default function PersistenceChart({ prices }: Props) {
     const agree = pairs.filter((p) => Math.sign(p.first) === Math.sign(p.second)).length / pairs.length;
     return { pairs, corr, agree };
   }, [prices, axis]);
+
+  const scatterDescription = useMemo(() => {
+    if (!data) return "前半と後半の状態別平均の散布図。標本が不足しています。";
+    return `状態ごとの平均リターンを前半（横軸）と後半（縦軸）で対にした散布図（${data.pairs.length}状態）。対角線に乗るほど再現性が高く、相関は${data.corr.toFixed(2)}、符号一致率は${(data.agree * 100).toFixed(0)}%です。`;
+  }, [data]);
 
   useEffect(() => {
     if (!canvasRef.current || !data) return;
@@ -98,7 +104,7 @@ export default function PersistenceChart({ prices }: Props) {
         {corrDir === "up" ? "（エッジは再現性が高い）" : corrDir === "down" ? "（前半と後半で逆転＝不安定）" : "（再現性は限定的）"}
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={scatterDescription} /></div>
       <div className="text-xs text-gray-500">緑=前半後半で符号一致（再現） / 赤=逆転。対角線に乗るほど安定したエッジ。</div>
 
       <AnalysisGuide title="持続性・サンプル外検証の詳細理論">

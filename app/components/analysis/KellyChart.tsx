@@ -39,6 +39,7 @@ import { doublingYears, doublingYearsLabel } from "../../lib/growth-drag";
 import { niceTicks } from "../../lib/axis-scale";
 import { CHART_COLORS } from "../../lib/chart-colors";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -83,6 +84,12 @@ export default function KellyChart({ prices }: Props) {
     () => (stats ? yearsToResolve(belief, stats.sigma) : Infinity),
     [stats, belief]
   );
+
+  const wallDescription = useMemo(() => {
+    if (!stats || !wall) return "越えるべき壁と測定の分解能。標本が不足しています。";
+    const verdict = wall.verdict === "above" ? "壁を超えている" : wall.verdict === "below" ? "壁に届いていない" : wall.verdict === "undecidable" ? "誤差が壁をまたいで判定できない" : "超えているが精度が足りない";
+    return `複利がプラスになるために必要な年率の壁 σ²/2 = ${(wall.hurdle * 100).toFixed(2)}% に、推定した年率μ̂ = ${(wall.muHat * 100).toFixed(2)}% と誤差棒（95%CI ${(wall.ciLo * 100).toFixed(2)}%〜${(wall.ciHi * 100).toFixed(2)}%）を重ねた図。SE(μ̂)=${(wall.seMu * 100).toFixed(2)}%はSE(σ̂)の${wall.precisionRatio.toFixed(0)}倍粗く、判定は「${verdict}」です。`;
+  }, [stats, wall]);
 
   // ── ① 壁と誤差棒（ヒーロー） ──────────────────────────────────────
   useEffect(() => {
@@ -383,7 +390,7 @@ export default function KellyChart({ prices }: Props) {
       <div className="space-y-1">
         <div className="text-xs font-bold text-gray-800">① 越えるべき壁と、測定の分解能</div>
         <div className="relative">
-          <canvas ref={wallRef} />
+          <AccessibleCanvas ref={wallRef} description={wallDescription} />
         </div>
         <div
           className={`text-xs rounded border p-2.5 leading-relaxed space-y-1.5 ${

@@ -15,6 +15,7 @@ import {
 } from "../../lib/edge-book";
 import { fmtYen } from "../../lib/edge-capacity";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -94,6 +95,15 @@ export default function EdgeBookChart({ prices }: Props) {
     () => computeEdgeBook(prices, catalog, effectiveSelected, { ...DEFAULT_BOOK_PARAMS, costBps, contention }),
     [prices, catalog, effectiveSelected, costBps, contention],
   );
+
+  const heatDescription = useMemo(() => {
+    if (!result.ok || result.corr.length < 2) return "エッジ間の相関ヒートマップ。標本が不足しています。";
+    let hi = { i: 0, j: 1, v: -2 };
+    for (let i = 0; i < result.corr.length; i++)
+      for (let j = i + 1; j < result.corr.length; j++)
+        if (result.corr[i][j] > hi.v) hi = { i, j, v: result.corr[i][j] };
+    return `エッジ${result.legs.length}本の日次相関ヒートマップ（青=負・赤=正）。平均ペア相関は${result.avgCorr.toFixed(2)}、悪い日だけだと${result.tailCorr.toFixed(2)}に上がり、最も相関が高い組は${result.legs[hi.i]?.label ?? ""}と${result.legs[hi.j]?.label ?? ""}の${hi.v.toFixed(2)}。分散比は${result.diversification.toFixed(2)}です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || !result.ok) return;
@@ -186,7 +196,7 @@ export default function EdgeBookChart({ prices }: Props) {
           {/* 相関ヒートマップ */}
           <div>
             <div className="text-xs text-gray-500 mb-1">エッジ間 日次相関（青=負・赤=正）— 低いほど分散が効く</div>
-            <canvas ref={canvasRef} className="w-full" />
+            <AccessibleCanvas ref={canvasRef} description={heatDescription} className="w-full" />
           </div>
 
           {/* 容量の食い合い */}
