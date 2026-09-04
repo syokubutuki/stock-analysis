@@ -170,6 +170,15 @@ function drawConditionalHists(canvas: HTMLCanvasElement, data: ReturnType<typeof
   }
 }
 
+// バイオリン図の代替テキスト。コンポーネント内に置くと useMemo の依存に入るので外に出す。
+function describeViolins(title: string, vs: ViolinData[]): string {
+  if (vs.length === 0) return `${title}。計算できるデータが不足しています。`;
+  const hi = vs.reduce((a, b) => (b.median > a.median ? b : a));
+  const lo = vs.reduce((a, b) => (b.median < a.median ? b : a));
+  const wide = vs.reduce((a, b) => (b.q75 - b.q25 > a.q75 - a.q25 ? b : a));
+  return `${title}（${vs.length}群）。中央値が最も高いのは${hi.label}の${(hi.median * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.median * 100).toFixed(3)}%、四分位範囲が最も広いのは${wide.label}の${((wide.q75 - wide.q25) * 100).toFixed(3)}%です。`;
+}
+
 export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
   const weekdayRef = useRef<HTMLCanvasElement>(null);
   const monthRef = useRef<HTMLCanvasElement>(null);
@@ -182,13 +191,6 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
   const monthViolins = useMemo(() => violinByGroup(lr, times, "month"), [prices, seriesMode]);
   const condDist = useMemo(() => conditionalDistributions(lr), [prices, seriesMode]);
 
-  const describeViolins = (title: string, vs: typeof weekdayViolins) => {
-    if (vs.length === 0) return `${title}。計算できるデータが不足しています。`;
-    const hi = vs.reduce((a, b) => (b.median > a.median ? b : a));
-    const lo = vs.reduce((a, b) => (b.median < a.median ? b : a));
-    const wide = vs.reduce((a, b) => (b.q75 - b.q25 > a.q75 - a.q25 ? b : a));
-    return `${title}（${vs.length}群）。中央値が最も高いのは${hi.label}の${(hi.median * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.median * 100).toFixed(3)}%、四分位範囲が最も広いのは${wide.label}の${((wide.q75 - wide.q25) * 100).toFixed(3)}%です。`;
-  };
   const weekdayViolinDescription = useMemo(() => describeViolins("曜日別リターン分布のバイオリンプロット", weekdayViolins), [weekdayViolins]);
   const monthViolinDescription = useMemo(() => describeViolins("月別リターン分布のバイオリンプロット", monthViolins), [monthViolins]);
   const condDescription = useMemo(() => {
