@@ -11,6 +11,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -92,6 +93,14 @@ export default function ExecutionTimingChart({ ticker }: Props) {
     [resp, side, leg]
   );
 
+  const chartDescription = useMemo(() => {
+    if (!res || res.bins.length === 0) return "約定タイミング別の改善幅。標本が不足しています。";
+    const cand = res.bins.filter((b) => !b.isMark);
+    const top = res.best ?? (cand.length ? cand.reduce((a, b) => (b.meanImprovePct > a.meanImprovePct ? b : a)) : null);
+    if (!top) return `${res.markLabel}を基準にした約定タイミングの比較（対象${res.nDays}営業日）。比較できる候補がありません。`;
+    return `${res.markLabel}を基準に、ずらした約定タイミングごとの平均改善幅を横棒で並べた図（対象${res.nDays}営業日）。最も良いのは${top.label}の${top.meanImprovePct.toFixed(3)}%（95%CI ${top.ciLoPct.toFixed(3)}〜${top.ciHiPct.toFixed(3)}%、勝率${(top.winRate * 100).toFixed(0)}%）です。`;
+  }, [res]);
+
   useEffect(() => {
     if (!canvasRef.current || !res) return;
     const H = 320;
@@ -146,7 +155,7 @@ export default function ExecutionTimingChart({ ticker }: Props) {
             </div>
           )}
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

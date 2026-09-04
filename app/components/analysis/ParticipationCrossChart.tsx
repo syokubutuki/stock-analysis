@@ -20,6 +20,7 @@ import {
   type ParticipationResult,
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -194,6 +195,14 @@ export default function ParticipationCrossChart({ tickers, pricesByTicker, names
 
   // ── プレミアム±SE の横断棒（横軸=リターン値なので Canvas2D） ──────────────
   const barCanvas = useRef<HTMLCanvasElement | null>(null);
+  const barDescription = useMemo(() => {
+    if (sorted.length === 0) return "銘柄別の参加プレミアム。まだ計算していません。";
+    const hi = sorted.reduce((a, b) => (b.r.premium.premium > a.r.premium.premium ? b : a));
+    const lo = sorted.reduce((a, b) => (b.r.premium.premium < a.r.premium.premium ? b : a));
+    const pos = sorted.filter((r) => r.r.premium.premium > 0).length;
+    return `銘柄別の参加プレミアムを横棒で並べた図（${sorted.length}銘柄、プラスは${pos}銘柄）。最大は${hi.ticker}の${(hi.r.premium.premium * 100).toFixed(2)}%、最小は${lo.ticker}の${(lo.r.premium.premium * 100).toFixed(2)}%${marketResult ? `で、市場（${proxyName || proxy}）は${(marketPremium * 100).toFixed(2)}%` : ""}です。`;
+  }, [sorted, marketResult, marketPremium, proxyName, proxy]);
+
   useEffect(() => {
     const canvas = barCanvas.current;
     if (!canvas) return;
@@ -287,7 +296,7 @@ export default function ParticipationCrossChart({ tickers, pricesByTicker, names
             <div className="text-xs font-semibold text-gray-700 mb-1.5">
               各銘柄の床（実現プレミアム ± SE・現在の並び順）
             </div>
-            <canvas ref={barCanvas} className="w-full" />
+            <AccessibleCanvas ref={barCanvas} description={barDescription} className="w-full" />
             <p className="mt-1 text-[11px] text-gray-500">
               バー＝実現プレミアム μ−r（年率）、ひげ＝±SE。緑=正・濃緑=t&gt;1.645で有意、赤=負。
               {marketResult && <>青破線＝市場の床（{pct(marketPremium)}）。</>}

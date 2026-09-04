@@ -36,6 +36,7 @@ import SectorStabilityPanel, {
   type StabilityControls,
 } from "./SectorFactorStabilityPanel";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import DataQualityNotice from "./DataQualityNotice";
 import { CHART_COLORS } from "../../lib/chart-colors";
@@ -436,6 +437,14 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
       ctx.fill();
     });
   }, [result, activeNames, heldSet]);
+
+  const scatDescription = useMemo(() => {
+    if (!result || result.assets.length === 0) return "市場β×セクターβの散布図。まだ計算していません。";
+    const a = result.assets;
+    const pure = a.reduce((x, y) => (y.sectorShare > x.sectorShare ? y : x));
+    const d = result.premise;
+    return `市場β（横軸）×セクターβ（縦軸）の散布図（${a.length}銘柄）。左上ほど純粋な金利プレイ、右下ほど市場βを買っているだけです。セクター寄与が最も高いのは${pure.ticker}の${(pure.sectorShare * 100).toFixed(0)}%で、このユニバースの分散は市場由来${(d.marketShare * 100).toFixed(0)}%・セクター由来${(d.sectorShare * 100).toFixed(0)}%です。`;
+  }, [result]);
 
   // ── L1c: 市場β × セクターβ の散布（この画面の主張）─────────────────
   const scatRef = useRef<HTMLCanvasElement | null>(null);
@@ -938,7 +947,7 @@ export default function SectorFactorSelectChart({ tickers, pricesByTicker, names
             <div className="mb-1 text-[11px] font-medium text-gray-700">
               金利プレイか、ただの高βか ─ 市場β × セクターβ
             </div>
-            <canvas ref={scatRef} />
+            <AccessibleCanvas ref={scatRef} description={scatDescription} />
             <div className="mt-1 text-[10px] text-gray-500">
               左上（青）＝市場βが低くセクターβが高い＝<b>純粋な金利プレイ</b>。
               右下（赤）＝セクターβが低く市場βが高い＝<b>金利プレイのつもりで市場を買っている</b>。

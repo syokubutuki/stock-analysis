@@ -51,6 +51,7 @@ import {
 } from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { DirectionGlyph } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -498,6 +499,10 @@ export default function CorrelationDragChart({
     window.addEventListener("resize", draw);
     return () => window.removeEventListener("resize", draw);
   }, [profile]);
+
+  const cliffDescription = useMemo(() => {
+    return `相関ρを変えたときに幾何成長率がどこまで削られるかを描いた「崖」の図（銘柄数N=${nAssets}・年率σ=${(sigma * 100).toFixed(0)}%）。いまの想定はρ=${rho.toFixed(2)}で、ρが上がるほど分散が効かなくなり成長率が落ちます。`;
+  }, [nAssets, sigma, rho]);
 
   // ── 崖の描画（静止画なので state 変化時と resize 時だけ） ──────────────────
   const cliffCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -1217,7 +1222,7 @@ export default function CorrelationDragChart({
             </span>
           </label>
         </div>
-        <canvas ref={cliffCanvas} className="w-full" />
+        <AccessibleCanvas ref={cliffCanvas} description={cliffDescription} className="w-full" />
         <p className="mt-1 text-[11px] text-gray-500">
           白丸＝あなたの現在地（総建玉 {(exposure * 100).toFixed(0)}%）。
           <strong>

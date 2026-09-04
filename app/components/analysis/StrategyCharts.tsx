@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { FeaturePoint } from "../../lib/feature-series";
 import { SimResult, StrategyMode, ExitRule } from "../../lib/strategy-sim";
 import { CHART_COLORS } from "../../lib/chart-colors";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   features: FeaturePoint[];
@@ -37,6 +38,27 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function StrategyCharts({ features, sim, mode }: Props) {
   const priceRef = useRef<HTMLCanvasElement>(null);
   const equityRef = useRef<HTMLCanvasElement>(null);
+
+  const priceDescription = useMemo(() => {
+    if (features.length < 2) return "価格と判断のチャート。特徴量を計算中、またはデータ不足です。";
+    const first = features[0], last = features[features.length - 1];
+    const alerts = sim.flags.filter((f) => f?.deterioration).length;
+    const marks = sim.byRule.model.markers.length;
+    return `終値の折れ線に、エントリー（▲）と出口（▼）、悪化シグナルの点灯日（赤帯）を重ねた図（${features.length}本、${first.time}から${last.time}）。悪化シグナルが点いた日は${alerts}日、出口の判断は${marks}回で、直近の終値は${last.close.toFixed(1)}です。`;
+  }, [features, sim]);
+
+  const equityDescription = useMemo(() => {
+    const rows: [string, number[]][] = [
+      ["バイ&ホールド", sim.hold],
+      ["悪化シグナル", sim.byRule.model.equity],
+      ["固定−X%", sim.byRule.fixed.equity],
+      ["ATRトレーリング", sim.byRule.atr.equity],
+    ].filter((r) => (r[1] as number[]).length > 0) as [string, number[]][];
+    if (rows.length === 0) return "損益曲線。計算できるデータが不足しています。";
+    const ends = rows.map((r) => [r[0], r[1][r[1].length - 1]] as [string, number]);
+    const best = ends.reduce((a, b) => (b[1] > a[1] ? b : a));
+    return `開始時を1.0に正規化した損益曲線を${rows.length}本重ねた図。最終値が最も高いのは${best[0]}の${best[1].toFixed(3)}倍で、内訳は${ends.map((e) => `${e[0]} ${e[1].toFixed(3)}`).join("・")}です。`;
+  }, [sim]);
 
   useEffect(() => {
     const n = features.length;
@@ -191,12 +213,12 @@ export default function StrategyCharts({ features, sim, mode }: Props) {
         <div className="text-xs text-gray-500 mb-1">
           価格と判断(▲エントリー / ▼出口、赤帯=悪化シグナル点灯日)
         </div>
-        <canvas ref={priceRef} />
+        <AccessibleCanvas ref={priceRef} description={priceDescription} />
       </div>
       {mode !== "single" && (
         <div>
           <div className="text-xs text-gray-500 mb-1">損益曲線(正規化 1.0 = 開始時)</div>
-          <canvas ref={equityRef} />
+          <AccessibleCanvas ref={equityRef} description={equityDescription} />
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ import { useBenchmarkPrices, BENCHMARK_PRESETS } from "../../hooks/useBenchmarkP
 import { computeCapm, CapmResult } from "../../lib/capm-sml";
 import { useSharedMuMode } from "../../lib/mu-mode-store";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -78,6 +79,13 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
     yMin -= yPad;
     yMax += yPad;
     return { xMin, xMax, yMin, yMax };
+  }, [result]);
+
+  const chartDescription = useMemo(() => {
+    if (!result || result.assets.length === 0) return "証券市場線（SML）。ベンチマークを読み込めていません。";
+    const hi = result.assets.reduce((a, b) => (b.alphaAnnual > a.alphaAnnual ? b : a));
+    const lo = result.assets.reduce((a, b) => (b.alphaAnnual < a.alphaAnnual ? b : a));
+    return `β（横軸）と年率リターン（縦軸）の平面に${result.assets.length}銘柄を置き、証券市場線を引いた図（対${result.benchName}・${result.nObs}観測）。線より上がα＞0で、最も高いのは${hi.ticker}の${(hi.alphaAnnual * 100).toFixed(1)}%、最も低いのは${lo.ticker}の${(lo.alphaAnnual * 100).toFixed(1)}%。等加重ポートフォリオはβ=${result.portfolioBeta.toFixed(2)}・α=${(result.portfolioAlphaAnnual * 100).toFixed(1)}%です。`;
   }, [result]);
 
   useEffect(() => {
@@ -290,7 +298,8 @@ export default function CapmSmlChart({ data, window: win = 250 }: Props) {
           ) : (
             <>
               <div className="relative">
-                <canvas
+                <AccessibleCanvas
+                  description={chartDescription}
                   ref={canvasRef}
                   onMouseMove={onMove}
                   onMouseLeave={() => setHoverTicker(null)}

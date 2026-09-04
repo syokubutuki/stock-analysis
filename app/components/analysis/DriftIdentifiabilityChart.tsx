@@ -21,6 +21,7 @@ import {
 import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -141,6 +142,12 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
     };
     return computeDriftIdentifiability(activePrices, params);
   }, [activeCount, activePrices, kappa, targetExcess, lookbackYears, rebalanceDays, quantile, costBps]);
+
+  const histDescription = useMemo(() => {
+    if (!result || !result.ok || result.winner.hist.length === 0) return "勝者の呪いのヌル分布。まだ計算していません。";
+    const w = result.winner;
+    return `真のドリフトが全銘柄で同じだと仮定したヌル（${w.nBoot}回）で「1位 − 横断平均」がどこまで出るかの分布に、実測を重ねたヒストグラム。実測は年率${(w.topLeadObserved * 100).toFixed(2)}%で、ヌルの平均は${(w.topLeadNullMean * 100).toFixed(2)}%・95%点は${(w.topLeadNull95 * 100).toFixed(2)}%。実測が95%点を超えないなら、1位の見かけの強さは選抜の上振れで説明できます。`;
+  }, [result]);
 
   // ── winner's curse のヌル分布（横軸=年率ドリフト・時間軸でないので Canvas2D）
   const histCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -468,7 +475,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                 sub="見かけのリードのうち誤差で説明される分" />
             </div>
             <div className="w-full">
-              <canvas ref={histCanvas} />
+              <AccessibleCanvas ref={histCanvas} description={histDescription} />
             </div>
             <p className="mt-1.5 text-[11px] text-gray-500">
               ヌルは各銘柄の平均を差し引いた（＝真の μ を全銘柄同一にした）リターン行列の移動ブロック再標本（

@@ -11,6 +11,7 @@ import {
   growthRatio,
 } from "../../lib/weekly-allocation";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -432,6 +433,12 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
     return m;
   }, [result, pricesByTicker, capital, lotMode]);
 
+  const allocDescription = useMemo(() => {
+    if (!result.ok || result.perStock.length === 0) return "銘柄配分。標本が不足しています。";
+    const top = result.perStock.reduce((a, b) => (b.weight > a.weight ? b : a));
+    return `相関を織り込んだケリー配分を銘柄別の横棒で並べた図（${result.nStocks}銘柄・${result.nWeeks}週）。最大は${top.ticker}の${(top.weight * 100).toFixed(1)}%、総建玉は${(result.exposure * 100).toFixed(0)}%（現金${(result.cash * 100).toFixed(0)}%）で、平均ペア相関${result.rhoBar.toFixed(2)}・実効銘柄数${result.nEffStocks.toFixed(1)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result.ok) return;
     const draw = () => {
@@ -585,7 +592,7 @@ export default function WeeklyAllocationChart({ tickers, pricesByTicker, names }
       <div className="mt-4">
         <div className="text-[11px] font-medium text-gray-700">① 銘柄配分（相関を織り込んだケリー）</div>
         <div className="mt-1">
-          <canvas ref={allocRef} />
+          <AccessibleCanvas ref={allocRef} description={allocDescription} />
         </div>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-[11px] border-collapse">

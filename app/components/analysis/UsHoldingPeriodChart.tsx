@@ -14,6 +14,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -119,6 +120,16 @@ export default function UsHoldingPeriodChart({ ticker }: Props) {
   const entryLabel = data?.grid?.bins[entrySafe]?.label ?? "";
   const mfePeak = useMemo(() => (excursion.length ? excursion.reduce((a, b) => (b.mfe > a.mfe ? b : a)) : null), [excursion]);
 
+  const chartDescription = useMemo(() => {
+    if (view === "ir") {
+      if (holding.length === 0 || !best) return "保有時間別の情報比。整合できた標本が不足しています。";
+      return `エントリーを固定し、手仕舞い時刻を動かしたときの情報比IR（＝平均÷σ）の曲線。IRが最大なのは${best.label}まで持つ場合で${best.ir.toFixed(2)}（平均${(best.mean * 100).toFixed(2)}%、n=${best.n}、p=${best.p.toFixed(3)}）です。`;
+    }
+    if (excursion.length === 0) return "保有時間別のMFE・MAE。整合できた標本が不足しています。";
+    const last = excursion[excursion.length - 1];
+    return `保有時間を延ばしたときの最大含み益MFEと最大含み損MAEの推移。MFEが最大なのは${mfePeak ? `${mfePeak.label}の${(mfePeak.mfe * 100).toFixed(2)}%` : "—"}で、最長保有時点のMAEは${(last.mae * 100).toFixed(2)}%です。`;
+  }, [view, holding, excursion, best, mfePeak]);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -182,7 +193,7 @@ export default function UsHoldingPeriodChart({ ticker }: Props) {
               <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5" style={{ backgroundColor: "#dc2626" }} /><span className="text-gray-600">MAE(最大含み損)</span></span>
             </div>
           )}
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

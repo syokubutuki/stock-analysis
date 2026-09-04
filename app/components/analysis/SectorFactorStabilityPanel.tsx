@@ -30,6 +30,7 @@ import {
 import type { StabilityWorkerRequest, StabilityWorkerResponse } from "../../lib/sector-factor-stability.worker";
 import type { FactorPrices } from "../../lib/sector-factor-select";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
@@ -279,6 +280,12 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
     (t: string) => (names[t] ?? t).slice(0, 12),
     [names]
   );
+
+  const decayDescription = useMemo(() => {
+    if (!result) return "順位の減衰曲線。まだ計算していません。";
+    const p = result.persistence;
+    return `将来の間隔h（横軸）に対して順位がどれだけ保たれるかπ(h)を描いた減衰曲線（${result.tickers.length}銘柄・${result.nObs}観測、${result.dateFrom}から${result.dateTo}）。判断に使うh=${p.decisionH}日でπ=${p.piPoint.toFixed(2)}（95%CI ${p.piLo.toFixed(2)}〜${p.piHi.toFixed(2)}）、フィットしたτは${p.tau === null ? "推定不能" : `${p.tau.toFixed(0)}日`}です。`;
+  }, [result]);
 
   // ── L2-A 減衰曲線 ────────────────────────────────────────
   const decayRef = useRef<HTMLCanvasElement | null>(null);
@@ -920,7 +927,7 @@ export default function SectorStabilityPanel({ state, controls, setControls, nam
         <div className="mb-1 text-[11px] font-medium text-gray-700">
           L2-A 持続率の減衰 π(h) ─ 今日の b の散らばりのうち h 日後まで残る割合
         </div>
-        <canvas ref={decayRef} />
+        <AccessibleCanvas ref={decayRef} description={decayDescription} />
         <div className="mt-1 text-[10px] leading-relaxed text-gray-500">
           π = <span className="font-mono">Cov_i(b̂_t, b̂_&#123;t+h&#125;) / [Var_i(b̂) − mean_i(SE²)]</span>。
           窓が重ならなければ推定誤差は共分散から自動的に消えるので、e をモデル化せずに η だけを取り出せる。

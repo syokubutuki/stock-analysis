@@ -20,6 +20,7 @@ import {
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import GuideEntryPanel from "./GuideEntryPanel";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -426,6 +427,13 @@ export default function GapAnalysisChart({ prices, period }: Props) {
   }, []);
 
   // === Draw canvases ===
+  const gapDistDescription = useMemo(() => {
+    if (!gapDistData || gapDistData.length === 0) return "ギャップサイズの分布。計算できるデータが不足しています。";
+    const peak = gapDistData.reduce((a, b) => (b.count > a.count ? b : a));
+    const total = gapDistData.reduce((a, b) => a + b.count, 0);
+    return `夜間リターン（ギャップ）のヒストグラム（${gapDistData.length}階級・${total}日）。最頻の階級は${peak.center.toFixed(2)}%付近で${peak.count}日、分布の幅は${gapDistData[0].center.toFixed(2)}%から${gapDistData[gapDistData.length - 1].center.toFixed(2)}%です。`;
+  }, [gapDistData]);
+
   useEffect(() => {
     if (gaps.length < 5) return;
     if (gapDistRef.current && gapDistData) drawGapDist(gapDistRef.current, gapDistData);
@@ -512,7 +520,7 @@ export default function GapAnalysisChart({ prices, period }: Props) {
       {gapDistData && (
         <div>
           <div className="text-xs text-gray-500 mb-1">ギャップサイズ分布 (夜間リターンのヒストグラム)</div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={gapDistRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={gapDistRef} description={gapDistDescription} /></div>
         </div>
       )}
 

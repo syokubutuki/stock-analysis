@@ -21,6 +21,7 @@ import { initCanvas, fmtSignedPct, fmtPct } from "./intradayShared";
 import { BinSchemeButtons, UsDriverButtons } from "./usSpilloverShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -139,6 +140,13 @@ export default function UsBinEventStudyChart({ prices }: Props) {
     }) : null),
     [prices, us, usMode, scheme, k, groupBy, filterBin, filterWeekday]
   );
+
+  const chartDescription = useMemo(() => {
+    if (!result || result.groups.length === 0) return "前後K日のイベントスタディ。整合できた標本が不足しています。";
+    const hi = result.groups.reduce((a, b) => (b.carPost > a.carPost ? b : a));
+    const lo = result.groups.reduce((a, b) => (b.carPost < a.carPost ? b : a));
+    return `前夜米国のビン別に、イベント日を0として前後の平均累積リターンを描いた図（全${result.nTotal}日、${result.groups.length}群）。イベント後の累積が最も高いのは${hi.label}の${(hi.carPost * 100).toFixed(2)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.carPost * 100).toFixed(2)}%で、翌日以降の寄与はそれぞれ${(hi.postDiff * 100).toFixed(2)}%・${(lo.postDiff * 100).toFixed(2)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!result || !canvasRef.current) return;
@@ -282,7 +290,7 @@ export default function UsBinEventStudyChart({ prices }: Props) {
             ))}
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
           <p className="text-[11px] text-gray-500">
             {"縦軸はイベント前日終値=0の累積対数リターン。s=−1 で全群が0に収束するのは定義による（そこを基準にしているため）。●はFDR補正後もその日の平均が0と異なる点。左側＝その条件が出るまでの背景、右側＝その後。"}
           </p>

@@ -22,6 +22,7 @@ import {
   type ParticipationResult,
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { DirectionGlyph, directionClass } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
@@ -131,6 +132,12 @@ export default function ParticipationPremiumChart() {
 
   // ── 参加の資産曲線（lightweight-charts：横軸=時間なので v5 標準） ──────────
   const chartContainer = useRef<HTMLDivElement | null>(null);
+  const histDescription = useMemo(() => {
+    if (!result) return "エントリー時刻スイープの分布。まだ計算していません。";
+    const s = result.sweep;
+    return `いつ買い始めたかを1日ずつずらしたときの${s.holdLabel}保有の年率リターンの分布（${s.n}通り）。中央値${(s.median * 100).toFixed(2)}%・平均${(s.mean * 100).toFixed(2)}%・標準偏差${(s.sd * 100).toFixed(2)}%で、最悪${(s.min * 100).toFixed(2)}%から最良${(s.max * 100).toFixed(2)}%まで散らばります（タイミングは分散だけを動かします）。`;
+  }, [result]);
+
   useEffect(() => {
     if (!chartContainer.current || !result) return;
     const el = chartContainer.current;
@@ -341,7 +348,7 @@ export default function ParticipationPremiumChart() {
                 sub="床は消えうる"
               />
             </div>
-            <canvas ref={histCanvas} className="w-full" style={{ height: 200 }} />
+            <AccessibleCanvas ref={histCanvas} description={histDescription} className="w-full" style={{ height: 200 }} />
             <p className="mt-1.5 text-[11px] text-gray-500">
               入口をずらしても分布の<b>平均（床）はほぼ動かず、広がる（分散）だけ</b>
               ＝タイミング否定の再確認。同時に、単一窓では床が負にもなる（

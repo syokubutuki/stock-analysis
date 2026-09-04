@@ -41,6 +41,7 @@ import {
 } from "../../lib/growth-drag";
 import { niceStep } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { DirectionGlyph, directionClass } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -205,6 +206,12 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
     setMoves((prev) => [...prev, ...Array.from({ length: count }, (_, i) => (i % 2 === 0 ? 1 : -1))]);
 
   const gameCanvas = useRef<HTMLCanvasElement | null>(null);
+  const gameDescription = useMemo(() => {
+    const p = game.path;
+    if (p.length === 0) return "コイン投げゲームの資産推移。まだ回していません。";
+    return `毎回同じ賭けを繰り返したときの資産推移（${p.length}回）。算術平均だけを見た期待値は${manYen(game.arith)}なのに対し、実際に辿った資産は${manYen(game.final)}で、複利では平均ではなく幾何成長率が効くことを示します。`;
+  }, [game]);
+
   useEffect(() => {
     const canvas = gameCanvas.current;
     if (!canvas) return;
@@ -471,7 +478,7 @@ export default function GrowthIntuitionPanel({ data, horizon = "swing" }: Props 
         </div>
 
         <div className="mt-2">
-          <canvas ref={gameCanvas} className="w-full" />
+          <AccessibleCanvas ref={gameCanvas} description={gameDescription} className="w-full" />
         </div>
         <p className="mt-1 text-[11px] text-gray-500">
           灰色の破線＝「平均リターンどおりに複利で増えたつもりの線」。交互に押していると平均は 0% なので

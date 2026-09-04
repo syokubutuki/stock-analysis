@@ -13,6 +13,7 @@ import {
 } from "../../lib/entry-vs-benchmark";
 import { TickerPrices, Side, EXIT_LABEL } from "../../lib/weekly-allocation";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -267,6 +268,19 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
     });
   }, [tickers, pricesByTicker, names, side, exitDay, kellyFraction, maxWeight, weightMode, benchPrices, benchTicker]);
 
+  const eqDescription = useMemo(() => {
+    if (!result.ok || result.rows.length === 0) return "戦略別の資金曲線。標本が不足しています。";
+    const best = result.rows.reduce((a, b) => (b.perf.cagr > a.perf.cagr ? b : a));
+    const worst = result.rows.reduce((a, b) => (b.perf.cagr < a.perf.cagr ? b : a));
+    return `エントリー戦略だけを差し替えた${result.rows.length}本の資金曲線を重ねた図（${result.nStocks}銘柄・${result.nWeeks}週、${result.from}から${result.to}）。年率(CAGR)が最も高いのは${best.label}の${(best.perf.cagr * 100).toFixed(2)}%（シャープ${best.perf.sharpe.toFixed(2)}）、最も低いのは${worst.label}の${(worst.perf.cagr * 100).toFixed(2)}%です。`;
+  }, [result]);
+
+  const atDescription = useMemo(() => {
+    const a = result.ok ? result.attribution : null;
+    if (!a || !a.ok) return "対数加法分解。標本が不足しています。";
+    return `戦略の年率対数リターンを市場・銘柄選択・資金配分・エントリーの4層に分けたウォーターフォール。市場${(a.market * 100).toFixed(2)}%＋選択${(a.selection * 100).toFixed(2)}%＋配分${(a.allocation * 100).toFixed(2)}%＋タイミング${(a.timing * 100).toFixed(2)}%＝合計${(a.total * 100).toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result.ok) return;
     const draw = () => {
@@ -391,7 +405,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
       </div>
 
       <div className="mt-3">
-        <canvas ref={eqRef} />
+        <AccessibleCanvas ref={eqRef} description={eqDescription} />
       </div>
 
       {/* 成績表 */}
@@ -456,7 +470,7 @@ export default function EntryVsBenchmarkChart({ tickers, pricesByTicker, names }
           総リターンの分解：エッジはどこから来ているか
         </div>
         <div className="mt-1">
-          <canvas ref={atRef} />
+          <AccessibleCanvas ref={atRef} description={atDescription} />
         </div>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-[11px] border-collapse">

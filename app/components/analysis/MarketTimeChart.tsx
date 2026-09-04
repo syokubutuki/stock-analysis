@@ -185,6 +185,11 @@ export default function MarketTimeChart({ prices }: Props) {
   }, [result]);
 
   // Chart 2: Price in calendar time vs volume time
+  const priceDescription = useMemo(() => {
+    if (result.data.length < 2) return "3つの時間軸で見た価格。計算できるデータが不足しています。";
+    return `同じ価格系列を、カレンダー時間・出来高時間・ボラティリティ時間の3つの軸で並べ直して重ねた図（${result.data.length}点）。市場時間では出来高やボラが多い時期ほど横に引き伸ばされ、少ない時期は圧縮されます。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = priceCanvasRef.current;
     if (!canvas || result.data.length < 2) return;
@@ -318,6 +323,11 @@ export default function MarketTimeChart({ prices }: Props) {
   }, [result]);
 
   // Chart 3: Price resampled in volatility time
+  const volPriceDescription = useMemo(() => {
+    if (result.volumeResampled.length < 2) return "市場時間で等間隔リサンプルした価格。計算できるデータが不足しています。";
+    return `出来高時間（${result.volumeResampled.length}点）とボラティリティ時間（${result.volatilityResampled.length}点）で等間隔にリサンプルした価格を並べた図。等間隔にすると、リターンの分布が正規分布に近づくかどうかを見る図です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = volPriceCanvasRef.current;
     if (!canvas || result.data.length < 2) return;
@@ -500,12 +510,12 @@ export default function MarketTimeChart({ prices }: Props) {
 
       {/* Chart 2: Price in volume time */}
       <div>
-        <canvas ref={priceCanvasRef} />
+        <AccessibleCanvas ref={priceCanvasRef} description={priceDescription} />
       </div>
 
       {/* Chart 3: Price in volatility time */}
       <div>
-        <canvas ref={volPriceCanvasRef} />
+        <AccessibleCanvas ref={volPriceCanvasRef} description={volPriceDescription} />
       </div>
 
       <AnalysisGuide title="市場時間の再定義 - 詳細理論">

@@ -23,6 +23,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -103,6 +104,14 @@ export default function IntradayWindowChart({ ticker }: Props) {
     return computeWindowWeekday(resp.bars, resp.gmtoffset, effectiveStartMin, effectiveEndMin, intervalToMin(interval));
   }, [resp, effectiveStartMin, effectiveEndMin, interval]);
   const showResult = !!result;
+
+  const chartDescription = useMemo(() => {
+    if (!result || result.rows.length === 0) return "曜日別の窓リターン。標本が不足しています。";
+    const hi = result.rows.reduce((a, b) => (b.mean > a.mean ? b : a));
+    const lo = result.rows.reduce((a, b) => (b.mean < a.mean ? b : a));
+    const sig = result.rows.filter((r) => r.signif).length;
+    return `選んだ時間窓のリターンを曜日別に横棒で並べた図（全${result.totalDays}日、全曜日まとめの平均は${(result.all.mean * 100).toFixed(3)}%）。最も高いのは曜日${hi.weekday}の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}、勝率${(hi.win * 100).toFixed(0)}%）、最も低いのは曜日${lo.weekday}の${(lo.mean * 100).toFixed(3)}%で、FDR補正後に有意なのは${sig}曜です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!result || !canvasRef.current) return;
@@ -262,7 +271,7 @@ export default function IntradayWindowChart({ ticker }: Props) {
             </table>
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           {/* ── 分位ビン × 原系列タイムライン ── */}
           <div className="pt-3 border-t border-gray-100 space-y-3">

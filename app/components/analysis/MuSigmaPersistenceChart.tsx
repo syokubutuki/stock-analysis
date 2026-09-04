@@ -17,6 +17,7 @@ import { muSigmaPersistence, type PersistenceRow } from "../../lib/mu-sigma-pers
 import { niceTicks, placeRect, type LabelRect } from "../../lib/axis-scale";
 import { CHART_COLORS, DIRECTION_TEXT_CLASS } from "../../lib/chart-colors";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   tickers: string[];
@@ -65,6 +66,11 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
       ),
     [tickers, pricesByTicker, names]
   );
+
+  const chartDescription = useMemo(() => {
+    if (res.rows.length < 3) return "前半と後半のμ・σの対応。標本が不足しています。";
+    return `${res.rows.length}銘柄について、前半（${res.from1}〜${res.to1}）と後半（${res.from2}〜${res.to2}）のσとμを対にした散布図（各半分${res.halfYears.toFixed(1)}年）。σの順位相関は${res.spearmanSigma.toFixed(2)}（ピアソン${res.pearsonSigma.toFixed(2)}）に対し、μの順位相関は${res.spearmanMu.toFixed(2)}（ピアソン${res.pearsonMu.toFixed(2)}）で、σは続くがμは続かないことを示します。`;
+  }, [res]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -358,7 +364,7 @@ export default function MuSigmaPersistenceChart({ tickers, pricesByTicker, names
       </label>
 
       <div className="relative">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
       <p className="text-[11px] text-gray-600 -mt-2 leading-relaxed">
         {res.medAbsDMu > res.medAbsDSigma * 1.5 ? (
