@@ -70,7 +70,7 @@ export default function UsAbsorptionChart({ ticker }: Props) {
     if (!result || result.timeLabels.length === 0) return "米国材料の吸収曲線。整合できた標本が不足しています。";
     let pi = 0;
     for (let i = 1; i < result.fraction.length; i++) if (Math.abs(result.fraction[i]) > Math.abs(result.fraction[pi])) pi = i;
-    return `前夜米国の材料を当日どこまで織り込んだかの曲線 f(t)（引け＝1）。寄付の時点で${(result.gapShare * 100).toFixed(0)}%を織り込み、最大は${result.timeLabels[pi]}の${result.fraction[pi].toFixed(2)}、引けの平均は${result.endMean.toFixed(2)}%です。`;
+    return `前夜米国の材料を当日どこまで織り込んだかの曲線 f(t)（引け＝1）。寄付の時点で${(result.gapShare * 100).toFixed(0)}%を織り込み、最大は${result.timeLabels[pi]}の${result.fraction[pi].toFixed(2)}、引けの平均は${(result.endMean * 100).toFixed(2)}%です。`;
   }, [result]);
 
   useEffect(() => {

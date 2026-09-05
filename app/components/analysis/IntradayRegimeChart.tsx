@@ -139,7 +139,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
       if (!regime || regime.buckets.length === 0) return "日内の状態分類。標本が不足しています。";
       const top = regime.buckets.reduce((a, b) => (b.count > a.count ? b : a));
       const best = regime.buckets.reduce((a, b) => (b.nextMeanPct > a.nextMeanPct ? b : a));
-      return `対象${regime.nDays}営業日を効率比${regime.erThreshold}で状態分類し、状態ごとの翌日リターンを並べた図。最も多いのは${top.label}の${top.count}日、翌日の平均が最も高いのは${best.label}の${best.nextMeanPct.toFixed(2)}%（勝率${(best.nextWin * 100).toFixed(0)}%）です。`;
+      return `対象${regime.nDays}営業日を効率比${regime.erThreshold}で状態分類し、状態ごとの翌日リターンを並べた図。最も多いのは${LABEL_NAME[top.label]}の${top.count}日、翌日の平均が最も高いのは${LABEL_NAME[best.label]}の${best.nextMeanPct.toFixed(2)}%（勝率${(best.nextWin * 100).toFixed(0)}%）です。`;
     }
     if (view === "analog") {
       if (!analog) return "類似日の日中経路。標本が不足しています。";
