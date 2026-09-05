@@ -10,6 +10,7 @@ import {
 } from "../../lib/ticker-pages";
 import type { Instrument } from "../../lib/instruments";
 import { NOTO_SANS_JP_400_BASE64, NOTO_SANS_JP_700_BASE64 } from "./_fonts/subset-base64";
+import { OG_TEXT, coveredByOgFont as covered } from "./_fonts/charset";
 
 export const alt = "株価構造分析 — 銘柄の直近1年の実測サマリー";
 export const size = { width: 1200, height: 630 };
@@ -25,26 +26,6 @@ const IMAGE_CACHE_CONTROL =
 // 数値の入らなかった画像まで8時間貼り付けない。一過性の上流障害から早く復帰させる。
 const FALLBACK_CACHE_CONTROL =
   "public, max-age=0, s-maxage=300, stale-while-revalidate=3600";
-
-/**
- * 同梱サブセットが収録している文字。`_fonts/README.md` の焼き直し手順と対になる唯一の定義。
- * **ここに無い文字を描くと豆腐になる**ので、描画前に必ず covered() を通すこと。
- */
-const OG_FONT_CHARSET =
-  " %&()+,-./0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" +
-  "·−　、。" +
-  "いかくこごさすずそただでなのはばほみらりれをァアィイウエオカガキクグケコサザジス" +
-  "セソタダチヂッテデトドナニノハバパヒフブプペボマミムモャヤユヨラリルレロン・ー" +
-  "一三上中丸事井京任伊住作価信値備共分券動化友味和品商国在地堂場塚塩士外大天学実富" +
-  "小属山崎川工市年忠成所技投指数日旭時最月期本村東松析柄株格業構機武気水海測準点物" +
-  "率王現生産田直研確積立第米紅素義自船花菱薬藤製西託証話認豊資越車近通造郵重野金鉄" +
-  "鉱銘間隠電（）";
-
-const FONT_GLYPHS = new Set(OG_FONT_CHARSET);
-
-function covered(...texts: string[]): boolean {
-  return texts.every((text) => [...text].every((char) => FONT_GLYPHS.has(char)));
-}
 
 // フォントは base64 で同梱している（理由は _fonts/subset-base64.ts の冒頭）。
 // モジュール評価はインスタンスにつき1回なので、リクエストごとのデコードは起きない。
@@ -193,7 +174,7 @@ function Header({ left }: { left: string }) {
         />
         <div style={{ fontSize: 26, color: COLORS.muted }}>{left}</div>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 700, color: "#dce9f7" }}>株価構造分析</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: "#dce9f7" }}>{OG_TEXT.siteName}</div>
     </div>
   );
 }
@@ -243,7 +224,7 @@ function InstrumentCard({
   const currency = unit ?? instrument.currency;
   return (
     <Frame>
-      <Header left={`${instrument.market} · ${currency}`} />
+      <Header left={`${instrument.market}${OG_TEXT.metaSeparator}${currency}`} />
 
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div
@@ -252,24 +233,24 @@ function InstrumentCard({
           {instrument.name}
         </div>
         <div style={{ fontSize: 26, color: COLORS.muted, marginTop: 14 }}>
-          {`銘柄コード ${instrument.ticker}`}
+          {`${OG_TEXT.tickerCodePrefix}${instrument.ticker}`}
         </div>
       </div>
 
       {summary ? (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
           <Metric
-            label={`現在値 ${currency}`}
+            label={`${OG_TEXT.currentPriceLabel}${currency}`}
             value={formatSummaryPrice(summary.currentPrice, currency)}
           />
           <Metric
-            label="期間リターン"
+            label={OG_TEXT.periodReturnLabel}
             value={signedPercent(summary.periodReturn)}
             color={signColor(summary.periodReturn)}
           />
-          <Metric label="年率ボラティリティ" value={plainPercent(summary.annualizedVolatility)} />
+          <Metric label={OG_TEXT.volatilityLabel} value={plainPercent(summary.annualizedVolatility)} />
           <Metric
-            label="最大ドローダウン"
+            label={OG_TEXT.maxDrawdownLabel}
             value={signedPercent(summary.maxDrawdown)}
             color={signColor(summary.maxDrawdown)}
           />
@@ -286,12 +267,16 @@ function InstrumentCard({
             color: COLORS.muted,
           }}
         >
-          実測値を準備中です
+          {OG_TEXT.summaryPending}
         </div>
       )}
 
       <Footer
-        right={summary ? `直近1年 · ${formatAsOf(summary.asOf)}時点` : "直近1年の実測サマリー"}
+        right={
+          summary
+            ? `${OG_TEXT.recentYearPrefix}${formatAsOf(summary.asOf)}${OG_TEXT.asOfSuffix}`
+            : OG_TEXT.recentYearSummary
+        }
       />
     </Frame>
   );
@@ -301,14 +286,14 @@ function InstrumentCard({
 function GenericCard() {
   return (
     <Frame>
-      <Header left="実測データの分析" />
+      <Header left={OG_TEXT.genericHeaderLeft} />
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ fontSize: 88, fontWeight: 700, lineHeight: 1.18 }}>株価構造分析</div>
+        <div style={{ fontSize: 88, fontWeight: 700, lineHeight: 1.18 }}>{OG_TEXT.siteName}</div>
         <div style={{ fontSize: 30, color: COLORS.muted, marginTop: 18 }}>
-          市場の隠れた構造を、データから。
+          {OG_TEXT.genericTagline}
         </div>
       </div>
-      <Footer right="実測サマリーは銘柄ページでご確認ください" />
+      <Footer right={OG_TEXT.genericFooter} />
     </Frame>
   );
 }

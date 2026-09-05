@@ -34,13 +34,25 @@ OFL は改変・再配布を許可する（同一ライセンスでの配布が�
 2. `opengraph-image.tsx` の固定文言（ラベル・ドメイン名・フォールバック文）
 3. 数字・記号・英字
 
-**この範囲外の文字が来たら豆腐になる。** そのため `opengraph-image.tsx` は
-`OG_FONT_CHARSET` に同じ文字列を持ち、描画前に被覆を検査して、
-外れた文字が1つでもあれば数値なしの汎用画像へ退避する（豆腐を出さない）。
+**この範囲外の文字が来たら豆腐になる。** そのため `charset.ts` が
+`OG_FONT_CHARSET` に同じ文字列を持ち、`opengraph-image.tsx` が描画前に
+`coveredByOgFont()` で被覆を検査して、外れた文字が1つでもあれば数値なしの汎用画像へ
+退避する（豆腐を出さない）。**画像に描く固定文言は `charset.ts` の `OG_TEXT` に置く**
+（直書きすると被覆検査の網から外れ、豆腐がそのまま焼かれる）。
 
 → したがって**銘柄を入れ替えたら、下の手順でサブセットを焼き直し、
-`OG_FONT_CHARSET` も更新すること。** 忘れても画像は壊れず汎用画像に落ちるだけだが、
-その銘柄だけ数値の入ったカードが出なくなる（FU20 と同じ性質の宿題）。
+`OG_FONT_CHARSET` も更新すること。**
+
+**この同期はテストで縛ってある**（FU28・`app/lib/__tests__/og-font-charset.test.ts`）。
+
+| 検査 | 止める壊れ方 |
+|---|---|
+| `TICKER_PAGE_INSTRUMENTS` の全銘柄 ⊆ `OG_FONT_CHARSET` | 銘柄を足して焼き直し忘れ → **その銘柄だけ汎用画像に退化** |
+| `OG_FIXED_TEXTS` ⊆ `OG_FONT_CHARSET` | 収録外の字を含むラベル追加 → **豆腐** |
+| `OG_FONT_CHARSET` = 同梱TTF2本の cmap（厳密一致） | 文字列だけ書き足してフォントを焼き直さない → **豆腐** |
+
+**「1 だけ直す」を絶対にしないこと。** `OG_FONT_CHARSET` を広げてフォントを
+焼き直さないと、フォントに無い字が「収録済み」として検査を素通りする。
 
 ## 焼き直しの手順
 
@@ -55,7 +67,7 @@ for W in 400 700; do
   curl -sSL -o "NotoSansJP-$W.ttf" "$URL"
 done
 
-# 2) opengraph-image.tsx の OG_FONT_CHARSET をそのまま charset.txt（UTF-8）に置き、
+# 2) charset.ts の OG_FONT_CHARSET をそのまま charset.txt（UTF-8）に置き、
 #    コードポイント列へ変換
 python -c "import io;s=io.open('charset.txt',encoding='utf-8').read();io.open('unicodes.txt','w').write(','.join('U+%04X'%ord(c) for c in s))"
 
