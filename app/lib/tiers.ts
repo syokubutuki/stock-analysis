@@ -53,8 +53,13 @@ const FREE_SERIES_SEGMENTS = new Set([
  * カテゴリは有料だが、個別に無料へ引き上げるパネル。
  * ここに並ぶのは「自分の発見を疑うための道具」であって、
  * 発見そのものを増やす道具ではない。上のコメントの理由により無料。
+ *
+ * **パネルIDの文字列複製である**（レジストリ `panel-registry.tsx` が正）。
+ * 改名すると課金境界が無言でずれるので、`__tests__/tiers.test.ts` が
+ * 実在性を双方向で突き合わせ、`isPanelFree()` の無料/有料の内訳を黄金値で固定している。
+ * export しているのはそのテストのためで、判定は `isPanelFree()` を使うこと。
  */
-const FREE_PANEL_IDS = new Set([
+export const FREE_PANEL_IDS: ReadonlySet<string> = new Set([
   "edge-walkforward", // ウォークフォワード頑健性（DSR + PBO）
   "edge-power", // 検出力の壁（今の標本で証明できるか）
   "edge-decay", // エッジ減衰・死亡検知（SPRT + CUSUM）
