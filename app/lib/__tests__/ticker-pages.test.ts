@@ -20,11 +20,13 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
+import { getInstrumentByTicker } from "../instruments";
 import {
   TICKER_PAGE_INSTRUMENTS,
   buildTickerPageSummary,
   getTickerPageInstrument,
 } from "../ticker-pages";
+import { getUniverse } from "../universes";
 import type { PricePoint } from "../types";
 import { assertGolden, annualizedSigma, logReturnsOf } from "./helpers/golden";
 
@@ -88,6 +90,65 @@ describe("getTickerPageInstrument: 表記ゆれを canonical へ寄せる", () =
       TICKER_PAGE_INSTRUMENTS.length > 50,
       `公開対象が ${TICKER_PAGE_INSTRUMENTS.length} 件しかない`,
     );
+  });
+});
+
+// FU40: 手動台帳 `PRICE_UNAVAILABLE_TICKERS` の腐り。
+//
+// **縛れる範囲をはっきりさせておく。** 台帳の腐り方は3つある。
+//
+//   (A) 新たに取得不能になった銘柄が台帳に載らない
+//   (B) 台帳に載せた銘柄が復活しても外れない
+//   (C) 台帳が**空振り**になる（`major100` 側の変化で1件も除外しなくなる）
+//
+// (A) と (B) は実際に価格を取りに行かないと判定できず、S17 が FU20 で
+// 「sitemap 生成に外部取得を増やさない」と決めているので**検知は見送った**
+// （理由と手での再確認手順は `ticker-pages.ts` の当該コメント）。
+// ここで縛れるのは (C) だけである。**この describe が通っても「台帳が正しい」
+// ことにはならない。** 保証しているのは「台帳が効いている」ことだけ。
+describe("公開集合の導出（FU40: 縛れるのは台帳の空振りだけ）", () => {
+  const universeTickers = getUniverse("major100")?.tickers ?? [];
+  const resolvable = universeTickers
+    .map(({ ticker }) => getInstrumentByTicker(ticker))
+    .filter((instrument): instrument is NonNullable<typeof instrument> => Boolean(instrument));
+  const published = new Set(TICKER_PAGE_INSTRUMENTS.map((i) => i.ticker));
+  const excluded = resolvable.filter((i) => !published.has(i.ticker)).map((i) => i.ticker);
+
+  test("走査が生きている（0件のまま「全部通った」と報告しない）", () => {
+    assert.ok(universeTickers.length >= 90, `major100 が ${universeTickers.length} 件しかない`);
+    assert.ok(
+      resolvable.length === universeTickers.length,
+      `instruments へ解決できない銘柄がある: ${universeTickers.length - resolvable.length} 件`,
+    );
+  });
+
+  test("公開集合が major100 から台帳ぶんだけ引いたものになっている", () => {
+    // 2026-09-05 実測: major100 は 99件、除外は 9613 の1件、公開は 98件。
+    // ここが「99 / 0 / 99」に動いたら台帳が空振りになっている（(C)）。
+    // 逆に除外が増えたら、増やした本人が意図したかを確かめること。
+    assert.deepEqual(
+      { universe: resolvable.length, excluded: excluded.length, published: published.size },
+      { universe: 99, excluded: 1, published: 98 },
+    );
+  });
+
+  test("実際に除外されているのが 9613 だけである（台帳が効いている）", () => {
+    // 台帳の文字列と major100 の表記（`9613.T`）がずれると、この Set は
+    // 例外も警告も出さずに**何も除外しなくなる**。それをここで止める。
+    assert.deepEqual(excluded, ["9613"]);
+    assert.ok(
+      universeTickers.some(({ ticker }) => ticker === "9613.T"),
+      "major100 から 9613 が消えた。台帳のエントリは死んでいるので外すこと",
+    );
+  });
+
+  test("公開する全銘柄が canonical 表記で自分自身へ解決する", () => {
+    // sitemap は `/t/${instrument.ticker}` を出し、ページは同じ文字列を
+    // `getTickerPageInstrument()` に通す。ここがずれると sitemap のURLが 404 になる。
+    const broken = TICKER_PAGE_INSTRUMENTS.filter(
+      (i) => getTickerPageInstrument(i.ticker)?.ticker !== i.ticker,
+    ).map((i) => i.ticker);
+    assert.deepEqual(broken, [], `sitemap に載るが解決できないURL: ${broken.join(", ")}`);
   });
 });
 
