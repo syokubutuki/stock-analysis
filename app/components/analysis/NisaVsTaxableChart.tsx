@@ -563,9 +563,9 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
             <AccessibleCanvas ref={histRef} description={histDescription} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-            <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" color={rolling.winRate > 0.5 ? "text-blue-600" : "text-emerald-700"} directionValue={rolling.winRate - 0.5} />
-            <Stat label="差の中央値" value={pct(rolling.medianEdge)} sub="戦略 − NISA" color={cls(rolling.medianEdge)} directionValue={rolling.medianEdge} />
-            <Stat label="差の平均" value={pct(rolling.meanEdge)} sub="戦略 − NISA" color={cls(rolling.meanEdge)} directionValue={rolling.meanEdge} />
+            <Stat label="戦略の勝率" value={`${(rolling.winRate * 100).toFixed(0)}%`} sub="NISAを上回った窓" directionValue={rolling.winRate - 0.5} />
+            <Stat label="差の中央値" value={pct(rolling.medianEdge)} sub="戦略 − NISA" directionValue={rolling.medianEdge} />
+            <Stat label="差の平均" value={pct(rolling.meanEdge)} sub="戦略 − NISA" directionValue={rolling.meanEdge} />
             <Stat label="差の5–95%" value={`${pct(rolling.p5)} 〜 ${pct(rolling.p95)}`} sub="ばらつき" />
           </div>
           <p className="text-xs text-fg-muted">
@@ -757,11 +757,11 @@ export default function NisaVsTaxableChart({ prices, plan }: Props) {
   );
 }
 
-function Stat({ label, value, sub, color, directionValue }: { label: string; value: string; sub?: string; color?: string; directionValue?: number }) {
+function Stat({ label, value, sub, directionValue }: { label: string; value: string; sub?: string; directionValue?: number }) {
   return (
     <div className="rounded-lg border border-gray-200 p-2">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-lg font-bold ${directionValue !== undefined ? directionClass(directionValue) : color ?? "text-gray-800"}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
+      <div className={`text-lg font-bold ${directionValue !== undefined ? directionClass(directionValue) : "text-gray-800"}`}>{directionValue !== undefined && <DirectionGlyph value={directionValue} />}{value}</div>
       {sub && <div className="text-[10px] text-fg-muted">{sub}</div>}
     </div>
   );
