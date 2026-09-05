@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 曜日トレード・シミュレータ（旧: SpiralHeatmap 内に埋没していた機能を独立コンポーネントへ移設）。
 // 任意の曜日×注文タイミング(始値/終値)×方向(買/売)の売買を編集し、複数レグを週内で1本に連結して
@@ -18,6 +18,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { type SlotSide } from "./WeekSlotGrid";
 import {
   computeStrategy,
@@ -166,7 +167,7 @@ function hitTestTimingMatrix(width: number, x: number, y: number): { idx: number
 function pct(v: number): string { return (v * 100).toFixed(3) + "%"; }
 function pct2(v: number): string { return (v * 100).toFixed(2) + "%"; }
 function bpDay(v: number): string { return (v * 10000).toFixed(2) + "bp"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return directionClass(v); }
 function initCanvas(canvas: HTMLCanvasElement, height: number): { ctx: CanvasRenderingContext2D; width: number; height: number } | null {
   const parent = canvas.parentElement;
   if (!parent) return null;
@@ -523,6 +524,22 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
   }, [bhEquity, equitySeriesData]);
 
   // === Draw 全組合せヒートマップ ===
+  const matrixDescription = useMemo(() => {
+    let best: { m: typeof tradeMatrices[number]; e: number; x: number; v: number } | null = null;
+    let nCells = 0;
+    for (const m of tradeMatrices) {
+      m.grid.forEach((row, e) => row.forEach((v, x) => {
+        if (v == null) return;
+        nCells++;
+        if (!best || v > best.v) best = { m, e, x, v };
+      }));
+    }
+    if (!best) return "曜日×売買時刻のマトリクス。標本が不足しています。";
+    const wd = ["月", "火", "水", "木", "金"];
+    const b = best as { m: typeof tradeMatrices[number]; e: number; x: number; v: number };
+    return `建て曜日（縦）×手仕舞い曜日（横）を、寄り・引けの組合せ${tradeMatrices.length}面ぶん並べたマトリクス（有効セル${nCells}個）。最も良いのは${b.m.entryTiming === "open" ? "寄り" : "引け"}建て→${b.m.exitTiming === "open" ? "寄り" : "引け"}手仕舞いの面の${wd[b.e]}曜→${wd[b.x]}曜で、値は${(b.v * 100).toFixed(3)}%です。`;
+  }, [tradeMatrices]);
+
   useEffect(() => {
     if (tradeMatrixRef.current) drawTimingMatrices(tradeMatrixRef.current, tradeMatrices, matrixMetric);
   }, [tradeMatrices, matrixMetric, drawTimingMatrices]);
@@ -1002,7 +1019,7 @@ export default function WeekdayTradeSimulator({ prices, onSendPlan }: Props) {
               ))}
             </div>
           </div>
-          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><canvas ref={tradeMatrixRef} onClick={addSpecFromMatrix} className="cursor-pointer" /></div>
+          <div className="w-full rounded border border-gray-100 bg-white overflow-x-auto overflow-hidden"><AccessibleCanvas ref={tradeMatrixRef} description={matrixDescription} onClick={addSpecFromMatrix} className="cursor-pointer" /></div>
         </div>
       </div>
 

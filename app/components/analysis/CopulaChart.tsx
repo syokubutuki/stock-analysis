@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
@@ -9,6 +9,7 @@ import { SeriesMode } from "../../lib/series-mode";
 import { alignSeries } from "../../lib/benchmark";
 import { computeCopulaAnalysis, type CopulaResult } from "../../lib/copula";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import DataQualityNotice from "./DataQualityNotice";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -293,6 +294,11 @@ export default function CopulaChart({ prices }: Props) {
   }, [prices, benchPrices]);
 
   // Draw return scatter
+  const returnScatterDescription = useMemo(() => {
+    if (!result) return "銘柄とベンチマークのリターン散布図。ベンチマークを読み込めていません。";
+    return `銘柄（縦軸）とベンチマーク（横軸）の日次リターンの散布図（${result.stockReturns.length}日）。ピアソン相関${result.pearson.toFixed(3)}、ケンドールτ=${result.kendallTau.toFixed(3)}、スピアマンρ=${result.spearmanRho.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!returnCanvasRef.current || !result) return;
     drawReturnScatter(
@@ -304,6 +310,11 @@ export default function CopulaChart({ prices }: Props) {
   }, [result, benchKey]);
 
   // Draw copula scatter
+  const copulaScatterDescription = useMemo(() => {
+    if (!result) return "コピュラ散布図。ベンチマークを読み込めていません。";
+    return `順位変換した(u,v)平面の散布図（${result.stockRanks.length}点）。下側テール依存は${result.lowerTail.toFixed(3)}、上側は${result.upperTail.toFixed(3)}、その差（テール非対称）は${result.tailAsymmetry.toFixed(3)}で、負なら暴落時にだけ一緒に落ちることを表します。`;
+  }, [result]);
+
   useEffect(() => {
     if (!copulaCanvasRef.current || !result) return;
     drawCopulaScatter(
@@ -409,13 +420,7 @@ export default function CopulaChart({ prices }: Props) {
             <div className="p-2 bg-gray-50 rounded">
               <div className="text-gray-500">テール非対称</div>
               <div
-                className={`font-mono font-medium ${
-                  result.tailAsymmetry > 0
-                    ? "text-green-700"
-                    : result.tailAsymmetry < 0
-                    ? "text-red-700"
-                    : "text-gray-700"
-                }`}
+                className={`font-mono font-medium ${directionClass(result.tailAsymmetry)}`}
               ><DirectionGlyph value={result.tailAsymmetry} />
                 {result.tailAsymmetry >= 0 ? "+" : ""}
                 {fmtPct(result.tailAsymmetry)}
@@ -441,7 +446,8 @@ export default function CopulaChart({ prices }: Props) {
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300 mr-1" />
             逆方向
           </div>
-          <canvas
+          <AccessibleCanvas
+                description={returnScatterDescription}
             ref={returnCanvasRef}
             className="w-full rounded border border-gray-100 mb-4 block"
           />
@@ -455,7 +461,8 @@ export default function CopulaChart({ prices }: Props) {
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-400 mr-1" />
             上側テール（上位10%急騰）
           </div>
-          <canvas
+          <AccessibleCanvas
+                description={copulaScatterDescription}
             ref={copulaCanvasRef}
             className="w-full rounded border border-gray-100 block"
           />

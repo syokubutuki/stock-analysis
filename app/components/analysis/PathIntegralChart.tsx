@@ -1,11 +1,12 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computePathIntegral } from "../../lib/path-integral";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -32,6 +33,14 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function PathIntegralChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computePathIntegral(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.paths.length === 0) return "経路積分のシミュレーション。計算できるデータが不足しています。";
+    const b = result.bands;
+    const i = b.p50.length - 1;
+    const f = result.finalStats;
+    return `GARCHブートストラップで${result.paths.length}本の経路を${result.horizon}日先まで生成し、5〜95%のバンドと代表経路を描いた図。最終日の中央値は${(b.p50[i] * 100).toFixed(2)}%、5〜95%は${(b.p5[i] * 100).toFixed(2)}%から${(b.p95[i] * 100).toFixed(2)}%で、上昇確率は${(f.upProb * 100).toFixed(1)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     const draw = () => {
@@ -211,16 +220,14 @@ export default function PathIntegralChart({ prices }: Props) {
         経路積分 (GARCH Bootstrap Monte Carlo)
       </h3>
       <div className="relative">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded border">
           <div className="text-gray-500">上昇確率</div>
           <div
-            className={`font-mono font-bold ${
-              finalStats.upProb >= 0.5 ? "text-green-700" : "text-red-600"
-            }`}
+            className={`font-mono font-bold ${directionClass(finalStats.upProb - 0.5)}`}
           >
             <DirectionGlyph value={finalStats.upProb - 0.5} />{(finalStats.upProb * 100).toFixed(1)}%
           </div>
@@ -228,9 +235,7 @@ export default function PathIntegralChart({ prices }: Props) {
         <div className="p-2 bg-gray-50 rounded border">
           <div className="text-gray-500">期待リターン</div>
           <div
-            className={`font-mono font-bold ${
-              finalStats.mean >= 0 ? "text-green-700" : "text-red-600"
-            }`}
+            className={`font-mono font-bold ${directionClass(finalStats.mean)}`}
           >
             <DirectionGlyph value={finalStats.mean} />{(finalStats.mean * 100).toFixed(2)}%
           </div>

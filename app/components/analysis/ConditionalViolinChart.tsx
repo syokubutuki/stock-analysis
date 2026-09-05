@@ -1,12 +1,13 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { conditionalDistributions, violinByGroup, type ViolinData } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -29,7 +30,7 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 }
 
 function pctFmt(v: number, d = 4): string { return (v * 100).toFixed(d) + "%"; }
-function colorClass(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorClass(v: number): string { return directionClass(v); }
 
 function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: string) {
   const r = initCanvas(canvas, 280); if (!r) return;
@@ -169,6 +170,15 @@ function drawConditionalHists(canvas: HTMLCanvasElement, data: ReturnType<typeof
   }
 }
 
+// バイオリン図の代替テキスト。コンポーネント内に置くと useMemo の依存に入るので外に出す。
+function describeViolins(title: string, vs: ViolinData[]): string {
+  if (vs.length === 0) return `${title}。計算できるデータが不足しています。`;
+  const hi = vs.reduce((a, b) => (b.median > a.median ? b : a));
+  const lo = vs.reduce((a, b) => (b.median < a.median ? b : a));
+  const wide = vs.reduce((a, b) => (b.q75 - b.q25 > a.q75 - a.q25 ? b : a));
+  return `${title}（${vs.length}群）。中央値が最も高いのは${hi.label}の${(hi.median * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.median * 100).toFixed(3)}%、四分位範囲が最も広いのは${wide.label}の${((wide.q75 - wide.q25) * 100).toFixed(3)}%です。`;
+}
+
 export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
   const weekdayRef = useRef<HTMLCanvasElement>(null);
   const monthRef = useRef<HTMLCanvasElement>(null);
@@ -180,6 +190,15 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
   const weekdayViolins = useMemo(() => violinByGroup(lr, times, "weekday"), [prices, seriesMode]);
   const monthViolins = useMemo(() => violinByGroup(lr, times, "month"), [prices, seriesMode]);
   const condDist = useMemo(() => conditionalDistributions(lr), [prices, seriesMode]);
+
+  const weekdayViolinDescription = useMemo(() => describeViolins("曜日別リターン分布のバイオリンプロット", weekdayViolins), [weekdayViolins]);
+  const monthViolinDescription = useMemo(() => describeViolins("月別リターン分布のバイオリンプロット", monthViolins), [monthViolins]);
+  const condDescription = useMemo(() => {
+    if (condDist.length === 0) return "条件付き分布のヒストグラム。計算できるデータが不足しています。";
+    const hi = condDist.reduce((a, b) => (b.mean > a.mean ? b : a));
+    const fat = condDist.reduce((a, b) => (b.kurtosis > a.kurtosis ? b : a));
+    return `直前の値動きで場合分けした条件付き分布のヒストグラム（${condDist.length}群）。平均が最も高いのは${hi.label}の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}）、尖度が最も高いのは${fat.label}の${fat.kurtosis.toFixed(2)}です。`;
+  }, [condDist]);
 
   useEffect(() => {
     if (weekdayRef.current && weekdayViolins.length > 0)
@@ -230,7 +249,7 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
               </tbody>
             </table>
           </div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={condRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={condRef} description={condDescription} /></div>
         </>
       )}
 
@@ -247,10 +266,10 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
       </div>
 
       {violinMode === "weekday" && weekdayViolins.length > 0 && (
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={weekdayRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={weekdayRef} description={weekdayViolinDescription} /></div>
       )}
       {violinMode === "month" && monthViolins.length > 0 && (
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={monthRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={monthRef} description={monthViolinDescription} /></div>
       )}
 
       <AnalysisGuide title="条件付き分布・バイオリンプロットの詳細理論">

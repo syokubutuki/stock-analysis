@@ -3,8 +3,9 @@
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries, SERIES_MODE_LABELS } from "../../lib/series-mode";
-import { acf, pacf, confidenceBound } from "../../lib/autocorrelation";
+import { acf, pacf, confidenceBound, type ACFPoint } from "../../lib/autocorrelation";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -87,6 +88,16 @@ function drawACF(
   ctx.fillText("Lag", width / 2 - 10, height - 3);
 }
 
+// 3つの ACF/PACF 図は同時に出るので、それぞれ「どのラグが帯を超えたか」を言う。
+// コンポーネント内に置くと useMemo の依存に入り、毎レンダーで作り直される。
+function describeAcf(title: string, data: ACFPoint[], bound: number): string {
+  const live = data.filter((d) => d.lag > 0);
+  if (live.length === 0) return `${title}。計算できるデータが不足しています。`;
+  const top = live.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
+  const over = live.filter((d) => Math.abs(d.value) > bound).map((d) => d.lag);
+  return `${title}。ラグ1から${live.length}までの棒グラフで、95%信頼帯は±${bound.toFixed(3)}。最大はラグ${top.lag}の${top.value.toFixed(3)}、帯を超えたラグは${over.length === 0 ? "ありません" : `${over.length}本（${over.slice(0, 5).join(", ")}${over.length > 5 ? " ほか" : ""}）`}。`;
+}
+
 export default function ACFChart({ prices, seriesMode }: Props) {
   const acfCanvasRef = useRef<HTMLCanvasElement>(null);
   const pacfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,6 +112,10 @@ export default function ACFChart({ prices, seriesMode }: Props) {
   const bound = confidenceBound(lr.length);
 
   const modeLabel = SERIES_MODE_LABELS[seriesMode];
+  const acfDescription = useMemo(() => describeAcf(`自己相関 ACF（${modeLabel}）`, acfData, bound), [acfData, bound, modeLabel]);
+  const pacfDescription = useMemo(() => describeAcf(`偏自己相関 PACF（${modeLabel}）`, pacfData, bound), [pacfData, bound, modeLabel]);
+  const acfSqDescription = useMemo(() => describeAcf(`二乗リターンの自己相関（${modeLabel}²・ボラティリティ・クラスタリング）`, acfSqData, bound), [acfSqData, bound, modeLabel]);
+
   useEffect(() => {
     if (acfCanvasRef.current) drawACF(acfCanvasRef.current, acfData, bound, `ACF (${modeLabel})`);
     if (pacfCanvasRef.current) drawACF(pacfCanvasRef.current, pacfData, bound, `PACF (${modeLabel})`);
@@ -118,12 +133,12 @@ export default function ACFChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <div className="w-full rounded border border-gray-100 overflow-hidden">
-            <canvas ref={acfCanvasRef} />
+            <AccessibleCanvas ref={acfCanvasRef} description={acfDescription} />
           </div>
         </div>
         <div>
           <div className="w-full rounded border border-gray-100 overflow-hidden">
-            <canvas ref={pacfCanvasRef} />
+            <AccessibleCanvas ref={pacfCanvasRef} description={pacfDescription} />
           </div>
         </div>
       </div>
@@ -131,7 +146,7 @@ export default function ACFChart({ prices, seriesMode }: Props) {
       <div className="mt-3">
         <div className="text-xs text-gray-500 mb-1">ボラティリティクラスタリング検出</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden">
-          <canvas ref={acfSqCanvasRef} />
+          <AccessibleCanvas ref={acfSqCanvasRef} description={acfSqDescription} />
         </div>
       </div>
 

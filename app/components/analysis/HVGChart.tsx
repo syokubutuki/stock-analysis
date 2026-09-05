@@ -12,6 +12,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeHVG } from "../../lib/hvg";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -66,6 +67,12 @@ export default function HVGChart({ prices, seriesMode }: Props) {
   }, [prices, hvg]);
 
   // Degree distribution
+  const distDescription = useMemo(() => {
+    if (hvg.degreeDistribution.length === 0) return "HVG次数分布。計算できるデータが不足しています。";
+    const peak = hvg.degreeDistribution.reduce((a, b) => (b.count > a.count ? b : a));
+    return `水平可視グラフの次数分布を片対数で描いた図（${hvg.degreeDistribution.length}階級）。最頻は次数${peak.degree}の${peak.count}件、平均次数は${hvg.meanDegree.toFixed(2)}、減衰率λ=${hvg.lambda.toFixed(3)}はランダム系列の理論値${hvg.theoreticalLambda.toFixed(3)}と${hvg.isNonlinear ? "有意に異なり非線形性あり" : "大きくは変わりません"}。`;
+  }, [hvg]);
+
   useEffect(() => {
     const canvas = distCanvasRef.current;
     if (!canvas || hvg.degreeDistribution.length === 0) return;
@@ -163,7 +170,7 @@ export default function HVGChart({ prices, seriesMode }: Props) {
           <div ref={degreeRef} className="w-full rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={distCanvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={distCanvasRef} description={distDescription} className="rounded border border-gray-100" />
         </div>
       </div>
 

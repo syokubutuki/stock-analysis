@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import {
@@ -12,6 +12,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeDensityMatrix } from "../../lib/density-matrix";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -169,6 +170,15 @@ export default function DensityMatrixChart({ prices }: Props) {
   }, [result]);
 
   // Current probability bar (Canvas)
+  const barDescription = useMemo(() => {
+    const cp = result.currentProbabilities;
+    if (cp.length === 0) return "現在のレジーム確率。計算できるデータが不足しています。";
+    let hi = 0;
+    for (let i = 1; i < cp.length; i++) if (cp[i] > cp[hi]) hi = i;
+    const parts = result.regimes.map((r, i) => `${r.label} ${(cp[i] * 100).toFixed(0)}%`).join("・");
+    return `いま各レジームにいる確率を横に積んだ帯グラフ。最も高いのは${result.regimes[hi].label}の${(cp[hi] * 100).toFixed(0)}%で、内訳は${parts}です。`;
+  }, [result]);
+
   useEffect(() => {
     const draw = () => {
       if (!barRef.current || result.currentProbabilities.length === 0) return;
@@ -340,7 +350,7 @@ export default function DensityMatrixChart({ prices }: Props) {
       {/* Current regime probability bar */}
       <div className="text-xs text-gray-500 mb-1">現在のレジーム確率</div>
       <div className="w-full mb-3">
-        <canvas ref={barRef} />
+        <AccessibleCanvas ref={barRef} description={barDescription} />
       </div>
 
       {/* Stacked area chart */}
@@ -425,9 +435,7 @@ export default function DensityMatrixChart({ prices }: Props) {
                     {r.label}
                   </td>
                   <td
-                    className={`p-1 text-right font-mono ${
-                      r.meanReturn >= 0 ? "text-green-700" : "text-red-600"
-                    }`}
+                    className={`p-1 text-right font-mono ${directionClass(r.meanReturn)}`}
                   >
                       <DirectionGlyph value={r.meanReturn} />{(r.meanReturn * 100).toFixed(1)}%
                   </td>

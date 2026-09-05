@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -16,7 +16,8 @@ import {
   minVarianceHedgeRatio,
 } from "../../lib/futures-carry";
 import AnalysisGuide from "./AnalysisGuide";
-import { CHART_COLORS } from "../../lib/chart-colors";
+import AccessibleCanvas from "./AccessibleCanvas";
+import { CHART_COLORS, withSign } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -131,6 +132,14 @@ export default function FuturesCarryChart({ prices }: Props) {
   }, [prices, benchPrices]);
 
   // 先物カーブ Canvas
+  const curveDescription = useMemo(() => {
+    const pts = curve.points;
+    if (pts.length === 0) return "理論先物カーブ。計算できるデータが不足しています。";
+    const near = pts[0], far = pts[pts.length - 1];
+    const regime = curve.regime === "contango" ? "コンタンゴ（期先が高い）" : curve.regime === "backwardation" ? "バックワーデーション（期先が安い）" : "フラット";
+    return `限月別の理論先物価格を並べたカーブ（現物${curve.spot.toFixed(1)}）。${near.months}か月先は${near.forward.toFixed(1)}（ベーシス${near.basis.toFixed(2)}）、${far.months}か月先は${far.forward.toFixed(1)}で、形状は${regime}です。`;
+  }, [curve]);
+
   useEffect(() => {
     const cv = curveRef.current;
     if (!cv) return;
@@ -263,14 +272,17 @@ export default function FuturesCarryChart({ prices }: Props) {
           curve.regime === "contango" ? "コンタンゴ" : curve.regime === "backwardation" ? "バック" : "フラット"
         } tone={curve.regime === "contango" ? "down" : curve.regime === "backwardation" ? "up" : undefined} />
         <Stat label="年率ロールイールド" value={`${((q - r) * 100).toFixed(2)}%`} tone={q - r >= 0 ? "up" : "down"} directionValue={q - r} />
-        {roll && <Stat label="累積ロールドラッグ" value={`${(roll.totalRollDrag * 100).toFixed(1)}%`} tone={roll.totalRollDrag > 0 ? "down" : "up"} directionValue={roll.totalRollDrag} />}
-        {roll && <Stat label="年率ドラッグ" value={`${(roll.annualizedRollDrag * 100).toFixed(2)}%`} tone={roll.annualizedRollDrag > 0 ? "down" : "up"} directionValue={roll.annualizedRollDrag} />}
+        {/* ドラッグは「正＝ロールで劣後」なので、色は上下ではなく good/bad を表す。
+            方向記号を重ねると「▲＝上昇」と「赤＝悪い」が同じセルで衝突するため、
+            第2の手がかりは記号ではなく**符号の明示**にする（FU36/FU37） */}
+        {roll && <Stat label="累積ロールドラッグ" value={withSign(roll.totalRollDrag * 100, 1, "%")} tone={roll.totalRollDrag > 0 ? "down" : "up"} />}
+        {roll && <Stat label="年率ドラッグ" value={withSign(roll.annualizedRollDrag * 100, 2, "%")} tone={roll.annualizedRollDrag > 0 ? "down" : "up"} />}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <p className="text-xs font-medium text-gray-600 mb-1">理論先物カーブ（限月別）</p>
-          <canvas ref={curveRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={curveRef} description={curveDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
           <p className="text-xs font-medium text-gray-600 mb-1">
@@ -364,7 +376,8 @@ function Stat({
   tone?: "up" | "down";
   directionValue?: number;
 }) {
-  const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
+  const c = directionValue !== undefined ? directionClass(directionValue) : tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 rounded border border-gray-200 bg-gray-50">
       <div className="text-gray-500">{label}</div>

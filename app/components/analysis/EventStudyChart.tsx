@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -10,6 +10,7 @@ import {
   type EventStudyResult,
 } from "../../lib/event-study";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { positionsFromSignals } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
@@ -119,6 +120,13 @@ export default function EventStudyChart({ prices }: Props) {
   const spreadRT = useMemo(() => (prices.length === 0 ? 0 : representativeSpread(prices)), [prices]);
 
   // 描画
+  const chartDescription = useMemo(() => {
+    if (!result) return "イベント・スタディの平均経路。トリガーが見つかっていません。";
+    const k = result.perK.length - 1;
+    const fin = result.perK[k];
+    return `トリガー${result.nTrigger}回（うち完全な窓を確保できた${result.nUsable}回）の前後の平均経路を、無条件平均と並べて描いた図。${k}日後の条件付き平均は${(fin.mean * 100).toFixed(2)}%（中央値${(fin.median * 100).toFixed(2)}%、上昇確率${(fin.winRate * 100).toFixed(0)}%）で、無条件平均${(result.baselineMean[k] * 100).toFixed(2)}%との差は${((fin.mean - result.baselineMean[k]) * 100).toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const h = 380;
@@ -314,13 +322,13 @@ export default function EventStudyChart({ prices }: Props) {
           <span>中央値: <span className="font-mono">{pct(finalStat.median)}</span></span>
           <span>上昇確率: <span className="font-mono">{(finalStat.winRate * 100).toFixed(0)}%</span></span>
           <span>無条件平均: <span className="font-mono text-gray-500">{pct(baselineFinal)}</span></span>
-          <span>超過(エッジ): <span className={`font-mono font-medium ${edge > 0 ? "text-green-700" : edge < 0 ? "text-red-700" : ""}`}><DirectionGlyph value={edge} />{pct(edge)}</span></span>
+          <span>超過(エッジ): <span className={`font-mono font-medium ${directionClass(edge)}`}><DirectionGlyph value={edge} />{pct(edge)}</span></span>
         </div>
       )}
 
       {/* チャート */}
       <div className="relative w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       {/* 凡例 */}
@@ -355,12 +363,12 @@ export default function EventStudyChart({ prices }: Props) {
                 return (
                   <tr key={s.k} className="border-b border-gray-100">
                     <td className="py-1 px-2 font-medium text-gray-700">{s.k}日後</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.mean >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.mean} />{pct(s.mean)}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.median >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.median} />{pct(s.median)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${directionClass(s.mean)}`}><DirectionGlyph value={s.mean} />{pct(s.mean)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${directionClass(s.median)}`}><DirectionGlyph value={s.median} />{pct(s.median)}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{(s.std * 100).toFixed(2)}%</td>
-                    <td className={`py-1 px-2 text-center font-mono ${s.winRate >= 0.5 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={s.winRate - 0.5} />{(s.winRate * 100).toFixed(0)}%</td>
+                    <td className={`py-1 px-2 text-center font-mono ${directionClass(s.winRate - 0.5)}`}><DirectionGlyph value={s.winRate - 0.5} />{(s.winRate * 100).toFixed(0)}%</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-500">{pct(base)}</td>
-                    <td className={`py-1 px-2 text-center font-mono font-medium ${ex > 0 ? "text-green-700" : ex < 0 ? "text-red-700" : ""}`}><DirectionGlyph value={ex} />{pct(ex)}</td>
+                    <td className={`py-1 px-2 text-center font-mono font-medium ${directionClass(ex)}`}><DirectionGlyph value={ex} />{pct(ex)}</td>
                     <td className="py-1 px-2 text-center font-mono text-fg-muted">{s.n}</td>
                   </tr>
                 );

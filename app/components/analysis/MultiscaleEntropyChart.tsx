@@ -13,6 +13,7 @@ import { logReturns } from "../../lib/transforms";
 import { multiscaleEntropy, fisherInformation } from "../../lib/multiscale-entropy";
 import { infoDecompositionWaterfall } from "../../lib/entropy-visualization";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -42,6 +43,13 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
   const waterfall = useMemo(() => infoDecompositionWaterfall(lr, volumes), [prices, seriesMode]);
 
   // MSE曲線
+  const mseDescription = useMemo(() => {
+    if (mse.length === 0) return "マルチスケール・エントロピー。計算できるデータが不足しています。";
+    const first = mse[0], last = mse[mse.length - 1];
+    const hi = mse.reduce((a, b) => (b.entropy > a.entropy ? b : a));
+    return `粗視化スケール（横軸）ごとのサンプルエントロピー曲線（スケール${first.scale}から${last.scale}）。スケール1で${first.entropy.toFixed(3)}、最大はスケール${hi.scale}の${hi.entropy.toFixed(3)}、最長スケールで${last.entropy.toFixed(3)}です（右上がりなら長い時間スケールにも構造が残っています）。`;
+  }, [mse]);
+
   useEffect(() => {
     const canvas = mseCanvasRef.current;
     if (!canvas || mse.length === 0) return;
@@ -159,6 +167,12 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
   }, [fisher]);
 
   // ウォーターフォール
+  const waterfallDescription = useMemo(() => {
+    if (waterfall.length === 0) return "情報分解のウォーターフォール。計算できるデータが不足しています。";
+    const top = waterfall.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
+    return `リターンのエントロピーを構成要素に分解したウォーターフォール（${waterfall.length}段）。寄与が最大なのは${top.label}の${top.value.toFixed(4)}です。`;
+  }, [waterfall]);
+
   useEffect(() => {
     const canvas = waterfallRef.current;
     if (!canvas || waterfall.length === 0) return;
@@ -238,7 +252,7 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <div className="w-full rounded border border-gray-100 overflow-hidden">
-            <canvas ref={mseCanvasRef} />
+            <AccessibleCanvas ref={mseCanvasRef} description={mseDescription} />
           </div>
           <div className="mt-2 text-xs p-2 bg-gray-50 rounded">
             <span className="text-gray-500">MSE傾き: </span>
@@ -259,7 +273,7 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
       <div className="mt-4">
         <div className="text-xs text-gray-500 mb-1">情報分解 — リターンのエントロピーを構成要素に分解</div>
         <div className="w-full rounded border border-gray-100 overflow-hidden">
-          <canvas ref={waterfallRef} />
+          <AccessibleCanvas ref={waterfallRef} description={waterfallDescription} />
         </div>
       </div>
 

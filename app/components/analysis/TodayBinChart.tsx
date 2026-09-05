@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -21,6 +21,7 @@ import {
 } from "../../lib/today-bin";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -343,7 +344,7 @@ function OccurrenceTable({ occ }: { occ: Occurrence[] }) {
               <tr key={i} className="border-b border-gray-50">
                 <td className="px-1.5 py-0.5 text-gray-600">{o.date.slice(0, 10)}</td>
                 <td className="px-1.5 text-right text-gray-500">{fmtPct(o.stateVal)}</td>
-                <td className={`px-1.5 text-right font-medium ${o.fwd >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={o.fwd} />{fmtPct(o.fwd)}</td>
+                <td className={`px-1.5 text-right font-medium ${directionClass(o.fwd)}`}><DirectionGlyph value={o.fwd} />{fmtPct(o.fwd)}</td>
               </tr>
             ))}
           </tbody>
@@ -460,6 +461,28 @@ export default function TodayBinChart({ prices }: Props) {
   if (prevKey !== sigKey) { setPrevKey(sigKey); setSelBin(null); }
 
   // 描画
+  const distDescription = useMemo(() => {
+    if (!res) return "状態値の分布と今日の位置。標本が不足しています。";
+    const t = res.todayValue === null ? "—" : res.todayValue.toFixed(3);
+    const pc = res.todayPercentile === null ? "—" : `${(res.todayPercentile * 100).toFixed(0)}パーセンタイル`;
+    return `${res.stateLabel}の全履歴${res.allStateVals.length}日ぶんの分布に、今日の値を縦線で重ねたヒストグラム。今日の値は${t}で、履歴の中では${pc}にあたります。`;
+  }, [res]);
+
+  const fwdDescription = useMemo(() => {
+    if (!res || res.bins.length === 0) return "ビン別の先行きリターン。標本が不足しています。";
+    const live = res.bins.filter((b) => b.n > 0);
+    if (live.length === 0) return "ビン別の先行きリターン。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
+    const lo = live.reduce((a, b) => (b.meanFwd < a.meanFwd ? b : a));
+    const sig = live.filter((b) => b.significant).length;
+    return `${res.stateLabel}のビン別に${res.horizonLabel}の平均リターンを棒で並べた図（全${res.totalN}日、無条件平均${(res.baselineMean * 100).toFixed(3)}%）。最も高いのは${hi.label}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.meanFwd * 100).toFixed(3)}%（n=${lo.n}）で、有意なビンは${sig}個です。`;
+  }, [res]);
+
+  const scatterDescription = useMemo(() => {
+    if (!res || res.scatter.length === 0) return "状態値と先行きリターンの散布図。標本が不足しています。";
+    return `横軸=${res.stateLabel}、縦軸=${res.horizonLabel}のリターンの散布図（${res.scatter.length}点）。ビン境界を縦線で、今日の値を強調で示しています。`;
+  }, [res]);
+
   useEffect(() => {
     if (!res) return;
     hotspotsRef.current = [];
@@ -559,7 +582,7 @@ export default function TodayBinChart({ prices }: Props) {
           })()}
 
           {/* 状態値の全履歴分布＋今日の位置 */}
-          <canvas ref={distRef} />
+          <AccessibleCanvas ref={distRef} description={distDescription} />
 
           {/* ビュー切替 */}
           <div className="flex gap-1 text-xs">
@@ -573,10 +596,10 @@ export default function TodayBinChart({ prices }: Props) {
           </div>
 
           {view === "fwd" ? (
-            <canvas ref={fwdRef} />
+            <AccessibleCanvas ref={fwdRef} description={fwdDescription} />
           ) : (
             <div className="relative">
-              <canvas ref={scatterRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} />
+              <AccessibleCanvas ref={scatterRef} description={scatterDescription} onMouseMove={onMove} onMouseLeave={() => setTip(null)} />
               {tip && <div className="pointer-events-none absolute z-10 max-w-[260px] rounded bg-gray-900/90 px-2 py-1 text-[10px] text-white shadow" style={{ left: Math.min(tip.left + 10, 9999), top: tip.top + 10 }}>{tip.text}</div>}
             </div>
           )}
@@ -603,7 +626,7 @@ export default function TodayBinChart({ prices }: Props) {
                         {isNow && <span className="text-blue-600 mr-1">◀今日</span>}{b.label}
                       </td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium ${b.meanFwd >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.meanFwd} />{fmtPct(b.meanFwd)}</td>
+                      <td className={`text-right px-2 font-medium ${directionClass(b.meanFwd)}`}><DirectionGlyph value={b.meanFwd} />{fmtPct(b.meanFwd)}</td>
                       <td className="text-right px-2 text-gray-600">{fmtPct(b.medianFwd)}</td>
                       <td className="px-2"><div className="flex items-center gap-1"><div className="relative h-3 w-12 bg-gray-100 rounded-sm overflow-hidden"><div className={`absolute inset-y-0 left-0 ${b.winRate >= 0.5 ? "bg-green-400" : "bg-red-400"}`} style={{ width: `${b.winRate * 100}%` }} /><div className="absolute inset-y-0 left-1/2 w-px bg-gray-400" /></div><span className="text-gray-600 tabular-nums">{(b.winRate * 100).toFixed(0)}%</span></div></td>
                       <td className="px-2 text-gray-500 whitespace-nowrap">{fmtPct(b.ciLow)}〜{fmtPct(b.ciHigh)}</td>

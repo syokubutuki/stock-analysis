@@ -11,6 +11,7 @@ import {
 } from "../../lib/exit-cross";
 import { ExitSide, EntryTiming } from "../../lib/optimal-exit";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   tickers: string[];
@@ -129,6 +130,12 @@ export default function ExitCrossChart({ tickers, pricesByTicker, names }: Props
     return computeExitCross(stocks, { side, entryTiming, entryDow: 1 });
   }, [tickers, pricesByTicker, names, side, entryTiming]);
 
+  const chartDescription = useMemo(() => {
+    if (!result.ok || result.byDay.length === 0) return "固定日エグジットの横断比較。標本が不足しています。";
+    const best = result.byDay.find((d) => d.day === result.bestDay) ?? result.byDay[0];
+    return `建ててから何日目に降りるかを1日ずつ変えたときの平均リターンとクラスタ頑健tを、${result.nTickers}銘柄をプールして並べた図（${result.from}から${result.to}）。最良は${result.bestDay}日目で平均${(best.mean * 100).toFixed(3)}%（t=${best.t.toFixed(2)}、独立週${best.nWeeks}）、金曜まで持つ場合は${(result.hold.mean * 100).toFixed(3)}%（t=${result.hold.t.toFixed(2)}）です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !result.ok) return;
@@ -200,7 +207,7 @@ export default function ExitCrossChart({ tickers, pricesByTicker, names }: Props
       </div>
 
       <div className="mt-3">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={chartDescription} />
       </div>
 
       {/* 日別テーブル */}

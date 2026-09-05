@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // ボラティリティ・ターゲティング（信用レバ可変 0〜3倍）vs バイ&ホールド。
 // リターン予測を使わず「ボラの予測可能性」だけでSharpe改善を狙う戦略を、
@@ -28,6 +28,7 @@ import {
 } from "../../lib/vol-targeting";
 import { useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -37,7 +38,7 @@ interface Props {
 const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 const pct1 = (v: number) => `${(v * 100).toFixed(1)}%`;
 const num2 = (v: number) => v.toFixed(2);
-const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => directionClass(v);
 
 const ESTIMATOR_LABEL: Record<VolEstimator, string> = {
   ewma: "EWMA (λ=0.94)",
@@ -272,6 +273,12 @@ export default function VolTargetingChart({ prices }: Props) {
     ctx.fillText("Sharpe", width - padR + 4, 10);
   }, [result]);
 
+  const permDescription = useMemo(() => {
+    const p = result?.perm;
+    if (!p) return "置換検定のヌル分布。まだ計算していません。";
+    return `σ̂とリターンの対応を壊した置換${p.dist.length}回のΔSharpeのヌル分布に、実測${p.actualDelta.toFixed(3)}を赤線で重ねたヒストグラム。片側p=${p.pOneSided.toFixed(3)}で、実測が右端に寄るほど改善が予測情報に由来します。`;
+  }, [result]);
+
   // === 置換検定ヒストグラム（横軸=ΔSharpe なので Canvas2D）===
   const permRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -484,8 +491,8 @@ export default function VolTargetingChart({ prices }: Props) {
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 px-2 text-gray-600">最大ドローダウン</td>
-              <td className={`text-right px-2 ${cls(metrics.strat.maxDD)}`}><DirectionGlyph value={metrics.strat.maxDD} />{pct(metrics.strat.maxDD)}</td>
-              <td className={`text-right px-2 ${cls(metrics.bh.maxDD)}`}><DirectionGlyph value={metrics.bh.maxDD} />{pct(metrics.bh.maxDD)}</td>
+              <td className="text-right px-2 text-gray-700">{pct(metrics.strat.maxDD)}</td>
+              <td className="text-right px-2 text-gray-700">{pct(metrics.bh.maxDD)}</td>
               <td className={`text-right px-2 font-medium ${cls(metrics.strat.maxDD - metrics.bh.maxDD)}`}><DirectionGlyph value={metrics.strat.maxDD - metrics.bh.maxDD} />{pct(metrics.strat.maxDD - metrics.bh.maxDD)}</td>
             </tr>
             <tr className="border-b border-gray-100">
@@ -562,7 +569,7 @@ export default function VolTargetingChart({ prices }: Props) {
             )}
             実測（赤線）が分布の右端なら、改善は予測情報に由来する本物。
           </p>
-          <div className="w-full"><canvas ref={permRef} /></div>
+          <div className="w-full"><AccessibleCanvas ref={permRef} description={permDescription} /></div>
         </div>
 
         {/* 4. ボラ予測力 */}

@@ -10,6 +10,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { computeMFEMAE, computeMFEMAEStats } from "../../lib/mfe-mae";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import { CHART_COLORS } from "../../lib/chart-colors";
@@ -86,6 +87,11 @@ export default function MFEMAEChart({ prices, period }: Props) {
   }, [points, prices, period]);
 
   // 散布図 (Canvas)
+  const scatterDescription = useMemo(() => {
+    if (points.length < 2) return "MFEとMAEの散布図。計算できるデータが不足しています。";
+    return `各日の最大含み益MFE（横軸）と最大含み損MAE（縦軸）の散布図（${points.length}日）。平均はMFE${(stats.avgMFE * 100).toFixed(2)}%・MAE${(stats.avgMAE * 100).toFixed(2)}%でリスクリワードは${stats.riskReward.toFixed(2)}、勝率${(stats.winRate * 100).toFixed(0)}%、MFEをどれだけ取れたか（利用率）は${(stats.avgMFECapture * 100).toFixed(0)}%です。`;
+  }, [points, stats]);
+
   useEffect(() => {
     const canvas = scatterRef.current;
     if (!canvas || points.length < 2) return;
@@ -222,7 +228,8 @@ export default function MFEMAEChart({ prices, period }: Props) {
             <span className="text-green-700">陽線</span> /{" "}
             <span className="text-red-500">陰線</span>)
           </div>
-          <canvas
+          <AccessibleCanvas
+            description={scatterDescription}
             ref={scatterRef}
             className="w-full rounded border border-gray-100"
             style={{ height: 200 }}

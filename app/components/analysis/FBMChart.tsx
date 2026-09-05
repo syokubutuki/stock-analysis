@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { simulateFBM } from "../../lib/fbm";
 import { computeDFA } from "../../lib/fractal";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -43,6 +44,19 @@ export default function FBMChart({ prices }: Props) {
   }, [hurst, prices]);
 
   // Fan chart
+  const fanDescription = useMemo(() => {
+    const p = result.percentiles;
+    if (p.p50.length === 0) return "フラクショナル・ブラウン運動の予測。計算できるデータが不足しています。";
+    const i = p.p50.length - 1;
+    return `Hurst指数${hurst.toFixed(3)}のフラクショナル・ブラウン運動で${p.p50.length}日先まで${result.paths.length}本シミュレートした価格のファンチャート。最終日の中央値は${p.p50[i].toFixed(1)}、5〜95%は${p.p5[i].toFixed(1)}から${p.p95[i].toFixed(1)}です。`;
+  }, [result, hurst]);
+
+  const msdDescription = useMemo(() => {
+    const c = result.msdCurve;
+    if (c.length === 0) return "平均二乗変位の傾き。計算できるデータが不足しています。";
+    return `時間差ごとの平均二乗変位（MSD）を両対数で描いた図（${c.length}点）。傾きが2Hに一致すればフラクショナル性が保たれており、いまのHurstは${hurst.toFixed(3)}（0.5が独立、それより大きければ持続性）です。`;
+  }, [result, hurst]);
+
   useEffect(() => {
     const canvas = fanRef.current;
     if (!canvas) return;
@@ -210,8 +224,8 @@ export default function FBMChart({ prices }: Props) {
         </span>
       </div>
 
-      <canvas ref={fanRef} />
-      <canvas ref={msdRef} className="mt-3" />
+      <AccessibleCanvas ref={fanRef} description={fanDescription} />
+      <AccessibleCanvas ref={msdRef} description={msdDescription} className="mt-3" />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { kramersMoyal } from "../../lib/kramers-moyal";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -23,6 +24,13 @@ export default function KramersMoyalChart({ prices, seriesMode }: Props) {
   const km = useMemo(() => kramersMoyal(priceLevels, lr, 20), [prices, seriesMode]);
 
   // Drift + Diffusion plot
+  const driftDescription = useMemo(() => {
+    if (km.priceLevels.length === 0) return "Kramers-Moyalのドリフト関数。計算できるデータが不足しています。";
+    let z = 0;
+    for (let i = 1; i < km.drift.length; i++) if (Math.abs(km.drift[i]) < Math.abs(km.drift[z])) z = i;
+    return `価格水準（横軸）ごとのドリフトμ(p)と拡散σ(p)を並べた図（${km.priceLevels.length}格子）。ドリフトがゼロに最も近いのは${km.priceLevels[z].toFixed(1)}付近で、そこが引き寄せの中心の目安です。`;
+  }, [km]);
+
   useEffect(() => {
     const canvas = driftCanvasRef.current;
     if (!canvas || km.priceLevels.length === 0) return;
@@ -125,6 +133,13 @@ export default function KramersMoyalChart({ prices, seriesMode }: Props) {
   }, [km]);
 
   // Potential function
+  const potentialDescription = useMemo(() => {
+    if (km.priceLevels.length === 0) return "ポテンシャル関数。計算できるデータが不足しています。";
+    let m = 0;
+    for (let i = 1; i < km.potential.length; i++) if (km.potential[i] < km.potential[m]) m = i;
+    return `ドリフトを積分して得たポテンシャルV(p)の形（${km.priceLevels.length}格子）。谷（安定点）は${km.stablePoints.length}個・山（不安定点）は${km.unstablePoints.length}個で、最も深い谷は${km.priceLevels[m].toFixed(1)}付近です。`;
+  }, [km]);
+
   useEffect(() => {
     const canvas = potentialCanvasRef.current;
     if (!canvas || km.priceLevels.length === 0) return;
@@ -234,10 +249,10 @@ export default function KramersMoyalChart({ prices, seriesMode }: Props) {
 
       <div className="space-y-3">
         <div>
-          <canvas ref={driftCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={driftCanvasRef} description={driftDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={potentialCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={potentialCanvasRef} description={potentialDescription} className="w-full rounded border border-gray-100" />
         </div>
       </div>
 

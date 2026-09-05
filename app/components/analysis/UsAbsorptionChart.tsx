@@ -9,6 +9,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -65,6 +66,13 @@ export default function UsAbsorptionChart({ ticker }: Props) {
     [data, scheme]
   );
 
+  const fractionDescription = useMemo(() => {
+    if (!result || result.timeLabels.length === 0) return "米国材料の吸収曲線。整合できた標本が不足しています。";
+    let pi = 0;
+    for (let i = 1; i < result.fraction.length; i++) if (Math.abs(result.fraction[i]) > Math.abs(result.fraction[pi])) pi = i;
+    return `前夜米国の材料を当日どこまで織り込んだかの曲線 f(t)（引け＝1）。寄付の時点で${(result.gapShare * 100).toFixed(0)}%を織り込み、最大は${result.timeLabels[pi]}の${result.fraction[pi].toFixed(2)}、引けの平均は${(result.endMean * 100).toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 220);
@@ -98,7 +106,7 @@ export default function UsAbsorptionChart({ ticker }: Props) {
             {overshoot <= 1.08 && result.gapShare < 0.9 && <> 日中にかけてじわじわ100%へ収束（継続吸収）。</>}
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={fractionDescription} /></div>
           <p className="text-[11px] text-fg-muted">
             縦軸=当日全体(前日終値→引け)を100%とした実現割合 f(t)。青破線＝寄付(ギャップ)時点。
             100%線を超えて垂れる形＝寄りの行き過ぎ→戻し、下から100%へ近づく形＝日中の継続吸収。

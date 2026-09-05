@@ -18,6 +18,7 @@ import {
 } from "../../lib/sarima";
 import type { SarimaWorkerResponse } from "../../lib/sarima.worker";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -258,6 +259,17 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
     [fit]
   );
 
+  const seriesAcfDescription = useMemo(() => {
+    const a = resp?.diffAcf;
+    if (!a) return "差分系列の自己相関。まだ推定していません。";
+    const bound = confidenceBound(a.w.length);
+    const live = a.acf.filter((d) => d.lag > 0);
+    if (live.length === 0) return "差分系列の自己相関。計算できるデータが不足しています。";
+    const top = live.reduce((x, y) => (Math.abs(y.value) > Math.abs(x.value) ? y : x));
+    const over = live.filter((d) => Math.abs(d.value) > bound).length;
+    return `差分系列の自己相関ACFをラグ1から${live.length}まで並べた棒グラフ（n=${a.w.length}、95%信頼帯±${bound.toFixed(3)}）。最大はラグ${top.lag}の${top.value.toFixed(3)}で、帯を超えたラグは${over}本です（MA次数qの目安）。`;
+  }, [resp]);
+
   useEffect(() => {
     if (resp?.diffAcf) {
       const bound = confidenceBound(resp.diffAcf.w.length);
@@ -492,7 +504,7 @@ export default function ArimaChart({ prices, seriesMode }: Props) {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="w-full overflow-hidden rounded border border-gray-100">
-                <canvas ref={seriesAcfRef} />
+                <AccessibleCanvas ref={seriesAcfRef} description={seriesAcfDescription} />
               </div>
               <div className="w-full overflow-hidden rounded border border-gray-100">
                 <canvas ref={seriesPacfRef} />

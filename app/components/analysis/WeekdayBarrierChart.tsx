@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 曜日ビン別 TP/SL ─ バリア設計の何が測れて何が測れないか（系C28）
 //
@@ -25,6 +25,7 @@ import type { BarrierWorkerRequest, BarrierWorkerResponse } from "../../lib/week
 import { initCanvas, fmtPct, fmtSignedPct, ViewTabs } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
@@ -429,6 +430,10 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
     A: boardA, B: boardB, H: hUnit, mu: muPerDay, sigma: sigPerDay, T: 250, cost: 0,
   });
 
+  const boardDescription = useMemo(() => {
+    return `利確幅A・損切り幅Bをσ単位で動かしたときの設計曲線。いまの設定（A=${board.A.toFixed(2)}・B=${board.B.toFixed(2)}・H=${board.H}日）では、利確に先に届く確率${(board.hitProbExact * 100).toFixed(1)}%（μ=0の理論値${(board.hitProbZeroMu * 100).toFixed(1)}%）、期待滞在${board.eTauH.toFixed(1)}日、暦時間シャープはコスト前${board.sharpeCal.toFixed(3)}・コスト後${board.sharpeAfterCost.toFixed(3)}です。`;
+  }, [board]);
+
   useEffect(() => {
     if (view !== "board") return;
     if (boardCanvas.current) {
@@ -606,7 +611,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
             </div>
             <div className="bg-gray-50 rounded p-2">
               <div className="text-gray-500">歪度 (A−B)/√(AB)</div>
-              <div className={`font-bold ${board.skew >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={board.skew} />{board.skew.toFixed(2)}</div>
+              <div className={`font-bold ${directionClass(board.skew)}`}><DirectionGlyph value={board.skew} />{board.skew.toFixed(2)}</div>
               <div className="text-[10px] text-fg-muted">正=大勝ち小負け</div>
             </div>
             <div className="bg-gray-50 rounded p-2">
@@ -640,7 +645,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div>
               <div className="text-xs font-medium text-gray-700 mb-1">A を動かしたときの3量（B={boardB.toFixed(2)} 固定）</div>
-              <div className="relative"><canvas ref={boardCanvas} /></div>
+              <div className="relative"><AccessibleCanvas ref={boardCanvas} description={boardDescription} /></div>
             </div>
             <div>
               <div className="text-xs font-medium text-gray-700 mb-1">コスト後 暦時間シャープの (A,B) 平面</div>
@@ -812,7 +817,7 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                       <td className="text-right px-2 text-gray-600">{r.n}</td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{fmtPct(r.timeoutShare, 0)}</td>
                       <td className="text-right px-2 tabular-nums text-gray-800">{fmtPct(r.pHat, 1)}</td>
-                      <td className={`text-right px-2 tabular-nums ${r.pP < 0.05 ? "font-bold" : ""} ${r.pHat >= r.pTheory ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.pHat - r.pTheory} />
+                      <td className={`text-right px-2 tabular-nums ${r.pP < 0.05 ? "font-bold" : ""} ${directionClass(r.pHat - r.pTheory)}`}><DirectionGlyph value={r.pHat - r.pTheory} />
                         {((r.pHat - r.pTheory) * 100).toFixed(1)}pp{r.pP < 0.05 ? "★" : ""}
                       </td>
                       <td className="text-right px-2 tabular-nums text-gray-800">{r.tauHat.toFixed(2)}</td>
@@ -1017,8 +1022,8 @@ export default function WeekdayBarrierChart({ prices, ticker }: Props) {
                         <tr key={r.label} className="border-b border-gray-100">
                           <td className="py-1 px-2 text-gray-700">{r.label}</td>
                           <td className="text-right px-2 text-gray-600">{r.n}</td>
-                          <td className={`text-right px-2 tabular-nums ${r.expPerTrade >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.expPerTrade} />{fmtSignedPct(r.expPerTrade, 3)}</td>
-                          <td className={`text-right px-2 tabular-nums ${r.expPerTime >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.expPerTime} />{fmtSignedPct(r.expPerTime, 3)}</td>
+                          <td className={`text-right px-2 tabular-nums ${directionClass(r.expPerTrade)}`}><DirectionGlyph value={r.expPerTrade} />{fmtSignedPct(r.expPerTrade, 3)}</td>
+                          <td className={`text-right px-2 tabular-nums ${directionClass(r.expPerTime)}`}><DirectionGlyph value={r.expPerTime} />{fmtSignedPct(r.expPerTime, 3)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-800">{r.sharpePerTrade.toFixed(3)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-600">{fmtPct(r.winRate, 1)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-600">{r.meanTauH.toFixed(2)}H</td>

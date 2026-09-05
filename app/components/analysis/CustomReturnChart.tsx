@@ -9,11 +9,12 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import PredictiveStrategyPanel, { type PredictionResult } from "./PredictiveStrategyPanel";
 import StrategyVsBenchmark from "./StrategyVsBenchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 import { CHART_COLORS } from "../../lib/chart-colors";
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 interface Props {
   prices: PricePoint[];
@@ -465,7 +466,11 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
                 的中 {hits}/{dl.length}（{((hits / dl.length) * 100).toFixed(1)}%）・上昇予測 {up}日
               </div>
             </div>
-            <canvas ref={stripRef} className="w-full" />
+            <AccessibleCanvas
+              ref={stripRef}
+              description={`GBDT日次予測の帯（上段=予測・中段=実際・下段=的中）。${dl.length}日のうち的中${hits}日（${((hits / dl.length) * 100).toFixed(1)}%）、上昇と予測したのは${up}日、直近${last.time}の予測は${last.predicted === 1 ? "上昇" : "下落"}で実際は${last.actual === 1 ? "上昇" : "下落"}です。`}
+              className="w-full"
+            />
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(22,163,74,0.85)" }} /> 上昇</span>
               <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: "rgba(220,38,38,0.85)" }} /> 下落</span>
@@ -505,7 +510,8 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
             <StatCell label="日次標準偏差" value={pctFmt(stats.stdev, 4)} />
             <StatCell label="平均利益" value={pctFmt(stats.avgWin, 4)} />
             <StatCell label="平均損失" value={pctFmt(stats.avgLoss, 4)} />
-            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative directionValue={stats.maxDD} />
+            {/* 最大DDは peak−cum の大きさで定義上つねに ≥0。方向を持たないので記号は付けない（FU37） */}
+            <StatCell label="最大ドローダウン" value={pctFmt(stats.maxDD)} negative />
             <StatCell label="プロフィットファクター" value={stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)} positive={stats.profitFactor > 1} directionValue={stats.profitFactor - 1} />
           </div>
         </>
@@ -551,7 +557,8 @@ export default function CustomReturnChart({ prices, ticker }: Props) {
 }
 
 function StatCell({ label, value, positive, negative, directionValue }: { label: string; value: string; positive?: boolean; negative?: boolean; directionValue?: number }) {
-  const color = positive ? "text-green-700" : negative ? "text-red-600" : "";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ positive/negative を使う
+  const color = directionValue !== undefined ? directionClass(directionValue) : positive ? "text-green-700" : negative ? "text-red-600" : "";
   return (
     <div className="p-2 bg-gray-50 rounded">
       <div className="text-gray-500">{label}</div>

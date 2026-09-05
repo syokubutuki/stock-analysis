@@ -13,6 +13,7 @@ import {
 } from "../../lib/conditional-forward-returns";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -254,6 +255,14 @@ export default function ConditionalForwardChart({
     }
   }, [result]);
 
+  const indDescription = useMemo(() => {
+    if (!indicator) return "指標の時系列。計算できるデータが不足しています。";
+    const live = indicator.values.filter((v): v is number => v !== null);
+    if (live.length === 0) return "指標の時系列。計算できるデータが不足しています。";
+    const last = live[live.length - 1];
+    return `${indicator.label}の時系列に、バケット境界（${indicator.thresholds.map((t) => t.label).join("・")}）を横線で引いた図（${live.length}点）。直近の値は${last.toFixed(2)}${indicator.unit}で、範囲は${Math.min(...live).toFixed(2)}から${Math.max(...live).toFixed(2)}です。`;
+  }, [indicator]);
+
   useEffect(() => {
     if (!indicator || !indRef.current) return;
     const init = initCanvas(indRef.current, 150);
@@ -313,7 +322,7 @@ export default function ConditionalForwardChart({
 
       {/* 判定指標の推移（なぜその状態かを可視化） */}
       {indicator ? (
-        <div className="relative"><canvas ref={indRef} /></div>
+        <div className="relative"><AccessibleCanvas ref={indRef} description={indDescription} /></div>
       ) : (
         <p className="text-[11px] text-fg-muted">この軸（{axes.find((a) => a.value === axis)?.label}）は数値指標として表示できないため、推移グラフは省略します。</p>
       )}

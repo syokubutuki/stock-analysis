@@ -12,6 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitHMM, detectChangePoints, kalmanFilter } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -78,6 +79,15 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
     window.addEventListener("resize", handleResize);
     return () => { window.removeEventListener("resize", handleResize); chart.remove(); hmmChartRef.current = null; };
   }, [prices, hmm]);
+
+  const transDescription = useMemo(() => {
+    const m = hmm.transitionMatrix;
+    if (m.length === 0) return "HMM の遷移確率行列。計算できるデータが不足しています。";
+    const stay = m.map((row, i) => row[i]);
+    let si = 0;
+    for (let i = 1; i < stay.length; i++) if (stay[i] > stay[si]) si = i;
+    return `Baum-Welchで推定した${hmm.nStates}状態HMMの遷移確率行列（縦=いまの状態、横=次の状態）。留まる確率が最も高いのは${hmm.stateLabels[si]}の${(stay[si] * 100).toFixed(0)}%で、期待継続日数は${hmm.expectedDuration.map((d) => d.toFixed(1)).join(" / ")}日です。`;
+  }, [hmm]);
 
   // Transition matrix canvas
   useEffect(() => {
@@ -272,7 +282,7 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
           <div ref={hmmRef} className="w-full rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={transCanvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={transCanvasRef} description={transDescription} className="rounded border border-gray-100" />
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { extremeValueAnalysis, higherOrderCumulants, tailDependence } from "../../lib/tail-risk";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -28,6 +29,12 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
   const tailDep = useMemo(() => tailDependence(lr, volRet.slice(0, lr.length), 0.1), [prices, seriesMode]);
 
   // GPD Q-Q plot
+  const qqDescription = useMemo(() => {
+    if (evt.qqPlot.length === 0) return "GPDのQ-Qプロット。計算できるデータが不足しています。";
+    const worst = evt.qqPlot.reduce((a, b) => (Math.abs(b.empirical - b.theoretical) > Math.abs(a.empirical - a.theoretical) ? b : a));
+    return `閾値超過分を一般化パレート分布に当てはめたQ-Qプロット（超過${evt.nExceedances}点）。形状パラメータξ=${evt.shape.toFixed(3)}（正なら裾が厚い）、スケールβ=${evt.scale.toFixed(4)}で、対角線からの最大乖離は理論${worst.theoretical.toFixed(4)}に対し実測${worst.empirical.toFixed(4)}です。`;
+  }, [evt]);
+
   useEffect(() => {
     const canvas = qqCanvasRef.current;
     if (!canvas || evt.qqPlot.length === 0) return;
@@ -85,6 +92,12 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
   }, [evt]);
 
   // Return level plot
+  const returnLevelDescription = useMemo(() => {
+    if (evt.returnLevels.length === 0) return "リターンレベル曲線。計算できるデータが不足しています。";
+    const parts = evt.returnLevels.map((r) => `${r.period}日に1度で${(r.level * 100).toFixed(1)}%`).join("・");
+    return `再現期間（横軸）に対する損失水準の曲線。VaR95%は${(evt.var95 * 100).toFixed(2)}%・99%は${(evt.var99 * 100).toFixed(2)}%で、${parts}という読み方をします。`;
+  }, [evt]);
+
   useEffect(() => {
     const canvas = returnLevelCanvasRef.current;
     if (!canvas || evt.returnLevels.length === 0) return;
@@ -203,10 +216,10 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div>
-          <canvas ref={qqCanvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={qqCanvasRef} description={qqDescription} className="rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={returnLevelCanvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={returnLevelCanvasRef} description={returnLevelDescription} className="rounded border border-gray-100" />
         </div>
         <div className="flex-1 text-xs text-gray-600 space-y-2">
           <div className="p-2 bg-red-50 rounded">

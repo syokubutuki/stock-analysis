@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computeDFA, computeMFDFA } from "../../lib/fractal";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -21,6 +22,17 @@ export default function DFAChart({ prices, seriesMode }: Props) {
   const mfdfa = useMemo(() => computeMFDFA(lr), [prices, seriesMode]);
 
   // DFA log-logプロット
+  const dfaDescription = useMemo(() => {
+    if (dfa.points.length < 2) return "DFAのlog-logプロット。計算できるデータが不足しています。";
+    return `窓長（対数横軸）とゆらぎF(n)（対数縦軸）のプロットと回帰直線（${dfa.points.length}点）。傾き＝スケーリング指数αは${dfa.hurstExponent.toFixed(3)}で、0.5が独立、0.5超で持続性、0.5未満で反持続性です。`;
+  }, [dfa]);
+
+  const mfDescription = useMemo(() => {
+    if (mfdfa.qValues.length === 0) return "マルチフラクタルDFA。計算できるデータが不足しています。";
+    const hi = Math.max(...mfdfa.hurst), lo = Math.min(...mfdfa.hurst);
+    return `モーメント次数q（横軸）ごとの一般化Hurst指数h(q)の曲線（q=${mfdfa.qValues[0]}から${mfdfa.qValues[mfdfa.qValues.length - 1]}）。h(q)は${lo.toFixed(3)}から${hi.toFixed(3)}まで動き、特異スペクトル幅は${mfdfa.width.toFixed(3)}です（幅が広いほどマルチフラクタル性が強い）。`;
+  }, [mfdfa]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || dfa.points.length < 2) return;
@@ -233,7 +245,7 @@ export default function DFAChart({ prices, seriesMode }: Props) {
 
       <div className="text-sm font-medium text-gray-700 mb-2">DFA (Detrended Fluctuation Analysis)</div>
       <div className="w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={dfaDescription} />
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
@@ -272,7 +284,7 @@ export default function DFAChart({ prices, seriesMode }: Props) {
           MF-DFA: h(q) と 特異性スペクトル f(α)
         </div>
         <div className="w-full rounded border border-gray-100 overflow-hidden">
-          <canvas ref={mfCanvasRef} />
+          <AccessibleCanvas ref={mfCanvasRef} description={mfDescription} />
         </div>
         <div className="mt-1 flex gap-3 text-xs text-gray-500">
           <span className="flex items-center gap-1">

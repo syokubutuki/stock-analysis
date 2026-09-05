@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { analyzeStreaks, type StreakAnalysis } from "../../lib/crash-surge-streak";
 import GuideEntryPanel from "./GuideEntryPanel";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 import DirectionValue from "./DirectionValue";
 
@@ -53,6 +54,13 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
   const fwdRef = useRef<HTMLCanvasElement>(null);
 
   // ===== 1. 連続日数の時系列分布 =====
+  const tsDescription = useMemo(() => {
+    if (!analysis) return "連続下落・連続上昇の時系列。計算できるデータが不足しています。";
+    const dLong = analysis.downRuns.reduce((a, b) => (b.length > a.length ? b : a), analysis.downRuns[0]);
+    const uLong = analysis.upRuns.reduce((a, b) => (b.length > a.length ? b : a), analysis.upRuns[0]);
+    return `終値の時系列に、しきい値${analysis.threshold}%を満たす連続下落（赤）と連続上昇（緑）の区間を塗り分けた図。下落ランは${analysis.downRuns.length}回（最長${dLong ? dLong.length : 0}日）、上昇ランは${analysis.upRuns.length}回（最長${uLong ? uLong.length : 0}日）です。`;
+  }, [analysis]);
+
   useEffect(() => {
     if (!tsRef.current || !analysis) return;
     const H = 320;
@@ -451,7 +459,7 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
         </div>
       )}
 
-      <div className="relative"><canvas ref={tsRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={tsRef} description={tsDescription} /></div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="relative"><canvas ref={lenRef} /></div>

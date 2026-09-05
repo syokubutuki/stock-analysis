@@ -29,6 +29,7 @@ import type {
 } from "../../lib/weekday-us-interaction.worker";
 import { US_DRIVERS, useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -347,6 +348,16 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
   }, [prices, params, usPrices, usLoading]);
 
   const main = result?.ok ? result.main : null;
+
+  const betaDescription = useMemo(() => {
+    if (!main) return "曜日別の追随βと信頼区間。標本が不足しています。";
+    const live = main.dows.filter((d) => d.n > 0);
+    if (live.length === 0) return "曜日別の追随βと信頼区間。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.beta > a.beta ? b : a));
+    const lo = live.reduce((a, b) => (b.beta < a.beta ? b : a));
+    const h = main.homBeta;
+    return `${TARGET_META[target].label}について、前夜米国に対する追随βを曜日別に描き95%区間を付けた図（全${main.n}日）。βが最大なのは${hi.label}の${hi.beta.toFixed(2)}（95%CI ${hi.betaLo.toFixed(2)}〜${hi.betaHi.toFixed(2)}、n=${hi.n}）、最小は${lo.label}の${lo.beta.toFixed(2)}です。曜日でβが同じかのCochran Qは${h.q.toFixed(2)}（置換p=${h.pPerm.toFixed(3)}、I²=${(h.i2 * 100).toFixed(0)}%）です。`;
+  }, [main, target]);
 
   useEffect(() => {
     const c = betaRef.current;
@@ -728,7 +739,7 @@ export default function WeekdayUsInteractionChart({ prices }: Props) {
               判定はここで行い、下のヒートマップは「どのセルか」を見るための表示です。
             </p>
             <div className="mt-2">
-              <canvas ref={betaRef} />
+              <AccessibleCanvas ref={betaRef} description={betaDescription} />
             </div>
 
             <div className="mt-2 overflow-x-auto">

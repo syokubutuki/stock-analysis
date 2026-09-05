@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 「月曜は下げて始まる」を条件付き現象として解剖する。
 // 目的変数(月曜ギャップ/寄り後追随/当日/窓埋め)を、前週末(直前の金曜・木曜)の値動き経路・
@@ -13,6 +13,7 @@ import { useUsDaily, US_DRIVERS } from "../../hooks/useUsDaily";
 import { initCanvas, LoadingError, IntradayCaveat } from "./intradayShared";
 import { UsDriverButtons } from "./usSpilloverShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StatBadge from "./StatBadge";
 import {
   buildMondayRecords, latestConditioners, MondayRec,
@@ -287,6 +288,45 @@ export default function MondayGapChart({ prices }: Props) {
   const td = targetDef(targetKey)!;
   const isRate = td.kind === "rate";
 
+  // 5つの canvas は view で排他表示されるので、どれも「唯一の情報源」になる。
+  // 表と重ならないよう、図が担う「どこが一番か」だけを言う。
+  const condDescription = useMemo(() => {
+    if (!cond || cond.bins.length === 0) return "条件ビン別の棒グラフ。標本が不足しています。";
+    const live = cond.bins.filter((b) => b.n > 0);
+    if (live.length === 0) return "条件ビン別の棒グラフ。標本が不足しています。";
+    const key = isRate ? (b: typeof live[number]) => b.posRate : (b: typeof live[number]) => b.mean;
+    const hi = live.reduce((a, b) => (key(b) > key(a) ? b : a));
+    const lo = live.reduce((a, b) => (key(b) < key(a) ? b : a));
+    const f = (v: number) => (isRate ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(3)}%`);
+    return `前週末の条件を${cond.k}ビンに分け、目的変数の平均を棒で並べた図（全${cond.totalN}件、無条件平均${f(isRate ? cond.baselinePos : cond.baselineMean)}）。最も高いのは${hi.label}の${f(key(hi))}（n=${hi.n}）、最も低いのは${lo.label}の${f(key(lo))}（n=${lo.n}）です。`;
+  }, [cond, isRate]);
+
+  const heatDescription = useMemo(() => {
+    if (!heat || heat.cells.length === 0) return "2条件の交互作用ヒートマップ。標本が不足しています。";
+    const hi = heat.cells.reduce((a, b) => (b.mean > a.mean ? b : a));
+    const sig = heat.cells.filter((c) => c.significant).length;
+    return `2つの条件（横${heat.xLabels.length}区分×縦${heat.yLabels.length}区分）の交互作用を色で並べたヒートマップ。最大は${heat.xLabels[hi.xi]}×${heat.yLabels[hi.yi]}の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}）で、FDR補正後に有意なセルは${sig}個です。`;
+  }, [heat]);
+
+  const scatterDescription = useMemo(() => {
+    if (!scatter || scatter.points.length === 0) return "条件と目的変数の散布図。標本が不足しています。";
+    if (!scatter.reg) return `条件（横軸）と目的変数（縦軸）の散布図（${scatter.points.length}点）。回帰は推定できていません。`;
+    return `条件（横軸）と目的変数（縦軸）の散布図と回帰直線（${scatter.points.length}点）。傾きβ=${scatter.reg.beta.toFixed(3)}（95%CI ${scatter.betaCI.lo.toFixed(3)}〜${scatter.betaCI.hi.toFixed(3)}）、相関${scatter.reg.corr.toFixed(3)}です。`;
+  }, [scatter]);
+
+  const quiverDescription = useMemo(() => {
+    if (!quiver || quiver.points.length === 0) return "木曜・金曜のベクトル図。標本が不足しています。";
+    const neg = quiver.points.filter((p) => p.t < 0).length;
+    return `横軸=木曜リターン・縦軸=金曜リターンの平面に${quiver.points.length}週を置き、目的変数の符号と大きさを色と点の大きさで表した図。目的変数が負だったのは${neg}週（${((neg / quiver.points.length) * 100).toFixed(0)}%）です。`;
+  }, [quiver]);
+
+  const driverDescription = useMemo(() => {
+    if (drivers.length === 0) return "ドライバーの寄与ランキング。標本が不足しています。";
+    const top = drivers.reduce((a, b) => (Math.abs(b.corr) > Math.abs(a.corr) ? b : a));
+    const sig = drivers.filter((d) => d.significant).length;
+    return `目的変数と各条件の相関を横棒で並べたランキング（${drivers.length}項目）。最も強いのは${top.label}の相関${top.corr.toFixed(3)}（FDR補正p=${top.pAdj.toFixed(3)}${top.partialCorr === null ? "" : `、前夜米国を統制した偏相関${top.partialCorr.toFixed(3)}`}）で、有意なのは${sig}項目です。`;
+  }, [drivers]);
+
   useEffect(() => {
     if (view !== "cond" || !cond || !condRef.current) return;
     const c = initCanvas(condRef.current, 240); if (c) drawCondBars(c.ctx, c.width, c.height, cond, isRate);
@@ -380,7 +420,7 @@ export default function MondayGapChart({ prices }: Props) {
                 相関 r={cond.corr.toFixed(3)}(p={cond.corrP < 0.001 ? "<.001" : cond.corrP.toFixed(3)})／全体 {isRate ? `上昇率 ${rateText(cond.baselinePos)}` : `平均 ${pctText(cond.baselineMean)}`}・下寄り率 {rateText(cond.baselineNeg)}(n={cond.totalN})。
                 {cond.nowValue !== null && <> 直近の{wd}曜前(金曜相当 {latest.friDate})の{condDef(condKey)?.label}={fmtCondValue(condKey, cond.nowValue)} → <span className="font-bold text-blue-700">{cond.bins.find((b) => b.idx === cond.nowBin)?.label ?? "—"}</span> ビン。</>}
               </div>
-              <canvas ref={condRef} />
+              <AccessibleCanvas ref={condRef} description={condDescription} />
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead>
@@ -398,7 +438,7 @@ export default function MondayGapChart({ prices }: Props) {
                           <td className="py-1 px-2 font-medium"><span className="inline-block w-2.5 h-2.5 rounded-full mr-1 align-middle" style={{ backgroundColor: b.color }} />{b.label}{cond.nowBin === b.idx && <span className="text-blue-600 ml-1">◀今</span>}</td>
                           <td className="text-right px-2 tabular-nums text-gray-500">{rng}</td>
                           <td className="text-right px-2 tabular-nums">{b.n}</td>
-                          <td className={`text-right px-2 tabular-nums font-medium ${(isRate ? b.posRate - 0.5 : b.mean) >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={isRate ? b.posRate - 0.5 : b.mean} />{isRate ? rateText(b.posRate) : pctText(b.mean)}</td>
+                          <td className={`text-right px-2 tabular-nums font-medium ${directionClass(isRate ? b.posRate - 0.5 : b.mean)}`}><DirectionGlyph value={isRate ? b.posRate - 0.5 : b.mean} />{isRate ? rateText(b.posRate) : pctText(b.mean)}</td>
                           <td className="text-right px-2 tabular-nums">{isRate ? "—" : pctText(b.median)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-600">{rateText(b.negRate)}</td>
                           <td className="text-right px-2 tabular-nums text-gray-500">{isRate ? "—" : `[${pctText(b.ciLo)}, ${pctText(b.ciHi)}]`}</td>
@@ -431,7 +471,7 @@ export default function MondayGapChart({ prices }: Props) {
           {heat && (
             <>
               <div className="text-[11px] text-gray-500">セル値={heatMetric === "neg" ? "下寄り率(赤=高)" : isRate ? "窓埋め達成率" : "月曜目的変数の平均(緑=上/赤=下)"}・★=FDR有意・青枠=直近条件の該当セル。</div>
-              <canvas ref={heatRef} />
+              <AccessibleCanvas ref={heatRef} description={heatDescription} />
               <p className="text-[11px] text-fg-muted">2要因の掛け合わせで初めて現れるエッジを見る。推奨: X=前夜米国／Y=金曜引けの勢い。米国を統制した上での金曜経路の効き(列内の縦の変化)に注目。</p>
             </>
           )}
@@ -449,7 +489,7 @@ export default function MondayGapChart({ prices }: Props) {
                 点=各{wd}曜(色: 前夜米国 陽=緑/陰=赤/不明=灰)。
                 {scatter.reg && <> 回帰: y={pctText(scatter.reg.alpha, 2)}{scatter.reg.beta >= 0 ? " + " : " − "}{Math.abs(scatter.reg.beta).toFixed(3)}·x｜r={scatter.reg.corr.toFixed(3)}・β p={scatter.reg.pBeta < 0.001 ? "<.001" : scatter.reg.pBeta.toFixed(3)}・βの95%CI [{scatter.betaCI.lo.toFixed(3)}, {scatter.betaCI.hi.toFixed(3)}]</>}
               </div>
-              <canvas ref={scatRef} />
+              <AccessibleCanvas ref={scatRef} description={scatterDescription} />
               <p className="text-[11px] text-fg-muted">傾きβが負なら「その変数が高いほど月曜は下げやすい」。前夜米国の色分けで、同じXでも米国次第で上下が割れる(交絡)かを目視できる。</p>
             </>
           )}
@@ -463,7 +503,7 @@ export default function MondayGapChart({ prices }: Props) {
           {quiver && (
             <>
               <div className="text-[11px] text-gray-500">位置=(木曜リターン, 金曜リターン)、色/大きさ={td.label}(緑=上/赤=下、大きいほど強い)。前週末2日の値動きベクトルがどの象限のとき月曜が下げるかを見る。</div>
-              <canvas ref={quivRef} />
+              <AccessibleCanvas ref={quivRef} description={quiverDescription} />
               <p className="text-[11px] text-fg-muted">例: 「木↓金↓(左下)」に赤(下寄り)が集まれば、下落継続後の月曜は窓を開けて下げやすい。「木↓金↑(左上)」でリバウンド後の月曜が反落するか等、経路の形と月曜の関係を象限で読む。</p>
             </>
           )}
@@ -476,7 +516,7 @@ export default function MondayGapChart({ prices }: Props) {
           <div className="text-[11px] text-gray-500">各説明変数と{td.label}の相関(棒)を強い順に。★=FDR有意。黒縦棒=前夜米国を統制した偏相関(米国という交絡を除いても残る効きか)。</div>
           {drivers.length === 0 ? <div className="text-xs text-fg-muted">標本が不足しています。</div> : (
             <>
-              <canvas ref={drivRef} />
+              <AccessibleCanvas ref={drivRef} description={driverDescription} />
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead><tr className="text-gray-500 border-b border-gray-200"><th className="text-left py-1 px-2">説明変数</th><th className="text-right px-2">n</th><th className="text-right px-2">相関 r</th><th className="text-right px-2">偏相関(米国統制)</th><th className="text-center px-2">有意性</th></tr></thead>
@@ -485,7 +525,7 @@ export default function MondayGapChart({ prices }: Props) {
                       <tr key={r.key} className="border-b border-gray-100">
                         <td className="py-1 px-2">{r.label}{r.needsUs && <span className="text-fg-muted"> (米)</span>}</td>
                         <td className="text-right px-2 tabular-nums">{r.n}</td>
-                        <td className={`text-right px-2 tabular-nums font-medium ${r.corr >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={r.corr} />{r.corr.toFixed(3)}</td>
+                        <td className={`text-right px-2 tabular-nums font-medium ${directionClass(r.corr)}`}><DirectionGlyph value={r.corr} />{r.corr.toFixed(3)}</td>
                         <td className="text-right px-2 tabular-nums text-gray-600">{r.partialCorr === null ? "—" : r.partialCorr.toFixed(3)}</td>
                         <td className="text-center px-2"><StatBadge n={r.n} p={r.pAdj} significant={r.significant} /></td>
                       </tr>

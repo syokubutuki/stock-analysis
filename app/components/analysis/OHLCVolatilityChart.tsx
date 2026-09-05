@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { rollingOHLCVol, wholePeriodVol, VolEstimates } from "../../lib/ohlc-volatility";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -86,6 +87,19 @@ export default function OHLCVolatilityChart({ prices }: Props) {
   }, [series, shown]);
 
   // 効率比バー（終値間法に対するσ²比。短いほど効率的）
+  const effDescription = useMemo(() => {
+    if (!eff) return "推定量別のボラ効率。計算できるデータが不足しています。";
+    const rows: [string, number, number][] = [
+      ["終値間", eff.whole.close, eff.varRatio.close],
+      ["Parkinson", eff.whole.parkinson, eff.varRatio.parkinson],
+      ["Garman-Klass", eff.whole.gk, eff.varRatio.gk],
+      ["Rogers-Satchell", eff.whole.rs, eff.varRatio.rs],
+      ["Yang-Zhang", eff.whole.yangZhang, eff.varRatio.yangZhang],
+    ];
+    const best = rows.reduce((a, b) => (b[2] < a[2] ? b : a));
+    return `全期間のボラを5つの推定量で測り、終値間法に対する分散比（効率）を並べた棒グラフ。終値間は${(eff.whole.close * 100).toFixed(2)}%で、最も効率が良いのは${best[0]}の分散比${best[2].toFixed(2)}（ボラ${(best[1] * 100).toFixed(2)}%）です。`;
+  }, [eff]);
+
   useEffect(() => {
     if (!effRef.current || !eff) return;
     const init = initCanvas(effRef.current, 150);
@@ -195,7 +209,7 @@ export default function OHLCVolatilityChart({ prices }: Props) {
         <div ref={chartRef} className="w-full rounded border border-gray-100" />
       </div>
 
-      <div className="relative"><canvas ref={effRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={effRef} description={effDescription} /></div>
 
       <AnalysisGuide title="OHLCボラティリティ推定量の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

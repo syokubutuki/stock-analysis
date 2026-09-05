@@ -7,11 +7,12 @@ import { useIntraday } from "../../hooks/useIntraday";
 import { intervalToMin } from "./usSpilloverShared";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat } from "./intradayShared";
 import {
-  drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  describePathStats, drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
   usePathEvolution, PathEvolutionControls, PathDriftTable,
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -77,7 +78,7 @@ export default function WeekdayIntradayPathChart({ ticker }: Props) {
         <>
           <PathLegend stats={result.bins} />
           <PathEvolutionControls stats={result.bins} evo={evo} />
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={describePathStats("曜日別の日内パス", result.bins, result.timeLabels)} /></div>
 
           <PathSummaryTable stats={result.bins} timeLabels={result.timeLabels} groupHeader="曜日" />
           <p className="text-[11px] text-fg-muted">

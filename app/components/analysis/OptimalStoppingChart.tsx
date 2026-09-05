@@ -1,11 +1,12 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeOptimalStopping } from "../../lib/optimal-stopping";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
@@ -17,6 +18,11 @@ export default function OptimalStoppingChart({ prices }: Props) {
 
   const closePrices = useMemo(() => prices.map((p) => p.close), [prices]);
   const result = useMemo(() => computeOptimalStopping(closePrices), [closePrices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.exerciseBoundary.length === 0) return "最適停止の行使境界。計算できるデータが不足しています。";
+    return `後退帰納で求めた「これ以上なら売る」水準（行使境界）の推移に、実際の価格を重ねた図（${result.exerciseBoundary.length}点）。最適停止の期待リターンは${(result.expectedReturn * 100).toFixed(2)}%、秘書問題の1/e戦略は${(result.secretaryReturn * 100).toFixed(2)}%、実測は${(result.actualReturn * 100).toFixed(2)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -139,19 +145,19 @@ export default function OptimalStoppingChart({ prices }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">最適停止リターン</div>
-          <div className={`font-mono text-sm font-bold ${result.expectedReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.expectedReturn} />
+          <div className={`font-mono text-sm font-bold ${directionClass(result.expectedReturn)}`}><DirectionGlyph value={result.expectedReturn} />
             {result.expectedReturn.toFixed(2)}%
           </div>
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">Secretary法リターン</div>
-          <div className={`font-mono text-sm font-bold ${result.secretaryReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.secretaryReturn} />
+          <div className={`font-mono text-sm font-bold ${directionClass(result.secretaryReturn)}`}><DirectionGlyph value={result.secretaryReturn} />
             {result.secretaryReturn.toFixed(2)}%
           </div>
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-xs text-gray-500">B&Hリターン</div>
-          <div className={`font-mono text-sm ${result.actualReturn >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.actualReturn} />
+          <div className={`font-mono text-sm ${directionClass(result.actualReturn)}`}><DirectionGlyph value={result.actualReturn} />
             {result.actualReturn.toFixed(2)}%
           </div>
         </div>
@@ -161,7 +167,7 @@ export default function OptimalStoppingChart({ prices }: Props) {
         </div>
       </div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

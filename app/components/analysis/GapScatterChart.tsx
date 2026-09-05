@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeGapSeries, type GapPoint } from "../../lib/gap-analysis";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
 import { CHART_COLORS } from "../../lib/chart-colors";
@@ -64,6 +65,12 @@ export default function GapScatterChart({ prices, period }: Props) {
     const y = gaps.map((g) => g.intradayReturn * 100);
     return linearRegression(x, y);
   }, [gaps]);
+
+  const scatterDescription = useMemo(() => {
+    if (gaps.length < 2) return "夜間と日中リターンの散布図。計算できるデータが不足しています。";
+    const q = quadrants;
+    return `夜間リターン（横軸）と日中リターン（縦軸）の散布図と回帰直線（${gaps.length}日）。傾きは${regression.slope.toFixed(3)}・R²=${regression.r2.toFixed(3)}で、傾きが負なら窓が日中に埋め戻される傾向を示します。内訳は${q.map((x) => `${x.label} ${x.count}日`).join("・")}です。`;
+  }, [gaps, quadrants, regression]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -226,7 +233,8 @@ export default function GapScatterChart({ prices, period }: Props) {
         </div>
       </div>
 
-      <canvas
+      <AccessibleCanvas
+        description={scatterDescription}
         ref={canvasRef}
         className="w-full rounded border border-gray-100"
         style={{ height: 300 }}

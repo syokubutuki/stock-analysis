@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 個別銘柄のドリフトは同定できるか（μ の識別限界）── 系C26。
 //
@@ -21,6 +21,7 @@ import {
 import { UNIVERSES, getUniverse } from "../../lib/universes";
 import { fetchUniverse, parseTickerList } from "../../lib/universe-fetch";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -41,7 +42,8 @@ const yearsFmt = (v: number) =>
 function Stat({
   label, value, tone, sub, directionValue,
 }: { label: string; value: string; tone?: "good" | "bad" | "neutral"; sub?: string; directionValue?: number }) {
-  const c = tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
+  const c = directionValue !== undefined ? directionClass(directionValue) : tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
   return (
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
@@ -140,6 +142,12 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
     };
     return computeDriftIdentifiability(activePrices, params);
   }, [activeCount, activePrices, kappa, targetExcess, lookbackYears, rebalanceDays, quantile, costBps]);
+
+  const histDescription = useMemo(() => {
+    if (!result || !result.ok || result.winner.hist.length === 0) return "勝者の呪いのヌル分布。まだ計算していません。";
+    const w = result.winner;
+    return `真のドリフトが全銘柄で同じだと仮定したヌル（${w.nBoot}回）で「1位 − 横断平均」がどこまで出るかの分布に、実測を重ねたヒストグラム。実測は年率${(w.topLeadObserved * 100).toFixed(2)}%で、ヌルの平均は${(w.topLeadNullMean * 100).toFixed(2)}%・95%点は${(w.topLeadNull95 * 100).toFixed(2)}%。実測が95%点を超えないなら、1位の見かけの強さは選抜の上振れで説明できます。`;
+  }, [result]);
 
   // ── winner's curse のヌル分布（横軸=年率ドリフト・時間軸でないので Canvas2D）
   const histCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -418,7 +426,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                       <td className="text-right px-2 tabular-nums text-gray-500 whitespace-nowrap">
                         [{pct(r.ciMuLo, 0)}, {pct(r.ciMuHi, 0)}]
                       </td>
-                      <td className={`text-right px-2 tabular-nums ${r.excessMu > 0 ? "text-green-700" : "text-red-600"}`}>
+                      <td className={`text-right px-2 tabular-nums ${directionClass(r.excessMu)}`}>
                         <DirectionGlyph value={r.excessMu} />{pct(r.excessMu)}
                       </td>
                       <td className="text-right px-2 tabular-nums">{num2(r.tExcess)}</td>
@@ -467,7 +475,7 @@ export default function DriftIdentifiabilityChart({ tickers, pricesByTicker, nam
                 sub="見かけのリードのうち誤差で説明される分" />
             </div>
             <div className="w-full">
-              <canvas ref={histCanvas} />
+              <AccessibleCanvas ref={histCanvas} description={histDescription} />
             </div>
             <p className="mt-1.5 text-[11px] text-gray-500">
               ヌルは各銘柄の平均を差し引いた（＝真の μ を全銘柄同一にした）リターン行列の移動ブロック再標本（

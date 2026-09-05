@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,6 +12,7 @@ import {
 import { PricePoint } from "../../lib/types";
 import { simulateDeltaHedge } from "../../lib/delta-hedge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -103,6 +104,14 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
   }, [result]);
 
   // リバランス頻度スキャン
+  const freqDescription = useMemo(() => {
+    const fs = result?.freqScan ?? [];
+    if (fs.length === 0) return "リバランス頻度とヘッジ誤差。計算できるデータが不足しています。";
+    const best = fs.reduce((a, b) => (b.rmsError < a.rmsError ? b : a));
+    const rich = fs.reduce((a, b) => (b.finalPnL > a.finalPnL ? b : a));
+    return `リバランス間隔（横軸）に対するヘッジ誤差RMSと最終P&Lのトレードオフ曲線（${fs.length}点）。誤差が最小なのは${best.every}日ごとのRMS=${best.rmsError.toFixed(4)}、最終P&Lが最大なのは${rich.every}日ごとの${rich.finalPnL.toFixed(2)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const cv = freqRef.current;
     if (!cv || !result || result.freqScan.length === 0) return;
@@ -188,8 +197,10 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-            <Stat label="ガンマ項 Σ½Γ(ΔS)²" value={fmt(result.gammaPnL)} tone="up" directionValue={result.gammaPnL} />
-            <Stat label="シータ項 ΣΘdt" value={fmt(result.thetaPnL)} tone="down" directionValue={result.thetaPnL} />
+            {/* ガンマ項は ½Γ(ΔS)² で定義上つねに ≥0、シータ項は Θ<0・dt>0 で ≤0。
+                方向を持たないので記号は付けない（FU37）。tone は「効いている向き」を表す固定色 */}
+            <Stat label="ガンマ項 Σ½Γ(ΔS)²" value={fmt(result.gammaPnL)} tone="up" />
+            <Stat label="シータ項 ΣΘdt" value={fmt(result.thetaPnL)} tone="down" />
             <Stat label="ガンマ+シータ" value={fmt(result.gammaPnL + result.thetaPnL)}
               tone={result.gammaPnL + result.thetaPnL >= 0 ? "up" : "down"} directionValue={result.gammaPnL + result.thetaPnL} />
           </div>
@@ -218,7 +229,7 @@ export default function DeltaHedgeSimChart({ prices }: Props) {
             <p className="text-xs font-medium text-gray-600 mb-1">
               リバランス頻度 vs ヘッジ誤差（頻度↑で誤差↓・コスト↑のトレードオフ）
             </p>
-            <canvas ref={freqRef} className="w-full rounded border border-gray-100" />
+            <AccessibleCanvas ref={freqRef} description={freqDescription} className="w-full rounded border border-gray-100" />
           </div>
         </>
       )}
@@ -284,7 +295,8 @@ function Stat({
   tone?: "up" | "down";
   directionValue?: number;
 }) {
-  const c = tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
+  const c = directionValue !== undefined ? directionClass(directionValue) : tone === "up" ? "text-green-700" : tone === "down" ? "text-red-600" : "text-gray-800";
   return (
     <div className="p-2 rounded border border-gray-200 bg-gray-50">
       <div className="text-gray-500">{label}</div>

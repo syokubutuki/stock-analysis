@@ -31,6 +31,7 @@ import { doublingYears, doublingYearsLabel } from "../../lib/growth-drag";
 import { niceTicks } from "../../lib/axis-scale";
 import { CHART_COLORS, DIRECTION_TEXT_CLASS } from "../../lib/chart-colors";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -160,6 +161,13 @@ export default function HoldingLedgerChart({ prices }: Props) {
     () => (effStats && params ? ledgerGrid(effStats, params, HOLD_DAYS_LIST, IN_MARKET_LIST) : null),
     [effStats, params]
   );
+
+  const waterfallDescription = useMemo(() => {
+    if (!ledger) return "持ち方の対数台帳（ウォーターフォール）。計算できるデータが不足しています。";
+    const drops = ledger.steps.filter((s) => s.kind !== "result" && s.delta < 0);
+    const worst = drops.length ? drops.reduce((a, b) => (b.delta < a.delta ? b : a)) : null;
+    return `期待リターンから幾何成長率までを段ごとに増減で示したウォーターフォール（${ledger.steps.length}段）。見かけの期待は年率${(ledger.expected * 100).toFixed(2)}%、最終的に増える速さは${(ledger.gNet * 100).toFixed(2)}%で、最も削ったのは${worst ? `${worst.label}の${(worst.delta * 100).toFixed(2)}%` : "なし"}です。`;
+  }, [ledger]);
 
   // ── ウォーターフォール ────────────────────────────────────────────────
   useEffect(() => {
@@ -550,7 +558,7 @@ export default function HoldingLedgerChart({ prices }: Props) {
 
       {/* ── ウォーターフォール ───────────────────────────────────────── */}
       <div className="relative">
-        <canvas ref={waterfallRef} />
+        <AccessibleCanvas ref={waterfallRef} description={waterfallDescription} />
       </div>
       <p className="text-[11px] text-gray-500 -mt-2">
         紫＝ボラティリティドラッグ（建玉 q の<strong>二乗</strong>で効く）、赤＝削っている項、灰＝その設定では有利に働いた項、

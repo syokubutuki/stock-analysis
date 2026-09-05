@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import { multivarSimplex } from "../../lib/multivar-simplex";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -28,6 +29,11 @@ export default function MultivarSimplexChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [emb, setEmb] = useState(3);
   const res = useMemo(() => (prices.length < 150 ? null : multivarSimplex(prices, emb)), [prices, emb]);
+
+  const chartDescription = useMemo(() => {
+    if (!res) return "多変量シンプレックス予測。標本が不足しています。";
+    return `埋め込み次元${emb}で近傍${res.nNeighbors}点を使ったシンプレックス予測と実測の散布図（${res.points.length}点）。予測スキルρ=${res.rho.toFixed(3)}で、直近の予測値は${(res.currentForecast * 100).toFixed(3)}%です。`;
+  }, [res, emb]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -73,7 +79,7 @@ export default function MultivarSimplexChart({ prices }: Props) {
         （近傍 {res.nNeighbors}点）
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <AnalysisGuide title="多変量近傍予測の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

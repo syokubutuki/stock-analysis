@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,6 +12,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -61,7 +62,7 @@ function SpeedBar({ g, maxAbs }: { g: SpeedGroup; maxAbs: number }) {
           style={{ width: `${w / 2}%` }}
         />
       </div>
-      <span className={`w-16 text-right font-medium ${g.afternoonMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={g.afternoonMean} />{fmtSignedPct(g.afternoonMean)}</span>
+      <span className={`w-16 text-right font-medium ${directionClass(g.afternoonMean)}`}><DirectionGlyph value={g.afternoonMean} />{fmtSignedPct(g.afternoonMean)}</span>
       <StatBadge n={g.n} p={g.afternoonP} significant={g.afternoonP < 0.05} />
     </div>
   );
@@ -82,6 +83,12 @@ export default function UsEventTimeChart({ ticker }: Props) {
     () => (data?.grid && rows.length ? stratifyBySpeed(rows, data.grid, data.gmtoffset) : null),
     [data, rows]
   );
+
+  const progressDescription = useMemo(() => {
+    if (progress.length === 0) return "進捗率別の到達後リターン。整合できた標本が不足しています。";
+    const top = progress.reduce((a, b) => (Math.abs(b.postMean) > Math.abs(a.postMean) ? b : a));
+    return `夜間ギャップの何倍まで日中で進んだか（進捗率）を横軸に、その水準へ初到達した後の引けまでのリターンを並べた図。${progress.length}水準のうち最も大きいのは${top.level.toFixed(2)}倍の${(top.postMean * 100).toFixed(2)}%（n=${top.n}、p=${top.postP.toFixed(3)}）です。`;
+  }, [progress]);
 
   useEffect(() => {
     if (progress.length === 0 || !canvasRef.current) return;
@@ -113,7 +120,7 @@ export default function UsEventTimeChart({ ticker }: Props) {
           </div>
 
           <div className="text-xs text-gray-500">日中進捗(夜間ギャップの倍数 ×gap)× 到達後→引けの前向きリターン</div>
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={progressDescription} /></div>
           <p className="text-[11px] text-fg-muted">
             緑=到達後まだ同方向に伸びる / 赤=到達後は逆行。青破線=1.0×gap(ギャップ相当)。基準を未来の引け値でなく前夜ギャップにしたので、選抜に先読みが入らない。
           </p>

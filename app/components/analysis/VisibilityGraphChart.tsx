@@ -12,6 +12,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeVisibilityGraph } from "../../lib/visibility-graph";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -76,6 +77,12 @@ export default function VisibilityGraphChart({ prices, seriesMode }: Props) {
   }, [prices, vg]);
 
   // 次数分布 log-logプロット
+  const degDistDescription = useMemo(() => {
+    if (vg.degreeDistribution.length === 0) return "可視グラフの次数分布。計算できるデータが不足しています。";
+    const peak = vg.degreeDistribution.reduce((a, b) => (b.count > a.count ? b : a));
+    return `可視グラフの次数分布を両対数で描いた図（${vg.degreeDistribution.length}階級）。最頻は次数${peak.degree}の${peak.count}件で、べき乗則指数は${vg.powerLawExponent.toFixed(2)}です（2〜3ならスケールフリーに近い）。`;
+  }, [vg]);
+
   useEffect(() => {
     const canvas = degDistRef.current;
     if (!canvas || vg.degreeDistribution.length === 0) return;
@@ -188,7 +195,7 @@ export default function VisibilityGraphChart({ prices, seriesMode }: Props) {
             次数分布 (log-log) — べき指数: {vg.powerLawExponent.toFixed(2)}
           </div>
           <div className="w-full rounded border border-gray-100 overflow-hidden">
-            <canvas ref={degDistRef} />
+            <AccessibleCanvas ref={degDistRef} description={degDistDescription} />
           </div>
         </div>
       </div>

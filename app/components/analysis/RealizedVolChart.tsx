@@ -11,6 +11,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -194,6 +195,24 @@ export default function RealizedVolChart({ ticker }: Props) {
   const sig = useMemo<SignatureResult | null>(() => (resp ? computeSignature(resp.bars, resp.gmtoffset, baseMin) : null), [resp, baseMin]);
   const vc = useMemo<VolumeClockResult | null>(() => (resp ? computeVolumeClock(resp.bars, resp.gmtoffset) : null), [resp]);
 
+  const chartDescription = useMemo(() => {
+    if (view === "rv") {
+      if (!rv) return "実現ボラの時系列。標本が不足しています。";
+      return `日次の実現ボラ（分足から積み上げ）の時系列（対象${rv.nDays}営業日）。年率換算の平均は${rv.meanAnnVolPct.toFixed(1)}%で、ジャンプと判定した日は${rv.jumpDays}日です。`;
+    }
+    if (view === "overnight") {
+      if (!ov) return "夜間と日中の累積比較。標本が不足しています。";
+      return `夜間リターンと日中リターンをそれぞれ累積した2本の曲線（対象${ov.nDays}営業日）。夜間は平均${ov.onMeanPct.toFixed(3)}%・シャープ${ov.onSharpe.toFixed(2)}、日中は平均${ov.idMeanPct.toFixed(3)}%・シャープ${ov.idSharpe.toFixed(2)}で、全分散に占める夜間の割合は${(ov.onVarShare * 100).toFixed(0)}%です。`;
+    }
+    if (view === "signature") {
+      if (!sig || sig.signature.length === 0) return "ボラのシグネチャプロット。標本が不足しています。";
+      const first = sig.signature[0], last = sig.signature[sig.signature.length - 1];
+      return `サンプリング間隔を変えたときの年率ボラ（シグネチャプロット）と分足リターンの自己相関。${first.stepMin}分で${first.annVolPct.toFixed(1)}%、${last.stepMin}分で${last.annVolPct.toFixed(1)}%です。`;
+    }
+    if (!vc) return "時間時計と出来高時計の比較。標本が不足しています。";
+    return `時間で刻んだバーと出来高で刻んだバーのリターン分布の比較。時間時計は${vc.nTimeBars}本で超過尖度${vc.timeKurt.toFixed(2)}、出来高時計は${vc.nVolBars}本で${vc.volKurt.toFixed(2)}です。`;
+  }, [view, rv, ov, sig, vc]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const H = view === "signature" ? 360 : 320;
@@ -223,7 +242,7 @@ export default function RealizedVolChart({ ticker }: Props) {
 
       {!loading && !error && ready && (
         <>
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           {view === "rv" && rv && (
             <>

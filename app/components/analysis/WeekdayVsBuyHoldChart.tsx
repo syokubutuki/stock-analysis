@@ -5,6 +5,8 @@
 // 詳しい理論は末尾の AnalysisGuide を参照。
 
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import { directionClass } from "./DirectionValue";
 import {
   createChart,
   LineSeries,
@@ -35,7 +37,7 @@ const num2 = (v: number) => v.toFixed(2);
 // 往復コストは bp（=0.01%）で読むほうが手数料表と突き合わせやすい
 const bp = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 10000).toFixed(1)}bp`;
 const bpAbs = (v: number) => `${(v * 10000).toFixed(1)}bp`;
-const cls = (v: number) => (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500");
+const cls = (v: number) => directionClass(v);
 
 // p値 → 星付き表示
 function pStars(p: number | null): { text: string; sig: boolean } {

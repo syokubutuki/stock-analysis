@@ -8,6 +8,7 @@ import {
   falseNearestNeighbors,
 } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -33,6 +34,11 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
   );
 
   // Draw AMI chart
+  const amiDescription = useMemo(() => {
+    if (amiResult.lags.length === 0) return "自己相互情報量AMI。計算できるデータが不足しています。";
+    return `ラグ（横軸）に対する自己相互情報量AMIの曲線（ラグ${amiResult.lags[0]}〜${amiResult.lags[amiResult.lags.length - 1]}）。最初の極小はラグ${amiResult.optimalTau}で、これが埋め込み遅れτの推奨値です。`;
+  }, [amiResult]);
+
   useEffect(() => {
     const canvas = amiCanvasRef.current;
     if (!canvas || amiResult.lags.length === 0) return;
@@ -149,6 +155,12 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
   }, [amiResult]);
 
   // Draw FNN chart
+  const fnnDescription = useMemo(() => {
+    if (fnnResult.dimensions.length === 0) return "偽近傍法FNN。計算できるデータが不足しています。";
+    const i = fnnResult.dimensions.indexOf(fnnResult.optimalDim);
+    return `埋め込み次元（横軸）に対する偽近傍の割合の曲線（次元${fnnResult.dimensions[0]}〜${fnnResult.dimensions[fnnResult.dimensions.length - 1]}）。割合が十分小さくなる次元は${fnnResult.optimalDim}で、そのときの偽近傍率は${i >= 0 ? (fnnResult.fnnRatio[i] * 100).toFixed(1) : "—"}%、飽和次元は${fnnResult.saturationDim}です。`;
+  }, [fnnResult]);
+
   useEffect(() => {
     const canvas = fnnCanvasRef.current;
     if (!canvas || fnnResult.dimensions.length === 0) return;
@@ -301,10 +313,10 @@ export default function EmbeddingOptimizer({ prices, seriesMode }: Props) {
       {/* Charts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <div>
-          <canvas ref={amiCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={amiCanvasRef} description={amiDescription} className="w-full rounded border border-gray-100" />
         </div>
         <div>
-          <canvas ref={fnnCanvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={fnnCanvasRef} description={fnnDescription} className="w-full rounded border border-gray-100" />
         </div>
       </div>
 

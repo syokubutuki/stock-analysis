@@ -12,6 +12,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { fitGarch, analyzeLeverage, detectJumps } from "../../lib/garch";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -87,6 +88,12 @@ export default function GarchChart({ prices, seriesMode }: Props) {
   }, [prices, garch]);
 
   // News Impact Curve (leverage effect)
+  const leverageDescription = useMemo(() => {
+    const c = leverage.newsImpactCurve;
+    if (c.length === 0) return "ニュース・インパクト曲線。計算できるデータが不足しています。";
+    return `過去のリターン（横軸）が翌日のボラ（縦軸）に与える影響を描いたニュース・インパクト曲線。非対称係数は${leverage.asymmetryCoeff.toFixed(3)}で、下落後の平均ボラ${(leverage.negativeVolMean * 100).toFixed(2)}%に対し上昇後は${(leverage.positiveVolMean * 100).toFixed(2)}%です（左右が非対称なほどレバレッジ効果が強い）。`;
+  }, [leverage]);
+
   useEffect(() => {
     const canvas = leverageCanvasRef.current;
     if (!canvas) return;
@@ -230,7 +237,7 @@ export default function GarchChart({ prices, seriesMode }: Props) {
 
       <div className="mt-3 flex flex-col sm:flex-row gap-3 items-start">
         <div>
-          <canvas ref={leverageCanvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={leverageCanvasRef} description={leverageDescription} className="rounded border border-gray-100" />
           <div className="text-xs text-fg-muted mt-1">
             非対称性: 負リターン後vol {(leverage.negativeVolMean * 100).toFixed(3)}%
             / 正リターン後vol {(leverage.positiveVolMean * 100).toFixed(3)}%

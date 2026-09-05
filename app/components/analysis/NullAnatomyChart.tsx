@@ -22,6 +22,7 @@ import type {
 } from "../../lib/null-anatomy.worker";
 import { US_DRIVERS, useUsDaily } from "../../hooks/useUsDaily";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -285,6 +286,15 @@ export default function NullAnatomyChart({ prices }: Props) {
   );
   const baseline = useMemo(() => result?.axes.find((a) => a.key === "none") ?? null, [result]);
 
+  const tChartDescription = useMemo(() => {
+    if (!result?.ok || !axis) return "スロット別のt統計量。まだ計算していません。";
+    const live = axis.slots.filter((s) => s.n > 0);
+    if (live.length === 0) return "スロット別のt統計量。標本が不足しています。";
+    const top = live.reduce((a, b) => (Math.abs(b.t) > Math.abs(a.t) ? b : a));
+    const over = live.filter((s) => Math.abs(s.t) > axis.tCritFwer).length;
+    return `週内スロット${live.length}本の平均リターンのt統計量を並べ、FWER臨界値${axis.tCritFwer.toFixed(2)}と単独臨界値${axis.tCritSingle.toFixed(2)}を線で引いた図。|t|が最大なのは${top.label}の${top.t.toFixed(2)}（補正p=${top.pAdj.toFixed(3)}、n=${top.n}）で、FWERを超えたスロットは${over}本です。`;
+  }, [result, axis]);
+
   useEffect(() => {
     const c = tRef.current;
     if (!c || !result?.ok || !axis) return;
@@ -470,7 +480,7 @@ export default function NullAnatomyChart({ prices }: Props) {
               <b>多重性の代償</b>そのものです。
             </p>
             <div className="mt-2">
-              <canvas ref={tRef} />
+              <AccessibleCanvas ref={tRef} description={tChartDescription} />
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-[10px]">
               {(["fwer", "single", "none"] as const).map((v) => (

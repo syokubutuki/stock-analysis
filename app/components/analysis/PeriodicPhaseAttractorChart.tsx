@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode } from "../../lib/series-mode";
 import { computePeriodicPhaseAttractor } from "../../lib/weekly-phase-attractor";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -39,6 +40,11 @@ export default function PeriodicPhaseAttractorChart({ prices, seriesMode }: Prop
   );
 
   const significant = result.ok && result.PL > result.surrogateQ95;
+
+  const scatterDescription = useMemo(() => {
+    if (!result.ok) return "周期位相アトラクタの散布図。標本が不足しています。";
+    return `遅延埋め込みした点を周期${result.period}日の位相で色分けした散布図（${result.n}点・重心${result.centroids2d.length}個）。位相ロッキング指標PL=${result.PL.toFixed(3)}に対しサロゲート95%点は${result.surrogateQ95.toFixed(3)}で、p=${result.pValue.toFixed(3)}です（PLが95%点を超えていれば位相構造は偶然では説明できません）。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = scatterRef.current;
@@ -181,7 +187,7 @@ export default function PeriodicPhaseAttractorChart({ prices, seriesMode }: Prop
           </div>
 
           <div className="flex justify-center">
-            <canvas ref={scatterRef} className="rounded border border-gray-200" />
+            <AccessibleCanvas ref={scatterRef} description={scatterDescription} className="rounded border border-gray-200" />
           </div>
           <div className="mt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
             <span>位相0</span>

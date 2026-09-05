@@ -11,6 +11,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { meanReversionAnalysis, simulateOU } from "../../lib/mean-reversion";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
@@ -67,6 +68,12 @@ export default function MeanReversionChart({ prices, seriesMode }: Props) {
   }, [result]);
 
   // OU simulation on canvas
+  const simDescription = useMemo(() => {
+    const p = result.ou.params;
+    if (!(p.theta > 0)) return "OU過程のシミュレーション。平均回帰が推定できていません。";
+    return `推定したOrnstein-Uhlenbeck過程のシミュレーション経路。回帰速度θ=${p.theta.toFixed(4)}・長期平均${p.mu.toFixed(2)}・σ=${p.sigma.toFixed(4)}で、半減期は${p.halfLife.toFixed(1)}日、当てはまりR²=${result.ou.rSquared.toFixed(3)}、Hurstは${result.hurst.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = simCanvasRef.current;
     if (!canvas || result.ou.params.theta <= 0) return;
@@ -207,7 +214,7 @@ export default function MeanReversionChart({ prices, seriesMode }: Props) {
 
       {/* OUシミュレーション */}
       <div className="mt-3">
-        <canvas ref={simCanvasRef} />
+        <AccessibleCanvas ref={simCanvasRef} description={simDescription} />
       </div>
 
       <AnalysisGuide title="Ornstein-Uhlenbeck平均回帰の詳細理論">

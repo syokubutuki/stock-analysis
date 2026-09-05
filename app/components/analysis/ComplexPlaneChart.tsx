@@ -13,6 +13,7 @@ import {
   trajectoryStats,
 } from "../../lib/complex-plane";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -58,6 +59,11 @@ export default function ComplexPlaneChart({ prices, seriesMode }: Props) {
   }, [method, lr, values, tau, period, phasorPeriod]);
 
   const stats = useMemo(() => trajectoryStats(points), [points]);
+
+  const chartDescription = useMemo(() => {
+    if (points.length === 0) return "複素平面の軌跡。計算できるデータが不足しています。";
+    return `価格系列を複素平面に写した軌跡（${points.length}点）。正味の変位は${stats.netDisplacement.toFixed(4)}、経路長は${stats.pathLength.toFixed(4)}で効率は${stats.efficiency.toFixed(3)}（1に近いほど直進、0に近いほど往復）、原点まわりの回転数は${stats.winding.toFixed(2)}周です。`;
+  }, [points, stats]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -226,7 +232,7 @@ export default function ComplexPlaneChart({ prices, seriesMode }: Props) {
       {/* 複素平面 Canvas */}
       <div className="flex flex-col sm:flex-row gap-4 items-start">
         <div>
-          <canvas ref={canvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={canvasRef} description={chartDescription} className="rounded border border-gray-100" />
           <div className="text-xs text-fg-muted mt-1">
             横軸=実部, 縦軸=虚部, 色=時間(青→赤), 緑点=始点, 赤点=最新
           </div>

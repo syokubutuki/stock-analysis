@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import {
   computeWeeklyPhaseSync,
@@ -8,6 +8,7 @@ import {
   WEEKDAY_LABELS,
 } from "../../lib/weekly-phase-attractor";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 既定バスケット: 米セクターETF (同一市場・同一タイムゾーンで週次位相を比較)
@@ -63,6 +64,12 @@ export default function WeeklyPhaseSyncChart() {
       setLoading(false);
     }
   };
+
+  const circleDescription = useMemo(() => {
+    if (!result || !result.ok) return "位相同期の円プロット。まだ計算していません。";
+    const deg = (result.meanPhaseRad * 180) / Math.PI;
+    return `${result.items.length}銘柄の週内選好位相を単位円上に置き、平均ベクトルを矢印で示した図。秩序変数r=${result.orderParameter.toFixed(3)}（振幅加重${result.weightedOrder.toFixed(3)}）で、平均位相は${deg.toFixed(0)}度です（rが1に近いほど銘柄がそろって同じ曜日に動く）。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = circleRef.current;
@@ -210,7 +217,7 @@ export default function WeeklyPhaseSyncChart() {
           </div>
 
           <div className="flex justify-center">
-            <canvas ref={circleRef} className="rounded border border-gray-200" />
+            <AccessibleCanvas ref={circleRef} description={circleDescription} className="rounded border border-gray-200" />
           </div>
 
           <div className="mt-3 overflow-x-auto">

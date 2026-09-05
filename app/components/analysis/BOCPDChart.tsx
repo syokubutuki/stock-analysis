@@ -13,6 +13,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { computeBOCPD } from "../../lib/bocpd";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -101,6 +102,14 @@ export default function BOCPDChart({ prices, seriesMode }: Props) {
   }, [result, lrTimes]);
 
   // Run-length posterior heatmap
+  const heatmapDescription = useMemo(() => {
+    if (result.runLengthPosterior.length === 0) return "run length の事後分布。計算できるデータが不足しています。";
+    const cps = result.changePoints.length;
+    let pi = 0;
+    for (let i = 1; i < result.changeProbability.length; i++) if (result.changeProbability[i] > result.changeProbability[pi]) pi = i;
+    return `run length（前回の変化点からの経過）の事後分布を色で描いたヒートマップに、変化確率P(r=0)とMAP run lengthを重ねた図。検出した変化点は${cps}個、変化確率が最大なのは${pi}番目の時点で${(result.changeProbability[pi] * 100).toFixed(1)}%、run lengthの上限は${result.maxRunLength}です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = heatmapRef.current;
     if (!canvas || result.runLengthPosterior.length === 0) return;
@@ -199,7 +208,7 @@ export default function BOCPDChart({ prices, seriesMode }: Props) {
         赤: 変化確率 P(r=0)、青線: MAP run length（右軸）
       </p>
 
-      <canvas ref={heatmapRef} />
+      <AccessibleCanvas ref={heatmapRef} description={heatmapDescription} />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

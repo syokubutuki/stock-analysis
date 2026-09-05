@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { buildEdgeCatalog } from "../../lib/edge-trades";
 import {
   capacityTable,
@@ -147,6 +148,12 @@ export default function EdgeCapacityChart({ prices }: Props) {
     return table[0] ?? null;
   }, [table, selectedId]);
 
+  const curveDescription = useMemo(() => {
+    if (!selected) return "容量曲線。エッジが選ばれていません。";
+    const yen = (v: number) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}億円` : `${(v / 1e4).toFixed(0)}万円`);
+    return `投入資金K（横軸）に対する年間期待利益の曲線。利益が最大になるのはK*=${yen(selected.kStar)}、純エッジが消えるのは${yen(selected.kBreakEven)}、参加率の上限は${yen(selected.kLiq)}で、実効容量K_eff=${yen(selected.kEff)}のときの年率純リターンは${selected.netAnnualAtKEffPct.toFixed(2)}%です。${deflate ? `選択バイアス補正後のK*は${yen(selected.kStarDeflated)}に縮みます。` : ""}`;
+  }, [selected, deflate]);
+
   useEffect(() => {
     if (!canvasRef.current || !selected) return;
     drawCurve(canvasRef.current, selected, deflate);
@@ -279,7 +286,7 @@ export default function EdgeCapacityChart({ prices }: Props) {
             {selected.edge.label}（{selected.direction === "long" ? "買い" : "売り"}・年{selected.edge.tradesPerYear.toFixed(0)}回・{deflate ? "選択バイアス補正後" : "素のμ"}）
             — 緑破線=K*(利益最大 {fmtYen(deflate ? selected.kStarDeflated : selected.kStar)}) / 赤破線=エッジ消滅({fmtYen(deflate ? selected.kBreakEvenDeflated : selected.kBreakEven)}) / 橙破線=流動性上限({fmtYen(selected.kLiq)})
           </div>
-          <canvas ref={canvasRef} className="w-full rounded border border-gray-100" />
+          <AccessibleCanvas ref={canvasRef} description={curveDescription} className="w-full rounded border border-gray-100" />
         </div>
       )}
 

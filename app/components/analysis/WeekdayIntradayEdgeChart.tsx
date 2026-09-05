@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -23,6 +23,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -103,6 +104,13 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
   const selected = result?.weekdays.find((w) => w.weekday === selectedWd) ?? null;
 
   // ヒートマップ描画
+  const heatDescription = useMemo(() => {
+    if (!selected || !result) return "日内タイミングのヒートマップ。標本が不足しています。";
+    const b = selected.best;
+    if (!b) return `${selected.label}曜の建て時刻×手仕舞い時刻のヒートマップ（対象${selected.nDays}日）。有効なウィンドウがありません。`;
+    return `${selected.label}曜について、何時に建てて何時に手仕舞うかの全組合せを色で並べたヒートマップ（対象${selected.nDays}日、検定したウィンドウ${result.nTested}本）。最良は${b.entryLabel}建て→${b.exitLabel}手仕舞いで平均${(b.mean * 100).toFixed(3)}%です。`;
+  }, [selected, result]);
+
   useEffect(() => {
     if (!selected || !canvasRef.current) return;
     const G = result!.timeLabels.length;
@@ -235,7 +243,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                           <td className="text-center px-2 font-medium text-gray-700 tabular-nums">{b.entryLabel}</td>
                           <td className="text-center px-2 font-medium text-gray-700 tabular-nums">{b.exitLabel}</td>
                           <td className="text-right px-2 text-gray-500">{fmtHold(b.holdBins, binMin)}</td>
-                          <td className={`text-right px-2 font-medium ${b.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.mean} />{fmtSignedPct(b.mean)}</td>
+                          <td className={`text-right px-2 font-medium ${directionClass(b.mean)}`}><DirectionGlyph value={b.mean} />{fmtSignedPct(b.mean)}</td>
                           <td className="px-2 text-gray-600 tabular-nums">{(b.win * 100).toFixed(0)}%</td>
                           <td className="px-2"><StatBadge n={b.n} p={b.pAdj} significant={b.pAdj < 0.05} minN={12} /></td>
                         </>
@@ -279,7 +287,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                   <span className="font-bold text-gray-800"> {selected.best.entryLabel}</span> に買い建て →
                   <span className="font-bold text-gray-800"> {selected.best.exitLabel}</span> に手仕舞い
                   （保有 {fmtHold(selected.best.holdBins, binMin)}）。
-                  平均 <span className={`font-bold ${selected.best.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={selected.best.mean} />{fmtSignedPct(selected.best.mean)}</span>
+                  平均 <span className={`font-bold ${directionClass(selected.best.mean)}`}><DirectionGlyph value={selected.best.mean} />{fmtSignedPct(selected.best.mean)}</span>
                   ・勝率 {(selected.best.win * 100).toFixed(0)}%・n={selected.best.n}日
                   {ci && (
                     <>（95%CI {fmtSignedPct(ci.lo)}〜{fmtSignedPct(ci.hi)}・同符号 {(ci.stable * 100).toFixed(0)}%）</>
@@ -287,7 +295,7 @@ export default function WeekdayIntradayEdgeChart({ ticker }: Props) {
                 </div>
 
                 <div className="text-xs text-gray-500">日内タイミング俯瞰（ヒートマップ）</div>
-                <div className="relative"><canvas ref={canvasRef} /></div>
+                <div className="relative"><AccessibleCanvas ref={canvasRef} description={heatDescription} /></div>
 
                 <div className="text-xs text-gray-500">
                   最良ウィンドウの累積リターン（％・暦時間軸、ホイールでズーム／ドラッグでパン）

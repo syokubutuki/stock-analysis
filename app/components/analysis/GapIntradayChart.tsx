@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
@@ -10,6 +10,7 @@ import {
 } from "./intradayShared";
 import { minuteToLabel } from "../../lib/intraday-core";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props { ticker: string; }
 
@@ -42,6 +43,13 @@ export default function GapIntradayChart({ ticker }: Props) {
     () => (resp ? computeGapIntraday(resp.bars, resp.gmtoffset) : null),
     [resp]
   );
+
+  const fillHistDescription = useMemo(() => {
+    if (!res || res.fillTimeHist.length === 0) return "窓埋め時刻のヒストグラム。埋まった日がまだありません。";
+    const total = res.fillTimeHist.reduce((a, b) => a + b.count, 0);
+    const peak = res.fillTimeHist.reduce((a, b) => (b.count > a.count ? b : a));
+    return `窓埋め時刻のヒストグラム（30分ビン）。埋まった${total}日のうち最も多いのは${peak.label}台の${peak.count}日で、全体の${((peak.count / total) * 100).toFixed(0)}%です。`;
+  }, [res]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -85,14 +93,14 @@ export default function GapIntradayChart({ ticker }: Props) {
                     <td className="text-right">{fmtPct(b.fillRate)}</td>
                     <td className="text-right">{b.medFillMin ? minuteToLabel(b.medFillMin) : "—"}</td>
                     <td className="text-right">{fmtPct(b.contRate)}</td>
-                    <td className={`text-right ${b.closeMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.closeMeanPct} />{fmtSignedPct(b.closeMeanPct / 100)}</td>
+                    <td className={`text-right ${directionClass(b.closeMeanPct)}`}><DirectionGlyph value={b.closeMeanPct} />{fmtSignedPct(b.closeMeanPct / 100)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={fillHistDescription} /></div>
 
           <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">
             {"窓埋め率が高い窓種は『寄り後に前日終値へ戻る（fade）』傾向＝逆張り（窓埋め狙い）が有利。継続率が高ければ gap-and-go（窓方向に伸びる）＝順張りが有利。埋め時刻分布は、窓埋めが前場に集中するか後場までかかるかを示す。"}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeCornishFisherVaR, computeOmegaRatio } from "../../lib/cornish-fisher";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 import DirectionValue from "./DirectionValue";
 
@@ -28,6 +29,12 @@ export default function CornishFisherChart({ prices }: Props) {
   const omega = useMemo(() => computeOmegaRatio(returns), [returns]);
 
   // Omega curve canvas
+  const omegaDescription = useMemo(() => {
+    if (omega.curve.length === 0) return "オメガレシオ曲線。計算できるデータが不足しています。";
+    const lo = omega.curve[0], hi = omega.curve[omega.curve.length - 1];
+    return `要求リターンの水準（横軸）ごとにオメガレシオΩを描いた曲線。Ω=1になる損益分岐は${(omega.breakeven * 100).toFixed(3)}%で、左端${(lo.threshold * 100).toFixed(2)}%ではΩ=${lo.omega.toFixed(2)}、右端${(hi.threshold * 100).toFixed(2)}%ではΩ=${hi.omega.toFixed(2)}です（Ωが1を超えるほど上振れが下振れを上回る）。`;
+  }, [omega]);
+
   useEffect(() => {
     const canvas = omegaCanvasRef.current;
     if (!canvas || omega.curve.length === 0) return;
@@ -180,7 +187,7 @@ export default function CornishFisherChart({ prices }: Props) {
         </div>
       </div>
 
-      <canvas ref={omegaCanvasRef} />
+      <AccessibleCanvas ref={omegaCanvasRef} description={omegaDescription} />
 
       <div className="text-xs text-gray-600 mt-2">{omega.interpretation}</div>
 

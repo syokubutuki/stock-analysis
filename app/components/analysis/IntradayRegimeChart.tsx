@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
@@ -13,6 +13,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -133,6 +134,21 @@ export default function IntradayRegimeChart({ ticker }: Props) {
   const analog = useMemo<AnalogResult | null>(() => (resp ? computeAnalog(resp.bars, resp.gmtoffset) : null), [resp]);
   const session = useMemo<SessionResult | null>(() => (resp ? computeSessionSplit(resp.bars, resp.gmtoffset, binMin) : null), [resp, binMin]);
 
+  const chartDescription = useMemo(() => {
+    if (view === "regime") {
+      if (!regime || regime.buckets.length === 0) return "日内の状態分類。標本が不足しています。";
+      const top = regime.buckets.reduce((a, b) => (b.count > a.count ? b : a));
+      const best = regime.buckets.reduce((a, b) => (b.nextMeanPct > a.nextMeanPct ? b : a));
+      return `対象${regime.nDays}営業日を効率比${regime.erThreshold}で状態分類し、状態ごとの翌日リターンを並べた図。最も多いのは${LABEL_NAME[top.label]}の${top.count}日、翌日の平均が最も高いのは${LABEL_NAME[best.label]}の${best.nextMeanPct.toFixed(2)}%（勝率${(best.nextWin * 100).toFixed(0)}%）です。`;
+    }
+    if (view === "analog") {
+      if (!analog) return "類似日の日中経路。標本が不足しています。";
+      return `直近日${analog.queryDate}の前半${analog.cutoffBars}バーに似た過去${analog.n}日の日中経路を重ねた図。近傍日の引けの平均は${analog.meanClosePct.toFixed(2)}%、勝率${(analog.winRate * 100).toFixed(0)}%、25〜75%帯は${analog.q25.toFixed(2)}%から${analog.q75.toFixed(2)}%です。`;
+    }
+    if (!session) return "前場と後場の関係。標本が不足しています。";
+    return `対象${session.nDays}営業日の${session.hasTwoSessions ? "前場と後場" : "午前と午後"}のリターンの散布図と回帰直線。傾きβ=${session.beta.toFixed(3)}、相関${session.corr.toFixed(3)}、R²=${session.r2.toFixed(3)}です。`;
+  }, [view, regime, analog, session]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const H = 320;
@@ -158,7 +174,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
           {view === "regime" && regime && (
             <>
               <div className="text-xs text-gray-500">対象 {regime.nDays} 営業日 / 効率比閾値 {regime.erThreshold}</div>
-              <div className="relative"><canvas ref={canvasRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -174,7 +190,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
                       <tr key={b.label} className="border-b border-gray-100">
                         <td className="py-1 font-medium" style={{ color: LABEL_COLOR[b.label] }}>{LABEL_NAME[b.label]}</td>
                         <td className="text-right">{b.count}</td>
-                        <td className={`text-right ${b.nextMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.nextMeanPct} />{fmtSignedPct(b.nextMeanPct / 100)}</td>
+                        <td className={`text-right ${directionClass(b.nextMeanPct)}`}><DirectionGlyph value={b.nextMeanPct} />{fmtSignedPct(b.nextMeanPct / 100)}</td>
                         <td className="text-right">{fmtPct(b.nextWin)}</td>
                       </tr>
                     ))}
@@ -190,7 +206,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
           {view === "analog" && analog && (
             <>
               <div className="text-xs text-gray-500">直近日 {analog.queryDate} / 前半{analog.cutoffBars}バーで類似検索 / 近傍{analog.n}日</div>
-              <div className="relative"><canvas ref={canvasRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <StatCell label="近傍の引け平均" value={fmtSignedPct(analog.meanClosePct / 100)} tone={analog.meanClosePct >= 0 ? "up" : "down"} />
                 <StatCell label="近傍の上昇率" value={fmtPct(analog.winRate)} />
@@ -208,7 +224,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
               <div className="text-xs text-gray-500">
                 対象 {session.nDays} 営業日 / {session.hasTwoSessions ? "前場・後場の2セッション" : "午前・午後で分割"}
               </div>
-              <div className="relative"><canvas ref={canvasRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <StatCell label="相関 r" value={session.corr.toFixed(3)} tone={session.corr >= 0 ? "up" : "down"} />
                 <StatCell label="傾き β" value={session.beta.toFixed(3)} />
@@ -230,7 +246,7 @@ export default function IntradayRegimeChart({ ticker }: Props) {
                       <tr key={b.label} className="border-b border-gray-100">
                         <td className="py-1 font-medium">{b.label}</td>
                         <td className="text-right">{b.n}</td>
-                        <td className={`text-right ${b.pmMeanPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.pmMeanPct} />{fmtSignedPct(b.pmMeanPct / 100)}</td>
+                        <td className={`text-right ${directionClass(b.pmMeanPct)}`}><DirectionGlyph value={b.pmMeanPct} />{fmtSignedPct(b.pmMeanPct / 100)}</td>
                         <td className="text-right">{fmtPct(b.pmWin)}</td>
                       </tr>
                     ))}

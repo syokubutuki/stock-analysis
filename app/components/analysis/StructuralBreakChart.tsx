@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo } from "react";
 import {
@@ -114,7 +114,7 @@ export default function StructuralBreakChart({ prices, seriesMode }: Props) {
                   <td className="text-right font-mono">{bp.stat.toFixed(3)}</td>
                   <td className="text-right font-mono">{bp.meanBefore.toFixed(5)}</td>
                   <td className="text-right font-mono">{bp.meanAfter.toFixed(5)}</td>
-                  <td className={`text-right font-mono ${bp.meanAfter > bp.meanBefore ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={bp.meanAfter - bp.meanBefore} />
+                  <td className={`text-right font-mono ${directionClass(bp.meanAfter - bp.meanBefore)}`}><DirectionGlyph value={bp.meanAfter - bp.meanBefore} />
                     {((bp.meanAfter - bp.meanBefore) * 100).toFixed(3)}%
                   </td>
                 </tr>

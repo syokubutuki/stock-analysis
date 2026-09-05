@@ -32,6 +32,7 @@ import {
   type VarianceConcentration,
 } from "../../lib/growth-drag";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -168,6 +169,11 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
 
   // ── G2 ウォーターフォール（横軸=リターン値の静的図なので Canvas2D） ──────
   const wfCanvas = useRef<HTMLCanvasElement | null>(null);
+  const wfDescription = useMemo(() => {
+    if (!decomp.ok) return "成長率のウォーターフォール。銘柄が2つ以上必要です。";
+    return `期待リターンから実際に増える速さまでを段で示したウォーターフォール（${decomp.nAssets}銘柄・総建玉${decomp.exposure.toFixed(2)}）。見かけの期待は年率${(decomp.expected * 100).toFixed(2)}%で、単独ドラッグ${(decomp.soloDrag * 100).toFixed(2)}%と相関ドラッグ${(decomp.corrDrag * 100).toFixed(2)}%を引くと${(decomp.growth * 100).toFixed(2)}%。相関がゼロなら${(decomp.growthNoCorr * 100).toFixed(2)}%でした。`;
+  }, [decomp]);
+
   useEffect(() => {
     const canvas = wfCanvas.current;
     if (!canvas || !decomp.ok) return;
@@ -380,7 +386,7 @@ export default function YourPortfolioDragPanel({ data, watchlist, horizon }: Pro
         <div className="text-xs font-semibold text-gray-700 mb-1.5">
           期待リターンは、どこへ消えたのか（年率・3項分解）
         </div>
-        <canvas ref={wfCanvas} className="w-full" />
+        <AccessibleCanvas ref={wfCanvas} description={wfDescription} className="w-full" />
         <p className="mt-1 text-[11px] text-gray-500">
           青＝期待リターン（見かけ） / 灰＝単独ドラッグ（分散しても残る分） /{" "}
           <strong className="text-red-600">赤＝相関ドラッグ（相関を無視した代償）</strong> /

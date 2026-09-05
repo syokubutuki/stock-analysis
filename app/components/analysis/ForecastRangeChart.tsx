@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeForecastRange } from "../../lib/forecast-range";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 import DirectionValue from "./DirectionValue";
 
@@ -19,6 +20,12 @@ export default function ForecastRangeChart({ prices }: Props) {
   const result = useMemo(() => computeForecastRange(prices, HORIZONS), [prices]);
 
   // ファンチャート描画
+  const chartDescription = useMemo(() => {
+    if (!result.ok || result.horizons.length === 0) return "先行きの価格レンジ予測。計算できるデータが不足しています。";
+    const last = result.horizons[result.horizons.length - 1];
+    return `現在値${result.currentPrice.toFixed(1)}を起点に、先行き${result.horizons[0].horizon}日から${last.horizon}日までの価格レンジをファンチャートで描いた図。${last.horizon}日先の中央値は${last.medianPrice.toFixed(1)}、上昇確率は${(last.upProb * 100).toFixed(0)}%で、日次σはGARCH予測${(result.dailyVolGarch * 100).toFixed(2)}%・標本${(result.dailyVolHist * 100).toFixed(2)}%です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !result.ok) return;
@@ -194,7 +201,7 @@ export default function ForecastRangeChart({ prices }: Props) {
         </div>
       </div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       {/* ホライズン別テーブル */}
       <div className="mt-3 overflow-x-auto">

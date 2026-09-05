@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeReturn } from "../../lib/volume-price-dynamics";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -27,6 +28,14 @@ const Q_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 export default function VolumeReturnChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computeVolumeReturn(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    const bs = result.buckets;
+    if (bs.length === 0) return "出来高四分位別の平均日次リターン。計算できるデータが不足しています。";
+    const hi = bs.reduce((a, b) => (b.mean > a.mean ? b : a));
+    const lo = bs.reduce((a, b) => (b.mean < a.mean ? b : a));
+    return `出来高四分位別の平均日次リターン(±1σ)の棒グラフ。最も高いのは${hi.label}の${(hi.mean * 100).toFixed(3)}%(n=${hi.n})、最も低いのは${lo.label}の${(lo.mean * 100).toFixed(3)}%(n=${lo.n})です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || result.buckets.length === 0) return;
@@ -102,7 +111,7 @@ export default function VolumeReturnChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">出来高-リターン同時分析</h3>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div className="p-3 bg-red-50 rounded border border-red-200">

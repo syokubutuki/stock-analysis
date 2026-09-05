@@ -11,6 +11,8 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { computePersistentHomology, fisherRaoDistance } from "../../lib/tda";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
+import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -29,6 +31,13 @@ export default function TDAChart({ prices, seriesMode }: Props) {
   const fr = useMemo(() => fisherRaoDistance(lr, Math.min(60, Math.floor(lr.length / 4))), [prices, seriesMode]);
 
   // Persistence diagram
+  const diagramDescription = useMemo(() => {
+    if (tda.diagram.length === 0) return "パーシステンス図。計算できるデータが不足しています。";
+    const top = tda.diagram.reduce((a, b) => (b.persistence > a.persistence ? b : a));
+    const b1 = tda.diagram.filter((d) => d.dimension === 1).length;
+    return `誕生（横軸）と消滅（縦軸）を点で置いたパーシステンス図（${tda.diagram.length}点、うち1次元の穴が${b1}個）。対角線から最も離れた点は次元${top.dimension}のpersistence=${top.persistence.toFixed(4)}で、離れているほど本物の構造です。`;
+  }, [tda]);
+
   useEffect(() => {
     const canvas = diagramCanvasRef.current;
     if (!canvas || tda.diagram.length === 0) return;
@@ -68,12 +77,12 @@ export default function TDAChart({ prices, seriesMode }: Props) {
       ctx.fill();
     }
 
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Persistence Diagram", size / 2, 12);
     ctx.font = "9px sans-serif";
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = CHART_COLORS.axis;
     ctx.fillText("birth", size / 2, size - 5);
     ctx.save();
     ctx.translate(10, margin.top + plotH / 2);
@@ -84,17 +93,24 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     // Legend
     ctx.fillStyle = "#3b82f6";
     ctx.fillRect(margin.left + 5, margin.top + 5, 8, 8);
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("H₀ (成分)", margin.left + 16, margin.top + 13);
     ctx.fillStyle = "#ef4444";
     ctx.fillRect(margin.left + 5, margin.top + 18, 8, 8);
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.fillText("H₁ (ループ)", margin.left + 16, margin.top + 26);
   }, [tda]);
 
   // Betti curves
+  const bettiDescription = useMemo(() => {
+    if (tda.thresholds.length === 0) return "ベッチ曲線。計算できるデータが不足しています。";
+    let i0 = 0;
+    for (let i = 1; i < tda.bettiCurve1.length; i++) if (tda.bettiCurve1[i] > tda.bettiCurve1[i0]) i0 = i;
+    return `しきい値ε（横軸）に対するβ₀（連結成分・実線）とβ₁（穴・破線）の曲線（${tda.thresholds.length}点）。β₁が最大になるのはε=${tda.thresholds[i0].toFixed(4)}で${tda.bettiCurve1[i0]}個、総persistenceはβ₀が${tda.totalPersistence0.toFixed(3)}・β₁が${tda.totalPersistence1.toFixed(3)}です。`;
+  }, [tda]);
+
   useEffect(() => {
     const canvas = bettiCanvasRef.current;
     if (!canvas || tda.thresholds.length === 0) return;
@@ -143,19 +159,19 @@ export default function TDAChart({ prices, seriesMode }: Props) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Betti Curves", width / 2, 12);
     ctx.font = "9px sans-serif";
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = CHART_COLORS.axis;
     ctx.fillText("ε (threshold)", width / 2, height - 5);
 
     // Legend
     ctx.strokeStyle = "#3b82f6";
     ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(margin.left + 8, margin.top + 12); ctx.lineTo(margin.left + 24, margin.top + 12); ctx.stroke();
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = CHART_COLORS.ink;
     ctx.textAlign = "left";
     ctx.fillText("β₀（実線）", margin.left + 28, margin.top + 15);
     ctx.strokeStyle = "#ef4444";
@@ -228,8 +244,8 @@ export default function TDAChart({ prices, seriesMode }: Props) {
       <div className="text-xs text-gray-500 mb-1">{tda.interpretation}</div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-3">
-        <canvas ref={diagramCanvasRef} className="rounded border border-gray-100" />
-        <canvas ref={bettiCanvasRef} className="rounded border border-gray-100" />
+        <AccessibleCanvas ref={diagramCanvasRef} description={diagramDescription} className="rounded border border-gray-100" />
+        <AccessibleCanvas ref={bettiCanvasRef} description={bettiDescription} className="rounded border border-gray-100" />
       </div>
 
       <div className="text-xs text-gray-500 mb-1">Fisher-Rao距離 — リターン分布の変化速度 (スパイク=レジーム変化)</div>

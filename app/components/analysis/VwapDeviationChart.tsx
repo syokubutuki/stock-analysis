@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
@@ -10,6 +10,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -105,6 +106,15 @@ export default function VwapDeviationChart({ ticker }: Props) {
     [resp, horizon]
   );
 
+  const chartDescription = useMemo(() => {
+    if (!res || res.buckets.length === 0) return "VWAP乖離Zと先行きリターン。標本が不足しています。";
+    const live = res.buckets.filter((b) => b.n > 0);
+    if (live.length === 0) return "VWAP乖離Zと先行きリターン。標本が不足しています。";
+    const hi = live.reduce((a, b) => (b.meanFwdPct > a.meanFwdPct ? b : a));
+    const lo = live.reduce((a, b) => (b.meanFwdPct < a.meanFwdPct ? b : a));
+    return `VWAPからの乖離Zで分けたビン別に、${res.horizonBars}バー先の平均リターンを並べた図（対象${res.nDays}営業日）。最も高いのは${hi.label}の${hi.meanFwdPct.toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${lo.meanFwdPct.toFixed(3)}%（n=${lo.n}）です。`;
+  }, [res]);
+
   useEffect(() => {
     if (!canvasRef.current || !res) return;
     const H = 340;
@@ -136,7 +146,7 @@ export default function VwapDeviationChart({ ticker }: Props) {
             ))}
           </div>
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           {view === "buckets" && (
             <>
@@ -156,8 +166,8 @@ export default function VwapDeviationChart({ ticker }: Props) {
                       <tr key={b.label} className="border-b border-gray-100">
                         <td className="py-1 font-medium">{b.label}</td>
                         <td className="text-right">{b.n}</td>
-                        <td className={`text-right ${b.meanFwdPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.meanFwdPct} />{fmtSignedPct(b.meanFwdPct / 100)}</td>
-                        <td className={`text-right ${b.medianFwdPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.medianFwdPct} />{fmtSignedPct(b.medianFwdPct / 100)}</td>
+                        <td className={`text-right ${directionClass(b.meanFwdPct)}`}><DirectionGlyph value={b.meanFwdPct} />{fmtSignedPct(b.meanFwdPct / 100)}</td>
+                        <td className={`text-right ${directionClass(b.medianFwdPct)}`}><DirectionGlyph value={b.medianFwdPct} />{fmtSignedPct(b.medianFwdPct / 100)}</td>
                         <td className="text-right">{fmtPct(b.winRate)}</td>
                       </tr>
                     ))}

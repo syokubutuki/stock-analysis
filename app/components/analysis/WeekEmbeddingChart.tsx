@@ -15,6 +15,7 @@ import {
   computeWeekEmbedding, WeekEmbeddingResult, EmbeddingView, EmbedVariant,
 } from "../../lib/week-embedding";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -154,6 +155,18 @@ const BADGE: Record<string, string> = {
 function ViewPanel({ view, result, colorMode, showTraj }: { view: EmbeddingView; result: WeekEmbeddingResult; colorMode: ColorMode; showTraj: boolean }) {
   const atlasRef = useRef<HTMLCanvasElement>(null);
   const eigenRef = useRef<HTMLCanvasElement>(null);
+  const atlasDescription = useMemo(() => {
+    const kind = view.variant === "level" ? "水準あり" : "形状のみ";
+    return `週の形をPC1・PC2の平面に配置した散布図（${kind}、${result.nWeeks}週）。近傍k=${view.kNN}のIC=${view.ic.toFixed(3)}（順列p=${view.icP.toFixed(3)}）、OOS IC=${view.oosIc.toFixed(3)}（方向的中${(view.oosHit * 100).toFixed(0)}%、p=${view.oosP.toFixed(3)}）です。`;
+  }, [view, result]);
+
+  const eigenDescription = useMemo(() => {
+    const e = view.eigen;
+    if (e.length === 0) return "固有週の形。計算できるデータが不足しています。";
+    const parts = e.slice(0, 3).map((x, i) => `PC${i + 1} ${(x.explained * 100).toFixed(0)}%`).join("、");
+    return `上位3つの固有週（週内経路の直交する形）の折れ線。説明分散比は${parts}です。`;
+  }, [view]);
+
   useEffect(() => {
     if (atlasRef.current) drawAtlas(atlasRef.current, view, result, colorMode, showTraj);
     if (eigenRef.current) {
@@ -185,8 +198,8 @@ function ViewPanel({ view, result, colorMode, showTraj }: { view: EmbeddingView;
         <span className="text-sm font-semibold text-gray-700">{view.variant === "level" ? "水準あり(週の方向を含む)" : "形状のみ(方向を除去)"}</span>
         <span className={`text-[11px] px-2 py-0.5 rounded border ${BADGE[vd.level]}`}>{vd.label}</span>
       </div>
-      <div className="w-full"><canvas ref={atlasRef} /></div>
-      <div className="w-full mt-1"><canvas ref={eigenRef} /></div>
+      <div className="w-full"><AccessibleCanvas ref={atlasRef} description={atlasDescription} /></div>
+      <div className="w-full mt-1"><AccessibleCanvas ref={eigenRef} description={eigenDescription} /></div>
       <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
         <div>In-sample IC: <b className="text-gray-800">{view.ic.toFixed(3)}</b></div>
         <div>ヌル平均: {view.icNullMean.toFixed(3)} ± {view.icNullSd.toFixed(3)}</div>

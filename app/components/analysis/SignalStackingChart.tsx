@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
@@ -12,6 +12,7 @@ import {
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { stackSignals, STACK_SCHEMES, type StackScheme, type StackResult } from "../../lib/signal-stacking";
 import { buildSignalCatalog } from "../../lib/edge-signals";
 
@@ -91,6 +92,15 @@ export default function SignalStackingChart({ prices }: Props) {
         ctx.fillText(v.toFixed(2), x + cell / 2, y + cell / 2 + 3);
       }
     }
+  }, [result]);
+
+  const corrDescription = useMemo(() => {
+    if (!result || result.corr.length < 2) return "シグナル間の相関行列。標本が不足しています。";
+    let hi = { i: 0, j: 1, v: -2 };
+    for (let i = 0; i < result.corr.length; i++)
+      for (let j = i + 1; j < result.corr.length; j++)
+        if (result.corr[i][j] > hi.v) hi = { i, j, v: result.corr[i][j] };
+    return `シグナル${result.labels.length}本の日次リターン相関行列（赤=正で冗長・青=負で分散に有利）。最も相関が高いのは${result.labels[hi.i]}と${result.labels[hi.j]}の${hi.v.toFixed(2)}で、合成シャープ${result.combinedSharpe.toFixed(2)}は単体最良${result.bestSingleSharpe.toFixed(2)}に対し分散化比率${result.diversification.toFixed(2)}です。`;
   }, [result]);
 
   useEffect(() => { if (corrRef.current) drawCorr(corrRef.current); }, [drawCorr]);
@@ -205,7 +215,7 @@ export default function SignalStackingChart({ prices }: Props) {
           {/* 相関行列 */}
           <div>
             <div className="text-xs text-gray-500 mb-1">シグナル間の相関(赤=正で冗長 / 青=負で分散に有利)</div>
-            <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={corrRef} /></div>
+            <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><AccessibleCanvas ref={corrRef} description={corrDescription} /></div>
           </div>
 
           {/* 合成エクイティ */}
@@ -232,7 +242,7 @@ export default function SignalStackingChart({ prices }: Props) {
                   <tr key={p.id} className="border-b border-gray-100">
                     <td className="py-1 px-1.5 text-fg-muted">{i + 1}</td>
                     <td className="px-1.5">{p.label}</td>
-                    <td className={`text-right px-1 font-mono ${p.sharpe > 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={p.sharpe} />{p.sharpe.toFixed(2)}</td>
+                    <td className={`text-right px-1 font-mono ${directionClass(p.sharpe)}`}><DirectionGlyph value={p.sharpe} />{p.sharpe.toFixed(2)}</td>
                     <td className="text-right px-1 font-mono text-gray-600">{(p.annReturn * 100).toFixed(1)}%</td>
                     <td className="text-right px-1 font-mono text-gray-600">{scheme === "agreement" ? "–" : (p.weight * 100).toFixed(0) + "%"}</td>
                     <td className={`text-right px-1.5 font-mono ${p.looDelta > 0 ? "text-blue-600 font-medium" : "text-fg-muted"}`}>{p.looDelta >= 0 ? "+" : ""}{p.looDelta.toFixed(2)}</td>

@@ -5,6 +5,7 @@ import { PortfolioData } from "../../hooks/usePortfolioData";
 import { alignReturns } from "../../lib/portfolio-risk";
 import { michaudResample, ResampleResult } from "../../lib/frontier-resample";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -104,6 +105,12 @@ export default function ResampledFrontierChart({ data, window: win = 250 }: Prop
     const xPad = (xMax - xMin) * 0.08 || 0.01;
     const yPad = (yMax - yMin) * 0.1 || 0.01;
     return { xMin: Math.max(0, xMin - xPad), xMax: xMax + xPad, yMin: yMin - yPad, yMax: yMax + yPad };
+  }, [result]);
+
+  const chartDescription = useMemo(() => {
+    if (!result) return "リサンプリング効率的フロンティア。まだ計算していません。";
+    const t = result.tangencyInSample, m = result.tangencyMichaud;
+    return `${result.nBoot}回のブートストラップで得た接点ポートフォリオと最小分散ポートフォリオの雲を、リスク（横軸）×リターン（縦軸）平面に描いた図（${result.tickers.length}銘柄・${result.nObs}観測）。単発推定の接点は σ=${t ? (t.sigma * 100).toFixed(1) : "—"}%・μ=${t ? (t.mu * 100).toFixed(1) : "—"}%、平均ウェイト（Michaud）は σ=${m ? (m.sigma * 100).toFixed(1) : "—"}%・μ=${m ? (m.mu * 100).toFixed(1) : "—"}%で、雲の広がりが推定誤差の大きさです。`;
   }, [result]);
 
   useEffect(() => {
@@ -245,7 +252,7 @@ export default function ResampledFrontierChart({ data, window: win = 250 }: Prop
             </div>
           ) : (
             <>
-              <canvas ref={canvasRef} className="w-full" style={{ height: HEIGHT }} />
+              <AccessibleCanvas ref={canvasRef} description={chartDescription} className="w-full" style={{ height: HEIGHT }} />
 
               <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-gray-500 items-center">
                 <Dot color="rgba(220,38,38,0.5)" label="接点の揺れ(リサンプル雲)" />

@@ -11,6 +11,7 @@ import {
   StatCell, drawTimeAxisLabels, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -168,6 +169,27 @@ export default function IntradayProfileChart({ ticker }: Props) {
     [resp, binMinutes]
   );
 
+  const chartDescription = useMemo(() => {
+    if (view === "weekday") {
+      if (!weekday) return "曜日×時間帯のヒートマップ。標本が不足しています。";
+      const cells = weekday.grid.flat().filter((c) => c && c.n >= weekday.minNHidden);
+      if (cells.length === 0) return "曜日×時間帯のヒートマップ。標本が不足しています。";
+      const hi = cells.reduce((a, b) => (b.driftPct > a.driftPct ? b : a));
+      const sigN = cells.filter((c) => c.signif).length;
+      return `曜日（縦）×時間帯（横）のドリフトを色で並べたヒートマップ。参考にできるセル${cells.length}個のうち最大は${hi.driftPct.toFixed(3)}%（n=${hi.n}）で、有意なセルは${sigN}個です。`;
+    }
+    if (!profile || profile.bins.length === 0) return "時間帯プロファイル。標本が不足しています。";
+    if (view === "drift") {
+      const cum = profile.cumDriftPct;
+      let pi = 0;
+      for (let i = 1; i < cum.length; i++) if (Math.abs(cum[i]) > Math.abs(cum[pi])) pi = i;
+      return `1日の平均的な形（始値比の累積ドリフト、対象${profile.nDays}営業日）。${profile.bins[pi]?.label ?? ""}で最大の${cum[pi].toFixed(3)}%に達し、引けは${cum[cum.length - 1].toFixed(3)}%です。`;
+    }
+    const wide = profile.bins.reduce((a, b) => (b.rangePct > a.rangePct ? b : a));
+    const sig = profile.bins.filter((b) => b.driftSignif).length;
+    return `時間帯別の値幅・出来高割合・ドリフトを並べた図（${profile.binMinutes}分ビン、対象${profile.nDays}営業日）。値幅が最大なのは${wide.label}の${wide.rangePct.toFixed(3)}%で、ドリフトがFDR補正後に有意な時間帯は${sig}個です。`;
+  }, [view, profile, weekday]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     if (view === "or") return;
@@ -196,7 +218,7 @@ export default function IntradayProfileChart({ ticker }: Props) {
             {resp?.timezone ? `（${resp.timezone}）` : ""}
           </div>
 
-          {view !== "or" && <div className="relative"><canvas ref={canvasRef} /></div>}
+          {view !== "or" && <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>}
 
           {view === "profile" && (
             <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 leading-relaxed">

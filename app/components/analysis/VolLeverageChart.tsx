@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolLeverage } from "../../lib/vol-leverage";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -30,6 +31,14 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function VolLeverageChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const res = useMemo(() => computeVolLeverage(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (!res || res.buckets.length === 0) return "ボラのレバレッジ効果。計算できるデータが不足しています。";
+    const live = res.buckets.filter((b) => b.n > 0);
+    if (live.length === 0) return "ボラのレバレッジ効果。計算できるデータが不足しています。";
+    const hi = live.reduce((a, b) => (b.nextVol > a.nextVol ? b : a));
+    return `当日リターンの大きさ別に翌日ボラの平均を棒で並べた図（全体平均${(res.baselineVol * 100).toFixed(2)}%）。翌日ボラが最も高いのは${hi.label}のあとで${(hi.nextVol * 100).toFixed(2)}%（n=${hi.n}）、当日リターンと翌日ボラの相関は${res.corr.toFixed(3)}です。`;
+  }, [res]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -73,7 +82,7 @@ export default function VolLeverageChart({ prices }: Props) {
         {res.corr < -0.05 ? "（負＝下落するほど翌日ボラ拡大＝レバレッジ効果あり）" : "（弱い）"}
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <AnalysisGuide title="ボラのレバレッジ効果の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

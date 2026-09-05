@@ -1,10 +1,11 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PricePoint } from "../../lib/types";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import {
   analyzeAtoms,
@@ -39,7 +40,7 @@ function star(p: number | null): string {
   if (p === null) return "";
   return p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "";
 }
-function colorCls(v: number): string { return v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "text-gray-500"; }
+function colorCls(v: number): string { return directionClass(v); }
 
 const SORT_LABELS: Record<ScanSort, string> = {
   pAdj: "FDR補正p値",
@@ -538,6 +539,37 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
     }
   }, []);
 
+  // 4つの canvas は同時に表示されるので、それぞれ別の説明を持たせる。
+  const overviewDescription = useMemo(() => {
+    if (prices.length === 0) return "原系列のミニマップ。データがありません。";
+    const from = prices[Math.max(0, effEnd - effWinLen)]?.time ?? "";
+    const to = prices[Math.min(prices.length - 1, effEnd - 1)]?.time ?? "";
+    return `全履歴${prices.length}本の終値のミニマップ。いま集計している窓は${from}から${to}の${effWinLen}本で、${winMode === "latest" ? "最新起点" : "ローリング"}です。`;
+  }, [prices, effEnd, effWinLen, winMode]);
+
+  const spectrumDescription = useMemo(() => {
+    const a = windowAnalysis.atoms;
+    if (a.length === 0) return "週内素片のエッジ・スペクトル。標本が不足しています。";
+    const hi = a.reduce((x, y) => (y.mean > x.mean ? y : x));
+    const lo = a.reduce((x, y) => (y.mean < x.mean ? y : x));
+    return `週内を夜間と日中の10素片に分け、それぞれの平均リターンを棒で並べた図。最も高いのは${hi.label}の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}、p=${hi.p === null ? "—" : hi.p.toFixed(3)}）、最も低いのは${lo.label}の${(lo.mean * 100).toFixed(3)}%（n=${lo.n}）です。`;
+  }, [windowAnalysis]);
+
+  const clockDescription = useMemo(() => {
+    const c = windowAnalysis.cumulative;
+    if (c.length === 0) return "週内クロック。標本が不足しています。";
+    let pi = 0;
+    for (let i = 1; i < c.length; i++) if (c[i] > c[pi]) pi = i;
+    const bl = windowAnalysis.bestLong;
+    return `週の始まりを0とした素片ごとの累積平均リターン。最大は素片${pi}の時点で${(c[pi] * 100).toFixed(3)}%、週末時点は${(c[c.length - 1] * 100).toFixed(3)}%です。${bl ? `最良の買い窓は${windowAnalysis.atoms[bl.from]?.label ?? ""}から${windowAnalysis.atoms[bl.to]?.label ?? ""}で合計${(bl.sum * 100).toFixed(3)}%です。` : ""}`;
+  }, [windowAnalysis]);
+
+  const atomYearDescription = useMemo(() => {
+    const y = atomAnalysis.yearly;
+    if (y.years.length === 0) return "素片×年のヒートマップ。標本が不足しています。";
+    return `週内10素片（縦）×${y.years[0]}年から${y.years[y.years.length - 1]}年（横）の平均リターンを色で並べたヒートマップ。色の基準になる最大絶対値は${(y.maxAbs * 100).toFixed(3)}%で、素片ごとのエッジが年を追ってどう変わるかを見る図です。`;
+  }, [atomAnalysis]);
+
   useEffect(() => {
     if (overviewRef.current) drawOverview(overviewRef.current, prices, effEnd - effWinLen, effEnd, winMode);
     if (spectrumRef.current) drawSpectrum(spectrumRef.current, windowAnalysis.atoms, spectrumFixedRange);
@@ -620,8 +652,9 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
 
         {/* 原系列ミニマップ: 全履歴のどこを集計しているかを一望し、ドラッグで窓を動かす */}
         <div className="w-full rounded border border-gray-200 bg-white overflow-hidden">
-          <canvas
+          <AccessibleCanvas
             ref={overviewRef}
+            description={overviewDescription}
             className="touch-none cursor-ew-resize"
             onPointerDown={onOverviewDown}
             onPointerMove={onOverviewMove}
@@ -770,7 +803,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           エッジ・スペクトル: 週内10素片の平均対数リターン(±標準誤差・有意性)
           {yFix !== "off" && <span className="text-blue-500">｜縦軸固定 ±{(spectrumFixedRange! * 100).toFixed(3)}%</span>}
         </div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={spectrumRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={spectrumRef} description={spectrumDescription} /></div>
       </div>
 
       {/* ===== (A) 週内クロック ===== */}
@@ -782,7 +815,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
           </span>
           {yFix !== "off" && <span className="text-blue-500">｜縦軸固定 ±{(clockFixedRange! * 100).toFixed(3)}%</span>}
         </div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={clockRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={clockRef} description={clockDescription} /></div>
       </div>
       </div>
 
@@ -809,7 +842,7 @@ export default function WeekdayEdgeScanChart({ prices }: Props) {
       {/* ===== (A) 素片×年ヒートマップ ===== */}
       <div>
         <div className="text-xs text-gray-500 mb-1">素片 × 年 ヒートマップ: 各素片の平均リターンの年次推移(エッジの持続/減衰)</div>
-        <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><canvas ref={atomYearRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-x-auto overflow-hidden"><AccessibleCanvas ref={atomYearRef} description={atomYearDescription} /></div>
         <p className="text-[10px] text-fg-muted mt-1">緑=プラス/赤=マイナス、濃さ=全セル最大絶対値に対する相対。横に同色が続く素片=持続的なエッジ。1年だけ極端=見かけ倒し。N&lt;2の年は灰色。</p>
       </div>
 

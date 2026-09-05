@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 合成ブック: 弱いエッジN本を束ねたときの Sharpe・テール相関・総容量の食い合い。
 // 同一銘柄で複数エッジを回すと同じオークション流動性を食い合い、総容量は個別の和にならない。
@@ -15,6 +15,7 @@ import {
 } from "../../lib/edge-book";
 import { fmtYen } from "../../lib/edge-capacity";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -95,6 +96,15 @@ export default function EdgeBookChart({ prices }: Props) {
     [prices, catalog, effectiveSelected, costBps, contention],
   );
 
+  const heatDescription = useMemo(() => {
+    if (!result.ok || result.corr.length < 2) return "エッジ間の相関ヒートマップ。標本が不足しています。";
+    let hi = { i: 0, j: 1, v: -2 };
+    for (let i = 0; i < result.corr.length; i++)
+      for (let j = i + 1; j < result.corr.length; j++)
+        if (result.corr[i][j] > hi.v) hi = { i, j, v: result.corr[i][j] };
+    return `エッジ${result.legs.length}本の日次相関ヒートマップ（青=負・赤=正）。平均ペア相関は${result.avgCorr.toFixed(2)}、悪い日だけだと${result.tailCorr.toFixed(2)}に上がり、最も相関が高い組は${result.legs[hi.i]?.label ?? ""}と${result.legs[hi.j]?.label ?? ""}の${hi.v.toFixed(2)}。分散比は${result.diversification.toFixed(2)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!canvasRef.current || !result.ok) return;
     drawHeatmap(canvasRef.current, result);
@@ -163,7 +173,7 @@ export default function EdgeBookChart({ prices }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">合成Sharpe(逆ボラ加重)</div>
-              <div className={`text-sm font-bold font-mono ${result.bookSharpe > 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={result.bookSharpe} />{num2(result.bookSharpe)}</div>
+              <div className={`text-sm font-bold font-mono ${directionClass(result.bookSharpe)}`}><DirectionGlyph value={result.bookSharpe} />{num2(result.bookSharpe)}</div>
               <div className="text-[10px] text-fg-muted">単体最良 +{num2(divGain)} / 無相関上限 {num2(result.sumSharpeIfIndep)}</div>
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
@@ -178,7 +188,7 @@ export default function EdgeBookChart({ prices }: Props) {
             </div>
             <div className="rounded border border-gray-200 px-2.5 py-1.5">
               <div className="text-[10px] text-gray-500">合成の年率 / 最大DD</div>
-              <div className={`text-sm font-bold font-mono ${result.bookAnn > 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={result.bookAnn} />{pct(result.bookAnn)}</div>
+              <div className={`text-sm font-bold font-mono ${directionClass(result.bookAnn)}`}><DirectionGlyph value={result.bookAnn} />{pct(result.bookAnn)}</div>
               <div className="text-[10px] text-fg-muted">DD {pct(result.bookMaxDD)} / 日次CVaR5% {pct(result.bookCVaR5)}</div>
             </div>
           </div>
@@ -186,7 +196,7 @@ export default function EdgeBookChart({ prices }: Props) {
           {/* 相関ヒートマップ */}
           <div>
             <div className="text-xs text-gray-500 mb-1">エッジ間 日次相関（青=負・赤=正）— 低いほど分散が効く</div>
-            <canvas ref={canvasRef} className="w-full" />
+            <AccessibleCanvas ref={canvasRef} description={heatDescription} className="w-full" />
           </div>
 
           {/* 容量の食い合い */}

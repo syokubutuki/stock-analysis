@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { buildOrdinalNetwork } from "../../lib/ordinal-network";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -31,6 +32,12 @@ export default function OrdinalNetwork({ prices, seriesMode }: Props) {
   const network = useMemo(() => buildOrdinalNetwork(lr, 3, 1), [prices, seriesMode]);
 
   // ネットワーク描画
+  const networkDescription = useMemo(() => {
+    if (network.nodes.length === 0) return "順序パターン・ネットワーク。計算できるデータが不足しています。";
+    const top = network.nodes.reduce((a, b) => (b.count > a.count ? b : a));
+    return `順序パターンをノード、遷移をエッジとして描いたネットワーク図（ノード${network.nodes.length}／エッジ${network.edges.length}）。最頻パターンは${top.pattern}の${top.count}回、遷移エントロピーは${network.transitionEntropy.toFixed(3)}、自己遷移率${(network.selfTransitionRate * 100).toFixed(1)}%、禁止パターンは${network.totalPatterns}中${network.numForbiddenPatterns}個です。`;
+  }, [network]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || network.nodes.length === 0) return;
@@ -170,7 +177,7 @@ export default function OrdinalNetwork({ prices, seriesMode }: Props) {
       </h3>
 
       <div className="w-full rounded border border-gray-100 overflow-hidden">
-        <canvas ref={canvasRef} />
+        <AccessibleCanvas ref={canvasRef} description={networkDescription} />
       </div>
 
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

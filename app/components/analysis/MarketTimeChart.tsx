@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeMarketTime } from "../../lib/market-time";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -35,6 +36,12 @@ export default function MarketTimeChart({ prices }: Props) {
   const result = useMemo(() => computeMarketTime(prices), [prices]);
 
   // Chart 1: Time mapping (calendar vs volume/volatility time)
+  const mappingDescription = useMemo(() => {
+    if (result.data.length < 2) return "カレンダー時間と市場時間の対応。計算できるデータが不足しています。";
+    const s = result.stats;
+    return `カレンダー時間（横軸）に対して、出来高時間とボラティリティ時間がどれだけ進んだかを描いた対応図（${result.data.length}点）。Gini係数は出来高時間${s.volumeGini.toFixed(3)}・ボラ時間${s.volatilityGini.toFixed(3)}（大きいほど時間の進み方が不均一）で、カレンダー時間との相関は${s.volumeCorrelation.toFixed(3)}・${s.volatilityCorrelation.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = mappingCanvasRef.current;
     if (!canvas || result.data.length < 2) return;
@@ -178,6 +185,11 @@ export default function MarketTimeChart({ prices }: Props) {
   }, [result]);
 
   // Chart 2: Price in calendar time vs volume time
+  const priceDescription = useMemo(() => {
+    if (result.data.length < 2) return "3つの時間軸で見た価格。計算できるデータが不足しています。";
+    return `同じ価格系列を、カレンダー時間・出来高時間・ボラティリティ時間の3つの軸で並べ直して重ねた図（${result.data.length}点）。市場時間では出来高やボラが多い時期ほど横に引き伸ばされ、少ない時期は圧縮されます。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = priceCanvasRef.current;
     if (!canvas || result.data.length < 2) return;
@@ -311,6 +323,11 @@ export default function MarketTimeChart({ prices }: Props) {
   }, [result]);
 
   // Chart 3: Price resampled in volatility time
+  const volPriceDescription = useMemo(() => {
+    if (result.volumeResampled.length < 2) return "市場時間で等間隔リサンプルした価格。計算できるデータが不足しています。";
+    return `出来高時間（${result.volumeResampled.length}点）とボラティリティ時間（${result.volatilityResampled.length}点）で等間隔にリサンプルした価格を並べた図。等間隔にすると、リターンの分布が正規分布に近づくかどうかを見る図です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = volPriceCanvasRef.current;
     if (!canvas || result.data.length < 2) return;
@@ -488,17 +505,17 @@ export default function MarketTimeChart({ prices }: Props) {
 
       {/* Chart 1: Time mapping */}
       <div>
-        <canvas ref={mappingCanvasRef} />
+        <AccessibleCanvas ref={mappingCanvasRef} description={mappingDescription} />
       </div>
 
       {/* Chart 2: Price in volume time */}
       <div>
-        <canvas ref={priceCanvasRef} />
+        <AccessibleCanvas ref={priceCanvasRef} description={priceDescription} />
       </div>
 
       {/* Chart 3: Price in volatility time */}
       <div>
-        <canvas ref={volPriceCanvasRef} />
+        <AccessibleCanvas ref={volPriceCanvasRef} description={volPriceDescription} />
       </div>
 
       <AnalysisGuide title="市場時間の再定義 - 詳細理論">

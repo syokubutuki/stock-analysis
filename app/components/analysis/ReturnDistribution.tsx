@@ -5,6 +5,7 @@ import { PricePoint } from "../../lib/types";
 import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { histogram, qqPlot, normalPDF, distributionStats } from "../../lib/distribution";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -21,6 +22,18 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
   const qq = useMemo(() => qqPlot(lr), [prices, seriesMode]);
 
   // ヒストグラム + 正規分布PDF
+  const histDescription = useMemo(() => {
+    if (hist.length === 0) return "リターンのヒストグラム。計算できるデータが不足しています。";
+    const peak = hist.reduce((a, b) => (b.count > a.count ? b : a));
+    return `リターンのヒストグラム（${hist.length}ビン）に正規分布のフィットを重ねた図。最頻の階級は${(peak.x * 100).toFixed(2)}%付近で${peak.count}日、平均${(stats.mean * 100).toFixed(3)}%・標準偏差${(stats.std * 100).toFixed(3)}%・歪度${stats.skewness.toFixed(2)}・尖度${stats.kurtosis.toFixed(2)}です。`;
+  }, [hist, stats]);
+
+  const qqDescription = useMemo(() => {
+    if (qq.length === 0) return "Q-Qプロット。計算できるデータが不足しています。";
+    const lo = qq[0], hi = qq[qq.length - 1];
+    return `正規分布に対するQ-Qプロット（${qq.length}点）。両端が直線から外れるほど裾が厚いことを表し、最小側は理論${lo.theoretical.toFixed(2)}に対し実測${lo.observed.toFixed(4)}、最大側は理論${hi.theoretical.toFixed(2)}に対し実測${hi.observed.toFixed(4)}。Jarque-Bera=${stats.jarqueBera.toFixed(1)}（p=${stats.jbPValue.toFixed(4)}）です。`;
+  }, [qq, stats]);
+
   useEffect(() => {
     const canvas = histRef.current;
     if (!canvas || hist.length === 0) return;
@@ -149,13 +162,13 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
         <div className="md:col-span-2">
           <div className="text-xs text-gray-500 mb-1">ヒストグラム + 正規分布フィット (青線)</div>
           <div className="w-full rounded border border-gray-100 overflow-hidden">
-            <canvas ref={histRef} />
+            <AccessibleCanvas ref={histRef} description={histDescription} />
           </div>
         </div>
         <div>
           <div className="text-xs text-gray-500 mb-1">Q-Qプロット (vs 正規分布)</div>
           <div className="flex justify-center rounded border border-gray-100 overflow-hidden">
-            <canvas ref={qqRef} />
+            <AccessibleCanvas ref={qqRef} description={qqDescription} />
           </div>
         </div>
       </div>

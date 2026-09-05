@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { fitVarianceGamma, simulateVG } from "../../lib/variance-gamma";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -31,6 +32,20 @@ export default function VarianceGammaChart({ prices }: Props) {
   }, [returns, prices]);
 
   // Fan chart
+  const fanDescription = useMemo(() => {
+    const p = result.percentiles;
+    if (p.p50.length === 0) return "Variance Gamma モデルの価格予測。計算できるデータが不足しています。";
+    const i = p.p50.length - 1;
+    return `Variance Gamma モデルで${p.p50.length}日先まで${result.paths.length}本シミュレートした価格のファンチャート。最終日の中央値は${p.p50[i].toFixed(1)}、5〜95%は${p.p5[i].toFixed(1)}から${p.p95[i].toFixed(1)}です。`;
+  }, [result]);
+
+  const densityDescription = useMemo(() => {
+    const d = result.densityComparison;
+    if (d.length === 0) return "VG密度と正規密度の比較。計算できるデータが不足しています。";
+    const pr = result.params;
+    return `Variance Gamma の密度と正規分布の密度を重ねた図（${d.length}点）。分散率ν=${pr.nu.toFixed(3)}（大きいほど裾が厚い）、歪みθ=${pr.theta.toFixed(4)}、σ=${pr.sigma.toFixed(4)}です。`;
+  }, [result]);
+
   useEffect(() => {
     const canvas = fanRef.current;
     if (!canvas) return;
@@ -208,8 +223,8 @@ export default function VarianceGammaChart({ prices }: Props) {
         </div>
       </div>
 
-      <canvas ref={fanRef} />
-      <canvas ref={densityRef} className="mt-3" />
+      <AccessibleCanvas ref={fanRef} description={fanDescription} />
+      <AccessibleCanvas ref={densityRef} description={densityDescription} className="mt-3" />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

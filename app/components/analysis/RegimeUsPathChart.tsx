@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // レジーム(相場基調) × 前夜米国 の交互作用: 日内平均累積パス。
 // 「可変累積トレンド」(直近K日の累積対数リターン)で上昇/中立/下落基調に日を層別し、
@@ -14,12 +14,13 @@ import { useAlignedDays, UsDriverButtons } from "./usSpilloverShared";
 import { US_DRIVERS } from "../../hooks/useUsDaily";
 import { initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct } from "./intradayShared";
 import {
-  drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
+  describePathStats, drawPathStats, PathLegend, PathSummaryTable, PairDiffMatrix, PathTimeline, TimelineDay,
   usePathEvolution, PathEvolutionControls, PathDriftTable,
   PathDriftGuideSection,
 } from "./intradayPathShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -278,7 +279,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
                           </span>
                         </td>
                         <td className="text-right px-2 text-gray-600">{b.n}</td>
-                        <td className={`text-right px-2 font-medium ${b.spilloverSpread >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.spilloverSpread} />{fmtSignedPct(b.spilloverSpread)}</td>
+                        <td className={`text-right px-2 font-medium ${directionClass(b.spilloverSpread)}`}><DirectionGlyph value={b.spilloverSpread} />{fmtSignedPct(b.spilloverSpread)}</td>
                         <td className="px-2"><StatBadge n={b.n} p={b.spreadPAdj} significant={b.spreadPAdj < 0.05} /></td>
                         <td className="text-center px-2">
                           <button
@@ -313,7 +314,7 @@ export default function RegimeUsPathChart({ ticker }: Props) {
             </div>
             <PathLegend stats={selected.usStats} />
             <PathEvolutionControls stats={selected.usStats} evo={evo} />
-            <div className="relative"><canvas ref={canvasRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={canvasRef} description={describePathStats("相場基調×前夜米国の日内パス", selected.usStats, result.timeLabels)} /></div>
             {(evo.showEras || evo.showSpaghetti) && (
               <p className="text-[11px] text-fg-muted">
                 {evo.showEras && "「時代分割」中は全期間平均を隠し、古い→直近ほど濃く太い線で描く。▲▽は直近期の高安時刻。"}

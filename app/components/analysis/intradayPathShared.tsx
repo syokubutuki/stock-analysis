@@ -11,8 +11,9 @@ import {
 } from "lightweight-charts";
 import { PathStat, PairDiff } from "../../lib/intraday-path-core";
 import { fmtSignedPct, drawTimeAxisLabels, initCanvas } from "./intradayShared";
+import AccessibleCanvas from "./AccessibleCanvas";
 import StatBadge from "./StatBadge";
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 0..1 の不透明度を #rrggbb に付ける2桁16進に変換。
@@ -208,13 +209,15 @@ interface HoverInfo {
 //   ・個別日: 「個別日」表示中はカーソルに最も近い1本を特定し、日付と終端を表示する
 // 個別日を重ねると線が数十本になり、目で追えても「どの日か」が分からなくなるのを解消する。
 export function PathCanvas({
-  stats, timeLabels, maxAbs, opts, height = 260,
+  stats, timeLabels, maxAbs, opts, height = 260, title = "日内の平均パス",
 }: {
   stats: PathStat[];
   timeLabels: string[];
   maxAbs: number;
   opts: PathDrawOpts;
   height?: number;
+  /** 代替テキストの見出し。読み上げで「何の図か」を最初に伝える */
+  title?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<HoverInfo | null>(null);
@@ -278,7 +281,12 @@ export function PathCanvas({
 
   return (
     <div className="relative">
-      <canvas ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)} />
+      <AccessibleCanvas
+        ref={canvasRef}
+        description={describePathStats(title, stats, timeLabels)}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+      />
       {hover && (
         <div
           className="pointer-events-none absolute z-10 rounded border border-gray-200 bg-white/95 px-2 py-1 text-[10px] shadow-sm"
@@ -403,7 +411,7 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
       <td className={`text-right px-2 tabular-nums ${sig ? "font-bold bg-amber-50" : ""} ${
         sig ? (kind === "peak" ? "text-blue-700" : "text-red-700") : "text-gray-500"
       }`} title={`Spearman ρ=${rho.toFixed(3)} / p=${p.toFixed(3)}${sig ? ` → ${dir}` : ""}`}>
-        <DirectionGlyph value={rho} />{rho >= 0 ? "+" : ""}{rho.toFixed(2)}{sig ? `★${dir}` : ""}
+        <DirectionGlyph value={rho} eps={0.02} />{rho >= 0 ? "+" : ""}{rho.toFixed(2)}{sig ? `★${dir}` : ""}
       </td>
     );
   };
@@ -439,9 +447,9 @@ export function PathDriftTable({ stats, timeLabels }: { stats: PathStat[]; timeL
                     </span>
                   </td>
                   <td className="text-right px-2 text-gray-500 tabular-nums">{d.nRho}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endEarly >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={d.endEarly} />{fmtSignedPct(d.endEarly)}</td>
-                  <td className={`text-right px-2 tabular-nums ${d.endLate >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={d.endLate} />{fmtSignedPct(d.endLate)}</td>
-                  <td className={`text-right px-2 font-medium tabular-nums ${d.endDiff >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={d.endDiff} />{fmtSignedPct(d.endDiff)}</td>
+                  <td className={`text-right px-2 tabular-nums ${directionClass(d.endEarly)}`}><DirectionGlyph value={d.endEarly} />{fmtSignedPct(d.endEarly)}</td>
+                  <td className={`text-right px-2 tabular-nums ${directionClass(d.endLate)}`}><DirectionGlyph value={d.endLate} />{fmtSignedPct(d.endLate)}</td>
+                  <td className={`text-right px-2 font-medium tabular-nums ${directionClass(d.endDiff)}`}><DirectionGlyph value={d.endDiff} />{fmtSignedPct(d.endDiff)}</td>
                   <td className="px-2"><StatBadge n={Math.min(d.nEarly, d.nLate)} p={d.endP} significant={d.endP < 0.05} /></td>
                   {rhoCell(d.peakRho, d.peakP, "peak")}
                   {rhoCell(d.troughRho, d.troughP, "trough")}
@@ -524,6 +532,21 @@ export function PathDriftGuideSection() {
   );
 }
 
+// Canvas の代替テキスト（A3）。**固定文言ではなく PathStat の計算結果から作る。**
+// 日内パスの図はどれも「どの群が一番伸びたか」「その群はいつ最大になるか」を読む図なので、
+// 群の数・終端の最大/最小・ピーク時刻の3点に絞る。手法の説明は AnalysisGuide にある。
+export function describePathStats(title: string, stats: PathStat[], timeLabels: string[]): string {
+  const live = stats.filter((s) => s.n > 0);
+  if (live.length === 0 || timeLabels.length === 0) return `${title}。集計できる立会日が不足しています。`;
+  const best = live.reduce((a, b) => (b.endMean > a.endMean ? b : a));
+  const worst = live.reduce((a, b) => (b.endMean < a.endMean ? b : a));
+  const peak = timeLabels[best.peakIdx] ?? "";
+  const head = `${title}。${live.length}群の日内累積リターン（寄り＝0）。`;
+  const tail = peak ? `${best.label}の平均パスは${peak}で最大になります。` : "";
+  if (live.length === 1) return `${head}終端は${fmtSignedPct(best.endMean)}（n=${best.n}）。${tail}`;
+  return `${head}引けが最も高いのは${best.label}の${fmtSignedPct(best.endMean)}（n=${best.n}）、最も低いのは${worst.label}の${fmtSignedPct(worst.endMean)}（n=${worst.n}）です。${tail}`;
+}
+
 // 群の色凡例。
 export function PathLegend({ stats, withN = true }: { stats: PathStat[]; withN?: boolean }) {
   return (
@@ -566,8 +589,8 @@ export function PathSummaryTable({
                 </span>
               </td>
               <td className="text-right px-2 text-gray-600">{b.n}</td>
-              <td className={`text-right px-2 font-medium ${b.endMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={b.endMean} />{fmtSignedPct(b.endMean)}</td>
-              <td className={`text-right px-2 ${b.endMed >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.endMed} />{fmtSignedPct(b.endMed)}</td>
+              <td className={`text-right px-2 font-medium ${directionClass(b.endMean)}`}><DirectionGlyph value={b.endMean} />{fmtSignedPct(b.endMean)}</td>
+              <td className={`text-right px-2 ${directionClass(b.endMed)}`}><DirectionGlyph value={b.endMed} />{fmtSignedPct(b.endMed)}</td>
               <td className="text-center px-2 text-gray-600">
                 <span className="text-blue-600">▲</span> {timeLabels[b.peakIdx] ?? "-"} <span className="text-fg-muted">({fmtSignedPct(b.mean[b.peakIdx])})</span>
               </td>
@@ -622,7 +645,7 @@ export function PairDiffMatrix({ stats, pairDiffs }: { stats: PathStat[]; pairDi
                       <td
                         key={c.key}
                         title={`差 ${fmtSignedPct(diff)} / p=${d.p.toFixed(3)} / FDR ${d.pAdj.toFixed(3)}`}
-                        className={`p-1 text-center tabular-nums ${sig ? "font-bold" : ""} ${diff >= 0 ? "text-green-700" : "text-red-700"} ${sig ? "bg-amber-50" : ""}`}
+                        className={`p-1 text-center tabular-nums ${sig ? "font-bold" : ""} ${directionClass(diff)} ${sig ? "bg-amber-50" : ""}`}
                       >
                         <DirectionGlyph value={diff} />{fmtSignedPct(diff, 1)}{sig ? "★" : ""}
                       </td>

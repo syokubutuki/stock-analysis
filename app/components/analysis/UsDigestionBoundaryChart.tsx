@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,6 +14,7 @@ import {
   initCanvas, IntervalButtons, LoadingError, IntradayCaveat, fmtSignedPct, drawTimeAxisLabels,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -102,8 +103,8 @@ const RevRow = ({ label, rev }: { label: string; rev: ReversalSplit }) => (
   <div className={`p-2 rounded border text-xs ${rev.reversed ? "border-purple-200 bg-purple-50" : "border-gray-200 bg-gray-50"}`}>
     <div className="text-gray-500">{label}{rev.reversed && <span className="ml-1 text-purple-700 font-bold">反転あり</span>}</div>
     <div className="flex gap-3 mt-0.5">
-      <span>前 <span className={`font-medium ${rev.preMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={rev.preMean} />{fmtSignedPct(rev.preMean)}</span> <span className="text-fg-muted">p={rev.preP < 0.001 ? "<.001" : rev.preP.toFixed(3)}</span></span>
-      <span>後 <span className={`font-medium ${rev.postMean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={rev.postMean} />{fmtSignedPct(rev.postMean)}</span> <span className="text-fg-muted">p={rev.postP < 0.001 ? "<.001" : rev.postP.toFixed(3)}</span></span>
+      <span>前 <span className={`font-medium ${directionClass(rev.preMean)}`}><DirectionGlyph value={rev.preMean} />{fmtSignedPct(rev.preMean)}</span> <span className="text-fg-muted">p={rev.preP < 0.001 ? "<.001" : rev.preP.toFixed(3)}</span></span>
+      <span>後 <span className={`font-medium ${directionClass(rev.postMean)}`}><DirectionGlyph value={rev.postMean} />{fmtSignedPct(rev.postMean)}</span> <span className="text-fg-muted">p={rev.postP < 0.001 ? "<.001" : rev.postP.toFixed(3)}</span></span>
     </div>
   </div>
 );
@@ -120,6 +121,19 @@ export default function UsDigestionBoundaryChart({ ticker }: Props) {
     () => (data?.grid && rows.length ? compute(rows, data.grid, data.gmtoffset) : null),
     [data, rows]
   );
+
+  const pathDescription = useMemo(() => {
+    if (!result) return "向き付け平均パスと消化完了点τ。整合できた標本が不足しています。";
+    const t = result.op.timeLabels;
+    return `前日終値を基準に米国方向を正へ向き付けした平均パス。95%到達で測ったτは${t[result.tauThreshIdx] ?? "—"}、変化点で測ったτは${t[result.tauCPIdx] ?? "—"}で、この2つが消化完了の推定です。`;
+  }, [result]);
+
+  const hazardDescription = useMemo(() => {
+    if (!result || result.hazard.length === 0) return "反転のハザードと生存率。整合できた標本が不足しています。";
+    const top = result.hazard.reduce((a, b) => (b.hazard > a.hazard ? b : a));
+    const last = result.hazard[result.hazard.length - 1];
+    return `その時刻で米国方向が崩れる確率（ハザード）と、まだ崩れていない割合（生存率）。ハザードが最大なのは${top.label}の${(top.hazard * 100).toFixed(0)}%で、引け時点の生存率は${(last.survival * 100).toFixed(0)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!result || !pathRef.current) return;
@@ -161,7 +175,7 @@ export default function UsDigestionBoundaryChart({ ticker }: Props) {
           </div>
 
           <div className="text-xs text-gray-500">向き付け平均パス（前日終値基準・米国方向を正）と2つのτ推定</div>
-          <div className="relative"><canvas ref={pathRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={pathRef} description={pathDescription} /></div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <RevRow label={`τ=${tauThreshLabel}(閾値)で分割`} rev={result.revThresh} />
@@ -174,7 +188,7 @@ export default function UsDigestionBoundaryChart({ ticker }: Props) {
               <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3" style={{ backgroundColor: "#f59e0b88" }} /><span className="text-gray-600">ハザード(その時刻で崩れる確率)</span></span>
               <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5" style={{ backgroundColor: "#4338ca" }} /><span className="text-gray-600">生存率(まだ崩れていない割合)</span></span>
             </div>
-            <div className="relative"><canvas ref={hzRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={hzRef} description={hazardDescription} /></div>
             <p className="text-[11px] text-fg-muted">
               ハザードが低い時間帯＝安全に持てる窓。生存率が急落する時刻より前に利確/手仕舞いするのが定石。
             </p>

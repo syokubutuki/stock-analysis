@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { estimateVolSmile } from "../../lib/vol-smile";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -23,6 +24,12 @@ export default function VolSmileChart({ prices }: Props) {
   }, [prices]);
 
   const result = useMemo(() => estimateVolSmile(returns), [returns]);
+
+  const chartDescription = useMemo(() => {
+    if (result.smile.length === 0) return "ボラティリティ・スマイル。計算できるデータが不足しています。";
+    const lo = result.smile[0], hi = result.smile[result.smile.length - 1];
+    return `行使価格の水準（マネーネス）ごとのインプライド・ボラを描いたスマイル曲線。ATMは${(result.atmVol * 100).toFixed(1)}%、左端（マネーネス${lo.moneyness.toFixed(2)}）は${(lo.impliedVol * 100).toFixed(1)}%、右端（${hi.moneyness.toFixed(2)}）は${(hi.impliedVol * 100).toFixed(1)}%で、スキューは${result.skew.toFixed(3)}（元系列の歪度${result.sourceSkewness.toFixed(2)}・超過尖度${result.sourceKurtosis.toFixed(2)}から推定）です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -164,7 +171,7 @@ export default function VolSmileChart({ prices }: Props) {
         </div>
       </div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       <p className="text-xs text-gray-600 mt-2">{result.interpretation}</p>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { computeTiming, binCounts, maxStatPermutation, TimingResult, MaxStatResult } from "../../lib/us-spillover-timing";
@@ -11,6 +11,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -77,6 +78,13 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
     });
   };
 
+  const heatDescription = useMemo(() => {
+    if (!result || result.cells.length === 0) return "建て時刻×手仕舞い時刻のヒートマップ。この米国ビンは標本が不足しています。";
+    const top = result.cells.reduce((a, b) => (Math.abs(b.mean) > Math.abs(a.mean) ? b : a));
+    const sig = result.cells.filter((c) => c.significant).length;
+    return `${result.binLabel}の日に、何時に建てて何時に手仕舞うかの全組合せ（${result.cells.length}通り）を色で並べたヒートマップ。最大は${result.timeLabels[top.i]}建て→${result.timeLabels[top.j]}手仕舞いの${(top.mean * 100).toFixed(2)}%（n=${top.n}、FDR補正p=${top.p.toFixed(3)}）で、FDR補正後に有意なのは${sig}組です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result || !canvasRef.current) return;
     const G = result.timeLabels.length;
@@ -120,7 +128,7 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
 
       {result && (
         <>
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={heatDescription} /></div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -162,7 +170,7 @@ export default function UsTimingEdgeChart({ ticker }: Props) {
                       <tr key={k} className="border-b border-gray-100">
                         <td className="py-1 px-2 font-mono text-gray-700">{result.timeLabels[c.i]} → {result.timeLabels[c.j]}</td>
                         <td className="px-2">{c.mean >= 0 ? <span className="text-green-700">ロング</span> : <span className="text-red-700">ショート</span>}</td>
-                        <td className={`text-right px-2 font-medium ${c.mean >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={c.mean} />{fmtSignedPct(c.mean)}</td>
+                        <td className={`text-right px-2 font-medium ${directionClass(c.mean)}`}><DirectionGlyph value={c.mean} />{fmtSignedPct(c.mean)}</td>
                         <td className="text-right px-2 text-gray-600">{c.n}</td>
                         <td className="text-right px-2 text-gray-600">{c.stable != null ? `${(c.stable * 100).toFixed(0)}%` : "—"}</td>
                         <td className="px-2"><StatBadge n={c.n} p={c.p} significant={c.significant} /></td>

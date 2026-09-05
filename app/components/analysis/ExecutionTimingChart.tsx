@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntraday } from "../../hooks/useIntraday";
@@ -11,6 +11,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, ViewTabs, LoadingError, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -92,6 +93,14 @@ export default function ExecutionTimingChart({ ticker }: Props) {
     [resp, side, leg]
   );
 
+  const chartDescription = useMemo(() => {
+    if (!res || res.bins.length === 0) return "約定タイミング別の改善幅。標本が不足しています。";
+    const cand = res.bins.filter((b) => !b.isMark);
+    const top = res.best ?? (cand.length ? cand.reduce((a, b) => (b.meanImprovePct > a.meanImprovePct ? b : a)) : null);
+    if (!top) return `${res.markLabel}を基準にした約定タイミングの比較（対象${res.nDays}営業日）。比較できる候補がありません。`;
+    return `${res.markLabel}を基準に、ずらした約定タイミングごとの平均改善幅を横棒で並べた図（対象${res.nDays}営業日）。最も良いのは${top.label}の${top.meanImprovePct.toFixed(3)}%（95%CI ${top.ciLoPct.toFixed(3)}〜${top.ciHiPct.toFixed(3)}%、勝率${(top.winRate * 100).toFixed(0)}%）です。`;
+  }, [res]);
+
   useEffect(() => {
     if (!canvasRef.current || !res) return;
     const H = 320;
@@ -146,7 +155,7 @@ export default function ExecutionTimingChart({ ticker }: Props) {
             </div>
           )}
 
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -171,14 +180,14 @@ export default function ExecutionTimingChart({ ticker }: Props) {
                         {b.label}{b.isMark && <span className="text-fg-muted">（成行・基準）</span>}
                       </td>
                       <td className="text-right px-2 text-gray-600">{b.n}</td>
-                      <td className={`text-right px-2 font-medium tabular-nums ${b.isMark ? "text-fg-muted" : b.meanImprovePct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.meanImprovePct} />
+                      <td className={`text-right px-2 font-medium tabular-nums ${directionClass(b.meanImprovePct, b.isMark ? Infinity : 0)}`}><DirectionGlyph value={b.meanImprovePct} eps={b.isMark ? Infinity : 0} />
                         {b.isMark ? "—" : fmtSignedPct(b.meanImprovePct / 100)}
                       </td>
                       <td className="px-2 text-gray-500 whitespace-nowrap tabular-nums">
                         {b.isMark ? "—" : `${fmtSignedPct(b.ciLoPct / 100)}〜${fmtSignedPct(b.ciHiPct / 100)}`}
                       </td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{b.isMark ? "—" : `${(b.winRate * 100).toFixed(0)}%`}</td>
-                      <td className={`text-right px-2 tabular-nums ${b.meanVsVwapPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={b.meanVsVwapPct} />
+                      <td className={`text-right px-2 tabular-nums ${directionClass(b.meanVsVwapPct)}`}><DirectionGlyph value={b.meanVsVwapPct} />
                         {fmtSignedPct(b.meanVsVwapPct / 100)}
                       </td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{b.driftStdPct.toFixed(2)}%</td>

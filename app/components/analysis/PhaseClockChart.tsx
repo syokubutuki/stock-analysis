@@ -10,6 +10,7 @@ import {
 } from "../../lib/phase-clock";
 import { conditionalForwardReturns } from "../../lib/conditional-forward-returns";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -68,6 +69,14 @@ export default function PhaseClockChart({ prices, seriesMode }: Props) {
   const nowStat = nowSector !== null ? sectorStats[nowSector] : null;
   const ampRatio =
     clock.nowAmp !== null && clock.ampMedian > 0 ? clock.nowAmp / clock.ampMedian : null;
+
+  const clockDescription = useMemo(() => {
+    const live = fwd.buckets.filter((b) => b.n > 0);
+    if (live.length === 0) return "位相クロック。計算できるデータが不足しています。";
+    const hi = live.reduce((a, b) => (b.meanFwd > a.meanFwd ? b : a));
+    const lo = live.reduce((a, b) => (b.meanFwd < a.meanFwd ? b : a));
+    return `周期${period}日のサイクルを${sectors}区画に割った円環に、区画別の先${horizon}日リターン平均を色で描いた位相クロック（無条件平均${(fwd.baselineMean * 100).toFixed(3)}%）。最も高いのは${hi.label}の${(hi.meanFwd * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.meanFwd * 100).toFixed(3)}%で、いまの位相は${fwd.nowLabel ?? "—"}です。`;
+  }, [fwd, period, sectors, horizon]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -278,7 +287,7 @@ export default function PhaseClockChart({ prices, seriesMode }: Props) {
 
       <div className="flex flex-col sm:flex-row gap-4 items-start">
         <div>
-          <canvas ref={canvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={canvasRef} description={clockDescription} className="rounded border border-gray-100" />
           <div className="text-xs text-fg-muted mt-1">
             12時=位相0°(直近のサイクル天井基準), 時計回りに位相が進む / 青い針=現在 / 黒枠=統計的に有意
           </div>

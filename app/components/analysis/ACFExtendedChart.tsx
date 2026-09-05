@@ -6,6 +6,7 @@ import { SeriesMode, extractSeries, SERIES_MODE_LABELS } from "../../lib/series-
 import { acf, confidenceBound } from "../../lib/autocorrelation";
 import { ljungBoxTest, rollingACF1 } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -93,6 +94,22 @@ export default function ACFExtendedChart({ prices, seriesMode }: Props) {
   const modeLabel = SERIES_MODE_LABELS[seriesMode];
 
   // 絶対リターンACF
+  const absAcfDescription = useMemo(() => {
+    const live = absAcfData.filter((d) => d.lag > 0);
+    if (live.length === 0) return "絶対リターンの自己相関。計算できるデータが不足しています。";
+    const top = live.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
+    const over = live.filter((d) => Math.abs(d.value) > bound).length;
+    return `絶対リターン|r|の自己相関（Taylor効果・ボラの長期記憶）をラグ1から${live.length}まで並べた棒グラフ。95%信頼帯は±${bound.toFixed(3)}で、最大はラグ${top.lag}の${top.value.toFixed(3)}、帯を超えたラグは${over}本です。`;
+  }, [absAcfData, bound]);
+
+  const rollingDescription = useMemo(() => {
+    if (rollingData.length < 2) return "ローリングACF(1)。計算できるデータが不足しています。";
+    const hi = rollingData.reduce((a, b) => (b.acf1 > a.acf1 ? b : a));
+    const lo = rollingData.reduce((a, b) => (b.acf1 < a.acf1 ? b : a));
+    const last = rollingData[rollingData.length - 1];
+    return `60日窓のACF(1)の時系列（${rollingData.length}点）。最大は${hi.time}の${hi.acf1.toFixed(3)}、最小は${lo.time}の${lo.acf1.toFixed(3)}で、直近${last.time}は${last.acf1.toFixed(3)}です（95%信頼帯±${bound.toFixed(3)}）。`;
+  }, [rollingData, bound]);
+
   useEffect(() => {
     if (absAcfRef.current) drawACFBars(absAcfRef.current, absAcfData, bound, `ACF (|${modeLabel}|)`);
   }, [absAcfData, bound, modeLabel]);
@@ -191,7 +208,7 @@ export default function ACFExtendedChart({ prices, seriesMode }: Props) {
       {/* 絶対リターンACF */}
       <div>
         <div className="text-xs text-gray-500 mb-1">絶対リターン |r| の自己相関 (Taylor効果・ボラティリティ長期記憶)</div>
-        <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={absAcfRef} /></div>
+        <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={absAcfRef} description={absAcfDescription} /></div>
         <div className="mt-1 text-xs text-gray-500">
           有意なラグ: {sigAbsACF.length > 0 ? sigAbsACF.map(d => `Lag${d.lag}`).join(", ") : "なし"}
         </div>
@@ -201,7 +218,7 @@ export default function ACFExtendedChart({ prices, seriesMode }: Props) {
       {rollingData.length > 0 && (
         <div>
           <div className="text-xs text-gray-500 mb-1">ローリングACF(1) — 自己相関の時変性 (破線=95%信頼区間)</div>
-          <div className="w-full rounded border border-gray-100 overflow-hidden"><canvas ref={rollingRef} /></div>
+          <div className="w-full rounded border border-gray-100 overflow-hidden"><AccessibleCanvas ref={rollingRef} description={rollingDescription} /></div>
         </div>
       )}
 

@@ -22,8 +22,9 @@ import {
   type ParticipationResult,
 } from "../../lib/participation-premium";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 // 市場代理プリセット。1321=日経225連動ETF（分配金込みadjClose→総収益の床・データ良好）。
@@ -56,8 +57,10 @@ function Stat({
   sub?: string;
   directionValue?: number;
 }) {
+  // 記号を出すときは色も同じ判定から出す（FU36）。出さないときだけ tone を使う
   const c =
-    tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
+    directionValue !== undefined ? directionClass(directionValue)
+      : tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-700" : "text-gray-800";
   return (
     <div className="rounded border border-gray-200 px-2.5 py-1.5">
       <div className="text-[10px] text-gray-500">{label}</div>
@@ -129,6 +132,12 @@ export default function ParticipationPremiumChart() {
 
   // ── 参加の資産曲線（lightweight-charts：横軸=時間なので v5 標準） ──────────
   const chartContainer = useRef<HTMLDivElement | null>(null);
+  const histDescription = useMemo(() => {
+    if (!result) return "エントリー時刻スイープの分布。まだ計算していません。";
+    const s = result.sweep;
+    return `いつ買い始めたかを1日ずつずらしたときの${s.holdLabel}保有の年率リターンの分布（${s.n}通り）。中央値${(s.median * 100).toFixed(2)}%・平均${(s.mean * 100).toFixed(2)}%・標準偏差${(s.sd * 100).toFixed(2)}%で、最悪${(s.min * 100).toFixed(2)}%から最良${(s.max * 100).toFixed(2)}%まで散らばります（タイミングは分散だけを動かします）。`;
+  }, [result]);
+
   useEffect(() => {
     if (!chartContainer.current || !result) return;
     const el = chartContainer.current;
@@ -298,11 +307,11 @@ export default function ParticipationPremiumChart() {
               />
               <Stat label="年率リターン(幾何)" value={pct(part.annualReturn)} />
               <Stat label="シャープ(rf=0)" value={part.sharpe.toFixed(2)} />
+              {/* 定義上つねに ≤0 で方向を持たないので記号は付けない（FU37） */}
               <Stat
                 label="最大ドローダウン"
                 value={pct(part.maxDrawdown)}
                 tone="bad"
-                directionValue={part.maxDrawdown}
                 sub="床を得る対価の谷"
               />
               <Stat label="累積リターン" value={pct(part.totalReturn, 0)} />
@@ -339,7 +348,7 @@ export default function ParticipationPremiumChart() {
                 sub="床は消えうる"
               />
             </div>
-            <canvas ref={histCanvas} className="w-full" style={{ height: 200 }} />
+            <AccessibleCanvas ref={histCanvas} description={histDescription} className="w-full" style={{ height: 200 }} />
             <p className="mt-1.5 text-[11px] text-gray-500">
               入口をずらしても分布の<b>平均（床）はほぼ動かず、広がる（分散）だけ</b>
               ＝タイミング否定の再確認。同時に、単一窓では床が負にもなる（

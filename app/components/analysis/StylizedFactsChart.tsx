@@ -7,6 +7,7 @@ import { distributionStats } from "../../lib/distribution";
 import { acf } from "../../lib/autocorrelation";
 import { ljungBoxTest } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -157,6 +158,14 @@ export default function StylizedFactsChart({ prices, seriesMode }: Props) {
   }, [prices, seriesMode, values]);
 
   // Scorecard canvas
+  const chartDescription = useMemo(() => {
+    if (facts.length === 0) return "定型化された事実の点検。計算できるデータが不足しています。";
+    const c = facts.filter((f) => f.status === "confirmed").length;
+    const p = facts.filter((f) => f.status === "partial").length;
+    const a = facts.filter((f) => f.status === "absent").length;
+    return `金融時系列の定型化された事実${facts.length}項目の成立状況を並べた図。成立${c}件・部分的${p}件・不成立${a}件で、${facts.map((f) => `${f.name}は${f.value}`).slice(0, 3).join("、")}です。`;
+  }, [facts]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || facts.length === 0) return;
@@ -232,7 +241,7 @@ export default function StylizedFactsChart({ prices, seriesMode }: Props) {
         </div>
       )}
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       {/* 詳細テキスト */}
       {facts.length > 0 && (

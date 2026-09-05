@@ -13,6 +13,7 @@ import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { mutualInformation, timeLaggedMI, transferEntropy, grangerTest } from "../../lib/causal";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 
 interface Props {
@@ -72,6 +73,11 @@ export default function CausalChart({ prices, seriesMode }: Props) {
   }, [prices, autoMI]);
 
   // Information flow diagram (canvas)
+  const flowDescription = useMemo(() => {
+    const dir = Math.abs(te.netFlow) < 1e-6 ? "どちらも同程度" : te.netFlow > 0 ? "ボラ→価格が優勢" : "価格→ボラが優勢";
+    return `ボラティリティと価格のあいだの情報の流れを矢印で表した図。移動エントロピーはボラ→価格が${te.te_xy.toFixed(4)}（p=${te.significance.te_xy_p.toFixed(3)}）、価格→ボラが${te.te_yx.toFixed(4)}（p=${te.significance.te_yx_p.toFixed(3)}）で、正味${te.netFlow.toFixed(4)}（${dir}）。相互情報量は${miPriceVol.toFixed(4)}です。`;
+  }, [te, miPriceVol]);
+
   useEffect(() => {
     const canvas = flowCanvasRef.current;
     if (!canvas) return;
@@ -196,7 +202,7 @@ export default function CausalChart({ prices, seriesMode }: Props) {
         </div>
         <div>
           <div className="text-xs text-gray-500 mb-1">情報フローダイアグラム</div>
-          <canvas ref={flowCanvasRef} className="rounded border border-gray-100" />
+          <AccessibleCanvas ref={flowCanvasRef} description={flowDescription} className="rounded border border-gray-100" />
         </div>
       </div>
 

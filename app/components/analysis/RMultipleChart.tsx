@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -8,6 +8,7 @@ import { rMultiples } from "../../lib/execution-stats";
 import { roundTripCost } from "../../lib/strategy-vs-benchmark";
 import { representativeSpread } from "../../lib/spread-estimator";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -42,6 +43,11 @@ export default function RMultipleChart({ prices }: Props) {
   );
   // 比較用にコスト前も持つ（控除で期待値の符号が反転したかを判定する）
   const gross = useMemo(() => (prices.length < 260 ? null : rMultiples(prices, 20, 0)), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (!res) return "Rマルチプルの分布。標本が不足しています。";
+    return `1トレードの損益をリスク単位Rで測った分布（${res.rs.length}回）。期待値は${res.expectancyR.toFixed(2)}R、勝率${(res.winRate * 100).toFixed(0)}%で、平均利益${res.avgWinR.toFixed(2)}R・平均損失${res.avgLossR.toFixed(2)}Rです。`;
+  }, [res]);
 
   useEffect(() => {
     if (!canvasRef.current || !res) return;
@@ -85,7 +91,7 @@ export default function RMultipleChart({ prices }: Props) {
         <div className="p-2 rounded border border-red-200 bg-red-50"><div className="text-gray-500">平均損失</div><div className="font-mono font-bold">{res.avgLossR.toFixed(2)}R</div></div>
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       {/* 取引コストを R 単位で実額控除 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 pt-1 border-t border-gray-100">
@@ -116,7 +122,7 @@ export default function RMultipleChart({ prices }: Props) {
           <span className="text-gray-500">
             期待値 コスト前 <span className="font-mono">{gross.expectancyR.toFixed(3)}R</span>
             {deduct && (
-              <> → 後 <span className={`font-mono font-medium ${res.expectancyR >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={res.expectancyR} />{res.expectancyR.toFixed(3)}R</span></>
+              <> → 後 <span className={`font-mono font-medium ${directionClass(res.expectancyR)}`}><DirectionGlyph value={res.expectancyR} />{res.expectancyR.toFixed(3)}R</span></>
             )}
           </span>
         )}

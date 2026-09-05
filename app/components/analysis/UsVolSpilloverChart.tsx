@@ -9,6 +9,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -74,6 +75,19 @@ export default function UsVolSpilloverChart({ ticker }: Props) {
     [data]
   );
 
+  const scatterDescription = useMemo(() => {
+    if (!result) return "米国変動の大きさと当日ボラの散布図。整合できた標本が不足しています。";
+    const g = result.volReg;
+    return `前夜の米国リターンの絶対値（横軸）と当日の実現ボラ（縦軸）の散布図と回帰直線。標本${g.n}日で傾きβ=${g.beta.toFixed(3)}（t=${g.tBeta.toFixed(2)}、p=${g.pBeta.toFixed(3)}）、決定係数R²=${g.r2.toFixed(3)}です。`;
+  }, [result]);
+
+  const volPathDescription = useMemo(() => {
+    if (!result || result.volPaths.length === 0) return "米国変動の大きさ別 日内ボラプロファイル。整合できた標本が不足しています。";
+    const endOf = (b: { path: number[] }) => b.path[b.path.length - 1] ?? 0;
+    const hi = result.volPaths.reduce((a, b) => (endOf(b) > endOf(a) ? b : a));
+    return `前夜米国の変動の大きさ3分位別に描いた日内ボラのプロファイル。引け時点のボラが最も高いのは${hi.label}（n=${hi.n}）で、縦軸の上限は${result.maxVol.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (!result || !scatterRef.current) return;
     const init = initCanvas(scatterRef.current, 220);
@@ -123,7 +137,7 @@ export default function UsVolSpilloverChart({ ticker }: Props) {
 
           <div className="pt-2 border-t border-gray-100 space-y-1">
             <div className="text-xs text-gray-500">|米国リターン| × 当日実現ボラ（散布・回帰）</div>
-            <div className="relative"><canvas ref={scatterRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={scatterRef} description={scatterDescription} /></div>
           </div>
 
           <div className="pt-2 border-t border-gray-100 space-y-2">
@@ -136,7 +150,7 @@ export default function UsVolSpilloverChart({ ticker }: Props) {
                 </span>
               ))}
             </div>
-            <div className="relative"><canvas ref={pathRef} /></div>
+            <div className="relative"><AccessibleCanvas ref={pathRef} description={volPathDescription} /></div>
             <p className="text-[11px] text-fg-muted">
               赤(米国大変動)の線が寄り直後に高く盛り上がるほど、荒れた米国の翌日は「寄り集中型」のボラ。
               終日高止まりなら終日荒れる。

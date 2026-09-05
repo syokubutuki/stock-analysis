@@ -5,6 +5,7 @@ import { createChart, LineSeries, type IChartApi, type Time } from "lightweight-
 import { PricePoint } from "../../lib/types";
 import { upDownCapture, cointegration, rollingCorrBeta } from "../../lib/relative-strength-ext";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -105,6 +106,13 @@ export default function RelativeStrengthExtChart({ prices }: Props) {
     return () => { window.removeEventListener("resize", onResize); chart.remove(); corrApi.current = null; };
   }, [rolling]);
 
+  const leadLagDescription = useMemo(() => {
+    if (!rolling || rolling.leadLag.length === 0) return "リードラグ相関の棒グラフ。計算できるデータが不足しています。";
+    const top = rolling.leadLag.reduce((a, b) => (Math.abs(b.corr) > Math.abs(a.corr) ? b : a));
+    const who = rolling.peakLag > 0 ? "ベンチが先行" : rolling.peakLag < 0 ? "銘柄が先行" : "同時";
+    return `リードラグ相関の棒グラフ。ラグ${rolling.leadLag[0].lag}から${rolling.leadLag[rolling.leadLag.length - 1].lag}のうち相関が最大なのはラグ${top.lag}の${top.corr.toFixed(2)}で、${who}を示します。`;
+  }, [rolling]);
+
   useEffect(() => {
     if (!llRef.current || !rolling) return;
     const init = initCanvas(llRef.current, 130);
@@ -160,7 +168,7 @@ export default function RelativeStrengthExtChart({ prices }: Props) {
 
       {coint && <div><div className="text-xs text-gray-500 mb-1">スプレッドZ（銘柄−β×ベンチ, ±2σ）</div><div ref={spreadRef} className="w-full rounded border border-gray-100" /></div>}
       {rolling && <div><div className="text-xs text-gray-500 mb-1">ローリング相関・β（青=相関/橙=β, 右第2軸）</div><div ref={corrRef} className="w-full rounded border border-gray-100" /></div>}
-      {rolling && <div className="relative"><canvas ref={llRef} /></div>}
+      {rolling && <div className="relative"><AccessibleCanvas ref={llRef} description={leadLagDescription} /></div>}
       {rolling && (
         <div className="text-xs text-gray-500">
           ピークラグ = {rolling.peakLag}（{rolling.peakLag > 0 ? "ベンチが先行" : rolling.peakLag < 0 ? "銘柄が先行" : "同時"}）

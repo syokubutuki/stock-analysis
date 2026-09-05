@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeTRDecomp } from "../../lib/ohlc-extended";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -25,6 +26,14 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function TrueRangeDecompChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computeTRDecomp(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    if (result.dates.length === 0) return "True Rangeの分解。計算できるデータが不足しています。";
+    const n = result.dates.length;
+    const gapDom = result.dominantComponent.filter((d) => d !== "intraday").length;
+    const meanGapShare = result.gapContribution.reduce((a, b) => a + b, 0) / n;
+    return `日々のTrue Rangeを、日中の高安と上窓・下窓に積み上げて分解した図（${n}日）。窓が支配的だった日は${gapDom}日（${((gapDom / n) * 100).toFixed(0)}%）で、TRに占める窓の平均寄与は${(meanGapShare * 100).toFixed(1)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     if (!canvasRef.current || result.dates.length === 0) return;
@@ -111,7 +120,7 @@ export default function TrueRangeDecompChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">True Range分解</h3>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className={`p-3 rounded text-xs ${lastGC > 0.3 ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"}`}>
         <div className="font-medium mb-1">現在のギャップ寄与率: {(lastGC * 100).toFixed(1)}%</div>

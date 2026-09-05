@@ -20,6 +20,7 @@ import {
 } from "../../lib/growth-drag";
 import { placeRect, type LabelRect } from "../../lib/axis-scale";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import AxiomPlacement from "./AxiomPlacement";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
@@ -254,6 +255,12 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
     const yPad = (yMax - yMin) * 0.08 || 0.01;
     return { xMin: Math.max(0, xMin - xPad), xMax: xMax + xPad, yMin: yMin - yPad, yMax: yMax + yPad };
   }, [result, benchPoint]);
+
+  const chartDescription = useMemo(() => {
+    if (!result) return "効率的フロンティア。まだ計算していません。";
+    const t = result.tangency, g = result.gmv;
+    return `リスク（横軸）×リターン（縦軸）の平面に、効率的フロンティアと資本市場線を描いた図（${result.tickers.length}銘柄・${result.nObs}観測、無リスク金利${(result.riskFree * 100).toFixed(2)}%）。接点ポートフォリオは${t ? `σ=${(t.sigma * 100).toFixed(1)}%・μ=${(t.mu * 100).toFixed(1)}%・シャープ${t.sharpe.toFixed(2)}` : "未定義（無リスク金利がGMV収益を上回る）"}、最小分散点は σ=${(g.sigma * 100).toFixed(1)}%・μ=${(g.mu * 100).toFixed(1)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -808,7 +815,8 @@ export default function EfficientFrontierChart({ data, window: win = 250 }: Prop
 
               {/* チャート */}
               <div className="relative">
-                <canvas
+                <AccessibleCanvas
+                  description={chartDescription}
                   ref={canvasRef}
                   onMouseMove={onMove}
                   onMouseLeave={() => setHover(null)}

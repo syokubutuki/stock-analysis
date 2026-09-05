@@ -22,6 +22,7 @@ import { useExceedanceAll } from "../../hooks/usePortfolioTail";
 import { publishDownsideRho } from "../../lib/downside-rho";
 import { openAnalysisPanel } from "../../lib/panel-nav";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -102,6 +103,13 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
   } = useExceedanceAll(aligned, NULL_MODES, EXCEEDANCE_OPTS);
   const results = rawResults as Record<NullMode, ExceedanceResult> | null;
   const result: ExceedanceResult | null = results ? results[nullMode] : null;
+
+  const chartDescription = useMemo(() => {
+    if (!result || !result.ok) return "超過相関スマイル。まだ計算していません。";
+    const ref = result.levels.find((l) => Math.abs(l.theta - result.refTheta) < 1e-9) ?? result.levels[result.levels.length - 1];
+    if (!ref) return "超過相関スマイル。まだ計算していません。";
+    return `しきい値θ（横軸）ごとに、下側だけ・上側だけで測った相関を並べたスマイル図（${result.tickers.length}銘柄・${result.nPairs}ペア・${result.T}日、無条件相関${result.rhoAll.toFixed(2)}）。θ=${ref.theta.toFixed(1)}での非対称A=ρ⁻−ρ⁺は${ref.asym.toFixed(3)}（ヌル平均${ref.asymNullMean.toFixed(3)}、95%区間${ref.asymLo.toFixed(3)}〜${ref.asymHi.toFixed(3)}、p=${ref.asymP.toFixed(3)}）です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -368,7 +376,7 @@ export default function ExceedanceCorrelationChart({ data, horizon = "position" 
               exceedance correlation の形：実測 vs 2変量正規のヌル帯
             </div>
             <div className="relative">
-              <canvas ref={canvasRef} className="w-full" />
+              <AccessibleCanvas ref={canvasRef} description={chartDescription} className="w-full" />
             </div>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
               <span className="flex items-center gap-1">

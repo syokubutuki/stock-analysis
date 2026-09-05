@@ -9,6 +9,7 @@ import {
   SeasonAxis,
 } from "../../lib/candle-seasonality";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -193,6 +194,23 @@ export default function CandleSeasonalityChart({ prices }: Props) {
     return aggregateSeason(extractCandles(prices), axis);
   }, [prices, axis]);
 
+  const chartDescription = useMemo(() => {
+    if (buckets.length === 0) return "ローソク足の季節性。標本が不足しています。";
+    const pick = (get: (b: BucketAgg) => number, name: string, fmt: (v: number) => string) => {
+      const hi = buckets.reduce((a, b) => (get(b) > get(a) ? b : a));
+      const lo = buckets.reduce((a, b) => (get(b) < get(a) ? b : a));
+      return `${name}が最大なのは${hi.label}の${fmt(get(hi))}、最小は${lo.label}の${fmt(get(lo))}です。`;
+    };
+    const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+    const head = `${axis === "weekday" ? "曜日" : "月"}別のローソク足の季節性（${buckets.length}区分・全${buckets.reduce((a, b) => a + b.n, 0)}日）。`;
+    if (metric === "shape") return head + pick((b) => b.body, "実体の割合", (v) => v.toFixed(2));
+    if (metric === "vol") return head + pick((b) => b.gkVol, "Garman-Klassボラ", pct);
+    if (metric === "clv") return head + pick((b) => b.clv, "終値のレンジ内位置CLV", (v) => v.toFixed(2));
+    if (metric === "excursion") return head + pick((b) => b.mfeUp, "寄りからの上振れMFE", pct);
+    if (metric === "gap") return head + pick((b) => b.fillRate, "窓埋め率", pct);
+    return head + pick((b) => b.bullRate, "陽線率", pct);
+  }, [buckets, axis, metric]);
+
   useEffect(() => {
     if (!canvasRef.current || buckets.length === 0) return;
     const init = initCanvas(canvasRef.current, H);
@@ -256,7 +274,7 @@ export default function CandleSeasonalityChart({ prices }: Props) {
         （各バケットの日数: {buckets.map((b) => `${b.label}${b.n}`).join(" ")}）
       </div>
 
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <AnalysisGuide title="ローソク足の季節性の詳細理論">
         <p className="font-medium text-gray-700">1. 何を見ているか</p>

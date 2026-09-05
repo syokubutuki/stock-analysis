@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { fitJumpDiffusion, simulateJumpDiffusion } from "../../lib/jump-diffusion";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 
 interface Props {
   prices: PricePoint[];
@@ -27,6 +28,14 @@ export default function JumpDiffusionChart({ prices }: Props) {
     const lastPrice = prices[prices.length - 1]?.close ?? 100;
     return simulateJumpDiffusion(params, lastPrice, 60, 500, 42);
   }, [returns, prices]);
+
+  const chartDescription = useMemo(() => {
+    const p = result.percentiles;
+    if (p.p50.length === 0) return "ジャンプ拡散モデルの予測。計算できるデータが不足しています。";
+    const i = p.p50.length - 1;
+    const pr = result.params;
+    return `Merton のジャンプ拡散モデルで${p.p50.length}日先まで${result.paths.length}本シミュレートした価格のファンチャート。最終日の中央値は${p.p50[i].toFixed(1)}、5〜95%は${p.p5[i].toFixed(1)}から${p.p95[i].toFixed(1)}。ジャンプ強度λ=${pr.lambda.toFixed(3)}回/年で、分散に占めるジャンプの寄与は${(result.jumpContribution * 100).toFixed(0)}%です。`;
+  }, [result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -158,7 +167,7 @@ export default function JumpDiffusionChart({ prices }: Props) {
 
       <div className="text-xs text-gray-600 mb-3">{result.interpretation}</div>
 
-      <canvas ref={canvasRef} />
+      <AccessibleCanvas ref={canvasRef} description={chartDescription} />
 
       <AnalysisGuide title="Merton Jump-Diffusionの詳細理論">
         <p className="font-medium text-gray-700">1. ジャンプ拡散モデルとは</p>

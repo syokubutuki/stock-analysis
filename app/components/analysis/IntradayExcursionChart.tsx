@@ -8,6 +8,7 @@ import {
   StatCell, IntradayCaveat,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -96,6 +97,16 @@ export default function IntradayExcursionChart({ ticker }: Props) {
     [resp, direction]
   );
 
+  const chartDescription = useMemo(() => {
+    if (!res) return "日中の含み益・含み損の分布。標本が不足しています。";
+    const dir = res.direction === "long" ? "買い" : "売り";
+    const head = `寄りから${dir}で入ったときの日中の最大含み益(MFE)と最大含み損(MAE)。対象${res.nDays}営業日で、MFE中央値${res.medMfePct.toFixed(2)}%・MAE中央値${res.medMaePct.toFixed(2)}%です。`;
+    if (view === "grid" && res.best) {
+      return `${head}利確${res.best.tpPct.toFixed(2)}%・損切り${res.best.slPct.toFixed(2)}%の格子が最良で、期待R=${res.best.expR.toFixed(2)}・勝率${(res.best.winRate * 100).toFixed(0)}%です。`;
+    }
+    return head;
+  }, [res, view]);
+
   useEffect(() => {
     if (!canvasRef.current || !res) return;
     const H = view === "grid" ? 320 : 340;
@@ -128,7 +139,7 @@ export default function IntradayExcursionChart({ ticker }: Props) {
       {!loading && !error && res && (
         <>
           <div className="text-xs text-gray-500">対象 {res.nDays} 営業日 / 寄りエントリー / 日中レンジ中央値 {res.medRangePct.toFixed(2)}%</div>
-          <div className="relative"><canvas ref={canvasRef} /></div>
+          <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
           {view === "dist" && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

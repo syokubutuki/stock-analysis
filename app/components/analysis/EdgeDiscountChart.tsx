@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PricePoint } from "../../lib/types";
@@ -10,6 +10,7 @@ import {
   initCanvas, fmtSignedPct, IntervalButtons, LoadingError, IntradayCaveat, StatCell,
 } from "./intradayShared";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; ticker: string; }
@@ -64,6 +65,12 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
 
   const sigRows = useMemo(() => (res ? res.edges.filter((e) => e.grossSignificant) : []), [res]);
 
+  const discountDescription = useMemo(() => {
+    if (sigRows.length === 0) return "コスト控除後のエッジ。粗利で有意なエッジがまだありません。";
+    const top = sigRows.reduce((a, b) => (b.effPct > a.effPct ? b : a));
+    return `粗利で有意なエッジ${sigRows.length}本について、粗利から寄り・引けの約定コストを引いた残りを横棒で並べた図。最も残るのは${top.label}で、粗利${top.grossPct.toFixed(3)}%が実効${top.effPct.toFixed(3)}%になり、${top.survives ? "生存" : "消滅"}です。`;
+  }, [sigRows]);
+
   useEffect(() => {
     if (!canvasRef.current || sigRows.length === 0) return;
     const init = initCanvas(canvasRef.current, 36 + sigRows.length * 26);
@@ -108,7 +115,7 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
             <StatCell label="計測日数" value={`${res.gaps.nDays}日`} />
           </div>
 
-          {sigRows.length > 0 && <div className="relative"><canvas ref={canvasRef} /></div>}
+          {sigRows.length > 0 && <div className="relative"><AccessibleCanvas ref={canvasRef} description={discountDescription} /></div>}
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -136,10 +143,10 @@ export default function EdgeDiscountChart({ prices, ticker }: Props) {
                     </td>
                     <td className="text-right px-2 text-gray-600 tabular-nums">{e.n}</td>
                     <td className="text-right px-2 tabular-nums text-gray-700">{fmtSignedPct(e.grossPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.openTermPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={e.openTermPct} />{fmtSignedPct(e.openTermPct / 100)}</td>
-                    <td className={`text-right px-2 tabular-nums ${e.closeTermPct >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={e.closeTermPct} />{fmtSignedPct(e.closeTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${directionClass(e.openTermPct)}`}><DirectionGlyph value={e.openTermPct} />{fmtSignedPct(e.openTermPct / 100)}</td>
+                    <td className={`text-right px-2 tabular-nums ${directionClass(e.closeTermPct)}`}><DirectionGlyph value={e.closeTermPct} />{fmtSignedPct(e.closeTermPct / 100)}</td>
                     <td className="text-right px-2 tabular-nums text-gray-500">{fmtSignedPct(e.spreadTermPct / 100)}</td>
-                    <td className={`text-right px-2 font-bold tabular-nums ${e.effPct >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={e.effPct} />{fmtSignedPct(e.effPct / 100)}</td>
+                    <td className={`text-right px-2 font-bold tabular-nums ${directionClass(e.effPct)}`}><DirectionGlyph value={e.effPct} />{fmtSignedPct(e.effPct / 100)}</td>
                     <td className="text-center px-2">
                       {e.grossSignificant
                         ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${e.survives ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>{e.survives ? "生存" : "消滅"}</span>

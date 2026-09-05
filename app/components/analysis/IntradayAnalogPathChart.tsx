@@ -1,6 +1,6 @@
 "use client";
 
-import { DirectionGlyph } from "./DirectionValue";
+import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 // 寄り前情報アナログ: 曜日 × 前夜米国ビン で絞ったうえに「今日に至る経路の形」が似た過去日だけを
 // 選び、その連続パス(直近K日の日足 → 夜間ギャップ → 当日日内)を今日の経路に重ねる。
@@ -27,6 +27,7 @@ import {
 } from "./intradayShared";
 import StatBadge from "./StatBadge";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { ticker: string; }
@@ -210,6 +211,17 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
     });
   }, [binning, data, usMode, leadLen, k, cond, metric, weight]);
 
+  const overlayDescription = useMemo(() => {
+    if (!result) return "類似日の日中パス重ね書き。整合できた標本が不足しています。";
+    return `今日に似た過去の日の日中パスを重ねた図（候補${result.nCand}日から近傍を選抜、新規性${(result.novelty * 100).toFixed(0)}%）。引けの代表値はアナログ${fmtSignedPct(result.analog.end)}（n=${result.analog.n}）、条件セル${fmtSignedPct(result.cell.end)}（n=${result.cell.n}）、無条件${fmtSignedPct(result.uncond.end)}（n=${result.uncond.n}）です。`;
+  }, [result]);
+
+  const nullDescription = useMemo(() => {
+    const o = result?.oos;
+    if (!o) return "ランダム近傍ヌルとの比較。検証できる標本が不足しています。";
+    return `ランダムにk本選んだヌルのIC分布に、実測のICを重ねた図。アナログのIC=${o.analog.ic.toFixed(3)}に対しヌル平均は${o.nullIcMean.toFixed(3)}で、上側p=${o.icNullP.toFixed(3)}です。`;
+  }, [result]);
+
   useEffect(() => {
     if (view !== "overlay" || !result || !canvasRef.current) return;
     const init = initCanvas(canvasRef.current, 300);
@@ -379,7 +391,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                 <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5" style={{ backgroundColor: C_CELL }} /><span className="text-gray-600">条件セル平均</span></span>
                 <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-0.5 border-t border-dashed" style={{ borderColor: C_UNCOND }} /><span className="text-gray-600">無条件平均</span></span>
               </div>
-              <div className="relative"><canvas ref={canvasRef} /></div>
+              <div className="relative"><AccessibleCanvas ref={canvasRef} description={overlayDescription} /></div>
               <p className="text-[11px] text-gray-500">
                 {"縦軸はすべて「前日終値=0」の累積対数リターン。左半分は前日までの日足経路（寄り前に確定＝距離の計算に使った部分）、境界の点が寄り付き（夜間ギャップ）、右半分が当日の日内。対数なので ギャップ+日中=当日 が足し算で繋がる。"}
                 {" 黒が今日、青が「似た経路をたどった過去日」の中央値。青と黒が寄り付き以降で離れていくなら、今日は前例と違う動きをしている。"}
@@ -387,15 +399,15 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">アナログの引け予想</div>
-                  <div className={`font-bold ${result.analog.end >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.analog.end} />{fmtSignedPct(result.analog.end)}</div>
+                  <div className={`font-bold ${directionClass(result.analog.end)}`}><DirectionGlyph value={result.analog.end} />{fmtSignedPct(result.analog.end)}</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">条件セル平均</div>
-                  <div className={`font-bold ${result.cell.end >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.cell.end} />{fmtSignedPct(result.cell.end)}</div>
+                  <div className={`font-bold ${directionClass(result.cell.end)}`}><DirectionGlyph value={result.cell.end} />{fmtSignedPct(result.cell.end)}</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">無条件平均</div>
-                  <div className={`font-bold ${result.uncond.end >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={result.uncond.end} />{fmtSignedPct(result.uncond.end)}</div>
+                  <div className={`font-bold ${directionClass(result.uncond.end)}`}><DirectionGlyph value={result.uncond.end} />{fmtSignedPct(result.uncond.end)}</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
                   <div className="text-gray-500">今日の実測（寄り→現在）</div>
@@ -428,9 +440,9 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                       <td className="px-2 text-gray-500">{WD_LABELS[n.weekday]}</td>
                       <td className="text-right px-2 text-gray-600 tabular-nums">{n.dist.toFixed(3)}</td>
                       <td className="text-right px-2 text-gray-500 tabular-nums">{fmtPct(n.weight, 1)}</td>
-                      <td className={`text-right px-2 tabular-nums ${n.usValue >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={n.usValue} />{fmtSignedPct(n.usValue)}</td>
-                      <td className={`text-right px-2 tabular-nums ${n.gap >= 0 ? "text-green-700" : "text-red-600"}`}><DirectionGlyph value={n.gap} />{fmtSignedPct(n.gap)}</td>
-                      <td className={`text-right px-2 font-medium tabular-nums ${n.end >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={n.end} />{fmtSignedPct(n.end)}</td>
+                      <td className={`text-right px-2 tabular-nums ${directionClass(n.usValue)}`}><DirectionGlyph value={n.usValue} />{fmtSignedPct(n.usValue)}</td>
+                      <td className={`text-right px-2 tabular-nums ${directionClass(n.gap)}`}><DirectionGlyph value={n.gap} />{fmtSignedPct(n.gap)}</td>
+                      <td className={`text-right px-2 font-medium tabular-nums ${directionClass(n.end)}`}><DirectionGlyph value={n.end} />{fmtSignedPct(n.end)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -470,7 +482,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                         <tr key={o.label} className="border-b border-gray-100">
                           <td className="py-1 px-2 text-gray-700">{o.label}</td>
                           <td className="text-right px-2 text-gray-500 tabular-nums">{o.n}</td>
-                          <td className={`text-right px-2 font-medium tabular-nums ${o.ic >= 0 ? "text-green-700" : "text-red-700"}`}><DirectionGlyph value={o.ic} />{o.ic.toFixed(3)}</td>
+                          <td className={`text-right px-2 font-medium tabular-nums ${directionClass(o.ic)}`}><DirectionGlyph value={o.ic} />{o.ic.toFixed(3)}</td>
                           {/* ICが負なら「有意に外している」ので、有意バッジは付けない(正のICだけを実績とみなす) */}
                           <td className="px-2"><StatBadge n={o.n} p={o.icP} significant={o.icP < 0.05 && o.ic > 0} /></td>
                           <td className={`text-right px-2 tabular-nums ${o.hit > 0.5 ? "text-green-700" : "text-gray-600"}`}>
@@ -492,7 +504,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                   </div>
                   <div className="bg-gray-50 rounded p-2">
                     <div className="text-gray-500">損失差（セル − アナログ）</div>
-                    <div className={`font-bold ${result.oos.lossMean > 0 ? "text-green-700" : "text-red-600"}`}>
+                    <div className={`font-bold ${directionClass(result.oos.lossMean)}`}>
                     <DirectionGlyph value={result.oos.lossMean} />{(result.oos.lossMean * 1e4).toFixed(2)}<span className="text-[10px] font-normal">×10⁻⁴</span>
                     </div>
                     <div className="text-[10px] text-fg-muted">p={result.oos.lossP.toFixed(3)}／CI[{(result.oos.lossLo * 1e4).toFixed(2)}, {(result.oos.lossHi * 1e4).toFixed(2)}]</div>
@@ -503,7 +515,7 @@ export default function IntradayAnalogPathChart({ ticker }: Props) {
                   </div>
                 </div>
 
-                <div className="relative"><canvas ref={nullRef} /></div>
+                <div className="relative"><AccessibleCanvas ref={nullRef} description={nullDescription} /></div>
                 <p className="text-[11px] text-gray-500">
                   {"ヌルは「同じ条件セルから距離を無視してk本を無作為抽出し、同じ集計をする」を200回繰り返した分布。近傍選抜という手続きだけを壊しているので、実測ICがこの山の中に埋もれていれば、形の近さは何も足していない。"}
                   {" 損失差は 二乗誤差(条件セル平均) − 二乗誤差(アナログ) の平均で、正ならアナログが正確。CIはブロックブートストラップ（連続する日の相関を保存）。"}

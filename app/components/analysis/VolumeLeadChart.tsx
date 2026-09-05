@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
 import { computeVolumeLead } from "../../lib/volume-price-dynamics";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props { prices: PricePoint[]; }
@@ -25,6 +26,15 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
 export default function VolumeLeadChart({ prices }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const result = useMemo(() => computeVolumeLead(prices), [prices]);
+
+  const chartDescription = useMemo(() => {
+    const cc = result.crossCorrelations;
+    if (cc.length === 0) return "出来高変化とリターンのクロスコレログラム。計算できるデータが不足しています。";
+    const top = cc.reduce((a, b) => (Math.abs(b.correlation) > Math.abs(a.correlation) ? b : a));
+    const conf = 1.96 / Math.sqrt(prices.length);
+    const lead = top.lag < 0 ? "出来高が先行" : top.lag > 0 ? "リターンが先行" : "同時点";
+    return `出来高変化とリターンのクロスコレログラム。相関が最も強いのはラグ${top.lag}(${lead})の${top.correlation.toFixed(3)}で、95%信頼帯±${conf.toFixed(3)}を${Math.abs(top.correlation) > conf ? "超えています" : "超えていません"}。`;
+  }, [result, prices.length]);
 
   useEffect(() => {
     if (!canvasRef.current || result.crossCorrelations.length === 0) return;
@@ -97,7 +107,7 @@ export default function VolumeLeadChart({ prices }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
       <h3 className="font-bold text-gray-800">出来高先行性分析</h3>
-      <div className="relative"><canvas ref={canvasRef} /></div>
+      <div className="relative"><AccessibleCanvas ref={canvasRef} description={chartDescription} /></div>
 
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div className="p-3 bg-green-50 rounded border border-green-200">

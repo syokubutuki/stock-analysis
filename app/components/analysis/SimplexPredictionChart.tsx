@@ -18,6 +18,7 @@ import {
   falseNearestNeighbors,
 } from "../../lib/attractor-investment";
 import AnalysisGuide from "./AnalysisGuide";
+import AccessibleCanvas from "./AccessibleCanvas";
 import { CHART_COLORS } from "../../lib/chart-colors";
 
 interface Props {
@@ -157,6 +158,11 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
     window.addEventListener("resize", handleResize);
     return () => { window.removeEventListener("resize", handleResize); chart.remove(); skillChartRef.current = null; };
   }, [skill]);
+
+  const thetaDescription = useMemo(() => {
+    if (nlTest.thetas.length === 0) return "非線形性テスト。計算できるデータが不足しています。";
+    return `S-mapの非線形パラメータθ（横軸）に対する予測スキルの曲線（θ=${nlTest.thetas[0]}から${nlTest.thetas[nlTest.thetas.length - 1]}）。線形（θ=0）のスキル${nlTest.linearSkill.toFixed(3)}に対し、最良は θ=${nlTest.bestTheta} の${nlTest.bestNonlinearSkill.toFixed(3)}で、右上がりなら非線形な力学があることを示します。`;
+  }, [nlTest]);
 
   // Nonlinearity test θ chart
   useEffect(() => {
@@ -337,7 +343,7 @@ export default function SimplexPredictionChart({ prices, seriesMode }: Props) {
             <div ref={skillRef} className="w-full rounded border border-gray-100" />
           </div>
           <div>
-            <canvas ref={thetaCanvasRef} className="w-full rounded border border-gray-100" />
+            <AccessibleCanvas ref={thetaCanvasRef} description={thetaDescription} className="w-full rounded border border-gray-100" />
           </div>
         </div>
       </div>
