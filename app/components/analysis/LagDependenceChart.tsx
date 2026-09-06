@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import {
   lagScatterHeatmap, copulaScatter, mutualInfoByLag, scatterMatrix,
 } from "../../lib/distribution-extended";
@@ -44,7 +44,7 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
   const miRef = useRef<HTMLCanvasElement>(null);
   const scatterRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr, times } = extractSeries(prices, seriesMode);
+  const { values: lr, times } = extractRatioSeries(prices, seriesMode);
   const volumes = useMemo(() => {
     const vols = prices.map(p => p.volume);
     return vols.slice(vols.length - lr.length);
@@ -59,8 +59,10 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
   const heatmapDescription = useMemo(() => {
     if (heatmap.data.length < 1) return "ラグ散布ヒートマップ。計算できるデータが不足しています。";
     const peak = heatmap.data.reduce((a, b) => (b.count > a.count ? b : a));
-    const nb = Math.max(1, Math.round(Math.sqrt(heatmap.data.length)));
-    const at = (i: number) => heatmap.minVal + ((i + 0.5) / nb) * (heatmap.maxVal - heatmap.minVal);
+    // `data` は**件数0のセルを含まない**ので、その長さから格子の一辺は逆算できない
+    // （50×50 のうち埋まるのは数百なので √data.length は 50 にならず、
+    //   最頻セルの位置が値域の外に出る）。返ってきた binWidth をそのまま使う。
+    const at = (i: number) => heatmap.minVal + (i + 0.5) * heatmap.binWidth;
     return `r[t-1]（横軸）とr[t]（縦軸）の同時密度をセルの色で表したヒートマップ（値域${(heatmap.minVal * 100).toFixed(2)}%〜${(heatmap.maxVal * 100).toFixed(2)}%）。最も濃いセルは約(${(at(peak.xIdx) * 100).toFixed(2)}%, ${(at(peak.yIdx) * 100).toFixed(2)}%)の${peak.count}件で、原点付近に集まるほど無相関です。`;
   }, [heatmap]);
 
