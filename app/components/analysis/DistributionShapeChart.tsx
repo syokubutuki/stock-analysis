@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { normalPDF } from "../../lib/distribution";
 import {
   empiricalCDF, kde, fitTDistribution, tPDF,
@@ -40,7 +40,7 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
   const ppRef = useRef<HTMLCanvasElement>(null);
   const tailRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr } = extractSeries(prices, seriesMode);
+  const { values: lr } = extractRatioSeries(prices, seriesMode);
 
   const cdfData = useMemo(() => empiricalCDF(lr), [prices, seriesMode]);
   const kdeData = useMemo(() => kde(lr, 200), [prices, seriesMode]);

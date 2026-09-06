@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { histogram, qqPlot, normalPDF, distributionStats } from "../../lib/distribution";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -16,7 +16,7 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
   const histRef = useRef<HTMLCanvasElement>(null);
   const qqRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr } = extractSeries(prices, seriesMode);
+  const { values: lr } = extractRatioSeries(prices, seriesMode);
   const stats = useMemo(() => distributionStats(lr), [prices, seriesMode]);
   const hist = useMemo(() => histogram(lr, 50), [prices, seriesMode]);
   const qq = useMemo(() => qqPlot(lr), [prices, seriesMode]);

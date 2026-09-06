@@ -10,7 +10,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { detectStructuralBreaks } from "../../lib/structural-break";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -23,7 +23,7 @@ export default function StructuralBreakChart({ prices, seriesMode }: Props) {
   const cusumRef = useRef<HTMLDivElement>(null);
   const cusumApiRef = useRef<IChartApi | null>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
+  const { values, times } = extractRatioSeries(prices, seriesMode);
   const result = useMemo(
     () => detectStructuralBreaks(values, times, 5, 30),
     [prices, seriesMode]

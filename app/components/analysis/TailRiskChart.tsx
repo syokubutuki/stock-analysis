@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { extremeValueAnalysis, higherOrderCumulants, tailDependence } from "../../lib/tail-risk";
 import AnalysisGuide from "./AnalysisGuide";
@@ -17,7 +17,7 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
   const qqCanvasRef = useRef<HTMLCanvasElement>(null);
   const returnLevelCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr } = extractSeries(prices, seriesMode);
+  const { values: lr } = extractRatioSeries(prices, seriesMode);
   const volumes = useMemo(() => {
     const vols = prices.map((p) => p.volume);
     return vols.slice(vols.length - lr.length);

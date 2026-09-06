@@ -9,7 +9,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { fitHMM, detectChangePoints, kalmanFilter } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -32,7 +32,7 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
   const cpChartRef = useRef<IChartApi | null>(null);
   const kalmanChartRef = useRef<IChartApi | null>(null);
 
-  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
   const closes = prices.map((p) => p.close);
   const times = prices.map((p) => p.time);
 
