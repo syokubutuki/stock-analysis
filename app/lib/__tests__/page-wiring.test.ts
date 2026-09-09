@@ -152,14 +152,15 @@ describe("終値だけの系列での分類（FU17/FU22: 投信で無意味な�
     // 2026-08-31 時点の実測値。**動かすのは判断を伴う変更のときだけ**で、
     // そのときは理由を残すこと。S17 は tech-adx / tech-breakout / tech-stoch / vol-atr の
     // 4件を SAFE → UNAVAILABLE へ倒した（78/24/149=251）。その後 6330e4d が
-    // sim-holding-ledger を CAUTION で足して 78/25/149=252 になった。
+    // sim-holding-ledger を CAUTION で足して 78/25/149=252 になった。さらに
+    // sim-rebalance（2資産リバランス）を SAFE で足して 78/25/150=253 になった。
     assert.deepEqual(
       {
         unavailable: CLOSE_ONLY_UNAVAILABLE_PANEL_IDS.size,
         caution: CLOSE_ONLY_CAUTION_PANEL_IDS.size,
         safe: CLOSE_ONLY_SAFE_PANEL_IDS.size,
       },
-      { unavailable: 78, caution: 25, safe: 149 },
+      { unavailable: 78, caution: 25, safe: 150 },
     );
   });
 
@@ -199,7 +200,7 @@ describe("系列セレクタの対応（U3: 使えないコントロールを出
         simulation: ratio("simulation"),
         quantum: ratio("quantum"),
       },
-      { distribution: "12/16", simulation: "2/18", quantum: "1/6" },
+      { distribution: "12/16", simulation: "2/19", quantum: "1/6" },
     );
   });
 });

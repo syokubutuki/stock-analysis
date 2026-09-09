@@ -873,6 +873,7 @@ export const SECTIONS: SectionDef[] = [
           definePanel({ id: "sim-forecast", title: "株価予測シミュレーター（モンテカルロ）", input: "filtered", closeOnly: "safe", height: 450, load: () => import("../components/analysis/PriceForecastChart") }),
           definePanel({ id: "sim-backtest", title: "シンプルバックテスト", input: "filtered", closeOnly: "safe", height: 350, load: () => import("../components/analysis/SimpleBacktestChart") }),
           definePanel({ id: "sim-vol-target", title: "ボラティリティ・ターゲティング（信用レバ可変） vs バイ&ホールド 統計検定", input: "all", closeOnly: "safe", height: 400, load: () => import("../components/analysis/VolTargetingChart") }),
+          definePanel({ id: "sim-rebalance", title: "2資産リバランス／動的配分（ボラティリティ収穫は取れるか）", input: "all+ticker", closeOnly: "safe", height: 450, load: () => import("../components/analysis/RebalancePremiumChart") }),
         ],
       },
       {

@@ -254,6 +254,7 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "sim-forecast",
   "sim-backtest",
   "sim-vol-target",
+  "sim-rebalance",
   "sa-sim-meanrev",
   "sa-sim-arima",
   "sim-kelly",

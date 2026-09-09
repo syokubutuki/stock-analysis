@@ -111,9 +111,11 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
   test("無料/有料の内訳が動いていない", () => {
     // 2026-09-05 実測。**動かすのは判断を伴う変更のときだけ**で、そのときは
     // 「無料だったものを有料へ移していない」ことを確かめてから録り直すこと（§6.4）。
+    // 2026-09-10: sim-rebalance を追加（simulation 節なので既定どおり有料）。
+    // 無料側は 86 件のまま動かしていない。
     assert.deepEqual(
       { free: FREE.length, paid: PAID.length, total: PANELS.length },
-      { free: 86, paid: 166, total: 252 },
+      { free: 86, paid: 167, total: 253 },
     );
   });
 
@@ -131,7 +133,7 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       individual: 8,
       "series-segment": 8,
       category: 70,
-      paid: 166,
+      paid: 167,
     });
   });
 
