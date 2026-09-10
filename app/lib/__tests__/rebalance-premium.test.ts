@@ -16,6 +16,13 @@
 //   ・**先読みが無い**。i 日目のウェイトは i 日目以降のリターンに依存しない
 //   ・コストは単調に効く（回転率の高いルールほど強く削られる）
 //   ・ウェイトが動かないルールでは巡回シフト・ヌルを出さない（意味を持たないため）
+//
+// ⑤「β<1 の構造から収益を取る経路」側で縛っているもの:
+//   ・σ_diff² = (β−1)²σ_B² + σ_ε² が閉じる（⑥「β<1 の寄与はごく僅か」の土台）
+//   ・BAB の年率が α/β に一致する（①が α を取り出す操作であることの代数的確認）
+//   ・**非対称βの符号**。β⁻>β⁺ を植え込んだら β⁻>β⁺ と読めること。
+//     ここが逆だと「下げに強い」と「下げに弱い」が入れ替わり、結論が反転する
+//   ・平均回帰の検出。定常な対数比を植え込めば成立、ランダムウォークなら不成立
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
@@ -238,6 +245,140 @@ describe("巡回シフト・ヌル", () => {
     const p1 = computeRebalance(a, b, SPEC, "momentum")!.ruleRows.find((x) => x.key === "momentum")!.nullP;
     const p2 = computeRebalance(a, b, SPEC, "momentum")!.ruleRows.find((x) => x.key === "momentum")!.nullP;
     assert.equal(p1, p2);
+  });
+});
+
+describe("β<1 の構造から収益を取る経路（⑤）", () => {
+  /** 市場モデル r_A = α + β·r_B + ε を直接組み立てる（β は上下で変えられる）。 */
+  function marketModel(
+    n: number, alphaDaily: number, betaUp: number, betaDown: number,
+    sigB: number, sigE: number, muB: number, seed: number
+  ): { a: PricePoint[]; b: PricePoint[] } {
+    const rng = mulberry32(seed);
+    const gauss = () => {
+      const u1 = Math.max(1e-12, rng()), u2 = rng();
+      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    };
+    const ca = [100], cb = [100];
+    for (let i = 1; i < n; i++) {
+      const rb = muB + sigB * gauss();
+      const beta = rb < 0 ? betaDown : betaUp;
+      const ra = alphaDaily + beta * rb + sigE * gauss();
+      cb.push(cb[i - 1] * (1 + rb));
+      ca.push(ca[i - 1] * (1 + ra));
+    }
+    return { a: toPrices(ca), b: toPrices(cb) };
+  }
+
+  test("σ_diff² = (β−1)²σ_B² + σ_ε² が閉じる（⑥の土台）", () => {
+    const { a, b } = marketModel(2500, 0.0002, 0.8, 0.8, 0.011, 0.010, 0.0002, 24680);
+    const r = computeRebalance(a, b, SPEC, "contrarian");
+    assert.ok(r);
+    const x = r.routes;
+    // β=1 のときに残る分はちょうど σ_ε
+    assert.equal(x.sigmaDiffAtBeta1, x.residVol);
+    const reconstructed = Math.hypot(x.residVol, (x.beta - 1) * r.pair.sigmaB);
+    assert.ok(
+      Math.abs(reconstructed - r.pair.sigmaDiff) < 0.02 * r.pair.sigmaDiff,
+      `分解が閉じない: 実測 ${r.pair.sigmaDiff} vs 再構成 ${reconstructed}`,
+    );
+    // β=0.8・σ_B=17.5%程度なら (β−1)σ_B ≈ 3.5% で、σ_ε≈16% に対して押し上げは僅か
+    assert.ok(x.sigmaDiffLift > 0, "β<1 なのに σ_diff を押し上げていない");
+    assert.ok(
+      x.sigmaDiffLift < 0.2 * x.sigmaDiffAtBeta1,
+      `β<1 の寄与が大きすぎる: ${x.sigmaDiffLift} vs ${x.sigmaDiffAtBeta1}`,
+    );
+  });
+
+  test("植え込んだ α を取り出せ、BAB の年率は α/β に一致する（①）", () => {
+    const alphaDaily = 0.0004; // 年率 ≈ 10%
+    const { a, b } = marketModel(3000, alphaDaily, 0.8, 0.8, 0.011, 0.010, 0.0002, 13579);
+    const r = computeRebalance(a, b, SPEC, "contrarian");
+    assert.ok(r);
+    const x = r.routes;
+    assert.ok(Math.abs(x.beta - 0.8) < 0.05, `β を復元できない: ${x.beta}`);
+    // α の標準誤差は se_ann = σ_ε / √years。**これがこのパネルの主要な警告そのもの**なので、
+    // 固定の許容差ではなく se の3倍で縛る（9.7年・σ_ε16% なら se は年 4.6pp もある）。
+    const seAnn = x.residVol / Math.sqrt(r.pair.years);
+    assert.ok(
+      Math.abs(x.alphaAnn - alphaDaily * 252) < 3 * seAnn,
+      `α を復元できない: ${x.alphaAnn} vs ${alphaDaily * 252}（se=${seAnn}）`,
+    );
+    // (1/β)μ_A − μ_B = (1/β)(α + βμ_B) − μ_B = α/β
+    assert.ok(
+      Math.abs(x.babAnn - x.alphaAnn / x.beta) < 1e-9,
+      `BAB が α/β と一致しない: ${x.babAnn} vs ${x.alphaAnn / x.beta}`,
+    );
+    assert.equal(x.carryBreakeven, x.babAnn);
+  });
+
+  test("非対称βの符号が逆さまにならない（④の結論そのもの）", () => {
+    // 下げで敏感・上げで鈍い（＝望みと逆）を植え込む
+    const bad = marketModel(3000, 0.0002, 0.70, 0.95, 0.011, 0.008, 0.0002, 2468);
+    const rb = computeRebalance(bad.a, bad.b, SPEC, "contrarian");
+    assert.ok(rb);
+    assert.ok(rb.routes.betaDown > rb.routes.betaUp, "β⁻>β⁺ を植えたのに逆に出た");
+    assert.ok(Math.abs(rb.routes.betaDown - 0.95) < 0.08, `β⁻ がずれる: ${rb.routes.betaDown}`);
+    assert.ok(Math.abs(rb.routes.betaUp - 0.70) < 0.08, `β⁺ がずれる: ${rb.routes.betaUp}`);
+    assert.ok(rb.routes.betaAsymT > 2, `差が有意に出ない: t=${rb.routes.betaAsymT}`);
+
+    // 逆向き（下げで鈍い＝望みどおり）を植えたら符号が反転すること
+    const good = marketModel(3000, 0.0002, 0.95, 0.70, 0.011, 0.008, 0.0002, 2468);
+    const rg = computeRebalance(good.a, good.b, SPEC, "contrarian");
+    assert.ok(rg);
+    assert.ok(rg.routes.betaDown < rg.routes.betaUp, "β⁻<β⁺ を植えたのに逆に出た");
+    assert.ok(rg.routes.betaAsymT < -2, `差が有意に出ない: t=${rg.routes.betaAsymT}`);
+  });
+
+  test("平均回帰は、定常な対数比を植えれば成立し、ランダムウォークなら不成立（③）", () => {
+    // ln(A/B) = x_t を直接作る。OU なら定常、累積すればランダムウォーク。
+    function pairFrom(xs: number[], seed: number): { a: PricePoint[]; b: PricePoint[] } {
+      const rng = mulberry32(seed);
+      const gauss = () => {
+        const u1 = Math.max(1e-12, rng()), u2 = rng();
+        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      };
+      const cb = [100];
+      for (let i = 1; i < xs.length; i++) cb.push(cb[i - 1] * Math.exp(0.0002 + 0.011 * gauss()));
+      const ca = cb.map((v, i) => v * Math.exp(xs[i]));
+      return { a: toPrices(ca), b: toPrices(cb) };
+    }
+    const rng = mulberry32(97531);
+    const gauss = () => {
+      const u1 = Math.max(1e-12, rng()), u2 = rng();
+      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    };
+    const n = 2000;
+    const ou = [0], rw = [0];
+    for (let i = 1; i < n; i++) {
+      ou.push(0.97 * ou[i - 1] + 0.02 * gauss());
+      rw.push(rw[i - 1] + 0.012 * gauss());
+    }
+    const mr = computeRebalance(...Object.values(pairFrom(ou, 111)) as [PricePoint[], PricePoint[]], SPEC, "contrarian");
+    const nm = computeRebalance(...Object.values(pairFrom(rw, 111)) as [PricePoint[], PricePoint[]], SPEC, "contrarian");
+    assert.ok(mr && nm);
+    assert.equal(mr.routes.meanReverting, true, `OU なのに平均回帰なしと判定: ADF=${mr.routes.adfStat}`);
+    assert.ok(mr.routes.halfLifeDays !== null && mr.routes.halfLifeDays < 60,
+      `半減期が長すぎる: ${mr.routes.halfLifeDays}`);
+    assert.equal(nm.routes.meanReverting, false, `ランダムウォークを平均回帰と判定: ADF=${nm.routes.adfStat}`);
+    // VR の z は検出力が無い。**ゲートに戻さないこと**の証拠を残しておく:
+    // ADF が −5 を割る強い OU でも、VR は 1 を下回るのに有意にはならない。
+    assert.ok(mr.routes.adfStat < -4, `OU の ADF が弱い: ${mr.routes.adfStat}`);
+    assert.ok(mr.routes.vr.some((v) => v.vr < 0.9), "VR が 1 未満へ落ちていない");
+    assert.equal(mr.routes.vr.filter((v) => v.significant).length, 0,
+      "VR が有意になった（この検定に検出力が付いたなら判定に使い直してよい）");
+  });
+
+  test("残存βは β−1 で、1:1ペアには市場エクスポージャーが残る（②）", () => {
+    const { a, b } = marketModel(2000, 0.0002, 0.8, 0.8, 0.011, 0.010, 0.0002, 8642);
+    const r = computeRebalance(a, b, SPEC, "contrarian");
+    assert.ok(r);
+    assert.ok(Math.abs(r.routes.residualBeta - (r.routes.beta - 1)) < 1e-12);
+    assert.ok(r.routes.residualBeta < -0.1, "β<1 なのに残存βが 0 近辺になっている");
+    // ⑤ 過剰ヘッジ = (1−β)·μ_B
+    assert.ok(
+      Math.abs(r.routes.overHedgeCostAnn - (1 - r.routes.beta) * r.pair.muB) < 1e-9,
+    );
   });
 });
 

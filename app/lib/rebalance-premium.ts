@@ -69,8 +69,10 @@
 
 import { alignSeries } from "./benchmark";
 import { normalCdf } from "./derivatives-core";
-import { mean, quantileSorted, std } from "./stats-significance";
+import { mean, quantileSorted, std, studentTwoSidedP } from "./stats-significance";
 import { PricePoint } from "./types";
+import { adfTest } from "./unit-root";
+import { computeVarianceRatio } from "./variance-ratio";
 
 export const TRADING_DAYS = 252;
 
@@ -341,8 +343,118 @@ export interface RuleRow {
   breakevenCostRT: number;
 }
 
+/**
+ * 「β<1 だから、指数が上げる日は相対的に負け、下げる日は相対的に勝つ」という構造から
+ * 収益を取りにいく経路を、全部同じ土俵で測る。
+ *
+ * **最初に潰しておくこと。** corr(r_A − r_B, r_B) < 0 それ自体は収益源ではない。
+ * これは β<1 の言い換えにすぎず、平均リターンについて何も言っていない。この構造を
+ * 「使う」には〈指数が下げる日〉を事前に知る必要があり、それが分かるなら指数を
+ * 空売りすればよいので、この経路は予測不可能性の壁の向こう側にある。
+ * ここで測るのは、**予測を要求しない**形に組み替えたときに何が残るか、である。
+ *
+ * 分解 r_A = α + β·r_B + ε を土台に置くと、経路は次の6つに尽きる:
+ *
+ *   ① α を取りにいく（β調整ロング・ショート ＝ 低βレバレッジ / BAB）
+ *      … 市場を消して α + ε だけ残す。原資は α。空売りコストが分岐点を作る。
+ *   ② 素朴な1:1ペア（A買い・B売り）
+ *      … β を無視するので (β−1)·r_B が残り、市場に対して純ショートが混じる。
+ *   ③ 相対の平均回帰（ペアトレード）
+ *      … 対数比 ln(A/B) が定常で、かつ半減期が短ければ乖離を売買できる。
+ *        原資は**平均回帰そのもの**で、6つのうちこれだけが「相対で動く」を直接換金する。
+ *   ④ 非対称β（下方βが上方βより小さいか）
+ *      … 下げでだけ β が小さいなら、g = μ − σ²/2 の σ² 側を非対称に削れる。
+ *   ⑤ ヘッジ比率の適正化
+ *      … 1単位ヘッジは (1−β) だけ過剰ヘッジ。新しい収益ではなく**取りこぼしの回収**。
+ *   ⑥ リバランス・プレミアムへの寄与
+ *      … σ_diff² = (β−1)²σ_B² + σ_ε²。β<1 が σ_diff をどれだけ押し上げているか。
+ */
+export interface RelativeRoutes {
+  /**
+   * 市場モデル r_A = α + β·r_B + ε の β。**単利リターンで推定する。**
+   *
+   * `PairStats.beta`（対数リターン ρ·σ_A/σ_B）とは 0.01 程度ずれる。どちらも正しいが、
+   * ここでは 1/β 単位ロング・1 単位ショートという**建玉比率をそのまま使う**ので、
+   * 富の合成と同じ単位（単利）で推定した β でなければならない。
+   */
+  beta: number;
+
+  // ① β調整ロング・ショート（＝BAB）
+  /** α = μ_A − β·μ_B（年率、算術）。 */
+  alphaAnn: number;
+  alphaT: number;
+  alphaP: number;
+  /** 残差ボラ σ_ε（年率）。 */
+  residVol: number;
+  /** 情報比 α/σ_ε。 */
+  infoRatio: number;
+  /** BAB 形式（A を 1/β 単位ロング・B を 1 単位ショート）の年率リターンと Sharpe。 */
+  babAnn: number;
+  babVol: number;
+  babSharpe: number;
+  /**
+   * 総キャリーの分岐点（年率）。BAB は B を 1 単位ショート・A を 1/β 単位ロングするので、
+   * 「貸株料＋逆日歩（B の 1 単位ぶん）」と「買方金利（A の 1/β 単位ぶん）」の合計が
+   * これを超えると収益が消える。**空売り料だけと比べると過小評価になる。**
+   */
+  carryBreakeven: number;
+
+  // ② 素朴な1:1ペア
+  pairAnn: number;
+  pairVol: number;
+  pairSharpe: number;
+  pairT: number;
+  /** 1:1 ペアに残る市場エクスポージャー β−1。負なら実質的に指数ショートを抱えている。 */
+  residualBeta: number;
+
+  // ③ 相対の平均回帰（ペアトレード）
+  /** 対数比 ln(A/B) をトレンド除去した残差に対する ADF（定常なら平均回帰）。 */
+  adfStat: number;
+  adfP: number;
+  adfStationary: boolean;
+  /** AR(1) 係数 φ と、そこから出る半減期（営業日）。φ≥1 なら null。 */
+  ouPhi: number;
+  halfLifeDays: number | null;
+  /**
+   * スプレッド日次リターンの分散比 VR(q)。1未満なら平均回帰の向き。
+   *
+   * **ただし判定には使わない。** Lo–MacKinlay の分散頑健 z はこの用途では検出力が無く、
+   * φ=0.97（半減期23日）の OU を植え込んで ADF=−5.6 が出る標本でも VR の z は −0.5 程度に
+   * しかならない。有意性をゲートにすると本物の平均回帰まで否決してしまうので、
+   * ここでは**傾向を見るための記述統計**として持つに留める（q が増えるにつれ 1 から
+   * 下へ離れていくか）。
+   */
+  vr: { q: number; vr: number; z: number; significant: boolean }[];
+  /**
+   * 平均回帰があるか。**定常であること（ADF）と、半減期が実務的な長さであること**の連言。
+   * 定常でも半減期が数年なら、建玉を寝かせる期間が長すぎて戦略として成立しない。
+   */
+  meanReverting: boolean;
+  /** `meanReverting` の閾値（営業日）。半減期がこれを超えたら取引可能とみなさない。 */
+  halfLifeLimitDays: number;
+
+  // ④ 非対称β
+  /** B が下げた日／上げた日それぞれの β。 */
+  betaDown: number;
+  betaUp: number;
+  /** β⁻ − β⁺ の t と両側p（交互作用ダミー回帰）。負に有意なら下げで鈍い＝望ましい。 */
+  betaAsymT: number;
+  betaAsymP: number;
+
+  // ⑤ ヘッジ比率の適正化
+  /** 1単位ヘッジしたときに捨てている年率リターン (1−β)·μ_B。 */
+  overHedgeCostAnn: number;
+
+  // ⑥ σ_diff への寄与
+  /** β=1 だったときの σ_diff（＝σ_ε）。 */
+  sigmaDiffAtBeta1: number;
+  /** β<1 が σ_diff を押し上げている分（年率、実測 − σ_ε）。 */
+  sigmaDiffLift: number;
+}
+
 export interface RebalanceResult {
   pair: PairStats;
+  routes: RelativeRoutes;
   rollingRho: RollingRhoRow[];
   decomposition: PremiumDecomposition;
   freqRows: FreqRow[];
@@ -646,6 +758,122 @@ function bhOvertakeYears(w: number, gA: number, gB: number, gRebal: number): num
   return (lo + hi) / 2;
 }
 
+
+// ───────────────────── β<1 の構造から収益を取る経路 ─────────────────────
+
+/** 切片つき単回帰 y = a + b·x。t 値まで返す。 */
+function ols1(x: number[], y: number[]): { a: number; b: number; bT: number; aT: number; resid: number[] } {
+  const n = Math.min(x.length, y.length);
+  const mx = mean(x.slice(0, n)), my = mean(y.slice(0, n));
+  let sxy = 0, sxx = 0;
+  for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; }
+  const b = sxx > 0 ? sxy / sxx : 0;
+  const a = my - b * mx;
+  const resid: number[] = [];
+  for (let i = 0; i < n; i++) resid.push(y[i] - a - b * x[i]);
+  const df = Math.max(1, n - 2);
+  let sse = 0;
+  for (const e of resid) sse += e * e;
+  const s2 = sse / df;
+  const seB = sxx > 0 ? Math.sqrt(s2 / sxx) : Infinity;
+  const seA = Math.sqrt(s2 * (1 / n + (mx * mx) / (sxx > 0 ? sxx : Infinity)));
+  return { a, b, bT: seB > 0 ? b / seB : 0, aT: seA > 0 ? a / seA : 0, resid };
+}
+
+/**
+ * 「相対では逆に動く」構造から収益を取りにいく6つの経路を、同じ標本で測る。
+ * 入力は単利リターン（富の合成に使う量）と対数リターン（統計に使う量）の両方。
+ */
+function computeRelativeRoutes(
+  rA: number[], rB: number[], lA: number[], lB: number[], pair: PairStats
+): RelativeRoutes {
+  const T = rA.length;
+  const D = TRADING_DAYS;
+
+  // ① α と残差（市場モデル r_A = α + β·r_B + ε を単利で推定）
+  const mkt = ols1(rB, rA);
+  const beta = mkt.b;
+  const alphaAnn = mkt.a * D;
+  const residVol = std(mkt.resid) * Math.sqrt(D);
+  // α の t は日次回帰の切片の t（自己相関は小さいので OLS の se をそのまま使う）
+  const alphaT = mkt.aT;
+  const alphaP = studentTwoSidedP(alphaT, Math.max(1, T - 2));
+  const infoRatio = residVol > 0 ? alphaAnn / residVol : 0;
+
+  // BAB: A を 1/β 単位・B を 1 単位ショート ⇒ 市場βは (1/β)·β − 1 = 0
+  const k = Math.abs(beta) > 1e-6 ? 1 / beta : 0;
+  const bab: number[] = [];
+  for (let i = 0; i < T; i++) bab.push(k * rA[i] - rB[i]);
+  const babAnn = mean(bab) * D;
+  const babVol = std(bab) * Math.sqrt(D);
+  // ロング 1/β 単位＋ショート 1 単位を賄うキャリーの上限。片側だけと比べないこと。
+  const carryBreakeven = babAnn;
+
+  // ② 素朴な1:1ペア（β を無視するので β−1 の市場エクスポージャーが残る）
+  const pairR: number[] = [];
+  for (let i = 0; i < T; i++) pairR.push(rA[i] - rB[i]);
+  const pairAnn = mean(pairR) * D;
+  const pairVol = std(pairR) * Math.sqrt(D);
+  const pairT = pairVol > 0 ? (pairAnn / pairVol) * Math.sqrt(T / D) : 0;
+
+  // ③ 相対の平均回帰。対数比 x_t = ln(A_t/B_t) は強いトレンドを持つので、
+  //    まず時間トレンドを外し、その残差に ADF と AR(1) を当てる（ペアトレードの標準手順）。
+  const x: number[] = [];
+  let cum = 0;
+  for (let i = 0; i < T; i++) { cum += lA[i] - lB[i]; x.push(cum); }
+  const tIdx = x.map((_, i) => i);
+  const detr = ols1(tIdx, x).resid;
+  const adf = adfTest(detr);
+  const ar = ols1(detr.slice(0, -1), detr.slice(1));
+  const ouPhi = ar.b;
+  const halfLifeDays = ouPhi > 0 && ouPhi < 1 ? Math.log(2) / -Math.log(ouPhi) : null;
+  const vrRes = computeVarianceRatio(pairR.map((_, i) => lA[i] - lB[i]));
+  const vr = vrRes.points.map((p) => ({ q: p.q, vr: p.vr, z: p.zStat, significant: p.significant }));
+  // 「平均回帰がある」＝ADF が定常を言い、**かつ半減期が1年以内**。
+  // VR の有意性はゲートにしない（上の doc コメントのとおり検出力が無い）。
+  const halfLifeLimitDays = TRADING_DAYS;
+  const meanReverting =
+    adf.isStationary && halfLifeDays !== null && halfLifeDays <= halfLifeLimitDays;
+
+  // ④ 非対称β。r_A = a + b·r_B + c·(r_B·1{r_B<0}) + … の交互作用項で β⁻−β⁺ を直接検定する。
+  //    2変数回帰になるので、交互作用項を r_B の残差へ直交化してから単回帰にする
+  //    （Frisch–Waugh–Lovell。単回帰の道具のまま正しい t が出る）。
+  const inter = rB.map((v) => (v < 0 ? v : 0));
+  const interOrth = ols1(rB, inter).resid;
+  const asym = ols1(interOrth, mkt.resid);
+  const betaDownMinusUp = asym.b;
+  const betaAsymT = asym.bT;
+  const betaAsymP = studentTwoSidedP(betaAsymT, Math.max(1, T - 3));
+  const down: number[] = [], downA: number[] = [], up: number[] = [], upA: number[] = [];
+  for (let i = 0; i < T; i++) {
+    if (rB[i] < 0) { down.push(rB[i]); downA.push(rA[i]); }
+    else { up.push(rB[i]); upA.push(rA[i]); }
+  }
+  const betaDown = down.length > 10 ? ols1(down, downA).b : beta;
+  const betaUp = up.length > 10 ? ols1(up, upA).b : beta;
+  void betaDownMinusUp;
+
+  // ⑤ 1単位ヘッジの過剰分 (1−β)·μ_B
+  const overHedgeCostAnn = (1 - beta) * pair.muB;
+
+  // ⑥ σ_diff² = (β−1)²σ_B² + σ_ε²。β=1 なら σ_ε だけが残る。
+  const sigmaDiffAtBeta1 = residVol;
+  const sigmaDiffLift = pair.sigmaDiff - sigmaDiffAtBeta1;
+
+  return {
+    beta,
+    alphaAnn, alphaT, alphaP, residVol, infoRatio,
+    babAnn, babVol, babSharpe: babVol > 0 ? babAnn / babVol : 0, carryBreakeven,
+    pairAnn, pairVol, pairSharpe: pairVol > 0 ? pairAnn / pairVol : 0, pairT,
+    residualBeta: beta - 1,
+    adfStat: adf.testStat, adfP: adf.pValue, adfStationary: adf.isStationary,
+    ouPhi, halfLifeDays, vr, meanReverting, halfLifeLimitDays,
+    betaDown, betaUp, betaAsymT, betaAsymP,
+    overHedgeCostAnn,
+    sigmaDiffAtBeta1, sigmaDiffLift,
+  };
+}
+
 // ───────────────────────── 入口 ─────────────────────────
 
 /**
@@ -724,6 +952,8 @@ export function computeRebalance(
     spreadAcf1: acf1,
     spreadAcf1T: acf1 * Math.sqrt(T),
   };
+
+  const routes = computeRelativeRoutes(rA, rB, lA, lB, pair);
 
   // ───── 分解（骨格1〜3）─────
   const w = clip(spec.weightA, 0, 1);
@@ -834,5 +1064,5 @@ export function computeRebalance(
     { key: selectedRule, label: RULE_LABEL[selectedRule], stats: selRun.stats, equity: selRun.core.equity, weights: selRun.core.weights, daily: selRun.core.daily },
   ];
 
-  return { pair, rollingRho, decomposition, freqRows, weightSweep, ruleRows, curves, selectedRule, spec };
+  return { pair, routes, rollingRho, decomposition, freqRows, weightSweep, ruleRows, curves, selectedRule, spec };
 }

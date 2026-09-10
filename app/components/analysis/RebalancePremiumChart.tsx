@@ -664,6 +664,210 @@ export default function RebalancePremiumChart({ prices, ticker }: Props) {
             )}
           </section>
 
+          {/* ───── ⑤ β<1 の構造から収益を取る経路 ───── */}
+          {(() => {
+            const x = result.routes;
+            const invBeta = x.beta;
+            const V = ({ ok, warn, children }: { ok: boolean; warn?: boolean; children: React.ReactNode }) => (
+              <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium border ${
+                ok ? "bg-green-50 border-green-300 text-green-700"
+                  : warn ? "bg-amber-50 border-amber-300 text-amber-700"
+                  : "bg-gray-100 border-gray-300 text-gray-500"
+              }`}>{children}</span>
+            );
+            const alphaOk = x.alphaP < 0.05 && x.infoRatio > 0.3;
+            const alphaWarn = !alphaOk && x.alphaP < 0.2;
+            const asymGood = x.betaDown < x.betaUp && x.betaAsymP < 0.05;
+            const asymBad = x.betaDown > x.betaUp && x.betaAsymP < 0.05;
+            return (
+              <section className="space-y-2">
+                <h4 className="text-sm font-semibold text-gray-700">
+                  ⑤「上げる日は相対的に負け、下げる日は相対的に勝つ」から収益を取る経路
+                </h4>
+
+                <div className="rounded border border-red-200 bg-red-50 p-3 text-xs text-gray-700 space-y-1">
+                  <p className="font-medium text-gray-800 text-sm">先に潰しておくこと：この構造そのものからは何も出ない。</p>
+                  <p>
+                    <span className="font-mono">corr(A−B, B) = {p.rhoSpreadVsB.toFixed(3)}</span> は
+                    <b> β={invBeta.toFixed(2)} の言い換え</b>であって、平均リターンについて何も言っていない。
+                    （⑤の β は単利リターンで推定する。①の建玉比率 1/β をそのまま使うため、
+                    富の合成と同じ単位で揃える必要がある。①の表の β={p.beta.toFixed(2)} は対数リターンのもので、
+                    差はこの推定単位の違いである。）
+                    「指数が下げる日は相対的に勝つ」を使うには<b>指数が下げる日を事前に知る</b>必要があり、
+                    それが分かるなら指数を空売りすればよい。つまりこの経路は予測不可能性の壁の向こう側にある
+                    （④の動的ルールが全滅しているのがその実証）。
+                  </p>
+                  <p>
+                    取れる可能性があるのは、<b>予測を要求しない形に組み替えた</b>ときに残るものだけである。
+                    分解 <span className="font-mono">r_A = α + β·r_B + ε</span> に照らすと、経路は次の6つに尽きる。
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs tabular-nums">
+                    <thead className="text-fg-muted border-b border-gray-200">
+                      <tr>
+                        <th className="text-left py-1 font-normal w-6">#</th>
+                        <th className="text-left font-normal">経路</th>
+                        <th className="text-left font-normal">何が原資か</th>
+                        <th className="text-left font-normal">実測</th>
+                        <th className="text-left font-normal w-20">判定</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 align-top">
+                      <tr>
+                        <td className="py-1.5">①</td>
+                        <td className="text-left">
+                          <b>β調整ロング・ショート</b>（低βレバレッジ / BAB）
+                          <div className="text-fg-muted">A を 1/β={invBeta > 1e-6 ? (1 / invBeta).toFixed(2) : "—"} 単位ロング、B を 1 単位ショート。市場βは 0 になる</div>
+                        </td>
+                        <td className="text-left text-fg-muted">
+                          α（銘柄固有のドリフト）。β&lt;1 を市場エクスポージャーで揃えて取り出す
+                        </td>
+                        <td className="text-left">
+                          α = <b className={directionClass(x.alphaAnn)}>{spct(x.alphaAnn, 1)}</b>/年（t={x.alphaT.toFixed(2)}, p={pText(x.alphaP)}）
+                          <div>σ_ε={pct(x.residVol, 1)} / IR={x.infoRatio.toFixed(2)}</div>
+                          <div>BAB年率 {pct(x.babAnn, 1)}・σ {pct(x.babVol, 1)}・S {x.babSharpe.toFixed(2)}</div>
+                          <div className="text-fg-muted">キャリー分岐 {pct(x.carryBreakeven, 1)}/年（貸株料＋買方金利の合計）</div>
+                        </td>
+                        <td><V ok={alphaOk} warn={alphaWarn}>{alphaOk ? "成立" : alphaWarn ? "弱い" : "不成立"}</V></td>
+                      </tr>
+
+                      <tr>
+                        <td className="py-1.5">②</td>
+                        <td className="text-left">
+                          <b>素朴な1:1ペア</b>（A買い・B売り）
+                          <div className="text-fg-muted">β を無視して同額で組む</div>
+                        </td>
+                        <td className="text-left text-fg-muted">
+                          Δμ。ただし β−1 の市場エクスポージャーが残るので純粋な相対ではない
+                        </td>
+                        <td className="text-left">
+                          年率 <b className={directionClass(x.pairAnn)}>{spct(x.pairAnn, 1)}</b>・σ {pct(x.pairVol, 1)}・S {x.pairSharpe.toFixed(2)}（t={x.pairT.toFixed(2)}）
+                          <div>
+                            残存β = <b>{x.residualBeta.toFixed(2)}</b>
+                            <span className="text-fg-muted">＝実質的に指数を{x.residualBeta < 0 ? "ショート" : "ロング"}している</span>
+                          </div>
+                        </td>
+                        <td><V ok={false} warn>①の劣化版</V></td>
+                      </tr>
+
+                      <tr>
+                        <td className="py-1.5">③</td>
+                        <td className="text-left">
+                          <b>相対の平均回帰</b>（ペアトレード）
+                          <div className="text-fg-muted">ln(A/B) の乖離を売買する</div>
+                        </td>
+                        <td className="text-left text-fg-muted">
+                          平均回帰そのもの。<b>これだけが「相対で動く」を直接換金する経路</b>
+                        </td>
+                        <td className="text-left">
+                          ADF={x.adfStat.toFixed(2)}（p={pText(x.adfP)}）→ {x.adfStationary ? "定常" : "単位根を棄却できない"}
+                          <div>
+                            AR(1) φ={x.ouPhi.toFixed(4)} / 半減期{" "}
+                            <b className={x.halfLifeDays !== null && x.halfLifeDays <= x.halfLifeLimitDays ? "text-green-700" : "text-gray-500"}>
+                              {x.halfLifeDays === null ? "—" : `${x.halfLifeDays.toFixed(0)}日`}
+                            </b>
+                            <span className="text-fg-muted">（{x.halfLifeLimitDays}日以内なら取引可能とみなす）</span>
+                          </div>
+                          <div className="text-fg-muted">
+                            分散比 {x.vr.map((v) => `q${v.q}:${v.vr.toFixed(2)}`).join(" ")}
+                            <span className="ml-1">（参考。この z は検出力が無いので判定には使わない）</span>
+                          </div>
+                        </td>
+                        <td><V ok={x.meanReverting}>{x.meanReverting ? "成立" : "不成立"}</V></td>
+                      </tr>
+
+                      <tr>
+                        <td className="py-1.5">④</td>
+                        <td className="text-left">
+                          <b>非対称β</b>（下げで鈍いか）
+                          <div className="text-fg-muted">下げでだけ β が小さければ凸性になる</div>
+                        </td>
+                        <td className="text-left text-fg-muted">
+                          g = μ − σ²/2 の σ² 側を<b>下方だけ</b>削れる
+                        </td>
+                        <td className="text-left">
+                          β⁻（Bが下げた日）= <b>{x.betaDown.toFixed(2)}</b> ／ β⁺（上げた日）= <b>{x.betaUp.toFixed(2)}</b>
+                          <div>差の t={x.betaAsymT.toFixed(2)}・p={pText(x.betaAsymP)}</div>
+                          <div className={asymBad ? "text-red-700 font-medium" : "text-fg-muted"}>
+                            {asymBad
+                              ? `下げは${pct(x.betaDown, 0)}ついていくのに上げは${pct(x.betaUp, 0)}しか取れない＝望みと逆`
+                              : asymGood
+                                ? "下げで鈍く上げで敏感＝望みどおりの向き"
+                                : "上下で差がない"}
+                          </div>
+                        </td>
+                        <td><V ok={asymGood} warn={!asymGood && !asymBad}>{asymGood ? "成立" : asymBad ? "逆向き" : "差なし"}</V></td>
+                      </tr>
+
+                      <tr>
+                        <td className="py-1.5">⑤</td>
+                        <td className="text-left">
+                          <b>ヘッジ比率の適正化</b>
+                          <div className="text-fg-muted">1単位でなく β 単位だけ売る</div>
+                        </td>
+                        <td className="text-left text-fg-muted">
+                          新しい収益ではなく<b>取りこぼしの回収</b>
+                        </td>
+                        <td className="text-left">
+                          1単位ヘッジは (1−β)={(-x.residualBeta).toFixed(2)} だけ過剰ヘッジ。
+                          <div>
+                            捨てている分は年 <b className={directionClass(x.overHedgeCostAnn)}>{spct(x.overHedgeCostAnn, 2)}</b>
+                            <span className="text-fg-muted">（(1−β)·μ_B）</span>
+                          </div>
+                        </td>
+                        <td><V ok={x.overHedgeCostAnn > 0.01}>{x.overHedgeCostAnn > 0.01 ? "回収可" : "軽微"}</V></td>
+                      </tr>
+
+                      <tr>
+                        <td className="py-1.5">⑥</td>
+                        <td className="text-left">
+                          <b>リバランス・プレミアムへの寄与</b>
+                          <div className="text-fg-muted">②の分解に β&lt;1 がどれだけ効いたか</div>
+                        </td>
+                        <td className="text-left text-fg-muted">
+                          σ_diff² = (β−1)²σ_B² + σ_ε²
+                        </td>
+                        <td className="text-left">
+                          実測 σ_diff = {pct(p.sigmaDiff, 1)}。うち β=1 でも残る分（σ_ε）が {pct(x.sigmaDiffAtBeta1, 1)}、
+                          <div>
+                            <b>β&lt;1 の寄与は {spct(x.sigmaDiffLift, 2)} だけ</b>
+                            <span className="text-fg-muted">＝スプレッドはほぼ全部が銘柄固有の値動き</span>
+                          </div>
+                        </td>
+                        <td><V ok={false}>ほぼ無関係</V></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
+                  <p className="font-medium text-gray-800">読み方</p>
+                  <p>
+                    ⑥が示すとおり、<b>「β&lt;1 で相対的に逆に動く」部分は σ_diff の {spct(x.sigmaDiffLift, 2)} しか作っていない</b>。
+                    残り {pct(x.sigmaDiffAtBeta1, 1)} は銘柄固有の ε である。相対の動きの正体は「指数と逆」ではなく
+                    <b>「指数と無関係」</b>で、収益源として意味を持つのは
+                    {alphaOk ? "①の α である。" : x.meanReverting ? "③の平均回帰である。" : "①③のいずれでもない（この標本では確たる裏付けが無い）。"}
+                  </p>
+                  {asymBad && (
+                    <p>
+                      さらに④が<b>望みと逆</b>である。日次で見ると「下げる日に相対的に勝つ」のは
+                      {pct(1 - x.betaDown, 0)} しかないのに、「上げる日に相対的に負ける」のは {pct(1 - x.betaUp, 0)} ある。
+                      全標本の β={invBeta.toFixed(2)} は上下を均した値なので、
+                      これを見て「下げに強い」と読むと二重に取り違えることになる。
+                    </p>
+                  )}
+                  <p>
+                    {alphaOk
+                      ? "①は成立しているが、α は過去の実現値であって将来の約束ではない。μ の識別限界から α の標準誤差は大きいので、建玉は点推定でなく下側信頼限界で決めること。"
+                      : "①が成立していない以上、この2資産で市場中立を組んでも期待できるのはゼロ近辺である。市場中立化はリスクを消す操作であって、リターンを生む操作ではない。"}
+                  </p>
+                </div>
+              </section>
+            );
+          })()}
+
           {/* ───── 曲線 ───── */}
           <section className="space-y-1">
             <h4 className="text-sm font-semibold text-gray-700">累積対数リターン・ウェイト経路・ローリング相関</h4>
