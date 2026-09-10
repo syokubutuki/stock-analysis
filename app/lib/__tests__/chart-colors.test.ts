@@ -30,7 +30,9 @@ import {
   DIRECTION_GLYPH,
   DIRECTION_TEXT_CLASS,
   directionOf,
+  hasCandlestickBodies,
 } from "../chart-colors";
+import fx from "./fixtures/price-fixtures.json";
 
 const CSS = readFileSync(fileURLToPath(new URL("../../globals.css", import.meta.url)), "utf8");
 
@@ -75,5 +77,66 @@ describe("方向の第2の手がかり（A4: 色が見えなくても同じ結�
     assert.equal(directionOf(-0.3, 0.5), "flat");
     assert.equal(directionOf(NaN), "flat");
     assert.equal(directionOf(0), "flat");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FU32: ローソク足の凡例が意味を持つかの判定
+//
+// 投信は基準価額しか配信されないので OHLC が全て同値になり、足は高さゼロの点になる。
+// それでも `CANDLESTICK_LEGEND`（中空＝陽線／塗りつぶし＝陰線）は描かれていた。
+// この関数は「凡例を出してよいか」の唯一の判定なので、両側から縛る。
+//
+// **落ちるべきときに落ち、落ちるべきでないときは落ちない**の両方を書く（§0.10④ の教訓）。
+// ---------------------------------------------------------------------------
+describe("hasCandlestickBodies（FU32: 凡例を出してよいか）", () => {
+  test("通常の株式データでは true（凡例は出したまま＝退行しない）", () => {
+    assert.equal(hasCandlestickBodies(fx.stock), true);
+  });
+
+  test("OHLC が全て同値なら false（投信 0331418A の形）", () => {
+    const fund = fx.stock.map((p) => ({
+      open: p.close,
+      high: p.close,
+      low: p.close,
+      close: p.close,
+    }));
+    assert.equal(hasCandlestickBodies(fund), false);
+  });
+
+  test("1 本でも実体かヒゲがあれば true（全件同値のときだけ隠す）", () => {
+    const base = { open: 100, high: 100, low: 100, close: 100 };
+    assert.equal(hasCandlestickBodies([base, base, base]), false);
+    assert.equal(
+      hasCandlestickBodies([base, { ...base, close: 101 }, base]),
+      true,
+      "実体があるのに隠した",
+    );
+    assert.equal(
+      hasCandlestickBodies([base, { ...base, high: 101 }, base]),
+      true,
+      "上ヒゲがあるのに隠した",
+    );
+    assert.equal(
+      hasCandlestickBodies([base, { ...base, low: 99 }, base]),
+      true,
+      "下ヒゲがあるのに隠した",
+    );
+  });
+
+  test("空配列では true（読み込み中に凡例を点滅させない）", () => {
+    assert.equal(hasCandlestickBodies([]), true);
+  });
+
+  test("判定は出来高を見ない（凡例が説明しているのは OHLC の見え方だけ）", () => {
+    // `app/page.tsx` の `hasCloseOnlyMarketData` は volume===0 も条件に入れるが、
+    // あちらは「出来高系の分析が成立するか」を見ている。ここは意図的に狭い。
+    const noVolumeButRealBars = fx.stock.map((p) => ({
+      open: p.open,
+      high: p.high,
+      low: p.low,
+      close: p.close,
+    }));
+    assert.equal(hasCandlestickBodies(noVolumeButRealBars), true);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { rollingMoments } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -99,7 +99,7 @@ export default function RollingMomentsChart({ prices, seriesMode }: Props) {
   const kurtRef = useRef<HTMLCanvasElement>(null);
   const stdRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr, times } = extractSeries(prices, seriesMode);
+  const { values: lr, times } = extractRatioSeries(prices, seriesMode);
   const rolling = useMemo(() => rollingMoments(lr, times, 60), [prices, seriesMode]);
   const latest = rolling[rolling.length - 1];
 

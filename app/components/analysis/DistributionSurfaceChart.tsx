@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { rollingDensitySurface } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -40,7 +40,7 @@ function viridisColor(t: number): string {
 export default function DistributionSurfaceChart({ prices, seriesMode }: Props) {
   const surfaceRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: lr, times } = extractSeries(prices, seriesMode);
+  const { values: lr, times } = extractRatioSeries(prices, seriesMode);
   const surface = useMemo(
     () => rollingDensitySurface(lr, times, 60, 40, 3),
     [prices, seriesMode]

@@ -8,7 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { ewmaVolatility, detectVolRegimes, volClustering } from "../../lib/volatility";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -33,7 +33,7 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
-  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const volData = useMemo(
     () => ewmaVolatility(lr, lrTimes, 0.94, 20),

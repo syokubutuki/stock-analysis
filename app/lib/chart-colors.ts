@@ -158,3 +158,27 @@ export const CANDLESTICK_OPTIONS = {
 
 /** ローソク足の凡例に添える説明。表記規則を画面に出さないと第2の手がかりは伝わらない */
 export const CANDLESTICK_LEGEND = "中空（白抜き）＝陽線・上昇／塗りつぶし＝陰線・下落";
+
+/**
+ * このデータでローソク足が実体を持つか（＝`CANDLESTICK_LEGEND` が意味を持つか）。
+ *
+ * 投信は基準価額しか配信されないので `open = high = low = close` になり、
+ * 足はすべて高さゼロの点になる。**中空も塗りつぶしもヒゲも存在しない**ので、
+ * 凡例（「中空＝陽線／塗りつぶし＝陰線」）はそのままだと嘘になる。→ FU32
+ *
+ * 判定を `volume === 0` まで含めないのは、この凡例が説明しているのが
+ * OHLC の見え方だけだからである（`app/page.tsx` の `hasCloseOnlyMarketData` は
+ * 出来高も条件に入れるが、あちらは「出来高系の分析が成立するか」を見ている）。
+ * 出来高だけがある銘柄でも OHLC が同値なら凡例は意味を持たないので、こちらが正しく狭い。
+ *
+ * データが空のときは true を返す。読み込み中に凡例が一瞬消える方が紛らわしいからである
+ * （そもそも足が 1 本も無ければ凡例の描画条件も満たされない）。
+ */
+export function hasCandlestickBodies(
+  bars: readonly { open: number; high: number; low: number; close: number }[]
+): boolean {
+  if (bars.length === 0) return true;
+  return bars.some(
+    (b) => b.open !== b.close || b.high !== b.close || b.low !== b.close
+  );
+}

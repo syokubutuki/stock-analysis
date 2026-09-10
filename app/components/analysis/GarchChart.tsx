@@ -9,7 +9,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { fitGarch, analyzeLeverage, detectJumps } from "../../lib/garch";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -28,7 +28,7 @@ export default function GarchChart({ prices, seriesMode }: Props) {
   const volChartRef = useRef<IChartApi | null>(null);
   const jumpChartRef = useRef<IChartApi | null>(null);
 
-  const { values: lr, times: lrTimes } = extractSeries(prices, seriesMode);
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const garch = useMemo(() => fitGarch(lr), [prices, seriesMode]);
   const leverage = useMemo(() => analyzeLeverage(lr), [prices, seriesMode]);

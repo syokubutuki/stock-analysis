@@ -4,7 +4,7 @@ import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { conditionalDistributions, violinByGroup, type ViolinData } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -185,7 +185,7 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
   const condRef = useRef<HTMLCanvasElement>(null);
   const [violinMode, setViolinMode] = useState<"weekday" | "month">("weekday");
 
-  const { values: lr, times } = extractSeries(prices, seriesMode);
+  const { values: lr, times } = extractRatioSeries(prices, seriesMode);
 
   const weekdayViolins = useMemo(() => violinByGroup(lr, times, "weekday"), [prices, seriesMode]);
   const monthViolins = useMemo(() => violinByGroup(lr, times, "month"), [prices, seriesMode]);

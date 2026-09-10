@@ -27,7 +27,11 @@ import {
 } from "../../lib/chart-series";
 import { setInitialVisibleRange } from "../../lib/chart-visible-range";
 import type { PeriodKey } from "../../hooks/useAnalysisData";
-import { CANDLESTICK_OPTIONS, CANDLESTICK_LEGEND } from "../../lib/chart-colors";
+import {
+  CANDLESTICK_OPTIONS,
+  CANDLESTICK_LEGEND,
+  hasCandlestickBodies,
+} from "../../lib/chart-colors";
 
 interface Props {
   prices: PricePoint[];
@@ -255,6 +259,11 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
     () => SERIES.filter((s) => enabled.has(s.id)),
     [enabled]
   );
+
+  // 投信のように OHLC が全て同値の銘柄では足が高さゼロの点になり、
+  // 中空/塗りつぶしの凡例が意味を持たない（FU32）。このチャートは
+  // パネルIDを持たない常時表示なので closeOnly の分類が届かず、ここで判定する。
+  const candleBodies = useMemo(() => hasCandlestickBodies(prices), [prices]);
 
   // Create/destroy chart on mount
   useEffect(() => {
@@ -792,7 +801,7 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
           ref={containerRef}
           className="w-full rounded border border-gray-100"
         />
-        {enabledSeries.some((s) => s.type === "candlestick") && (
+        {enabledSeries.some((s) => s.type === "candlestick") && candleBodies && (
           <p className="mt-1 text-[11px] text-fg-muted">{CANDLESTICK_LEGEND}</p>
         )}
 

@@ -8,7 +8,14 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { SERIES_MODE_LABELS, extractSeries, type SeriesMode } from "../series-mode";
+import {
+  SERIES_MODE_LABELS,
+  SERIES_MODE_UNITS,
+  extractSeries,
+  extractRatioSeries,
+  isLevelSeries,
+  type SeriesMode,
+} from "../series-mode";
 import type { PricePoint } from "../types";
 import fx from "./fixtures/price-fixtures.json";
 import { assertGoldenArray } from "./helpers/golden";
@@ -109,5 +116,117 @@ describe("SERIES_MODE_LABELS", () => {
       assert.ok(SERIES_MODE_LABELS[mode].length > 0);
     }
     assert.equal(Object.keys(SERIES_MODE_LABELS).length, ALL_MODES.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FU47: 系列の単位（水準 / 差分 / 比率）
+//
+// `extractSeries` の戻り値は 6 モードで単位が違うのに型は同じ `number[]` である。
+// 受け取る側がそれを見分けられず「リターンだろう」と決め打って `×100` して `%` を
+// 付けていたのが FU47（`0331418A` の「平均 1931819.394%」・`7203.T` の「179740.3866%」）。
+//
+// この単位表は 11 個のコンポーネントが依存する分岐なので、モードを増やしたときに
+// **表への追記を忘れたら落ちる**ようにしておく。
+// ---------------------------------------------------------------------------
+describe("SERIES_MODE_UNITS（FU47: この系列は比率か水準か）", () => {
+  test("全モードに単位がある（モードを増やして追記を忘れたら落ちる）", () => {
+    for (const mode of ALL_MODES) {
+      assert.ok(
+        SERIES_MODE_UNITS[mode],
+        `${mode} の単位が SERIES_MODE_UNITS に無い`,
+      );
+    }
+    assert.equal(Object.keys(SERIES_MODE_UNITS).length, ALL_MODES.length);
+  });
+
+  test("close / open だけが水準である", () => {
+    const level = ALL_MODES.filter((m) => isLevelSeries(m));
+    assert.deepEqual(level, ["close", "open"]);
+  });
+
+  test("diff は差分であって比率ではない（%で見せてよい集合に混ぜない）", () => {
+    assert.equal(SERIES_MODE_UNITS.diff, "difference");
+  });
+
+  test("リターン系の3モードは比率（×100 して % にしてよい）", () => {
+    for (const mode of ["logReturn", "overnightReturn", "intradayReturn"] as SeriesMode[]) {
+      assert.equal(SERIES_MODE_UNITS[mode], "ratio", `${mode} が比率でない`);
+    }
+  });
+});
+
+describe("extractRatioSeries（FU47: %で見せる前に比率へ直す）", () => {
+  test("close は対数リターンへ直り、時刻が 1 本落ちる", () => {
+    const ratio = extractRatioSeries(SLICE, "close");
+    // logReturn モードの黄金値と一致するのが正しい（同じ量を2経路で出しているため）
+    assertGoldenArray(ratio.values, [
+      -0.01263652627, 0.01123763527, 0.02711236682, -0.001043028376,
+    ]);
+    assert.equal(ratio.values.length, SLICE.length - 1);
+    assert.equal(ratio.times[0], SLICE[1].time);
+    assert.equal(ratio.values.length, ratio.times.length);
+  });
+
+  test("open も対数リターンへ直る（水準はこの 2 モード）", () => {
+    const ratio = extractRatioSeries(SLICE, "open");
+    // ln(open[t]/open[t-1]) を fixture から独立に計算した値
+    assertGoldenArray(ratio.values, [
+      -0.001872864441, -0.01520890821, 0.02560992706, 0.009746679444,
+    ]);
+    assert.equal(ratio.times[0], SLICE[1].time);
+  });
+
+  test("比率・差分モードは extractSeries と完全に同じものを返す（素通し）", () => {
+    for (const mode of ["diff", "logReturn", "overnightReturn", "intradayReturn"] as SeriesMode[]) {
+      assert.deepEqual(
+        extractRatioSeries(fx.stock, mode),
+        extractSeries(fx.stock, mode),
+        `${mode} が素通しになっていない`,
+      );
+    }
+  });
+
+  test("どのモードでも値と時刻の本数が一致する", () => {
+    for (const mode of ALL_MODES) {
+      const { values, times } = extractRatioSeries(fx.stock, mode);
+      assert.equal(values.length, times.length, `${mode} で本数がずれた`);
+    }
+  });
+
+  test("水準の絶対値が %表示に流れない（FU47 の再発検知）", () => {
+    // 基準価額 10,000〜37,945 円の投信を模した系列。extractSeries なら 10^4 台、
+    // extractRatioSeries なら 10^-2 台に収まる。×100 して % を付けても意味を保つ。
+    const fund: PricePoint[] = fx.stock.slice(0, 60).map((p, i) => {
+      const nav = 10000 + i * 50;
+      return { time: p.time, open: nav, high: nav, low: nav, close: nav, volume: 0 };
+    });
+    const raw = extractSeries(fund, "close").values;
+    const ratio = extractRatioSeries(fund, "close").values;
+    assert.ok(Math.max(...raw.map(Math.abs)) > 1000, "前提が崩れた（水準が小さすぎる）");
+    assert.ok(
+      Math.max(...ratio.map(Math.abs)) < 0.1,
+      "水準がそのまま流れている（×100 すると 1000% を超える）",
+    );
+  });
+
+  test("1 点しかなければ水準モードは空（下流に NaN を流さない）", () => {
+    const one = SLICE.slice(0, 1);
+    assert.deepEqual(extractRatioSeries(one, "close"), { values: [], times: [] });
+  });
+
+  test("0 や負の価格が混じっても非有限値を返さない", () => {
+    const broken: PricePoint[] = [
+      { time: "2025-01-06", open: 100, high: 101, low: 99, close: 100, volume: 1 },
+      { time: "2025-01-07", open: 0, high: 0, low: 0, close: 0, volume: 1 },
+      { time: "2025-01-08", open: 100, high: 101, low: 99, close: 100, volume: 1 },
+    ];
+    for (const mode of ALL_MODES) {
+      const { values } = extractRatioSeries(broken, mode);
+      assert.ok(
+        values.every((v) => Number.isFinite(v)),
+        `${mode} が非有限値を返した`,
+      );
+    }
   });
 });
