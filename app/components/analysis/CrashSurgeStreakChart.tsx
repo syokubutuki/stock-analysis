@@ -58,7 +58,8 @@ export default function CrashSurgeStreakChart({ prices }: Props) {
     if (!analysis) return "連続下落・連続上昇の時系列。計算できるデータが不足しています。";
     const dLong = analysis.downRuns.reduce((a, b) => (b.length > a.length ? b : a), analysis.downRuns[0]);
     const uLong = analysis.upRuns.reduce((a, b) => (b.length > a.length ? b : a), analysis.upRuns[0]);
-    return `終値の時系列に、しきい値${analysis.threshold}%を満たす連続下落（赤）と連続上昇（緑）の区間を塗り分けた図。下落ランは${analysis.downRuns.length}回（最長${dLong ? dLong.length : 0}日）、上昇ランは${analysis.upRuns.length}回（最長${uLong ? uLong.length : 0}日）です。`;
+    // analysis.threshold は比率（0.03 = 3%）。可視側のスライダー表示 `±{thresholdPct.toFixed(1)}%` と同じ形にする（FU51）。
+    return `終値の時系列に、しきい値±${(analysis.threshold * 100).toFixed(1)}%を満たす連続下落（赤）と連続上昇（緑）の区間を塗り分けた図。下落ランは${analysis.downRuns.length}回（最長${dLong ? dLong.length : 0}日）、上昇ランは${analysis.upRuns.length}回（最長${uLong ? uLong.length : 0}日）です。`;
   }, [analysis]);
 
   useEffect(() => {
