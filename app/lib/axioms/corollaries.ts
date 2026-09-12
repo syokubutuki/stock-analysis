@@ -366,7 +366,7 @@ const C5_VOL_TARGETING: Corollary = {
   frictionEffect:
     "公準5より σ_t の微小変動ごとに建玉を直すと売買コストが嵩む。" +
     "EWMA 平滑や再調整のヒステリシス帯で回転率を抑える。σ_t 推定はノイズに敏感。",
-  components: ["GarchChart", "NoiseCorrectedVolChart", "VolConeChart"],
+  components: ["GarchChart", "VolConeChart"],
   priority: 3,
 };
 
@@ -469,9 +469,9 @@ const C7_HEDGE: Corollary = {
     "ヘッジとは価格を予想して逃げることではなく、第二の建玉で系統的な dP を差し引くこと。" +
     "消せるのは市場リスクだけで、固有リスク（α の source）は残る。",
   frictionEffect:
-    "β の推定は非同期取引で減衰（→ Dimson/AttenuationBeta で補正）。" +
+    "β の推定は非同期取引で減衰（Dimson β で補正する。本アプリでは未実装）。" +
     "β は時変（条件付きβ・下方β）で、動的ヘッジは公準5のコストを生む。",
-  components: ["ConditionalBetaChart", "AttenuationBetaChart"],
+  components: ["ConditionalBetaChart"],
   priority: 2,
 };
 

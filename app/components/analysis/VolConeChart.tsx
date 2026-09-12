@@ -25,11 +25,13 @@ export default function VolConeChart({ prices }: Props) {
 
   const cone = useMemo(() => computeVolCone(returns), [returns]);
 
+  // currentPercentile は lib（cornish-fisher.ts）が既に 0〜100 で返す。可視側のチップ
+  // （`{pctile.toFixed(0)}%ile`）と同じく *100 しない（FU51）。currentVol / p50 は比率なので *100 する。
   const chartDescription = useMemo(() => {
     if (cone.windows.length === 0) return "ボラティリティ・コーン。計算できるデータが不足しています。";
     let hot = 0;
     for (let i = 1; i < cone.currentPercentile.length; i++) if (cone.currentPercentile[i] > cone.currentPercentile[hot]) hot = i;
-    return `窓長${cone.windows[0]}日から${cone.windows[cone.windows.length - 1]}日までの年率ボラの分位帯（p10/p25/p50/p75/p90）に現在値を重ねたコーン。現在値のパーセンタイルが最も高いのは${cone.windows[hot]}日窓の${(cone.currentPercentile[hot] * 100).toFixed(0)}%（現在${(cone.currentVol[hot] * 100).toFixed(1)}%・中央値${(cone.percentiles[hot].p50 * 100).toFixed(1)}%）です。`;
+    return `窓長${cone.windows[0]}日から${cone.windows[cone.windows.length - 1]}日までの年率ボラの分位帯（p10/p25/p50/p75/p90）に現在値を重ねたコーン。現在値のパーセンタイルが最も高いのは${cone.windows[hot]}日窓の${cone.currentPercentile[hot].toFixed(0)}%ile（現在${(cone.currentVol[hot] * 100).toFixed(1)}%・中央値${(cone.percentiles[hot].p50 * 100).toFixed(1)}%）です。`;
   }, [cone]);
 
   useEffect(() => {

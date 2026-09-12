@@ -255,9 +255,22 @@ export default function UnifiedChart({ prices, period, onNavigate }: Props) {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, [resizeChartForFullscreen]);
 
+  // 出来高が1本も配信されない銘柄（投信の基準価額・一部の指数）では、出来高グループの系列
+  // （出来高・出来高MA・OBV・OBV MA）は恒等的に 0 で意味を持たない。既定系列に「出来高」が
+  // 入っているため、投信では 0 のヒストグラム・右軸の「0.00」・凡例・下部25%の空白帯だけが
+  // 残っていた（FU53）。判定は出来高だけを見る（OHLC は見ない。`hasCandlestickBodies` が
+  // OHLC だけを見るのと同じ理屈で、こちらは出来高系列の可否だけを決める）。
+  //
+  // 永続化された `enabled` は書き換えない。初期値 `DEFAULT_ENABLED` だけ直しても、株式で作った
+  // 集合（volume 入り）を持ったまま投信へ切り替えると同じ症状が出るので、描画に使う集合を
+  // 導出するここで外す。株式に戻れば従来どおり描かれる。
+  const hasVolumeData = useMemo(() => prices.some((p) => p.volume > 0), [prices]);
   const enabledSeries = useMemo(
-    () => SERIES.filter((s) => enabled.has(s.id)),
-    [enabled]
+    () =>
+      SERIES.filter(
+        (s) => enabled.has(s.id) && (hasVolumeData || s.group !== "volume")
+      ),
+    [enabled, hasVolumeData]
   );
 
   // 投信のように OHLC が全て同値の銘柄では足が高さゼロの点になり、

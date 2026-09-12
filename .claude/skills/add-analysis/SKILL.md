@@ -27,7 +27,7 @@ description: 新しい分析（チャート／パネル）をこのアプリに�
 
 **価格データ（CLAUDE.md の規約）**
 - 追加の系列が要るなら必ず `/api/stock?ticker=…&range=10y`。Yahoo を直接叩かない
-- ベンチマークは `useBenchmarkPrices(ticker)`。手本 `AttenuationBetaChart.tsx`
+- ベンチマークは `useBenchmarkPrices(ticker)`。手本 `CopulaChart.tsx`（旧手本 `AttenuationBetaChart.tsx` は未配線のため S23 で削除。しかもフックを使わず内部 fetch していた）
 
 **lightweight-charts v5 の落とし穴**
 - `chart.addSeries(LineSeries, {...})`。`addLineSeries()` は無い

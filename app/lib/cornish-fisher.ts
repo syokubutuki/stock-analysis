@@ -162,6 +162,12 @@ export function computeVolCone(returns: number[]): VolConeResult {
       vols.push(Math.sqrt(s2 * 252)); // annualize
     }
 
+    // 「現在値」は時系列の末尾。ソートより前に取ること。
+    // 初版（806e814）はソート後の末尾を取っていたため、現在値が常に歴史的最大値になり、
+    // 全銘柄・全窓で 100%ile・解釈文が常に「高水準」になっていた（S23 の棚卸し §1.4）。
+    // 可視・代替テキスト・図の3つが同じ値を描くので、突き合わせでは見つからない。
+    const current = vols[vols.length - 1]; // most recent (chronological)
+
     vols.sort((a, b) => a - b);
     const m = vols.length;
     percentiles.push({
@@ -172,7 +178,6 @@ export function computeVolCone(returns: number[]): VolConeResult {
       p90: vols[Math.floor(m * 0.9)],
     });
 
-    const current = vols[m - 1]; // most recent
     currentVol.push(current);
 
     // Where does current vol sit?

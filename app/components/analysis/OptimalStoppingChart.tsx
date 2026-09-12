@@ -19,9 +19,11 @@ export default function OptimalStoppingChart({ prices }: Props) {
   const closePrices = useMemo(() => prices.map((p) => p.close), [prices]);
   const result = useMemo(() => computeOptimalStopping(closePrices), [closePrices]);
 
+  // expectedReturn / secretaryReturn / actualReturn は lib（optimal-stopping.ts）が
+  // 既に百分率で返す。可視側（下のカード）と同じく *100 しない（FU51）。
   const chartDescription = useMemo(() => {
     if (result.exerciseBoundary.length === 0) return "最適停止の行使境界。計算できるデータが不足しています。";
-    return `後退帰納で求めた「これ以上なら売る」水準（行使境界）の推移に、実際の価格を重ねた図（${result.exerciseBoundary.length}点）。最適停止の期待リターンは${(result.expectedReturn * 100).toFixed(2)}%、秘書問題の1/e戦略は${(result.secretaryReturn * 100).toFixed(2)}%、実測は${(result.actualReturn * 100).toFixed(2)}%です。`;
+    return `後退帰納で求めた「これ以上なら売る」水準（行使境界）の推移に、実際の価格を重ねた図（${result.exerciseBoundary.length}点）。最適停止の期待リターンは${result.expectedReturn.toFixed(2)}%、秘書問題の1/e戦略は${result.secretaryReturn.toFixed(2)}%、実測は${result.actualReturn.toFixed(2)}%です。`;
   }, [result]);
 
   useEffect(() => {
