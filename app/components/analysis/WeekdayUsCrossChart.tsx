@@ -901,7 +901,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
 // ───────────────────────── ヒートマップ表 ─────────────────────────
 
 // 横断平均行の行キー(銘柄コードと衝突しない値)。
-const CONSENSUS_KEY = " consensus";
+const CONSENSUS_KEY = "\u0001consensus";
 
 // 共通縦軸(±yMax)。scope 内の全セルで 1% あたりの高さを揃えるための上限。
 function scaleMaxAbs(cells: (CellStats | null)[]): number {
