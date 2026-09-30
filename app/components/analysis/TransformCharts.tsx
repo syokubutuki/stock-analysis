@@ -328,19 +328,19 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">累積リターン</div>
           <div className={`font-mono font-medium ${cumRet >= 0 ? "text-teal-600" : "text-red-600"}`}>
-            {formatRatioSeriesValue(cumRet, seriesMode, 2)}
+            {(cumRet * 100).toFixed(2)}%
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">最大ドローダウン</div>
           <div className="font-mono font-medium text-red-600">
-            {formatRatioSeriesValue(maxDD, seriesMode, 2)}
+            {(maxDD * 100).toFixed(2)}%
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">現在ドローダウン</div>
           <div className={`font-mono font-medium ${currentDD < -0.05 ? "text-red-600" : "text-gray-700"}`}>
-            {formatRatioSeriesValue(currentDD, seriesMode, 2)}
+            {(currentDD * 100).toFixed(2)}%
           </div>
         </div>
       </div>
