@@ -643,6 +643,7 @@ export const SECTIONS: SectionDef[] = [
       {
         group: "状態 → 先行きリターン",
         panels: [
+          definePanel({ id: "cond-rise-to-decline", title: "上昇後、何日で下落し始めるか（日数の分布）", input: "filtered", closeOnly: "safe", height: 650, load: () => import("../components/analysis/RiseToDeclineChart") }),
           definePanel({ id: "cond-forward", title: "状態→先行きリターン表（RSI/ボラ/トレンド別）", input: "filtered", closeOnly: "safe", height: 400, load: () => import("../components/analysis/ConditionalForwardChart") }),
           definePanel({ id: "cond-segment-edge", title: "条件付きエッジ：日中 vs 夜間（状態別にどちらの執行が有利か）", input: "filtered", closeOnly: "unavailable", height: 400, load: () => import("../components/analysis/ConditionalSegmentEdgeChart") }),
           definePanel({ id: "cond-custom-bucket", title: "カスタム条件ビルダー（任意の指標・閾値・分位）", input: "filtered", closeOnly: "safe", height: 400, load: () => import("../components/analysis/CustomBucketChart") }),

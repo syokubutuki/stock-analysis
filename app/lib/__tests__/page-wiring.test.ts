@@ -160,7 +160,8 @@ describe("終値だけの系列での分類（FU17/FU22: 投信で無意味な�
         caution: CLOSE_ONLY_CAUTION_PANEL_IDS.size,
         safe: CLOSE_ONLY_SAFE_PANEL_IDS.size,
       },
-      { unavailable: 78, caution: 25, safe: 150 },
+      // 初回下落の待ち時間分布は終値だけで成立するため SAFE に1件追加。
+      { unavailable: 78, caution: 25, safe: 151 },
     );
   });
 

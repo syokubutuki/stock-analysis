@@ -45,6 +45,13 @@ export const CHART_COLORS = {
   surface: "#fafafa",
 } as const;
 
+/** 条件付き分析の期間表示。価格の上下ではなく、判定区間と追跡区間を区別する。 */
+export const EVENT_WINDOW_COLORS = {
+  lookback: "#1d4ed8",
+  followup: "#b45309",
+  outcome: "#7e22ce",
+} as const;
+
 /**
  * 方向（上昇・下落）の配色。
  *

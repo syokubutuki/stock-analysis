@@ -115,7 +115,8 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
     // 無料側は 86 件のまま動かしていない。
     assert.deepEqual(
       { free: FREE.length, paid: PAID.length, total: PANELS.length },
-      { free: 86, paid: 167, total: 253 },
+      // cond-rise-to-decline を既存の条件付き分析カテゴリへ追加。既存無料枠は不変。
+      { free: 86, paid: 168, total: 254 },
     );
   });
 
@@ -133,7 +134,7 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       individual: 8,
       "series-segment": 8,
       category: 70,
-      paid: 167,
+      paid: 168,
     });
   });
 
