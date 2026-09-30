@@ -48,6 +48,28 @@ export function isLevelSeries(mode: SeriesMode): boolean {
 }
 
 /**
+ * `extractRatioSeries()` の表示倍率と単位。
+ *
+ * 水準は同関数内で比率へ変換済みなので `%`、もともと比率のモードも `%`。
+ * `diff` だけは価格差を意図的に素通しするため、100倍せず円で表示する。
+ */
+export function ratioSeriesDisplayUnit(mode: SeriesMode): "%" | "円" {
+  return SERIES_MODE_UNITS[mode] === "difference" ? "円" : "%";
+}
+
+export function scaleRatioSeriesValue(value: number, mode: SeriesMode): number {
+  return SERIES_MODE_UNITS[mode] === "difference" ? value : value * 100;
+}
+
+export function formatRatioSeriesValue(
+  value: number,
+  mode: SeriesMode,
+  fractionDigits: number,
+): string {
+  return `${scaleRatioSeriesValue(value, mode).toFixed(fractionDigits)}${ratioSeriesDisplayUnit(mode)}`;
+}
+
+/**
  * 比率（対数リターン）として扱える系列を返す。
  *
  * 水準（`close` / `open`）のときだけ `logReturns()` を通し、時刻を 1 本落とす。

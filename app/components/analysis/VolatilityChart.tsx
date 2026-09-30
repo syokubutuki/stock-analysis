@@ -8,7 +8,12 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+  scaleRatioSeriesValue,
+} from "../../lib/series-mode";
 import { ewmaVolatility, detectVolRegimes, volClustering } from "../../lib/volatility";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -47,7 +52,8 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
 
   // 年率換算
   const annualizeFactor = Math.sqrt(252);
-  const currentVol = volData.length > 0 ? volData[volData.length - 1].ewma * annualizeFactor * 100 : 0;
+  const currentVol = volData.length > 0 ? volData[volData.length - 1].ewma * annualizeFactor : 0;
+  const displayedCurrentVol = scaleRatioSeriesValue(currentVol, seriesMode);
 
   useEffect(() => {
     if (!containerRef.current || volData.length === 0) return;
@@ -74,7 +80,7 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
     ewmaSeries.setData(
       volData.map((v) => ({
         time: v.time as Time,
-        value: v.ewma * annualizeFactor * 100, // 年率%
+        value: scaleRatioSeriesValue(v.ewma * annualizeFactor, seriesMode),
       }))
     );
 
@@ -88,7 +94,7 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
     realizedSeries.setData(
       volData.map((v) => ({
         time: v.time as Time,
-        value: v.realized * annualizeFactor * 100,
+        value: scaleRatioSeriesValue(v.realized * annualizeFactor, seriesMode),
       }))
     );
 
@@ -104,7 +110,7 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [volData]);
+  }, [volData, seriesMode]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -124,8 +130,8 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">現在のEWMA Vol (年率)</div>
-          <div className={`font-mono font-medium text-sm ${currentVol > 30 ? "text-red-600" : currentVol > 20 ? "text-orange-600" : "text-green-700"}`}>
-            {currentVol.toFixed(1)}%
+          <div className={`font-mono font-medium text-sm ${displayedCurrentVol > 30 ? "text-red-600" : displayedCurrentVol > 20 ? "text-orange-600" : "text-green-700"}`}>
+            {formatRatioSeriesValue(currentVol, seriesMode, 1)}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
@@ -137,11 +143,11 @@ export default function VolatilityChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">低ボラ閾値 (年率)</div>
-          <div className="font-mono font-medium">{(thresholds.low * annualizeFactor * 100).toFixed(1)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(thresholds.low * annualizeFactor, seriesMode, 1)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">高ボラ閾値 (年率)</div>
-          <div className="font-mono font-medium">{(thresholds.high * annualizeFactor * 100).toFixed(1)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(thresholds.high * annualizeFactor, seriesMode, 1)}</div>
         </div>
       </div>
 

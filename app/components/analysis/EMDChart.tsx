@@ -8,7 +8,11 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { computeEMD, hilbertTransform } from "../../lib/emd";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -159,7 +163,7 @@ export default function EMDChart({ prices, seriesMode }: Props) {
                 {imf.label}
               </div>
               <div>周期: ~{hilbertInfo[i]?.avgPeriod.toFixed(1) || "?"}日</div>
-              <div>振幅: {(hilbertInfo[i]?.avgAmp * 100).toFixed(3) || "?"}%</div>
+              <div>振幅: {formatRatioSeriesValue(hilbertInfo[i]?.avgAmp ?? NaN, seriesMode, 3)}</div>
             </div>
           ))}
         </div>

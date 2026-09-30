@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { normalPDF } from "../../lib/distribution";
 import {
   empiricalCDF, kde, fitTDistribution, tPDF,
@@ -60,19 +64,19 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
   // 1. CDF比較プロット
   const cdfDescription = useMemo(() => {
     if (cdfData.length < 2) return "経験的CDFと正規CDFの比較。計算できるデータが不足しています。";
-    return `経験的CDFと正規分布のCDFを重ねた図（${cdfData.length}点）。最大乖離はKS統計量D=${ks.D.toFixed(4)}（p=${ks.pValue.toFixed(4)}）で、位置は${(ks.maxDeviationAt * 100).toFixed(2)}%付近。Anderson-Darlingは A²*=${ad.A2star.toFixed(3)}（p=${ad.pValue.toFixed(4)}）です。`;
-  }, [cdfData, ks, ad]);
+    return `経験的CDFと正規分布のCDFを重ねた図（${cdfData.length}点）。最大乖離はKS統計量D=${ks.D.toFixed(4)}（p=${ks.pValue.toFixed(4)}）で、位置は${formatRatioSeriesValue(ks.maxDeviationAt, seriesMode, 2)}付近。Anderson-Darlingは A²*=${ad.A2star.toFixed(3)}（p=${ad.pValue.toFixed(4)}）です。`;
+  }, [cdfData, ks, ad, seriesMode]);
 
   const kdeDescription = useMemo(() => {
     if (kdeData.length < 2) return "カーネル密度推定。計算できるデータが不足しています。";
     const peak = kdeData.reduce((a, b) => (b.density > a.density ? b : a));
-    return `カーネル密度推定に正規分布とt分布フィットを重ねた図。密度のピークは${(peak.x * 100).toFixed(2)}%付近で、t分布フィットの自由度νは${isFinite(tFit.nu) ? tFit.nu.toFixed(1) : "∞"}（νが小さいほど裾が厚い）です。`;
-  }, [kdeData, tFit]);
+    return `カーネル密度推定に正規分布とt分布フィットを重ねた図。密度のピークは${formatRatioSeriesValue(peak.x, seriesMode, 2)}付近で、t分布フィットの自由度νは${isFinite(tFit.nu) ? tFit.nu.toFixed(1) : "∞"}（νが小さいほど裾が厚い）です。`;
+  }, [kdeData, tFit, seriesMode]);
 
   const logHistDescription = useMemo(() => {
     if (lr.length < 10) return "対数スケール密度。計算できるデータが不足しています。";
-    return `密度を対数スケールで描き、裾の部分を拡大した図（${lr.length}点）。正規分布なら放物線になり、直線に近いほど指数的な裾（＝厚い裾）を表します。標準偏差は${(s * 100).toFixed(3)}%です。`;
-  }, [lr, s]);
+    return `密度を対数スケールで描き、裾の部分を拡大した図（${lr.length}点）。正規分布なら放物線になり、直線に近いほど指数的な裾（＝厚い裾）を表します。標準偏差は${formatRatioSeriesValue(s, seriesMode, 3)}です。`;
+  }, [lr, s, seriesMode]);
 
   const ppDescription = useMemo(() => {
     if (pp.length < 5) return "P-Pプロット。計算できるデータが不足しています。";
@@ -83,8 +87,8 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
   const tailDescription = useMemo(() => {
     if (lr.length < 20) return "上側・下側テールの比較。計算できるデータが不足しています。";
     const u = tails.upper, d = tails.lower;
-    return `上側テールと下側テールのヒストグラムを重ねた図。上側は${u.n}件で条件付き期待値${(u.conditionalMean * 100).toFixed(3)}%・最大${(u.max * 100).toFixed(2)}%、下側は${d.n}件で${(d.conditionalMean * 100).toFixed(3)}%・最大${(d.max * 100).toFixed(2)}%です。`;
-  }, [lr, tails]);
+    return `上側テールと下側テールのヒストグラムを重ねた図。上側は${u.n}件で条件付き期待値${formatRatioSeriesValue(u.conditionalMean, seriesMode, 3)}・最大${formatRatioSeriesValue(u.max, seriesMode, 2)}、下側は${d.n}件で${formatRatioSeriesValue(d.conditionalMean, seriesMode, 3)}・最大${formatRatioSeriesValue(d.max, seriesMode, 2)}です。`;
+  }, [lr, tails, seriesMode]);
 
   useEffect(() => {
     if (!cdfRef.current || cdfData.length < 2) return;
@@ -442,11 +446,11 @@ export default function DistributionShapeChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="p-2 bg-green-50 rounded">
           <div className="text-gray-500">上側テール (正のリターン)</div>
-          <div className="font-mono">N={tails.upper.n}, 平均={pctFmt(tails.upper.mean)}, 最大={pctFmt(tails.upper.max)}</div>
+          <div className="font-mono">N={tails.upper.n}, 平均={formatRatioSeriesValue(tails.upper.mean, seriesMode, 4)}, 最大={formatRatioSeriesValue(tails.upper.max, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-red-50 rounded">
           <div className="text-gray-500">下側テール (負のリターン)</div>
-          <div className="font-mono">N={tails.lower.n}, 平均={pctFmt(tails.lower.mean)}, 最小={pctFmt(tails.lower.max)}</div>
+          <div className="font-mono">N={tails.lower.n}, 平均={formatRatioSeriesValue(tails.lower.mean, seriesMode, 4)}, 最小={formatRatioSeriesValue(tails.lower.max, seriesMode, 4)}</div>
         </div>
       </div>
 

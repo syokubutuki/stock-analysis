@@ -9,7 +9,11 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { fitHMM, detectChangePoints, kalmanFilter } from "../../lib/regime";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -260,8 +264,8 @@ export default function RegimeChart({ prices, seriesMode }: Props) {
         {hmm.stateLabels.map((label, s) => (
           <div key={label} className="p-2 rounded" style={{ backgroundColor: STATE_COLORS[s] + "20" }}>
             <div className="font-medium" style={{ color: STATE_COLORS[s] }}>{label}</div>
-            <div>μ: {(hmm.stateMeans[s] * 100).toFixed(3)}%</div>
-            <div>σ: {(hmm.stateVols[s] * 100).toFixed(3)}%</div>
+            <div>μ: {formatRatioSeriesValue(hmm.stateMeans[s], seriesMode, 3)}</div>
+            <div>σ: {formatRatioSeriesValue(hmm.stateVols[s], seriesMode, 3)}</div>
             <div>持続: {hmm.expectedDuration[s].toFixed(1)}日</div>
           </div>
         ))}

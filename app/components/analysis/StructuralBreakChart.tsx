@@ -10,7 +10,11 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { detectStructuralBreaks } from "../../lib/structural-break";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -115,7 +119,7 @@ export default function StructuralBreakChart({ prices, seriesMode }: Props) {
                   <td className="text-right font-mono">{bp.meanBefore.toFixed(5)}</td>
                   <td className="text-right font-mono">{bp.meanAfter.toFixed(5)}</td>
                   <td className={`text-right font-mono ${directionClass(bp.meanAfter - bp.meanBefore)}`}><DirectionGlyph value={bp.meanAfter - bp.meanBefore} />
-                    {((bp.meanAfter - bp.meanBefore) * 100).toFixed(3)}%
+                    {formatRatioSeriesValue(bp.meanAfter - bp.meanBefore, seriesMode, 3)}
                   </td>
                 </tr>
               ))}

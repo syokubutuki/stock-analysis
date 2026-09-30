@@ -8,7 +8,11 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { computeAnalyticSignal, analyticSignalStats } from "../../lib/analytic-signal";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -239,8 +243,8 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
 
       {/* 統計カード */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
-        <StatCard label="平均振幅" value={`${(stats.meanAmplitude * 100).toFixed(3)}%`} />
-        <StatCard label="振幅の標準偏差" value={`${(stats.stdAmplitude * 100).toFixed(3)}%`} />
+        <StatCard label="平均振幅" value={formatRatioSeriesValue(stats.meanAmplitude, seriesMode, 3)} />
+        <StatCard label="振幅の標準偏差" value={formatRatioSeriesValue(stats.stdAmplitude, seriesMode, 3)} />
         <StatCard label="平均周波数" value={`${stats.meanFrequency.toFixed(4)} c/d`} />
         <StatCard label="中央周期" value={`${stats.medianPeriod.toFixed(1)} 日`} />
         <StatCard

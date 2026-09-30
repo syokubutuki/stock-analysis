@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+  ratioSeriesDisplayUnit,
+  scaleRatioSeriesValue,
+} from "../../lib/series-mode";
 import { rollingMoments } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -135,12 +141,12 @@ export default function RollingMomentsChart({ prices, seriesMode }: Props) {
     if (stdRef.current) {
       drawTimeSeries(
         stdRef.current,
-        rolling.map(d => ({ time: d.time, value: d.std * 100 })),
-        "ローリング標準偏差 (60日窓, %)",
+        rolling.map(d => ({ time: d.time, value: scaleRatioSeriesValue(d.std, seriesMode) })),
+        `ローリング標準偏差 (60日窓, ${ratioSeriesDisplayUnit(seriesMode)})`,
         "#3b82f6"
       );
     }
-  }, [rolling]);
+  }, [rolling, seriesMode]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -161,7 +167,7 @@ export default function RollingMomentsChart({ prices, seriesMode }: Props) {
       <div className="w-full rounded border border-gray-100 overflow-hidden">
         <AccessibleCanvas
           ref={stdRef}
-          description={latest ? `60日ローリング標準偏差。直近${latest.time}は${(latest.std * 100).toFixed(2)}%です。` : "60日ローリング標準偏差。計算できるデータが不足しています。"}
+          description={latest ? `60日ローリング標準偏差。直近${latest.time}は${formatRatioSeriesValue(latest.std, seriesMode, 2)}です。` : "60日ローリング標準偏差。計算できるデータが不足しています。"}
         />
       </div>
 

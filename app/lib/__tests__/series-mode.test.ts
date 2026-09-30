@@ -13,7 +13,10 @@ import {
   SERIES_MODE_UNITS,
   extractSeries,
   extractRatioSeries,
+  formatRatioSeriesValue,
   isLevelSeries,
+  ratioSeriesDisplayUnit,
+  scaleRatioSeriesValue,
   type SeriesMode,
 } from "../series-mode";
 import type { PricePoint } from "../types";
@@ -227,6 +230,22 @@ describe("extractRatioSeries（FU47: %で見せる前に比率へ直す）", () 
         values.every((v) => Number.isFinite(v)),
         `${mode} が非有限値を返した`,
       );
+    }
+  });
+});
+
+describe("extractRatioSeries の表示単位（FU52: diff は円）", () => {
+  test("diff だけは100倍せず円で表示する", () => {
+    assert.equal(ratioSeriesDisplayUnit("diff"), "円");
+    assert.equal(scaleRatioSeriesValue(12.345, "diff"), 12.345);
+    assert.equal(formatRatioSeriesValue(12.345, "diff", 2), "12.35円");
+  });
+
+  test("水準由来とリターン系は百分率表示を維持する", () => {
+    for (const mode of ["close", "open", "logReturn", "overnightReturn", "intradayReturn"] as SeriesMode[]) {
+      assert.equal(ratioSeriesDisplayUnit(mode), "%", `${mode} の表示単位`);
+      assert.equal(scaleRatioSeriesValue(0.0125, mode), 1.25);
+      assert.equal(formatRatioSeriesValue(0.0125, mode, 2), "1.25%");
     }
   });
 });

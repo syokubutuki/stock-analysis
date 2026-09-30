@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { rollingDensitySurface } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -55,8 +59,8 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
       if (latest.densities[i] > latest.densities[peakIndex]) peakIndex = i;
     }
     const peakReturn = surface.binCenters[peakIndex] ?? 0;
-    return `ローリング密度サーフェス。直近${latest.time}の60日分布は、リターン${(peakReturn * 100).toFixed(2)}%付近で密度が最大です。`;
-  }, [surface]);
+    return `ローリング密度サーフェス。直近${latest.time}の60日分布は、リターン${formatRatioSeriesValue(peakReturn, seriesMode, 2)}付近で密度が最大です。`;
+  }, [surface, seriesMode]);
 
   useEffect(() => {
     if (!surfaceRef.current || surface.rows.length < 2) return;
@@ -110,7 +114,7 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
     for (let i = 0; i < nBins; i += yStep) {
       const v = binCenters[i];
       const y = pad.top + (nBins - 1 - i) * cellH + cellH / 2;
-      ctx.fillText((v * 100).toFixed(1) + "%", pad.left - 5, y + 3);
+      ctx.fillText(formatRatioSeriesValue(v, seriesMode, 1), pad.left - 5, y + 3);
     }
 
     // X軸ラベル (日付)
@@ -140,7 +144,7 @@ export default function DistributionSurfaceChart({ prices, seriesMode }: Props) 
     ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("高密度", barX + barW + 3, pad.top + 8);
     ctx.fillText("低密度", barX + barW + 3, pad.top + barH);
-  }, [surface]);
+  }, [surface, seriesMode]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">

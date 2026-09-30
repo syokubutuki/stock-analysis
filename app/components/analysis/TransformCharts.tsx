@@ -14,6 +14,7 @@ import {
   SeriesMode,
   extractRatioSeries,
   extractSeries,
+  formatRatioSeriesValue,
   isLevelSeries,
 } from "../../lib/series-mode";
 import {
@@ -303,11 +304,11 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
       <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">平均リターン</div>
-          <div className="font-mono font-medium">{(mean * 100).toFixed(4)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(mean, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">標準偏差</div>
-          <div className="font-mono font-medium">{(std * 100).toFixed(4)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(std, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">歪度</div>
@@ -327,19 +328,19 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">累積リターン</div>
           <div className={`font-mono font-medium ${cumRet >= 0 ? "text-teal-600" : "text-red-600"}`}>
-            {(cumRet * 100).toFixed(2)}%
+            {formatRatioSeriesValue(cumRet, seriesMode, 2)}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">最大ドローダウン</div>
           <div className="font-mono font-medium text-red-600">
-            {(maxDD * 100).toFixed(2)}%
+            {formatRatioSeriesValue(maxDD, seriesMode, 2)}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">現在ドローダウン</div>
           <div className={`font-mono font-medium ${currentDD < -0.05 ? "text-red-600" : "text-gray-700"}`}>
-            {(currentDD * 100).toFixed(2)}%
+            {formatRatioSeriesValue(currentDD, seriesMode, 2)}
           </div>
         </div>
       </div>

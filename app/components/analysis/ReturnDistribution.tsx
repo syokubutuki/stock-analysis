@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { histogram, qqPlot, normalPDF, distributionStats } from "../../lib/distribution";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -25,8 +29,8 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
   const histDescription = useMemo(() => {
     if (hist.length === 0) return "リターンのヒストグラム。計算できるデータが不足しています。";
     const peak = hist.reduce((a, b) => (b.count > a.count ? b : a));
-    return `リターンのヒストグラム（${hist.length}ビン）に正規分布のフィットを重ねた図。最頻の階級は${(peak.x * 100).toFixed(2)}%付近で${peak.count}日、平均${(stats.mean * 100).toFixed(3)}%・標準偏差${(stats.std * 100).toFixed(3)}%・歪度${stats.skewness.toFixed(2)}・尖度${stats.kurtosis.toFixed(2)}です。`;
-  }, [hist, stats]);
+    return `リターンのヒストグラム（${hist.length}ビン）に正規分布のフィットを重ねた図。最頻の階級は${formatRatioSeriesValue(peak.x, seriesMode, 2)}付近で${peak.count}日、平均${formatRatioSeriesValue(stats.mean, seriesMode, 3)}・標準偏差${formatRatioSeriesValue(stats.std, seriesMode, 3)}・歪度${stats.skewness.toFixed(2)}・尖度${stats.kurtosis.toFixed(2)}です。`;
+  }, [hist, stats, seriesMode]);
 
   const qqDescription = useMemo(() => {
     if (qq.length === 0) return "Q-Qプロット。計算できるデータが不足しています。";
@@ -176,11 +180,11 @@ export default function ReturnDistribution({ prices, seriesMode }: Props) {
       <div className="mt-3 grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">平均</div>
-          <div className="font-mono font-medium">{(stats.mean * 100).toFixed(4)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(stats.mean, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">標準偏差</div>
-          <div className="font-mono font-medium">{(stats.std * 100).toFixed(4)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(stats.std, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">歪度</div>

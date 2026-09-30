@@ -4,7 +4,11 @@ import { DirectionGlyph, directionClass } from "./DirectionValue";
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { conditionalDistributions, violinByGroup, type ViolinData } from "../../lib/distribution-extended";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -29,10 +33,9 @@ function initCanvas(canvas: HTMLCanvasElement, height: number) {
   return { ctx, width, height };
 }
 
-function pctFmt(v: number, d = 4): string { return (v * 100).toFixed(d) + "%"; }
 function colorClass(v: number): string { return directionClass(v); }
 
-function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: string) {
+function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: string, seriesMode: SeriesMode) {
   const r = initCanvas(canvas, 280); if (!r) return;
   const { ctx, width, height } = r;
   if (data.length === 0) return;
@@ -108,7 +111,7 @@ function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: strin
   for (let i = 0; i <= 5; i++) {
     const v = allMinX + (xRange * i) / 5;
     const y = toY(v);
-    ctx.fillText(pctFmt(v, 2), pad.left - 5, y + 3);
+    ctx.fillText(formatRatioSeriesValue(v, seriesMode, 2), pad.left - 5, y + 3);
     ctx.strokeStyle = "#f0f0f0"; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
   }
@@ -125,7 +128,7 @@ function drawViolins(canvas: HTMLCanvasElement, data: ViolinData[], title: strin
 }
 
 // 条件付き分布のヒストグラム
-function drawConditionalHists(canvas: HTMLCanvasElement, data: ReturnType<typeof conditionalDistributions>) {
+function drawConditionalHists(canvas: HTMLCanvasElement, data: ReturnType<typeof conditionalDistributions>, seriesMode: SeriesMode) {
   const r = initCanvas(canvas, 250); if (!r) return;
   const { ctx, width, height } = r;
   if (data.length === 0) return;
@@ -166,17 +169,17 @@ function drawConditionalHists(canvas: HTMLCanvasElement, data: ReturnType<typeof
     // ラベル
     ctx.fillStyle = "#333"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(bucket.label, ox + cellW / 2, height - 5);
-    ctx.fillText(`μ=${pctFmt(bucket.mean, 2)}`, ox + cellW / 2, pad.top + 10);
+    ctx.fillText(`μ=${formatRatioSeriesValue(bucket.mean, seriesMode, 2)}`, ox + cellW / 2, pad.top + 10);
   }
 }
 
 // バイオリン図の代替テキスト。コンポーネント内に置くと useMemo の依存に入るので外に出す。
-function describeViolins(title: string, vs: ViolinData[]): string {
+function describeViolins(title: string, vs: ViolinData[], seriesMode: SeriesMode): string {
   if (vs.length === 0) return `${title}。計算できるデータが不足しています。`;
   const hi = vs.reduce((a, b) => (b.median > a.median ? b : a));
   const lo = vs.reduce((a, b) => (b.median < a.median ? b : a));
   const wide = vs.reduce((a, b) => (b.q75 - b.q25 > a.q75 - a.q25 ? b : a));
-  return `${title}（${vs.length}群）。中央値が最も高いのは${hi.label}の${(hi.median * 100).toFixed(3)}%（n=${hi.n}）、最も低いのは${lo.label}の${(lo.median * 100).toFixed(3)}%、四分位範囲が最も広いのは${wide.label}の${((wide.q75 - wide.q25) * 100).toFixed(3)}%です。`;
+  return `${title}（${vs.length}群）。中央値が最も高いのは${hi.label}の${formatRatioSeriesValue(hi.median, seriesMode, 3)}（n=${hi.n}）、最も低いのは${lo.label}の${formatRatioSeriesValue(lo.median, seriesMode, 3)}、四分位範囲が最も広いのは${wide.label}の${formatRatioSeriesValue(wide.q75 - wide.q25, seriesMode, 3)}です。`;
 }
 
 export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
@@ -191,29 +194,29 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
   const monthViolins = useMemo(() => violinByGroup(lr, times, "month"), [prices, seriesMode]);
   const condDist = useMemo(() => conditionalDistributions(lr), [prices, seriesMode]);
 
-  const weekdayViolinDescription = useMemo(() => describeViolins("曜日別リターン分布のバイオリンプロット", weekdayViolins), [weekdayViolins]);
-  const monthViolinDescription = useMemo(() => describeViolins("月別リターン分布のバイオリンプロット", monthViolins), [monthViolins]);
+  const weekdayViolinDescription = useMemo(() => describeViolins("曜日別リターン分布のバイオリンプロット", weekdayViolins, seriesMode), [weekdayViolins, seriesMode]);
+  const monthViolinDescription = useMemo(() => describeViolins("月別リターン分布のバイオリンプロット", monthViolins, seriesMode), [monthViolins, seriesMode]);
   const condDescription = useMemo(() => {
     if (condDist.length === 0) return "条件付き分布のヒストグラム。計算できるデータが不足しています。";
     const hi = condDist.reduce((a, b) => (b.mean > a.mean ? b : a));
     const fat = condDist.reduce((a, b) => (b.kurtosis > a.kurtosis ? b : a));
-    return `直前の値動きで場合分けした条件付き分布のヒストグラム（${condDist.length}群）。平均が最も高いのは${hi.label}の${(hi.mean * 100).toFixed(3)}%（n=${hi.n}）、尖度が最も高いのは${fat.label}の${fat.kurtosis.toFixed(2)}です。`;
-  }, [condDist]);
+    return `直前の値動きで場合分けした条件付き分布のヒストグラム（${condDist.length}群）。平均が最も高いのは${hi.label}の${formatRatioSeriesValue(hi.mean, seriesMode, 3)}（n=${hi.n}）、尖度が最も高いのは${fat.label}の${fat.kurtosis.toFixed(2)}です。`;
+  }, [condDist, seriesMode]);
 
   useEffect(() => {
     if (weekdayRef.current && weekdayViolins.length > 0)
-      drawViolins(weekdayRef.current, weekdayViolins, "曜日別リターン分布 (バイオリンプロット)");
-  }, [weekdayViolins]);
+      drawViolins(weekdayRef.current, weekdayViolins, "曜日別リターン分布 (バイオリンプロット)", seriesMode);
+  }, [weekdayViolins, seriesMode]);
 
   useEffect(() => {
     if (monthRef.current && monthViolins.length > 0)
-      drawViolins(monthRef.current, monthViolins, "月別リターン分布 (バイオリンプロット)");
-  }, [monthViolins]);
+      drawViolins(monthRef.current, monthViolins, "月別リターン分布 (バイオリンプロット)", seriesMode);
+  }, [monthViolins, seriesMode]);
 
   useEffect(() => {
     if (condRef.current && condDist.length > 0)
-      drawConditionalHists(condRef.current, condDist);
-  }, [condDist]);
+      drawConditionalHists(condRef.current, condDist, seriesMode);
+  }, [condDist, seriesMode]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
@@ -240,8 +243,8 @@ export default function ConditionalViolinChart({ prices, seriesMode }: Props) {
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 px-2 text-gray-600 font-medium">{b.label}</td>
                     <td className="py-1 px-2 text-center font-mono text-gray-600">{b.n}</td>
-                    <td className={`py-1 px-2 text-center font-mono ${colorClass(b.mean)}`}><DirectionGlyph value={b.mean} />{pctFmt(b.mean)}</td>
-                    <td className="py-1 px-2 text-center font-mono text-gray-600">{pctFmt(b.std)}</td>
+                    <td className={`py-1 px-2 text-center font-mono ${colorClass(b.mean)}`}><DirectionGlyph value={b.mean} />{formatRatioSeriesValue(b.mean, seriesMode, 4)}</td>
+                    <td className="py-1 px-2 text-center font-mono text-gray-600">{formatRatioSeriesValue(b.std, seriesMode, 4)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${Math.abs(b.skewness) > 0.5 ? "text-orange-600" : "text-gray-600"}`}>{b.skewness.toFixed(3)}</td>
                     <td className={`py-1 px-2 text-center font-mono ${b.kurtosis > 1 ? "text-red-600" : "text-gray-600"}`}>{b.kurtosis.toFixed(3)}</td>
                   </tr>
