@@ -55,7 +55,7 @@ export function isLevelSeries(mode: SeriesMode): boolean {
  *
  * **リターンの分布・ボラティリティ・VaR・レジームのように「比率であること」を
  * 前提にした分析は、`extractSeries` ではなくこちらを使うこと。**
- * この 3 行は本関数を作る前、14 個のコンポーネントに `needsTransform` という名前で
+ * この 3 行は本関数を作る前、14 個のコンポーネントに同じ水準判定として
  * 手書きで複製されていた（`TransformCharts` ほか）。複製を写し忘れた側が FU47 である。
  *
  * `diff` を比率に直していないのは、既存の 14 件がそう書かれていたからである。

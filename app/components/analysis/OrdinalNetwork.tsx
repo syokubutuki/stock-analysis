@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { buildOrdinalNetwork } from "../../lib/ordinal-network";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -26,9 +25,7 @@ const PATTERN_LABELS: Record<string, string> = {
 export default function OrdinalNetwork({ prices, seriesMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
+  const { values: lr } = extractRatioSeries(prices, seriesMode);
   const network = useMemo(() => buildOrdinalNetwork(lr, 3, 1), [prices, seriesMode]);
 
   // ネットワーク描画

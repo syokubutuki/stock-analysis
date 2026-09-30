@@ -8,8 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { computeAnalyticSignal, analyticSignalStats } from "../../lib/analytic-signal";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -27,10 +26,7 @@ export default function AnalyticSignalChart({ prices, seriesMode }: Props) {
   const ampChartRef = useRef<IChartApi | null>(null);
   const freqChartRef = useRef<IChartApi | null>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const result = useMemo(() => computeAnalyticSignal(lr), [prices, seriesMode]);
   const stats = useMemo(() => analyticSignalStats(result), [result]);

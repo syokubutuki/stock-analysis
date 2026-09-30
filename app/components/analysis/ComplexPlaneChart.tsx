@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries, extractSeries } from "../../lib/series-mode";
 import {
   ComplexPoint,
   analyticTrajectory,
@@ -39,9 +38,8 @@ export default function ComplexPlaneChart({ prices, seriesMode }: Props) {
   // 解析信号・ウェーブレット・フェーザは定常なリターン系列で計算。
   // 遅延埋め込みは「水準」のアトラクタが意味を持つので元系列をそのまま使う。
   const { values } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
   const lr = useMemo(
-    () => (needsTransform ? logReturns(values) : values),
+    () => extractRatioSeries(prices, seriesMode).values,
     [prices, seriesMode]
   );
 

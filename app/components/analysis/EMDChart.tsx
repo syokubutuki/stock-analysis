@@ -8,8 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { computeEMD, hilbertTransform } from "../../lib/emd";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -28,10 +27,7 @@ export default function EMDChart({ prices, seriesMode }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const residueChartRef = useRef<IChartApi | null>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const emdResult = useMemo(() => computeEMD(lr, 5), [prices, seriesMode]);
 

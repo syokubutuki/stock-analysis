@@ -8,8 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { computeHHS, computeSTFT, rollingSpectralEntropy } from "../../lib/hilbert-huang-spectrum";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -38,10 +37,7 @@ export default function HilbertHuangChart({ prices, seriesMode }: Props) {
   const entropyRef = useRef<HTMLDivElement>(null);
   const entropyChartRef = useRef<IChartApi | null>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const hhs = useMemo(() => computeHHS(lr, 35), [prices, seriesMode]);
   const stft = useMemo(() => computeSTFT(lr, 64, 4), [prices, seriesMode]);
