@@ -8,8 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { multiscaleEntropy, fisherInformation } from "../../lib/multiscale-entropy";
 import { infoDecompositionWaterfall } from "../../lib/entropy-visualization";
 import AnalysisGuide from "./AnalysisGuide";
@@ -26,12 +25,7 @@ export default function MultiscaleEntropyChart({ prices, seriesMode }: Props) {
   const fisherChartRef = useRef<IChartApi | null>(null);
   const waterfallRef = useRef<HTMLCanvasElement>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  // For raw price modes (close/open), convert to log-returns for entropy analysis.
-  // For return-based modes (diff/logReturn/etc.), use extracted values directly.
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const mse = useMemo(() => multiscaleEntropy(lr, 20, 2), [prices, seriesMode]);
   const fisher = useMemo(() => fisherInformation(lr, lrTimes, 60, 20), [prices, seriesMode]);

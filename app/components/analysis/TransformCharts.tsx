@@ -10,9 +10,14 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
 import {
-  logReturns,
+  SeriesMode,
+  extractRatioSeries,
+  extractSeries,
+  formatRatioSeriesValue,
+  isLevelSeries,
+} from "../../lib/series-mode";
+import {
   rankTransform,
   volNormalizedReturns,
   cumulativeLogReturns,
@@ -58,7 +63,7 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
   const [zscoreWindow, setZscoreWindow] = useState(60);
 
   const { values: closes, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   useEffect(() => {
     if (!containerRef.current || closes.length < 2) return;
@@ -78,9 +83,6 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
     let data: number[] = [];
     let dataTimesArr: string[] = [];
 
-    const lr = needsTransform ? logReturns(closes) : closes;
-    const lrTimes = needsTransform ? times.slice(1) : times;
-
     switch (mode) {
       case "logReturn":
         data = lr;
@@ -91,7 +93,7 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
         dataTimesArr = lrTimes;
         break;
       case "volNorm":
-        data = needsTransform ? volNormalizedReturns(closes, 20) : closes;
+        data = isLevelSeries(seriesMode) ? volNormalizedReturns(closes, 20) : closes;
         dataTimesArr = lrTimes;
         break;
       case "cumReturn":
@@ -201,7 +203,6 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
   }, [prices, mode, seriesMode, diffOrder, boxcoxLambda, zscoreWindow]);
 
   // 統計情報
-  const lr = needsTransform ? logReturns(closes) : closes;
   const mean = lr.length > 0 ? lr.reduce((a, b) => a + b, 0) / lr.length : 0;
   const std = lr.length > 0
     ? Math.sqrt(lr.reduce((a, v) => a + (v - mean) ** 2, 0) / lr.length)
@@ -303,11 +304,11 @@ export default function TransformCharts({ prices, seriesMode }: Props) {
       <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">平均リターン</div>
-          <div className="font-mono font-medium">{(mean * 100).toFixed(4)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(mean, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">標準偏差</div>
-          <div className="font-mono font-medium">{(std * 100).toFixed(4)}%</div>
+          <div className="font-mono font-medium">{formatRatioSeriesValue(std, seriesMode, 4)}</div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
           <div className="text-gray-500">歪度</div>

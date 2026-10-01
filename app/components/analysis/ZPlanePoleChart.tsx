@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { fitARPoles, selectARByAic, ARFit } from "../../lib/z-plane";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -20,10 +19,8 @@ export default function ZPlanePoleChart({ prices, seriesMode }: Props) {
   const [order, setOrder] = useState(8);
 
   // AR は定常系列に当てはめる。水準系列(close/open)は対数リターン化。
-  const { values } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
   const series = useMemo(
-    () => (needsTransform ? logReturns(values) : values),
+    () => extractRatioSeries(prices, seriesMode).values,
     [prices, seriesMode]
   );
 

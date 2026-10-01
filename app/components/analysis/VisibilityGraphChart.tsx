@@ -8,8 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { computeVisibilityGraph } from "../../lib/visibility-graph";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -24,10 +23,7 @@ export default function VisibilityGraphChart({ prices, seriesMode }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const degDistRef = useRef<HTMLCanvasElement>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const vg = useMemo(
     () => computeVisibilityGraph(lr, lrTimes, 50),

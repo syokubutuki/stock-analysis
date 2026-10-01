@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { extremeValueAnalysis, higherOrderCumulants, tailDependence } from "../../lib/tail-risk";
 import AnalysisGuide from "./AnalysisGuide";
@@ -94,9 +98,9 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
   // Return level plot
   const returnLevelDescription = useMemo(() => {
     if (evt.returnLevels.length === 0) return "リターンレベル曲線。計算できるデータが不足しています。";
-    const parts = evt.returnLevels.map((r) => `${r.period}日に1度で${(r.level * 100).toFixed(1)}%`).join("・");
-    return `再現期間（横軸）に対する損失水準の曲線。VaR95%は${(evt.var95 * 100).toFixed(2)}%・99%は${(evt.var99 * 100).toFixed(2)}%で、${parts}という読み方をします。`;
-  }, [evt]);
+    const parts = evt.returnLevels.map((r) => `${r.period}日に1度で${formatRatioSeriesValue(r.level, seriesMode, 1)}`).join("・");
+    return `再現期間（横軸）に対する損失水準の曲線。VaR95%は${formatRatioSeriesValue(evt.var95, seriesMode, 2)}・99%は${formatRatioSeriesValue(evt.var99, seriesMode, 2)}で、${parts}という読み方をします。`;
+  }, [evt, seriesMode]);
 
   useEffect(() => {
     const canvas = returnLevelCanvasRef.current;
@@ -143,7 +147,7 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
       ctx.arc(x, y, 4, 0, 2 * Math.PI);
       ctx.fill();
       ctx.fillText(`${l.period}d`, x, y - 8);
-      ctx.fillText(`${(Math.abs(l.level) * 100).toFixed(1)}%`, x, y + 14);
+      ctx.fillText(formatRatioSeriesValue(Math.abs(l.level), seriesMode, 1), x, y + 14);
     });
 
     ctx.fillStyle = "#374151";
@@ -152,7 +156,7 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
     ctx.font = "9px sans-serif";
     ctx.fillStyle = "#6b7280";
     ctx.fillText("再現期間 (日)", width / 2, height - 5);
-  }, [evt]);
+  }, [evt, seriesMode]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -167,12 +171,12 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
         </div>
         <div className="p-2 bg-red-50 rounded">
           <div className="text-red-600">VaR 95%</div>
-          <div className="font-bold text-red-700">{(evt.var95 * 100).toFixed(2)}%</div>
+          <div className="font-bold text-red-700">{formatRatioSeriesValue(evt.var95, seriesMode, 2)}</div>
         </div>
         <div className="p-2 bg-red-50 rounded">
           <div className="text-red-600">ES 95% (CVaR)</div>
           <div className="font-bold text-red-700">
-            {isFinite(evt.expectedShortfall95) ? `${(evt.expectedShortfall95 * 100).toFixed(2)}%` : "∞"}
+            {isFinite(evt.expectedShortfall95) ? formatRatioSeriesValue(evt.expectedShortfall95, seriesMode, 2) : "∞"}
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
@@ -190,7 +194,7 @@ export default function TailRiskChart({ prices, seriesMode }: Props) {
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3 text-xs">
         <div className="p-1 bg-gray-50 rounded text-center">
           <div className="text-fg-muted">κ₁ (平均)</div>
-          <div className="font-bold">{(cumulants.mean * 100).toFixed(4)}%</div>
+          <div className="font-bold">{formatRatioSeriesValue(cumulants.mean, seriesMode, 4)}</div>
         </div>
         <div className="p-1 bg-gray-50 rounded text-center">
           <div className="text-fg-muted">κ₂ (分散)</div>

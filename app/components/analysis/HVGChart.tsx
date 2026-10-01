@@ -8,8 +8,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { computeHVG } from "../../lib/hvg";
 import AnalysisGuide from "./AnalysisGuide";
 import AccessibleCanvas from "./AccessibleCanvas";
@@ -24,10 +23,7 @@ export default function HVGChart({ prices, seriesMode }: Props) {
   const degreeChartRef = useRef<IChartApi | null>(null);
   const distCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const hvg = useMemo(() => computeHVG(lr, 50), [prices, seriesMode]);
 

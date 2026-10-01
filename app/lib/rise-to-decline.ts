@@ -1,4 +1,5 @@
 import type { PricePoint } from "./types";
+import { kaplanMeierDaily, survivalQuantile } from "./survival";
 
 export type DeclineDefinition = "first-down" | "daily-drop" | "consecutive" | "drawdown" | "below-signal" | "future-peak";
 
@@ -151,33 +152,26 @@ export function computeRiseToDecline(
   }
 
   const declines = Array<number>(horizon + 1).fill(0);
-  const censored = Array<number>(horizon + 1).fill(0);
   for (const event of result.events) {
     if (event.outcome === "decline" || event.outcome === "peak") declines[event.duration]++;
-    else if (event.outcome !== "incomplete") censored[event.duration]++;
   }
-  // Kaplan–Meier: 同じ日に発生と打ち切りがあれば、両者をその日のリスク集合に含める。
-  let atRisk = result.events.length - censored[0];
-  let survival = 1;
-  let cumulativePeaks = 0;
-  for (let day = 1; day <= horizon; day++) {
-    if (definition === "future-peak") {
+  if (definition === "future-peak") {
+    let cumulativePeaks = 0;
+    for (let day = 1; day <= horizon; day++) {
       cumulativePeaks += declines[day];
       result.days.push({ day, atRisk: result.observed, declines: declines[day], censored: 0,
         cumulativeProbability: result.observed > 0 ? cumulativePeaks / result.observed : null });
-      continue;
     }
-    if (atRisk > 0) survival *= 1 - declines[day] / atRisk;
-    // リスク集合が尽きた後の未観測の裾は外挿しない。全件発生済みなら100%を保持。
-    const cumulativeProbability = atRisk > 0 || survival === 0 ? 1 - survival : null;
-    result.days.push({ day, atRisk, declines: declines[day], censored: censored[day], cumulativeProbability });
-    atRisk -= declines[day] + censored[day];
+  } else {
+    // Kaplan–Meier（survival.ts と共通）: 同じ日に発生と打ち切りがあれば、両者をその日のリスク集合に含める。
+    result.days = kaplanMeierDaily(
+      result.events.map((e) => ({ time: e.duration, event: e.outcome === "decline" })),
+      horizon,
+    ).map((d) => ({ day: d.day, atRisk: d.atRisk, declines: d.events, censored: d.censored,
+      cumulativeProbability: d.cumulativeProbability }));
   }
-  const quantile = (q: number) => result.days.find(
-    (d) => d.cumulativeProbability !== null && d.cumulativeProbability >= q - 1e-12,
-  )?.day ?? null;
-  result.median = quantile(0.5);
-  result.quartiles = [quantile(0.25), quantile(0.75)];
+  result.median = survivalQuantile(result.days, 0.5);
+  result.quartiles = [survivalQuantile(result.days, 0.25), survivalQuantile(result.days, 0.75)];
 
   const binWidth = Math.ceil(horizon / 20);
   for (let from = 1; from <= horizon; from += binWidth) {

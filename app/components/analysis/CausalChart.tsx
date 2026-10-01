@@ -9,7 +9,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
+import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
 import { logReturns } from "../../lib/transforms";
 import { mutualInformation, timeLaggedMI, transferEntropy, grangerTest } from "../../lib/causal";
 import AnalysisGuide from "./AnalysisGuide";
@@ -26,9 +26,7 @@ export default function CausalChart({ prices, seriesMode }: Props) {
   const miChartRef = useRef<IChartApi | null>(null);
   const flowCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { values: extracted } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(extracted) : extracted;
+  const { values: lr } = extractRatioSeries(prices, seriesMode);
   const allVols = prices.map((p) => p.volume);
   const volumes = allVols.slice(allVols.length - lr.length);
   const volReturns = logReturns(volumes.map((v) => v || 1));

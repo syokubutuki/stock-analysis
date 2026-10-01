@@ -34,6 +34,7 @@ export const TEST_INVENTORY: TestInventoryItem[] = [
   { section: "ポートフォリオ", analysisId: "pf-weekday-cross-section", label: "クロスセクション曜日プール", count: 50, basis: "銘柄約10×5曜日", fdrLocal: true },
   { section: "ポートフォリオ", analysisId: "pf-weekday-us-cross", label: "曜日×前夜米国ビン横断", count: 150, basis: "銘柄約10×5曜日×3ビン", fdrLocal: true },
   { section: "カレンダー", analysisId: "cal-sector-basket", label: "業種バスケット曜日×日内", count: 100, basis: "業種×曜日×日内窓", fdrLocal: true },
+  { section: "今の条件から先を読む", analysisId: "cond-nday-move", label: "値動き条件別の売買検証（候補格子）", count: 96, basis: "方向2×n4×p4×h3 の既定格子。手で試した条件は画面で別に数える（PBO・ウォークフォワードで選択を点検、p値の補正はしない）", fdrLocal: false },
 ];
 
 export interface RegistrySummary {

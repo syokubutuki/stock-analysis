@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractRatioSeries } from "../../lib/series-mode";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import {
   lagScatterHeatmap, copulaScatter, mutualInfoByLag, scatterMatrix,
 } from "../../lib/distribution-extended";
@@ -63,8 +67,8 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
     // （50×50 のうち埋まるのは数百なので √data.length は 50 にならず、
     //   最頻セルの位置が値域の外に出る）。返ってきた binWidth をそのまま使う。
     const at = (i: number) => heatmap.minVal + (i + 0.5) * heatmap.binWidth;
-    return `r[t-1]（横軸）とr[t]（縦軸）の同時密度をセルの色で表したヒートマップ（値域${(heatmap.minVal * 100).toFixed(2)}%〜${(heatmap.maxVal * 100).toFixed(2)}%）。最も濃いセルは約(${(at(peak.xIdx) * 100).toFixed(2)}%, ${(at(peak.yIdx) * 100).toFixed(2)}%)の${peak.count}件で、原点付近に集まるほど無相関です。`;
-  }, [heatmap]);
+    return `r[t-1]（横軸）とr[t]（縦軸）の同時密度をセルの色で表したヒートマップ（値域${formatRatioSeriesValue(heatmap.minVal, seriesMode, 2)}〜${formatRatioSeriesValue(heatmap.maxVal, seriesMode, 2)}）。最も濃いセルは約(${formatRatioSeriesValue(at(peak.xIdx), seriesMode, 2)}, ${formatRatioSeriesValue(at(peak.yIdx), seriesMode, 2)})の${peak.count}件で、原点付近に集まるほど無相関です。`;
+  }, [heatmap, seriesMode]);
 
   const copulaDescription = useMemo(() => {
     if (copula.length < 5) return "コピュラ散布図。計算できるデータが不足しています。";
@@ -113,7 +117,7 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
     // 軸ラベル
     const { minVal, maxVal } = heatmap;
     ctx.fillStyle = "#666"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(`r[t-1] (${(minVal * 100).toFixed(1)}%~${(maxVal * 100).toFixed(1)}%)`, size / 2, size - 5);
+    ctx.fillText(`r[t-1] (${formatRatioSeriesValue(minVal, seriesMode, 1)}~${formatRatioSeriesValue(maxVal, seriesMode, 1)})`, size / 2, size - 5);
     ctx.save(); ctx.translate(10, size / 2); ctx.rotate(-Math.PI / 2);
     ctx.fillText("r[t]", 0, 0); ctx.restore();
 
@@ -128,7 +132,7 @@ export default function LagDependenceChart({ prices, seriesMode }: Props) {
     ctx.fillStyle = CHART_COLORS.ink; ctx.font = "8px sans-serif"; ctx.textAlign = "left";
     ctx.fillText("高", barX + barW + 3, pad + 8);
     ctx.fillText("低", barX + barW + 3, pad + barH);
-  }, [heatmap]);
+  }, [heatmap, seriesMode]);
 
   // 12. コピュラ散布図
   useEffect(() => {

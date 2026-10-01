@@ -8,8 +8,11 @@ import {
   type Time,
 } from "lightweight-charts";
 import { PricePoint } from "../../lib/types";
-import { SeriesMode, extractSeries } from "../../lib/series-mode";
-import { logReturns } from "../../lib/transforms";
+import {
+  SeriesMode,
+  extractRatioSeries,
+  formatRatioSeriesValue,
+} from "../../lib/series-mode";
 import { computeEMD, hilbertTransform } from "../../lib/emd";
 import AnalysisGuide from "./AnalysisGuide";
 
@@ -28,10 +31,7 @@ export default function EMDChart({ prices, seriesMode }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const residueChartRef = useRef<IChartApi | null>(null);
 
-  const { values, times } = extractSeries(prices, seriesMode);
-  const needsTransform = seriesMode === "close" || seriesMode === "open";
-  const lr = needsTransform ? logReturns(values) : values;
-  const lrTimes = needsTransform ? times.slice(1) : times;
+  const { values: lr, times: lrTimes } = extractRatioSeries(prices, seriesMode);
 
   const emdResult = useMemo(() => computeEMD(lr, 5), [prices, seriesMode]);
 
@@ -163,7 +163,7 @@ export default function EMDChart({ prices, seriesMode }: Props) {
                 {imf.label}
               </div>
               <div>周期: ~{hilbertInfo[i]?.avgPeriod.toFixed(1) || "?"}日</div>
-              <div>振幅: {(hilbertInfo[i]?.avgAmp * 100).toFixed(3) || "?"}%</div>
+              <div>振幅: {formatRatioSeriesValue(hilbertInfo[i]?.avgAmp ?? NaN, seriesMode, 3)}</div>
             </div>
           ))}
         </div>
