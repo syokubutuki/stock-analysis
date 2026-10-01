@@ -344,6 +344,7 @@ export default function AnalysisPage() {
             seriesMode,
             ticker: data.ticker,
             currency: data.currency,
+            dataQuality: data.dataQuality,
           }
         : null,
     [allPrices, data, filteredPrices, period, seriesMode],

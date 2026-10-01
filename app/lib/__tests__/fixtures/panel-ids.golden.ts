@@ -155,6 +155,7 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "net-ordinal",
   "net-recurrence",
   "cond-rise-to-decline",
+  "cond-nday-move",
   "cond-forward",
   "cond-segment-edge",
   "cond-custom-bucket",
