@@ -54,6 +54,7 @@ import ChartPlaceholder from "../components/analysis/ChartPlaceholder";
 import type { PeriodKey } from "../hooks/useAnalysisData";
 import type { SeriesMode } from "./series-mode";
 import type { PricePoint } from "./types";
+import type { PriceSanityReport } from "./price-sanity";
 
 export type SectionKey =
   | "basic"
@@ -84,7 +85,7 @@ export type SectionKey =
 export type CloseOnlyRequirement = "unavailable" | "caution" | "safe";
 
 /**
- * パネルが受け取る入力の形。実在するのはこの9通りだけで、新しい形を増やすときは
+ * パネルが受け取る入力の形。実在するのはこの10通りだけで、新しい形を増やすときは
  * `PANEL_INPUT_PROPS` と `panelProps()` の両方に足すこと（型が落とす）。
  *
  * `filtered` は PeriodSelector で切った期間、`all` は10年フル。期間を変えて
@@ -98,6 +99,7 @@ export type PanelInput =
   | "all"
   | "all+period"
   | "all+ticker"
+  | "all+period+ticker"
   | "ticker"
   | "none";
 
@@ -110,16 +112,22 @@ interface PanelInputPropsMap {
   "all": { prices: PricePoint[] };
   "all+period": { prices: PricePoint[]; period: PeriodKey };
   "all+ticker": { prices: PricePoint[]; ticker: string };
+  /**
+   * 10年フル＋ページの期間＋銘柄＋取得時のデータ品質。計算条件と取得データを再現用に
+   * 書き出す分析（cond-nday-move）が使う。dataQuality は StockData.dataQuality そのもの。
+   */
+  "all+period+ticker": { prices: PricePoint[]; period: PeriodKey; ticker: string; dataQuality?: PriceSanityReport };
   "ticker": { ticker: string };
   "none": Record<string, never>;
 }
 
-/** 9通りを1つに均した、描画時に spread する props。 */
+/** 10通りを1つに均した、描画時に spread する props。 */
 export interface PanelSpreadProps {
   prices?: PricePoint[];
   period?: PeriodKey;
   seriesMode?: SeriesMode;
   ticker?: string;
+  dataQuality?: PriceSanityReport;
 }
 
 /** page.tsx が持っていて、パネルへ渡しうる値の全体。 */
@@ -130,6 +138,8 @@ export interface PanelRenderContext {
   seriesMode: SeriesMode;
   ticker: string;
   currency: string;
+  /** 取得時に検出・修復した価格破損の記録（StockData.dataQuality） */
+  dataQuality?: PriceSanityReport;
 }
 
 /** `input` の宣言どおりの props を組み立てる。page.tsx 側に分岐を持たせない。 */
@@ -149,6 +159,8 @@ export function panelProps(input: PanelInput, ctx: PanelRenderContext): PanelSpr
       return { prices: ctx.allPrices, period: ctx.period };
     case "all+ticker":
       return { prices: ctx.allPrices, ticker: ctx.ticker };
+    case "all+period+ticker":
+      return { prices: ctx.allPrices, period: ctx.period, ticker: ctx.ticker, dataQuality: ctx.dataQuality };
     case "ticker":
       return { ticker: ctx.ticker };
     case "none":
@@ -644,6 +656,7 @@ export const SECTIONS: SectionDef[] = [
         group: "状態 → 先行きリターン",
         panels: [
           definePanel({ id: "cond-rise-to-decline", title: "上昇後、何日で下落し始めるか（日数の分布）", input: "filtered", closeOnly: "safe", height: 650, load: () => import("../components/analysis/RiseToDeclineChart") }),
+          definePanel({ id: "cond-nday-move", title: "値動き条件別の将来分布・売買検証（n日騰落率 → ①事後の分布 ②実行可能な売買 ③過剰適合の点検）", input: "all+period+ticker", closeOnly: "caution", height: 1100, load: () => import("../components/analysis/NdayMoveChart") }),
           definePanel({ id: "cond-forward", title: "状態→先行きリターン表（RSI/ボラ/トレンド別）", input: "filtered", closeOnly: "safe", height: 400, load: () => import("../components/analysis/ConditionalForwardChart") }),
           definePanel({ id: "cond-segment-edge", title: "条件付きエッジ：日中 vs 夜間（状態別にどちらの執行が有利か）", input: "filtered", closeOnly: "unavailable", height: 400, load: () => import("../components/analysis/ConditionalSegmentEdgeChart") }),
           definePanel({ id: "cond-custom-bucket", title: "カスタム条件ビルダー（任意の指標・閾値・分位）", input: "filtered", closeOnly: "safe", height: 400, load: () => import("../components/analysis/CustomBucketChart") }),
