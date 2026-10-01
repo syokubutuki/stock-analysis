@@ -38,6 +38,18 @@ function logSanity(ticker: string, report: PriceSanityReport): void {
       `[price-sanity] ${ticker}: repaired ${glitch.from}..${glitch.to} (${glitch.days}d) factor=${glitch.factor}`,
     );
   }
+  const removed = report.removedClosedDays ?? [];
+  if (removed.length > 0) {
+    console.warn(
+      `[price-sanity] ${ticker}: removed ${removed.length} row(s) on TSE closed days ` +
+        `(${removed[0].time}..${removed[removed.length - 1].time})`,
+    );
+  }
+  for (const suspect of report.sessionSuspects ?? []) {
+    if (suspect.kind === "closedDay") {
+      console.warn(`[price-sanity] ${ticker}: row with content on TSE closed day ${suspect.time}`);
+    }
+  }
   if (report.suspects.length > 0) {
     console.warn(
       `[price-sanity] ${ticker}: ${report.suspects.length} unrepaired jump(s) >35%: ` +
@@ -64,7 +76,7 @@ function isStockCacheEntry(value: unknown): value is StockCacheEntry {
 
 async function fetchAndRepair(ticker: string, range: StockRange): Promise<StockData> {
   const data = await fetchStockSource(ticker, range);
-  const fixed = repairPriceGlitches(data.prices);
+  const fixed = repairPriceGlitches(data.prices, { ticker });
   logSanity(ticker, fixed.report);
   return {
     ...data,

@@ -1,4 +1,5 @@
 import type { PricePoint } from "./types";
+import { followsTseCalendar, tseClosureReason } from "./tse-calendar";
 
 /**
  * 価格データのスケール破損の検出と修復（データ取得の関門で全消費者に適用する）。
@@ -55,6 +56,29 @@ import type { PricePoint } from "./types";
  * 区間内のリターンも保たれる。水準で直すことで OHLC・ドローダウン・バリア（TP/SL）・
  * ローソク足描画まで一貫して正しくなる。出来高は価格と逆向きに誤スケールされている
  * ため倍率を掛けて戻す（1306.T では 251.8M × 0.1 ≒ 25M で平常水準と整合する）。
+ *
+ * ## 休場日の幻の行（2つ目の破損クラス・SANITIZER_VERSION 4）
+ *
+ * 東証銘柄の日足には、2017-07-17〜2018-12-31 の東証休場日 22日（祝日・振替休日・年末年始）に
+ * **出来高0・四本値＝前日終値**の行が入っている（実測: 当時上場の東証系列すべて。2019年以降は
+ * 無い。docs/phantom-holiday-rows.md）。値は前日の据え置きなので σ・β はほぼ動かないが、
+ * 「行＝立会日」という前提を壊す: N営業日リターン・保有期間が休場日を数え、休場の月曜が
+ * リターン0の月曜として曜日統計に混ざり、売買シミュレータは休場日の「始値」＝前日終値で約定する
+ * （実在しない約定で、次の本当の寄り付きの窓を飛ばす）。
+ *
+ * ここでの誤検出は「本物の立会日を消す」ことで、スケール破損より害が具体的である。
+ * 出来高0・前日終値据え置きの行は、**気配のまま売買が成立しなかった本物の立会日**にも出る
+ * （エーザイ 2019-03-25 は翌日 −20% で寄った。オムロン 2019-03-11・小糸 2024-03-29 も同型）。
+ * 消せば翌日の窓が前日に繰り上がり、約定できなかった日に約定したことになる。
+ * そこで値の形ではなく**取引所の暦**を一次の証拠にし、次をすべて満たす行だけを除く:
+ *
+ *   1. 系列が東証の暦に従う（`.T` と東証指数。投信・米国・為替・金利には当てない）
+ *   2. その日付が東証の休場日（app/lib/tse-calendar.ts。価格データとは独立に持つ）
+ *   3. 出来高0 で、終値が直前の行と同じ（＝その行は新しい情報を何も持たない）
+ *
+ * 2 だけ満たして 3 を満たさない行（休場日なのに値動きや出来高がある）は日付ずれ等の別の
+ * 異常なので消さずに `sessionSuspects` で報告する。3 だけ満たす立会日の行（売買不成立）は
+ * 正しいデータとして残し、`.T` に限って `sessionSuspects` で知らせる（指数は出来高0が常態）。
  */
 
 /**
@@ -63,8 +87,10 @@ import type { PricePoint } from "./types";
  * 価格は IndexedDB に8時間キャッシュされる（app/lib/price-cache.ts）。修復を入れても
  * 古い版で保存された破損データがキャッシュに残っていると、利用者の画面は直らない。
  * キャッシュ側でこの版を突き合わせ、版が違うエントリは TTL 内でも無効として捨てる。
+ *
+ * 4: 東証休場日の幻の行の除去と、売買不成立日・休場日の異常行の報告を追加。
  */
-export const SANITIZER_VERSION = 3;
+export const SANITIZER_VERSION = 4;
 
 /** データ破損とみなす1日あたり対数リターンの下限（|log r| > これ）。±35%。 */
 const JUMP_THRESHOLD = 0.3;
@@ -154,11 +180,39 @@ export interface PriceJumpSuspect {
   logReturn: number;
 }
 
+/** 東証の休場日に配信されていたため除去した行。 */
+export interface RemovedClosedDay {
+  time: string;
+  /** 休場の理由（祝日名・振替休日・年末年始休業など）。 */
+  reason: string;
+  /** 配信されていた終値（＝直前の立会日の終値の据え置き）。 */
+  close: number;
+}
+
+/**
+ * 値は書き換えずに残したが、立会の実体について知らせておく行。
+ *   zeroVolume … 立会日なのに出来高0・終値が前日と同じ（気配のまま売買不成立・売買停止など）
+ *   closedDay  … 東証の休場日なのに行があり、しかも値動きか出来高がある（日付ずれ等。要目視）
+ */
+export interface SessionSuspect {
+  time: string;
+  kind: "zeroVolume" | "closedDay";
+  /** kind が closedDay のときの休場の理由。 */
+  reason?: string;
+}
+
 export interface PriceSanityReport {
   /** 修復した破損区間。空なら何も書き換えていない。 */
   repaired: PriceGlitch[];
   /** 修復しなかった極端なジャンプ（要人間判断）。 */
   suspects: PriceJumpSuspect[];
+  /**
+   * 東証の休場日に配信されていたため除去した行（SANITIZER_VERSION 4 以降）。
+   * 省略可能にしてあるのは、版 3 以前の報告（古い配信・キャッシュ）でも読めるようにするため。
+   */
+  removedClosedDays?: RemovedClosedDay[];
+  /** 書き換えずに残した、立会の実体が疑わしい行（SANITIZER_VERSION 4 以降）。 */
+  sessionSuspects?: SessionSuspect[];
   /**
    * 修復前/修復後の年率ボラティリティ（修復があったときだけ意味を持つ）。
    * 「放置するとどれだけ壊れていたか」を数値で示す。この比が 1 に近い修復は
@@ -194,13 +248,86 @@ function snapFactor(logFactor: number): number | null {
   return best;
 }
 
+/** 終値が直前の行と同じとみなす相対許容（調整後終値の浮動小数点誤差だけを吸収する）。 */
+const SAME_CLOSE_TOLERANCE = 1e-6;
+
+function sameClose(a: number, b: number): boolean {
+  return a > 0 && b > 0 && Math.abs(a / b - 1) <= SAME_CLOSE_TOLERANCE;
+}
+
 /**
- * 価格系列のスケール破損を修復する。入力は破壊せず新しい配列を返す。
+ * 東証の休場日に配信された行を除く（設計は冒頭「休場日の幻の行」）。
  *
- * 検出は終値の対数リターンで行い、修復は OHLC を倍率で割り・出来高に倍率を掛ける。
- * 修復が無ければ入力配列をそのまま返す（参照が変わらないので再レンダリングを誘発しない）。
+ * 東証の暦に従わない系列には何もしない。除くものが無ければ入力配列をそのまま返す。
  */
-export function repairPriceGlitches(prices: PricePoint[]): {
+export function removeClosedDayRows(
+  prices: PricePoint[],
+  ticker: string,
+): {
+  prices: PricePoint[];
+  removed: RemovedClosedDay[];
+  sessionSuspects: SessionSuspect[];
+} {
+  const removed: RemovedClosedDay[] = [];
+  const sessionSuspects: SessionSuspect[] = [];
+  if (!followsTseCalendar(ticker)) return { prices, removed, sessionSuspects };
+  // 売買不成立の報告は株式・ETF（.T）だけ。指数は出来高を持たない日が常態なので知らせても雑音になる。
+  const reportZeroVolume = ticker.trim().toUpperCase().endsWith(".T");
+
+  const kept: PricePoint[] = [];
+  for (const p of prices) {
+    // 比較相手は「直前に残した行」。休場が連続しても（1/1〜1/3）据え置き値は同じ立会日に遡る。
+    const prev = kept.length > 0 ? kept[kept.length - 1] : null;
+    const noNewInformation = p.volume === 0 && prev !== null && sameClose(p.close, prev.close);
+    const reason = tseClosureReason(p.time);
+    if (reason !== null) {
+      if (noNewInformation) {
+        removed.push({ time: p.time, reason, close: p.close });
+        continue;
+      }
+      sessionSuspects.push({ time: p.time, kind: "closedDay", reason });
+    } else if (noNewInformation && reportZeroVolume) {
+      sessionSuspects.push({ time: p.time, kind: "zeroVolume" });
+    }
+    kept.push(p);
+  }
+  return { prices: removed.length > 0 ? kept : prices, removed, sessionSuspects };
+}
+
+export interface SanitizeOptions {
+  /**
+   * 系列のティッカー（Yahoo 表記）。東証の暦に従う系列（`.T`・^N225 等）でだけ
+   * 休場日行の除去を行う。省略時は休場日の判定をしない（スケール破損の修復だけ）。
+   */
+  ticker?: string;
+}
+
+/**
+ * 価格系列の破損を修復する（取得の関門で全消費者に一度だけ適用する）。入力は破壊しない。
+ *
+ *   1. 休場日の幻の行の除去（options.ticker が東証の暦に従う系列のときだけ）
+ *   2. スケール破損の修復: 検出は終値の対数リターンで行い、OHLC を倍率で割り・出来高に倍率を掛ける
+ *
+ * 1 を先に行うのは、幻の行がリターン0の点としてロバストσ（MAD）を縮めるため。
+ * 何も手を入れなければ入力配列をそのまま返す（参照が変わらないので再レンダリングを誘発しない）。
+ */
+export function repairPriceGlitches(
+  input: PricePoint[],
+  options: SanitizeOptions = {},
+): {
+  prices: PricePoint[];
+  report: PriceSanityReport;
+} {
+  const closed = options.ticker
+    ? removeClosedDayRows(input, options.ticker)
+    : null;
+  const { prices, report } = repairScaleGlitches(closed ? closed.prices : input);
+  if (closed && closed.removed.length > 0) report.removedClosedDays = closed.removed;
+  if (closed && closed.sessionSuspects.length > 0) report.sessionSuspects = closed.sessionSuspects;
+  return { prices, report };
+}
+
+function repairScaleGlitches(prices: PricePoint[]): {
   prices: PricePoint[];
   report: PriceSanityReport;
 } {
@@ -343,7 +470,47 @@ export function describeSanityReport(report: PriceSanityReport | undefined): str
       `±35% を超える日次変動を検出しましたが、スケール破損と断定できないため未修正です: ${list}${more}。本物の急変動か未調整の分割かは目視で確認してください`
     );
   }
+  const removed = report.removedClosedDays ?? [];
+  if (removed.length > 0) {
+    const where = removed.length === 1
+      ? `${removed[0].time} ${removed[0].reason}`
+      : `${removed[0].time}〜${removed[removed.length - 1].time} の祝日・年末年始など`;
+    parts.push(
+      `配信元が東証の休場日（${where}）に入れていた出来高0・前日終値据え置きの行を ${removed.length}行除去しました（残すと営業日数・曜日別の統計・売買シミュレーションに休場日が立会日として混ざります）`
+    );
+  }
+  const sessions = report.sessionSuspects ?? [];
+  const zeroVolume = sessions.filter((s) => s.kind === "zeroVolume");
+  if (zeroVolume.length > 0) {
+    parts.push(
+      `立会日なのに出来高0・前日終値据え置きの日が ${zeroVolume.length}日あります（${listDates(zeroVolume)}）。気配のまま売買が成立しなかった日・売買停止の可能性があるため、値は書き換えていません`
+    );
+  }
+  const closedDay = sessions.filter((s) => s.kind === "closedDay");
+  if (closedDay.length > 0) {
+    parts.push(
+      `東証の休場日なのに値動きか出来高のある行が ${closedDay.length}行あります（${listDates(closedDay)}）。日付のずれの可能性があるため除去していません。目視で確認してください`
+    );
+  }
   return parts.length > 0 ? parts.join("／") : null;
+}
+
+/**
+ * 利用者の判断が要る指摘（未修復のジャンプ・休場日なのに中身のある行）があるか。
+ * 除去・売買不成立日の告知だけなら false（開示はするが、警告の色や詳細パネルの自動展開はしない）。
+ */
+export function hasSanityWarnings(report: PriceSanityReport | undefined): boolean {
+  if (!report) return false;
+  return (
+    report.repaired.length > 0 ||
+    report.suspects.length > 0 ||
+    (report.sessionSuspects ?? []).some((s) => s.kind === "closedDay")
+  );
+}
+
+function listDates(rows: { time: string }[]): string {
+  const head = rows.slice(0, 3).map((r) => r.time).join("・");
+  return rows.length > 3 ? `${head} 他${rows.length - 3}日` : head;
 }
 
 function formatFactor(factor: number): string {

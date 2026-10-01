@@ -33,7 +33,7 @@ TypeScript、React 関数コンポーネント、2 スペースインデント�
 
 **方式は黄金値（golden value）です。** 数式の正しさを証明するのではなく、固定フィクスチャに対する出力を記録して意図しない変化を検知します。したがって計算を意図的に変えたときはテストが落ちるのが正常で、変更が正しいと判断したうえで黄金値を録り直してください。
 
-- フィクスチャは `app/lib/__tests__/fixtures/price-fixtures.json`（生成物・手で編集しない）。再生成は `npm run test:fixtures`。生成器は `app/lib/__tests__/tools/generate-fixtures.ts` にあり、`1306.T` のスケール破損（OHLC が 1/10・出来高が 10 倍・2 営業日で復帰）と、修復してはいけない対照群（`^TNX` 型・`^VIX` 型）を持ちます。
+- フィクスチャは `app/lib/__tests__/fixtures/price-fixtures.json`（生成物・手で編集しない）。再生成は `npm run test:fixtures`。生成器は `app/lib/__tests__/tools/generate-fixtures.ts` にあり、`1306.T` のスケール破損（OHLC が 1/10・出来高が 10 倍・2 営業日で復帰）と、修復してはいけない対照群（`^TNX` 型・`^VIX` 型）を持ちます。東証休場日の幻の行の事故ケース（実測した22日・売買不成立日の対照群・`^N225` 型）は同じ生成器が `holiday-fixtures.json` に書きます。
 - テストは Yahoo Finance を直接叩きません。フィクスチャは合成系列です。
 - 乱数を使う関数は `helpers/rng.ts` の `withSeededRandom()` で `Math.random` を mulberry32 に差し替えてから呼びます。
 - β・σ・シャープの物差しは `helpers/golden.ts` に**独立実装**しています。実装側のヘルパーを流用すると、実装が壊れたときテストも同じ向きに壊れて検知できません。

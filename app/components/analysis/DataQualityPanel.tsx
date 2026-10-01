@@ -83,6 +83,8 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
 
   const repairedTargets = all.filter((t) => (t.report?.repaired.length ?? 0) > 0);
   const suspectTargets = all.filter((t) => (t.report?.suspects.length ?? 0) > 0);
+  const removedTargets = all.filter((t) => (t.report?.removedClosedDays?.length ?? 0) > 0);
+  const sessionTargets = all.filter((t) => (t.report?.sessionSuspects?.length ?? 0) > 0);
   const checkedCount = all.filter((t) => !t.error).length;
 
   return (
@@ -91,8 +93,8 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
         <div>
           <h3 className="text-sm font-medium text-gray-800">価格データの破損点検</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            配信元のスケール破損を検出・修復した記録。1点の異常値で σ・β・相関・最適化がすべて壊れるため、
-            修復した箇所は必ず開示する。
+            配信元のスケール破損の修復と、東証休場日に配信された行の除去の記録。1点の異常値で σ・β・相関・最適化がすべて壊れ、
+            休場日の行は営業日数と曜日の統計を狂わせるため、手を入れた箇所は必ず開示する。
           </p>
         </div>
         <button
@@ -114,6 +116,10 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
           tone={suspectTargets.length > 0 ? "info" : "ok"}
           label={`要確認 ${suspectTargets.length} 銘柄`}
         />
+        <Badge
+          tone={removedTargets.length > 0 ? "note" : "ok"}
+          label={`休場日の行を除去 ${removedTargets.length} 銘柄`}
+        />
         <Badge tone="neutral" label={`点検済 ${checkedCount} 系列`} />
         {benchTargets === null && (
           <span className="text-fg-muted self-center">
@@ -123,7 +129,10 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
         )}
       </div>
 
-      {repairedTargets.length === 0 && suspectTargets.length === 0 && (
+      {repairedTargets.length === 0 &&
+        suspectTargets.length === 0 &&
+        removedTargets.length === 0 &&
+        sessionTargets.length === 0 && (
         <p className="mt-3 text-xs text-gray-500">
           点検した {checkedCount} 系列に破損は見つからなかった（書き換えは一切していない）。
         </p>
@@ -183,6 +192,80 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
         </div>
       )}
 
+      {/* 休場日の行の除去 */}
+      {removedTargets.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <p className="text-sm font-medium text-gray-800">東証の休場日に配信された行（除去済み）</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            配信元が東証の休場日（祝日・振替休日・年末年始）に、出来高0・四本値＝前日終値の行を入れていた。
+            立会が無かった日なので行ごと除いた（値の書き換えではない）。除去は
+            <span className="font-medium">取引所の休場日表と一致する日</span>に限り、
+            立会日の出来高0の行（売買不成立）は残している。
+          </p>
+          {removedTargets.map((t) => (
+            <details key={`rm-${t.ticker}`} className="mt-2 text-xs">
+              <summary className="cursor-pointer text-gray-700">
+                {`${t.ticker}（${t.label}）: ${t.report!.removedClosedDays!.length}行`}
+              </summary>
+              <table className="mt-1 w-full">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-100">
+                    <th className="text-left py-1">日付</th>
+                    <th className="text-left py-1">休場の理由</th>
+                    <th className="text-right py-1">配信値(終値・前日の据え置き)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {t.report!.removedClosedDays!.map((r) => (
+                    <tr key={r.time} className="border-b border-gray-50">
+                      <td className="py-1 text-gray-700">{r.time}</td>
+                      <td className="py-1 text-gray-700">{r.reason}</td>
+                      <td className="py-1 text-right text-gray-700">{r.close.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          ))}
+        </div>
+      )}
+
+      {/* 書き換えずに残した、立会の実体が疑わしい行 */}
+      {sessionTargets.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <p className="text-sm font-medium text-gray-800">出来高0の立会日・休場日の異常行（未修正）</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            「売買不成立」は立会日なのに出来高0・前日終値据え置きの日。気配のまま売買が成立しなかった日
+            （ストップ高・安の張り付き等）や売買停止で起こる本物の立会日なので、
+            <span className="font-medium">値は一切書き換えていない</span>
+            。その日の終値は約定値ではなく前日の値なので、その日に売買できたとは限らない。
+            「休場日の異常行」は休場日なのに値動きか出来高がある行で、日付のずれ等の可能性がある（要目視）。
+          </p>
+          <table className="mt-2 w-full text-xs">
+            <thead>
+              <tr className="text-gray-500 border-b border-gray-100">
+                <th className="text-left py-1">銘柄</th>
+                <th className="text-left py-1">日付</th>
+                <th className="text-left py-1">種類</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessionTargets.flatMap((t) =>
+                t.report!.sessionSuspects!.map((s) => (
+                  <tr key={`${t.ticker}-${s.time}-${s.kind}`} className="border-b border-gray-50">
+                    <td className="py-1 text-gray-700">{t.ticker}</td>
+                    <td className="py-1 text-gray-700">{s.time}</td>
+                    <td className="py-1 text-gray-700">
+                      {s.kind === "zeroVolume" ? "売買不成立（出来高0）" : `休場日の異常行（${s.reason ?? "休場日"}）`}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* 取得できなかった系列 */}
       {all.filter((t) => t.error).length > 0 && (
         <p className="mt-3 text-xs text-fg-muted">
@@ -195,11 +278,18 @@ export default function DataQualityPanel({ ticker, prices, report }: Props) {
   );
 }
 
-function Badge({ tone, label }: { tone: "ok" | "warn" | "info" | "neutral"; label: string }) {
+function Badge({
+  tone,
+  label,
+}: {
+  tone: "ok" | "warn" | "info" | "note" | "neutral";
+  label: string;
+}) {
   const cls = {
     ok: "bg-green-50 text-green-700 border-green-200",
     warn: "bg-amber-50 text-amber-800 border-amber-200",
     info: "bg-orange-50 text-orange-800 border-orange-200",
+    note: "bg-sky-50 text-sky-800 border-sky-200",
     neutral: "bg-gray-50 text-gray-600 border-gray-200",
   }[tone];
   return <span className={`px-2 py-0.5 rounded border ${cls}`}>{label}</span>;
@@ -405,11 +495,46 @@ function Guide() {
         {"人工的な段差が入らない。"}
       </p>
 
+      <p className="font-medium text-gray-700 mt-3">4b. 休場日の幻の行（2つ目の破損クラス）</p>
+      <p>
+        東証銘柄の配信には、2017-07-17〜2018-12-31 の東証休場日 22日（海の日・敬老の日・振替休日・
+        年末年始など）に<span className="font-medium">出来高0・四本値＝前日終値</span>
+        の行が入っている。値は前日の据え置きなので σ や β はほとんど動かないが、
+        「1行＝1立会日」という前提が崩れる。
+      </p>
+      <ul className="list-disc pl-4 space-y-1">
+        <li>{"N営業日リターン R_t(N) = ln(P_{t+N} / P_t) の N が休場日を数え、実際は N−1 日分のリターンになる"}</li>
+        <li>休場の月曜（22日のうち13日が月曜）がリターン0の月曜として曜日別の平均・分散に混ざり、月曜の統計を0へ引き寄せる</li>
+        <li>売買シミュレータが休場日の「始値」＝前日終値で約定し、次の本当の寄り付きの窓を飛ばす（実在しない約定）</li>
+        <li>連休明けの判定（前の立会日からの暦日数）で、祝日明けの火曜が「通常の火曜」に見える</li>
+      </ul>
+      <p>
+        除去の条件は<span className="font-medium">3つすべて</span>:
+        ①東証の暦に従う系列（.T と日経平均。投信・米国・為替は対象外）
+        ②その日付が東証の休場日（祝日法の規則と特例から算出した表。価格データとは独立）
+        ③出来高0 かつ 終値が直前の行と同じ。
+        「出来高0・値動きなし」だけで消さないのは、
+        <span className="font-medium">気配のまま売買が成立しなかった本物の立会日</span>
+        にも同じ形の行が出るため（例: エーザイ 2019-03-25 は翌日 −20% で寄った）。
+        これを消すと翌日の窓が前日に繰り上がり、約定できなかった日に約定したことになる。
+        こうした立会日の行は残し、「売買不成立」として表に出す。
+      </p>
+
       <p className="font-medium text-gray-700 mt-3">5. 結果の読み方</p>
       <ul className="list-disc pl-4 space-y-1">
         <li>
-          <span className="font-medium">修復 0 銘柄</span>
+          <span className="font-medium">修復 0 銘柄・除去 0 銘柄</span>
           ：書き換えは一切していない。表示している数値は配信値そのまま。
+        </li>
+        <li>
+          <span className="font-medium">休場日の行を除去</span>
+          ：取引所が開いていなかった日の行を除いただけで、立会日の値は変えていない。
+          2017〜2018年を含む期間の東証銘柄ではほぼ必ず出る（配信元の事情で、銘柄の問題ではない）。
+        </li>
+        <li>
+          <span className="font-medium">売買不成立（出来高0）</span>
+          ：その日の終値は約定値ではなく前日の値。翌日の大きな窓とセットで出ることが多い
+          （買い気配・売り気配のまま引けた日）。その日に売買できた前提の検証は過大評価になる。
         </li>
         <li>
           <span className="font-medium">修復あり</span>

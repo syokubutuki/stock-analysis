@@ -594,6 +594,21 @@ export default function PortfolioPage() {
             </div>
           );
         })()}
+        {(() => {
+          // 休場日の行の除去は2017〜2018年を含む東証銘柄のほぼ全部に出るので、件数だけを1行で開示する。
+          const removed = Object.values(data).filter(
+            (v) => (v.dataQuality?.removedClosedDays?.length ?? 0) > 0
+          );
+          if (removed.length === 0) return null;
+          const rows = removed.reduce((s, v) => s + v.dataQuality!.removedClosedDays!.length, 0);
+          return (
+            <div className="bg-sky-50 border border-sky-200 text-sky-800 rounded-lg p-3 text-xs">
+              <span className="font-medium">データ品質: </span>
+              {`${removed.length}銘柄で、配信元が東証の休場日に入れていた出来高0・前日終値据え置きの行（計${rows}行）を除去しました。`}
+              {`残すと営業日数・曜日別の統計・売買シミュレーションに休場日が立会日として混ざります。`}
+            </div>
+          );
+        })()}
 
         {watchlist.length === 0 ? (
           <div className="py-16 text-center text-fg-muted">

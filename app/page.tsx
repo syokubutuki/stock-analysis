@@ -17,6 +17,7 @@ import DataQualityNotice from "./components/analysis/DataQualityNotice";
 import CollapsibleAnalysis from "./components/analysis/CollapsibleAnalysis";
 import DirectionValue from "./components/analysis/DirectionValue";
 import { formatSummaryPrice } from "./lib/format";
+import { hasSanityWarnings } from "./lib/price-sanity";
 import { SeriesMode } from "./lib/series-mode";
 import {
   CLOSE_ONLY_CAUTION_PANEL_IDS,
@@ -31,7 +32,7 @@ import {
   type PanelRenderContext,
   type SectionKey,
 } from "./lib/panel-registry";
-import { OPEN_PANEL_EVENT, type OpenPanelDetail } from "./lib/panel-nav";
+import { OPEN_PANEL_EVENT, openAnalysisPanel, type OpenPanelDetail } from "./lib/panel-nav";
 import { recordTicker } from "./lib/test-ledger";
 
 // 分析パネル 251件の配線（動的 import・所属節・入力の形・終値だけの系列での扱い）は
@@ -295,9 +296,9 @@ export default function AnalysisPage() {
     return () => window.removeEventListener(OPEN_PANEL_EVENT, onOpen as EventListener);
   }, [activeSection, navigateToSection]);
 
-  const hasDataQualityIssues =
-    (data?.dataQuality?.repaired.length ?? 0) > 0 ||
-    (data?.dataQuality?.suspects.length ?? 0) > 0;
+  // 休場日の行の除去・売買不成立日の告知だけなら詳細パネルを自動展開しない。東証銘柄の多くに
+  // 常時あるため、展開すると「破損ゼロでもパネルが毎回最上段を占める」状態に戻ってしまう。
+  const hasDataQualityIssues = hasSanityWarnings(data?.dataQuality);
   const hasCloseOnlyMarketData = useMemo(
     () => allPrices.length > 0 && allPrices.every((price) =>
       price.volume === 0 &&
@@ -502,7 +503,10 @@ export default function AnalysisPage() {
 
         <DataQualityNotice
           report={data?.dataQuality}
-          onOpenPanel={() => navigateToSection("basic", "data-quality")}
+          // navigateToSection は節の切替時にしか効かない（開閉フラグを次のマウントで読む）ため、
+          // 「基本」節で詳細パネルが閉じていると無反応になる。告知だけのときはパネルが既定で
+          // 閉じているので、マウント済みパネルにも節をまたぐ場合にも届くイベントで開く。
+          onOpenPanel={() => openAnalysisPanel(DATA_QUALITY_PANEL.id)}
         />
 
         {data && filteredPrices.length > 0 && (

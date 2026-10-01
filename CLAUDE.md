@@ -9,6 +9,8 @@
 
 - ベンチマークは `useBenchmarkPrices(ticker)`。自前 fetch なら `/api/stock?ticker=…&range=10y`。
 - 別の外部データ源を追加するときは、その route handler でも `repairPriceGlitches()` を通す。
+  **`{ ticker }` も渡す**。渡さないと東証休場日の幻の行（2017-07〜2018-12、出来高0・前日終値据え置き）が
+  除去されない。休場日表は `app/lib/tse-calendar.ts`、経緯は `docs/phantom-holiday-rows.md`。
 - 閾値・判定を変えたら `SANITIZER_VERSION` を上げる（IndexedDBキャッシュが旧版を捨てる）。
 - 手を入れたことは画面に開示する（`DataQualityNotice`／`StockData.dataQuality`）。
 - 判定の設計思想・過去の誤検出事故は `app/lib/price-sanity.ts` 冒頭に記載。触る前に読むこと。

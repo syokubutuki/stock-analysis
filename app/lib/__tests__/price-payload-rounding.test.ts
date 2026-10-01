@@ -79,7 +79,8 @@ describe("配信ペイロードの丸め: 実装側の契約", () => {
   test("丸めは修復の後段に置かれている（順序が逆だと破損検出が鈍る）", () => {
     assert.match(
       SOURCE,
-      /const fixed = repairPriceGlitches\(data\.prices\);[\s\S]*prices: roundPricePayload\(fixed\.prices\)/,
+      // ticker を渡さないと東証休場日の行の除去が黙って止まる（price-sanity.ts 冒頭）ので、引数ごと固定する。
+      /const fixed = repairPriceGlitches\(data\.prices, \{ ticker \}\);[\s\S]*prices: roundPricePayload\(fixed\.prices\)/,
       "repairPriceGlitches → roundPricePayload の順序が崩れている",
     );
   });

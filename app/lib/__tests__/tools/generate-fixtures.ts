@@ -3,7 +3,7 @@
 //   npx tsx app/lib/__tests__/tools/generate-fixtures.ts
 //   npx tsx app/lib/__tests__/tools/generate-fixtures.ts --search   （SEED の再探索）
 //
-// 生成物 `app/lib/__tests__/fixtures/price-fixtures.json` はリポジトリにコミットする。
+// 生成物 `app/lib/__tests__/fixtures/price-fixtures.json`・`holiday-fixtures.json` はリポジトリにコミットする。
 // テストは JSON を読むだけで、この生成器には依存しない（＝生成器を直しても黄金値は動かない）。
 // 生成器を意図的に変えたときは JSON と、テスト側の黄金値の両方を録り直すこと。
 //
@@ -189,6 +189,111 @@ function buildGuards(seed: number): { tnx: PricePoint[]; vix: PricePoint[] } {
   return { tnx, vix };
 }
 
+/**
+ * 東証休場日の「幻の行」の事故ケース（holiday-fixtures.json）。
+ *
+ * 配信元は 2017-07-17〜2018-12-31 の東証休場日 22日に、出来高0・四本値＝前日終値の行を入れていた
+ * （docs/phantom-holiday-rows.md の実測）。ここでは日付を**実測した休場日の文字列で直書き**する。
+ * tse-calendar.ts で休場日を作ると、カレンダーが壊れたときにフィクスチャも同じ向きに壊れ、
+ * テストが事故を検知できなくなるため（helpers/golden.ts を独立実装にしているのと同じ理由）。
+ *
+ * 系列には対照群を同居させる:
+ *   ・売買不成立の立会日（エーザイ 2019-03-25 型）: 出来高0・前日終値据え置き、翌日 −20% で寄る
+ *     → 休場日ではないので消してはいけない
+ *   ・指数（^N225 型）: 2018-07-16 だけ「前日の行の丸写し・出来高0」の幻の行がある（実測どおり）
+ */
+const OBSERVED_TSE_CLOSURES = [
+  "2017-07-17", "2017-08-11", "2017-09-18", "2017-10-09", "2017-11-03", "2017-11-23",
+  "2018-01-01", "2018-01-02", "2018-01-03", "2018-01-08", "2018-02-12", "2018-03-21",
+  "2018-04-30", "2018-05-03", "2018-05-04", "2018-07-16", "2018-09-17", "2018-09-24",
+  "2018-10-08", "2018-11-23", "2018-12-24", "2018-12-31",
+  // 2019 年の休場日には幻の行が無い（配信も無い）。窓の末尾の立会日の並びを正しくするために持つ。
+  "2019-01-01", "2019-01-02", "2019-01-03", "2019-01-14",
+];
+const PHANTOM_DATES = OBSERVED_TSE_CLOSURES.filter((d) => d < "2019-01-01");
+const NO_TRADE_DATE = "2018-06-13";
+const INDEX_PHANTOM_DATE = "2018-07-16";
+
+function buildHolidayFixtures(seed: number) {
+  const rand = mulberry32(seed + 1);
+  const norm = makeNormal(rand);
+  const closed = new Set(OBSERVED_TSE_CLOSURES);
+  const sessions = businessDays("2017-06-01", 420)
+    .filter((d) => !closed.has(d) && d <= "2019-01-31");
+  const n = sessions.length;
+  const noTrade = sessions.indexOf(NO_TRADE_DATE);
+
+  const rets = Array.from({ length: n }, () => 0.0003 + 0.015 * norm());
+  const gaps = rets.map((r) => r * 0.4 + 0.004 * norm());
+  const ranges = Array.from({ length: n }, () => 0.01 + 0.005 * Math.abs(norm()));
+  // 売買不成立の日は値が動かず、翌日に −20% の窓で寄る（気配のまま引けた翌日の形）。
+  rets[noTrade] = 0;
+  gaps[noTrade] = 0;
+  ranges[noTrade] = 0;
+  gaps[noTrade + 1] = -0.22;
+  rets[noTrade + 1] = -0.2;
+  const stockClean = buildSeries(sessions, {
+    s0: 700,
+    logRets: rets,
+    gaps,
+    ranges,
+    baseVolume: 30_000_000,
+    volNoise: Array.from({ length: n }, () => 0.3 * norm()),
+  });
+  stockClean[noTrade] = { ...stockClean[noTrade], volume: 0 };
+
+  const idxRets = Array.from({ length: n }, () => 0.0002 + 0.011 * norm());
+  const indexClean = buildSeries(sessions, {
+    s0: 20_000,
+    logRets: idxRets,
+    gaps: idxRets.map((r) => r * 0.5),
+    ranges: Array.from({ length: n }, () => 0.008 + 0.004 * Math.abs(norm())),
+    baseVolume: 70_000_000,
+    volNoise: Array.from({ length: n }, () => 0.2 * norm()),
+  });
+
+  // 休場日の行を、直前の立会日の後ろに差し込む（配信元と同じ並び）。
+  const insert = (
+    clean: PricePoint[],
+    dates: string[],
+    make: (prev: PricePoint, time: string) => PricePoint,
+  ): PricePoint[] => {
+    const out: PricePoint[] = [];
+    const pending = [...dates].sort();
+    for (const p of clean) {
+      while (pending.length > 0 && pending[0] < p.time) {
+        out.push(make(out[out.length - 1], pending.shift()!));
+      }
+      out.push(p);
+    }
+    return out;
+  };
+  const stockRaw = insert(stockClean, PHANTOM_DATES, (prev, time) => ({
+    time,
+    open: prev.close,
+    high: prev.close,
+    low: prev.close,
+    close: prev.close,
+    volume: 0,
+  }));
+  // ^N225 の実測の形: 前日の行を丸写しして出来高だけ0。
+  const indexRaw = insert(indexClean, [INDEX_PHANTOM_DATE], (prev, time) => ({
+    ...prev,
+    time,
+    volume: 0,
+  }));
+
+  return {
+    phantomDates: PHANTOM_DATES,
+    noTradeDate: NO_TRADE_DATE,
+    indexPhantomDate: INDEX_PHANTOM_DATE,
+    stockRaw,
+    stockClean,
+    indexRaw,
+    indexClean,
+  };
+}
+
 function main(): void {
   if (process.argv.includes("--search")) {
     let best = { seed: SEED, score: Infinity, betaRaw: 0, betaClean: 0 };
@@ -218,6 +323,17 @@ function main(): void {
     vix: guards.vix,
   };
   writeFileSync(join(outDir, "price-fixtures.json"), `${JSON.stringify(payload)}\n`, "utf8");
+  // 休場日の事故ケースは別ファイルにする（既存の price-fixtures.json をビット単位で変えないため）。
+  writeFileSync(
+    join(outDir, "holiday-fixtures.json"),
+    `${JSON.stringify({
+      _comment:
+        "生成物。手で編集しない。app/lib/__tests__/tools/generate-fixtures.ts で再生成する。",
+      seed: SEED,
+      ...buildHolidayFixtures(SEED),
+    })}\n`,
+    "utf8",
+  );
   console.log("wrote fixtures.", {
     betaRaw: built.betaRaw,
     betaClean: built.betaClean,
