@@ -655,6 +655,7 @@ export const SECTIONS: SectionDef[] = [
       {
         group: "状態 → 先行きリターン",
         panels: [
+          definePanel({ id: "cond-surge-pullback", title: "急騰後の押し目と2週間の波の位置", input: "filtered", closeOnly: "unavailable", height: 1000, load: () => import("../components/analysis/SurgePullbackChart") }),
           definePanel({ id: "cond-rise-to-decline", title: "上昇後、何日で下落し始めるか（日数の分布）", input: "filtered", closeOnly: "safe", height: 650, load: () => import("../components/analysis/RiseToDeclineChart") }),
           definePanel({ id: "cond-nday-move", title: "値動き条件別の将来分布・売買検証（n日騰落率 → ①事後の分布 ②実行可能な売買 ③過剰適合の点検）", input: "all+period+ticker", closeOnly: "caution", height: 1100, load: () => import("../components/analysis/NdayMoveChart") }),
           definePanel({ id: "cond-forward", title: "状態→先行きリターン表（RSI/ボラ/トレンド別）", input: "filtered", closeOnly: "safe", height: 400, load: () => import("../components/analysis/ConditionalForwardChart") }),

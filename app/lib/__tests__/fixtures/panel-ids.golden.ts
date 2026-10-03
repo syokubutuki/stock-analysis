@@ -154,6 +154,7 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "net-hvg",
   "net-ordinal",
   "net-recurrence",
+  "cond-surge-pullback",
   "cond-rise-to-decline",
   "cond-nday-move",
   "cond-forward",

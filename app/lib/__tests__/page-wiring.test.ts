@@ -162,7 +162,8 @@ describe("終値だけの系列での分類（FU17/FU22: 投信で無意味な�
       },
       // 初回下落の待ち時間分布は終値だけで成立するため SAFE に1件追加。
       // cond-nday-move は①分布が終値だけで成立し、②③（始値で約定）だけが投信で使えないので CAUTION。
-      { unavailable: 78, caution: 26, safe: 151 },
+      // cond-surge-pullback は日中高安によるレンジ位置を要するため UNAVAILABLE。
+      { unavailable: 79, caution: 26, safe: 151 },
     );
   });
 

@@ -98,7 +98,7 @@ describe("FREE_PANEL_IDS とレジストリの双方向突き合わせ", () => {
   test("8件が edge / calendar 節に居る（節ごと無料化していない）", () => {
     const sections = [...FREE_PANEL_IDS]
       .map((id) => PANELS.find((p) => p.id === id)?.section)
-      .filter((s): s is string => s !== undefined);
+      .filter((s) => s !== undefined);
     assert.equal(sections.length, FREE_PANEL_IDS.size);
     assert.deepEqual([...new Set(sections)].sort(), ["calendar", "edge"]);
     // 節ぜんたいは有料のままであること（無料化したのは個別の8件だけ）。
@@ -117,7 +117,8 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       { free: FREE.length, paid: PAID.length, total: PANELS.length },
       // cond-rise-to-decline を既存の条件付き分析カテゴリへ追加。既存無料枠は不変。
       // cond-nday-move も同カテゴリ（課金の総スイッチ PAYWALL_ENABLED=false のため表示には影響しない）。
-      { free: 86, paid: 169, total: 255 },
+      // cond-surge-pullback も同カテゴリに追加。既存パネルの料金区分は変更なし。
+      { free: 86, paid: 170, total: 256 },
     );
   });
 
@@ -135,7 +136,7 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       individual: 8,
       "series-segment": 8,
       category: 70,
-      paid: 169,
+      paid: 170,
     });
   });
 
