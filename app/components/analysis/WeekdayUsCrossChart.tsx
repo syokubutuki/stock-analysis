@@ -155,13 +155,13 @@ const METRICS: Metric[] = [
   { key: "clv", label: "終値位置(安0-高1)", group: "トレード質", color: "divHalf", fmt: "pct0", get: (c) => c.clv, hint: "引けが日中レンジのどこか。1に近い=引け強い(大引け天井)、0=引け弱い。" },
   { key: "sharpe", label: "シャープ(平均/σ)", group: "トレード質", color: "div", fmt: "num2", get: (c) => c.sharpe, hint: "日中平均÷σ。リスク調整後の質。|0.2|超で強め。" },
   // 時刻
-  { key: "peak", label: "上値ピーク時刻", group: "時刻", color: "timeGrid", fmt: "timeGrid", get: (c) => c.peakIdx, hint: "平均パスが最大になる時刻=利確の目安。" },
-  { key: "trough", label: "最安時刻", group: "時刻", color: "timeGrid", fmt: "timeGrid", get: (c) => c.troughIdx, hint: "平均パスが最小になる時刻=仕込み/損切りの目安。" },
+  { key: "peak", label: "上値ピーク時刻", group: "時刻", color: "timeGrid", fmt: "timeGrid", get: (c) => c.peakIdx, hint: "平均パスが最大になる時間帯。最適な売却時刻を示すものではありません。" },
+  { key: "trough", label: "最安時刻", group: "時刻", color: "timeGrid", fmt: "timeGrid", get: (c) => c.troughIdx, hint: "平均パスが最小になる時間帯。最適な購入・損切り時刻を示すものではありません。" },
   { key: "highTime", label: "高値時刻(中央)", group: "時刻", color: "timeMin", fmt: "timeMin", get: (c) => c.highMin, hint: "その日の高値を付けた時刻の中央値。" },
   { key: "lowTime", label: "安値時刻(中央)", group: "時刻", color: "timeMin", fmt: "timeMin", get: (c) => c.lowMin, hint: "その日の安値を付けた時刻の中央値。" },
   // その他
   { key: "n", label: "データ数", group: "その他", color: "count", fmt: "int", get: (c) => c.n, additive: true, hint: "そのセルの立会日数。少ないほど不安定。" },
-  { key: "shape", label: "日内パス形状＋高安時刻", group: "その他", color: "shape", fmt: "none", get: () => 0, hint: "寄り基準の平均累積パス(±1σ帯)に、上値ピーク/最安(平均パス基準)と高値/安値の時刻中央(各日実測)の4マーカーを重ねて同時表示。" },
+  { key: "shape", label: "日内パス形状＋高安時刻", group: "その他", color: "shape", fmt: "none", get: () => 0, hint: "寄り基準の平均累積パス(±1標準誤差帯)に、上値ピーク/最安(平均パス基準)と高値/安値の時刻中央(各日実測)の4マーカーを重ねて同時表示。" },
 ];
 
 const METRIC_GROUPS = ["リターン", "値幅・到達", "トレード質", "時刻", "その他"];
@@ -637,8 +637,9 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
           {/* ===== 並び替え(対象量 × 曜日スコープ × 方向) ===== */}
           <div className="rounded border border-gray-100 bg-gray-50/60 p-2.5 space-y-1.5">
             <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <span className="text-gray-600 font-medium">並び替え</span>
+              <span className="text-gray-600 font-medium">曜日別の表の並び順</span>
               <select
+                aria-label="曜日別の表の並び順"
                 value={sortField.key}
                 onChange={(e) => pickSortField(e.target.value)}
                 title={sortField.hint}
@@ -655,21 +656,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                 })}
               </select>
 
-              <span className="inline-flex items-center gap-1 flex-wrap pl-2 border-l border-gray-200">
-                <span className="text-fg-muted text-[10px]">曜日:</span>
-                {WD_SCOPES.map((s) => (
-                  <button
-                    key={String(s.value)}
-                    onClick={() => setWdScope(s.value)}
-                    title={s.hint}
-                    className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                      wdScope === s.value ? "bg-amber-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </span>
+              <WeekdayScopeControls value={wdScope} onChange={setWdScope} />
 
               <span className="inline-flex items-center gap-1 flex-wrap pl-2 border-l border-gray-200">
                 {SORT_DIRS.map((d) => (
@@ -684,37 +671,6 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
                     {d.label}
                   </button>
                 ))}
-              </span>
-            </div>
-
-            {/* 期待値・配分の基準 */}
-            <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <span className="text-gray-500 text-[10px]">期待値の基準:</span>
-              {MU_BASES.map((b) => (
-                <button
-                  key={b.value}
-                  onClick={() => setMuBasis(b.value)}
-                  title={b.hint}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                    muBasis === b.value ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
-                  }`}
-                >
-                  {b.label}
-                </button>
-              ))}
-              <span className="inline-flex items-center gap-1.5 flex-wrap pl-2 border-l border-gray-200">
-                <label className="inline-flex items-center gap-1 cursor-pointer" title="期待値から1標準誤差を差し引いた保守値 μ̃=sign(μ)·max(0,|μ|−SE) で配分を作る。標本が薄く偶然大きく見えている銘柄の配分を自動で削る。">
-                  <input type="checkbox" checked={haircut} onChange={(e) => setHaircut(e.target.checked)} className="accent-emerald-600" />
-                  <span className="text-gray-600 text-[11px]">配分を−1SEで割引</span>
-                </label>
-                <label className="inline-flex items-center gap-1" title="この立会日数に満たない銘柄は配分の対象外にする(ウェイト0)。">
-                  <span className="text-gray-500 text-[10px]">最小n</span>
-                  <input
-                    type="number" min={1} max={200} value={minN}
-                    onChange={(e) => setMinN(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
-                    className="w-12 px-1 py-0.5 text-[11px] border border-gray-200 rounded tabular-nums"
-                  />
-                </label>
               </span>
             </div>
 
@@ -766,14 +722,17 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
             onRename={onRename}
           />
 
+          {(metric.key === "shape" || metric.color === "timeGrid" || metric.color === "timeMin") && <TimingReadingGuide />}
+
           <p className="text-[11px] text-fg-muted">
             列(曜日)方向に色が銘柄をまたいで揃う＝そのビンでの曜日効果はウォッチリスト共通。1銘柄だけ突出＝個別要因/ノイズ。
             前夜米国ビンや対象期間を切り替え、同じ曜日列の傾向が反転/強弱・出現/消滅するかを見る。
           </p>
 
           {/* ===== 銘柄ランキング表(銘柄×指標) ===== */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5" role="region" aria-label="銘柄ランキング">
             <button
+              aria-expanded={showRank}
               onClick={() => setShowRank((v) => !v)}
               className="text-xs font-medium text-gray-700 hover:text-blue-600 inline-flex items-center gap-1"
             >
@@ -781,16 +740,53 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
               銘柄ランキング（{wdScopeLabel(wdScope)}・{MU_BASES.find((b) => b.value === muBasis)!.label}）
             </button>
             {showRank && result && allocMap && (
-              <CrossRankTable
-                result={result}
-                rows={sortedRows}
-                names={names}
-                scope={wdScope}
-                basis={muBasis}
-                allocMap={allocMap}
-                minN={minN}
-                haircut={haircut}
-              />
+              <>
+                <div className="rounded border border-gray-100 bg-gray-50/60 p-2.5 space-y-2">
+                  <WeekdayScopeControls value={wdScope} onChange={setWdScope} />
+                  {/* 期待値・配分の基準 */}
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                    <span className="text-gray-500 text-[10px]">期待値の基準:</span>
+                    {MU_BASES.map((b) => (
+                      <button
+                        key={b.value}
+                        onClick={() => setMuBasis(b.value)}
+                        title={b.hint}
+                        className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                          muBasis === b.value ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                    <span className="inline-flex items-center gap-1.5 flex-wrap pl-2 border-l border-gray-200">
+                      <label className="inline-flex items-center gap-1 cursor-pointer" title="期待値から1標準誤差を差し引いた保守値 μ̃=sign(μ)·max(0,|μ|−SE) で配分を作る。標本が薄く偶然大きく見えている銘柄の配分を自動で削る。">
+                        <input type="checkbox" checked={haircut} onChange={(e) => setHaircut(e.target.checked)} className="accent-emerald-600" />
+                        <span className="text-gray-600 text-[11px]">配分を−1SEで割引</span>
+                      </label>
+                      <label className="inline-flex items-center gap-1" title="この立会日数に満たない銘柄は配分の対象外にする(ウェイト0)。">
+                        <span className="text-gray-500 text-[10px]">最小n</span>
+                        <input
+                          type="number" min={1} max={200} value={minN}
+                          onChange={(e) => setMinN(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
+                          className="w-12 px-1 py-0.5 text-[11px] border border-gray-200 rounded tabular-nums"
+                        />
+                      </label>
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-fg-muted">曜日・期待値・配分の設定は、上の曜日別の表にも反映されます。</p>
+                </div>
+                <CrossRankTable
+                  result={result}
+                  rows={sortedRows}
+                  names={names}
+                  scope={wdScope}
+                  basis={muBasis}
+                  allocMap={allocMap}
+                  minN={minN}
+                  haircut={haircut}
+                />
+              </>
             )}
           </div>
         </>
@@ -810,7 +806,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
           <li><strong>リターン</strong>: 日中=ln(C/O)、前日比=ln(C/P)(オーバーナイト込み・実損益に近い)、ギャップ=ln(O/P)(夜間の窓)。</li>
           <li><strong>値幅・到達</strong>: 上値到達=ln(H/O)(利確余地)、下値到達=ln(L/O)(含み損の深さ=ストップ目安)、日中レンジ=ln(H/L)、ボラ=日中リターンのσ、<strong>パス振幅</strong>=max_t r̄(t) − min_t r̄(t)（平均累積パス r̄(t)=mean ln(P_t/O) の山谷幅）。日中レンジが「各日の値幅を平均したもの(方向が打ち消される前)」なのに対し、パス振幅は「平均してもなお残る方向性の大きさ」。レンジは大きいのに振幅が小さい＝日々よく動くが方向がバラバラ(エッジなし)、両方大きい＝時間帯の癖が一貫。</li>
           <li><strong>トレード質</strong>: 勝率=C&gt;Oの割合、終値位置=(C−L)/(H−L)(1=大引け天井/0=引け安)、シャープ=日中平均/σ。</li>
-          <li><strong>時刻</strong>: 上値ピーク/最安時刻=平均累積パスの最大/最小時間、高値/安値時刻=日中の高安を付けた時刻の中央値。前者は『銘柄全体で均した山谷』、後者は『各日が実際に高安を付けた時刻の代表値』で、両者はズレうる(平均パスは打ち消し合いで山谷が緩み時刻が中央寄りに、各日の実測は極値なのでばらつく)。</li>
+          <li><strong>時刻</strong>: 上値ピーク/最安時刻=平均累積パスの最大/最小時間、高値/安値時刻=日中の高安を付けた時刻の中央値。前者は『銘柄全体で均した山谷』、後者は『各日が実際に高安を付けた時刻の代表値』で、両者はズレうる。平均パスは時間帯ごとの足の終値から作り、各日の高安時刻は足の高値・安値から求める。中央値は最も出やすい時刻ではなく、値動きの大きさや時刻の分布によって平均パスの山谷と離れる。</li>
           <li><strong>形状＋高安時刻</strong>: 寄り基準の平均累積パス r(t)=ln(P_t/O) を各セルにスパークライン描画し、上記4時刻を1枚に重ねて同時表示(● 上値ピーク/最安=平均パス基準、▽△ 高値/安値時刻中央=各日実測)。●と▽△の横のズレで両者の違いを一目で読める。縦軸は3通りから選べる(下記)。振幅の大きさは左上に山谷幅(%)を数値表示。灰帯は平均の±1標準誤差(σ/√n; 日次±1σ~1-2%だと平均パス~0.1-0.5%が潰れるため。枠でクリップし、帯が枠を超えるほど平均が不確か)。破線は寄り(0)の水準。</li>
         </ul>
 
@@ -828,6 +824,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
         </p>
 
         <p className="font-medium text-gray-700 mt-3">4. 並び替え（対象量 × 曜日スコープ × 方向）</p>
+        <p>曜日別の表の並び順はその表の直前で、銘柄ランキングの並び順はランキング直前または列見出しで変更する。それぞれ独立した並び順。集計する曜日は上下で共通、期待値・配分の設定はランキング直前にある。</p>
         <p>
           {"ヒートマップは(銘柄×曜日)の2次元だが、『どの銘柄に建てるか』を決めるには行を1つの数に潰す必要がある。潰し方が曜日スコープ。曜日 d のセル平均を μ_d、そのσを σ_d、標本数を n_d、標準誤差を se_d = σ_d/√n_d とすると:"}
         </p>
@@ -872,7 +869,7 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
 
         <p className="font-medium text-gray-700 mt-3">8. 投資判断への活用</p>
         <ul className="list-disc pl-4 space-y-1">
-          <li><strong>配分→時刻の順で往復する</strong>: まずランキング表(または配分%ソート)で建てる候補と割合を絞り、次にその銘柄の行をヒートマップで見て、上値ピーク/最安時刻・上値到達/下値到達から建玉と手仕舞いの時刻・利確幅・ストップ幅を決める。「誰に賭けるか」と「いつ出入りするか」は別の問いで、前者がこの表、後者がヒートマップ。</li>
+          <li><strong>配分→時刻の順で往復する</strong>: まずランキング表(または配分%ソート)で建てる候補と割合を絞り、次にその銘柄の行をヒートマップで見て、上値ピーク/最安時刻・上値到達/下値到達から建玉と手仕舞いの時刻・利確幅・ストップ幅を決める。「誰に賭けるか」と「いつ出入りするか」は別の問いで、前者がこの表、後者がヒートマップ。ただし、平均パスの山谷は最適な売買時刻ではなく、前後の時間帯と期間を変えた安定性を確認するための手がかり。</li>
           <li><strong>曜日スコープの使い分け</strong>: 週合計＝月〜金を通しで回す前提の配分、単一曜日＝その曜日だけ建てる前提の配分。実際に建てるつもりのスケジュールとスコープを一致させる(木曜しか建てないのに週合計で配分を決めない)。</li>
           <li>今夜の前夜米国は寄り前に確定(上部バナー)。そのビン列で、明日の曜日に最も効く銘柄・向き・利確/損切り時刻を選ぶ。前日比とギャップの分解で「窓で取るか日中で取るか」も判断。</li>
           <li>振幅は<strong>建玉サイズの手がかり</strong>: 同じ勝率・同じ方向なら振幅の大きい銘柄ほど1回の値幅が取れる。逆に振幅が小さいのに有意★が出ているセルは、手数料・スプレッドで消える大きさかを必ず確認する(振幅%が往復コストを下回るなら実行不能)。</li>
@@ -895,6 +892,46 @@ export default function WeekdayUsCrossChart({ tickers, names, onRename }: Props)
         </ul>
       </AnalysisGuide>
     </div>
+  );
+}
+
+function WeekdayScopeControls({ value, onChange }: { value: WdScope; onChange: (value: WdScope) => void }) {
+  return (
+    <div role="group" aria-label="集計する曜日（上下共通）" className="flex items-center gap-1 flex-wrap text-xs">
+      <span className="text-gray-500 text-[10px]">集計する曜日（上下共通）:</span>
+      {WD_SCOPES.map((s) => (
+        <button
+          key={String(s.value)}
+          onClick={() => onChange(s.value)}
+          aria-pressed={value === s.value}
+          title={s.hint}
+          className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+            value === s.value ? "bg-amber-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
+          }`}
+        >{s.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function TimingReadingGuide() {
+  return (
+    <aside className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-gray-700 space-y-2" aria-label="高安時刻の読み方">
+      <p className="font-semibold">どちらの時刻を参考にすればよい？</p>
+      <p>売買する時間帯を考えるときは、まず<strong>平均パスの形</strong>を見て、高安時刻の中央値を補助として使います。●の一点より前後を含む山・谷を見て、集計期間を変えても傾向が残るか確認してください。</p>
+      <p><strong>●は平均した線の山・谷、▽△は各日の高安時刻の中央値。</strong>中央値は、高安が最も出やすい時刻ではありません。</p>
+      <details>
+        <summary className="cursor-pointer font-medium text-slate-700">詳しい読み方・計算の違い</summary>
+        <div className="mt-2 space-y-2 leading-relaxed">
+          <p><strong>● 上値ピーク／最安時刻:</strong> 各時間帯の足の終値を寄り付き基準の対数リターンにし、対象日で平均してから最大・最小の時間帯を探します。寄り付きから保有した場合の値動きを考える参考になりますが、少数の大幅変動に左右されることがあります。</p>
+          <p><strong>▽△ 高値／安値時刻（中央）:</strong> 各日の足の高値・安値から、その日の高安時刻を探し（同値なら最初）、早い順に並べた真ん中を取ります。偶数日なら中央2つの時刻の平均です。値動きの大きさは使いません。</p>
+          <p>例えば、高値が9時と15時に半分ずつ出た場合、中央値は12時です。実際には高値が出ていない時間や、昼休みになることもあります。</p>
+          <p>2種類の時刻が離れていても計算の矛盾ではありません。計算順序と使う価格が異なり、値動きの大きさや高安時刻の分布が影響します。同じ条件なら、図の●は単独表示の「上値ピーク時刻／最安時刻」、▽△は「高値／安値時刻（中央）」に対応します。</p>
+          <p>標本数nと灰帯（平均の±1標準誤差）も確認し、特定の大変動日への依存や別の期間での再現性を確かめてください。表示時刻は足・時間帯の単位で、足の中の正確な高安時刻は分かりません。</p>
+        </div>
+      </details>
+      <p className="text-[11px] text-gray-500">どちらも過去の集計です。当日の高安や最適な売買時刻を予測・保証するものではありません。</p>
+    </aside>
   );
 }
 
@@ -1068,13 +1105,13 @@ function CrossHeatmap({
             <span className="text-slate-600">灰帯＝平均の±1標準誤差 σ/√n（枠でクリップ; 帯が枠を超えるほど不確か）</span>。
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            <span><span style={{ color: SP_GREEN }} className="font-bold">●</span> 上値ピーク時刻（平均パス最大＝利確目安）</span>
+            <span><span style={{ color: SP_GREEN }} className="font-bold">●</span> 上値ピーク時刻（平均パスが最大）</span>
             <span><span style={{ color: SP_GREEN }} className="font-bold">▽</span> 高値時刻・中央（各日実測の高値時刻）</span>
-            <span><span style={{ color: SP_RED }} className="font-bold">●</span> 最安時刻（平均パス最小＝仕込み/損切り目安）</span>
+            <span><span style={{ color: SP_RED }} className="font-bold">●</span> 最安時刻（平均パスが最小）</span>
             <span><span style={{ color: SP_RED }} className="font-bold">△</span> 安値時刻・中央（各日実測の安値時刻）</span>
           </div>
           <div className="text-fg-muted">
-            ●（均された山谷の時刻）と ▽△（典型的な高安の時刻）の横のズレが両者の違い。近ければ一貫、離れれば日によって高安の付け方がばらつく。破線＝寄り(0)の水準。
+            ●は平均した線の山谷、▽△は各日の高安時刻の中央値。計算順序と使う価格が異なるため、時刻は一致しないことがあります。破線＝寄り(0)の水準。
           </div>
         </div>
       )}
@@ -1235,6 +1272,33 @@ function CrossRankTable({
 
   return (
     <div className="space-y-1">
+      <div role="group" aria-label="ランキングの並び順" className="rounded border border-gray-100 bg-gray-50/60 p-2.5 space-y-1.5">
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <label className="inline-flex items-center gap-2">
+            <span className="font-medium text-gray-700">ランキングの並び順</span>
+            <select
+              aria-label="ランキングの並び順"
+              value={sortKey}
+              onChange={(e) => {
+                const col = RANK_COLUMNS.find((c) => c.key === e.target.value)!;
+                setSortKey(col.key);
+                setSortDir(col.dir);
+              }}
+              className="max-w-full rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700"
+            >
+              {RANK_COLUMNS.map((col) => <option key={col.key} value={col.key}>{col.label}</option>)}
+            </select>
+          </label>
+          {(["desc", "asc"] as const).map((dir) => (
+            <button key={dir} onClick={() => setSortDir(dir)} aria-pressed={sortDir === dir}
+              className={`rounded px-2 py-1 text-[11px] ${sortDir === dir ? "bg-gray-800 text-white" : "border border-gray-200 bg-white text-gray-600"}`}
+            >{dir === "desc" ? "降順" : "昇順"}</button>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-600" aria-live="polite">
+          現在：{RANK_COLUMNS.find((c) => c.key === sortKey)!.label}・{sortDir === "desc" ? "降順" : "昇順"}。列見出しからも変更できます。曜日別の表の並び順とは独立しています。
+        </p>
+      </div>
       <div className="overflow-x-auto">
         <table className="text-[11px] w-full border-collapse">
           <thead>
@@ -1245,11 +1309,13 @@ function CrossRankTable({
                   <th
                     key={col.key}
                     title={col.hint}
-                    onClick={() => onSort(col.key, col.dir)}
+                    aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                     className={`px-2 py-1.5 cursor-pointer select-none whitespace-nowrap font-medium ${col.key === "name" ? "text-left" : "text-right"} ${active ? "text-blue-600" : "text-gray-500 hover:text-gray-800"}`}
                   >
-                    {col.label}
-                    <span className="ml-0.5 inline-block w-2">{active ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+                    <button onClick={() => onSort(col.key, col.dir)} className="inline-flex items-center py-1" aria-label={`${col.label}で並び替え`}>
+                      {col.label}
+                      <span className="ml-0.5 inline-block w-2">{active ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+                    </button>
                   </th>
                 );
               })}
