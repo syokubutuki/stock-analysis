@@ -752,7 +752,7 @@ export const SECTIONS: SectionDef[] = [
     key: "causal",
     label: "何が値動きに先行するか",
     method: "因果・情報",
-    description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果",
+    description: "イベントスタディ・Transfer Entropy・Granger因果・相互情報量・CCM非線形因果・クロスアセット先行指標",
     render: "panels",
     groups: [
       {
@@ -760,6 +760,7 @@ export const SECTIONS: SectionDef[] = [
           definePanel({ id: "causal-event", title: "条件付きイベントスタディ（始点重ね描き）", input: "all", closeOnly: "safe", height: 400, load: () => import("../components/analysis/EventStudyChart") }),
           definePanel({ id: "sa-causal", title: "因果・情報伝達解析（Transfer Entropy・Granger）", input: "filtered+series", closeOnly: "caution", height: 300, load: () => import("../components/analysis/CausalChart") }),
           definePanel({ id: "causal-ccm", title: "CCM非線形因果分析", input: "filtered+series", closeOnly: "caution", height: 400, load: () => import("../components/analysis/CCMChart") }),
+          definePanel({ id: "causal-cross-asset", title: "クロスアセット先行指標スキャン（金・BTC・金利・為替・海外金融株 → 寄りの窓／寄り後／5日先）", input: "all+ticker", closeOnly: "unavailable", height: 600, load: () => import("../components/analysis/CrossAssetLeadChart") }),
         ],
       },
     ],

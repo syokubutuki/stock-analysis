@@ -22,7 +22,7 @@ export interface BenchmarkPrices {
   dataQuality?: PriceSanityReport;
 }
 
-interface CacheEntry {
+export interface CacheEntry {
   prices: PricePoint[];
   name: string;
   dataQuality?: PriceSanityReport;
@@ -30,6 +30,11 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<CacheEntry>>();
+
+/** フック外（複数銘柄の一括取得など）からも同じキャッシュを共有して使う。 */
+export function fetchBenchmarkPrices(ticker: string): Promise<CacheEntry> {
+  return fetchBench(ticker);
+}
 
 async function fetchBench(ticker: string): Promise<CacheEntry> {
   const cached = cache.get(ticker);

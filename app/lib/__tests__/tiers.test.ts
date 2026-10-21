@@ -118,7 +118,8 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       // cond-rise-to-decline を既存の条件付き分析カテゴリへ追加。既存無料枠は不変。
       // cond-nday-move も同カテゴリ（課金の総スイッチ PAYWALL_ENABLED=false のため表示には影響しない）。
       // cond-surge-pullback も同カテゴリに追加。既存パネルの料金区分は変更なし。
-      { free: 86, paid: 170, total: 256 },
+      // 2026-10-21: causal-cross-asset を追加（causal 節なので既定どおり有料）。無料側は 86 件のまま。
+      { free: 86, paid: 171, total: 257 },
     );
   });
 
@@ -136,7 +137,7 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       individual: 8,
       "series-segment": 8,
       category: 70,
-      paid: 170,
+      paid: 171,
     });
   });
 

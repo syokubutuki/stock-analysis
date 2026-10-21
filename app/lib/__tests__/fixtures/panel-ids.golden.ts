@@ -190,6 +190,7 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "causal-event",
   "sa-causal",
   "causal-ccm",
+  "causal-cross-asset",
   "tail-main",
   "tail-copula",
   "tail-hill",
