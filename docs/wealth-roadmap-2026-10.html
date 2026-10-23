@@ -1,0 +1,421 @@
+<title>資産形成のための改善計画</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 1 column of running text (max 72ch) with a sticky mini-nav; proposals are cards, evidence is tables. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --fg:#1c2330; --muted:#5b6575; --line:#d9dde4;
+  --accent:#2a4a7a; --accent-soft:#e3ebf6; --warn:#b4453a; --warn-soft:#f8e7e4; --good:#2d7a5a; --good-soft:#e2f1ea; --hold:#8a6d1f; --hold-soft:#f6eed6;
+  --display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --body:"Noto Sans JP","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#141922; --surface:#1c2330; --fg:#e8ebf0; --muted:#a3acbb; --line:#2f3845;
+  --accent:#8fb0e0; --accent-soft:#223450; --warn:#e58a7e; --warn-soft:#45272a; --good:#7fc7a4; --good-soft:#1f3a30; --hold:#d9b45a; --hold-soft:#3d3521; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#141922; --surface:#1c2330; --fg:#e8ebf0; --muted:#a3acbb; --line:#2f3845;
+  --accent:#8fb0e0; --accent-soft:#223450; --warn:#e58a7e; --warn-soft:#45272a; --good:#7fc7a4; --good-soft:#1f3a30; --hold:#d9b45a; --hold-soft:#3d3521; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.8;font-size:15px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:860px;margin:0 auto}
+header.top{padding-block:40px 24px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,4.5vw,36px);line-height:1.3;margin:8px 0 12px;text-wrap:balance}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--muted);margin-top:14px}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-block:8px;overflow-x:auto}
+nav.toc ol{display:flex;gap:4px 14px;list-style:none;margin:0;padding:0;white-space:nowrap;font-size:13px}
+nav.toc a{color:var(--muted);text-decoration:none;padding:4px 2px;border-bottom:2px solid transparent}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+section{padding-block:36px 8px;border-bottom:1px solid var(--line)}
+h2{font-family:var(--display);font-weight:700;font-size:24px;margin:0 0 6px;text-wrap:balance}
+h2 .num{font-family:var(--mono);font-size:13px;color:var(--muted);display:block;letter-spacing:.06em}
+h3{font-size:17px;font-weight:700;margin:28px 0 8px;text-wrap:balance}
+p{max-width:72ch;margin:0 0 12px}
+ul,ol{max-width:72ch;padding-left:1.4em;margin:0 0 14px}
+li{margin:4px 0}
+.sub{color:var(--muted);font-size:14px}
+strong{font-weight:700}
+code{font-family:var(--mono);font-size:.9em;background:var(--accent-soft);padding:1px 5px;border-radius:3px}
+.formula{font-family:var(--mono);font-size:14px;background:var(--surface);border:1px solid var(--line);padding:10px 14px;margin:10px 0 16px;overflow-x:auto;max-width:72ch}
+/* summary block */
+.verdict{background:var(--surface);border-left:4px solid var(--accent);padding:16px 20px;margin:20px 0}
+.verdict ol{margin:0;padding-left:1.3em}
+.verdict li{margin:8px 0}
+/* tables */
+.tw{overflow-x:auto;margin:12px 0 20px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-weight:700;background:var(--surface);white-space:nowrap}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+/* pills */
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;white-space:nowrap;letter-spacing:.02em}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.hold{background:var(--hold-soft);color:var(--hold)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+/* proposal cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin:16px 0}
+.card h3{margin:0 0 6px;font-size:17px}
+.card .id{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.06em}
+.card .tags{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+.kv{display:grid;grid-template-columns:7em 1fr;gap:6px 14px;margin:0;font-size:14px}
+.kv dt{color:var(--muted);font-weight:500}
+.kv dd{margin:0;min-width:0}
+.kv dd ul{margin:0}
+@media (max-width:560px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* lever map */
+.levers{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0 20px}
+.lever{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);padding:12px 14px;min-width:0}
+.lever b{display:block;font-size:14px}
+.lever span{display:block;font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:4px}
+.lever.ok{border-top-color:var(--good)} .lever.no{border-top-color:var(--warn)} .lever.mid{border-top-color:var(--hold)}
+/* phases */
+.phase{display:grid;grid-template-columns:8em 1fr;gap:8px 16px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.phase b{font-family:var(--mono);font-size:13px;color:var(--accent)}
+.phase ul{margin:0}
+@media (max-width:560px){.phase{grid-template-columns:1fr}}
+.stop{background:var(--warn-soft);border-left:4px solid var(--warn);padding:14px 18px;margin:16px 0}
+.stop ul{margin:0}
+footer{padding-block:28px;color:var(--muted);font-size:13px}
+a{color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">kabugenron / stock-analysis · 改善計画</div>
+  <h1>資産形成のための改善計画 ─ 分析を「建玉」に接続する</h1>
+  <p class="lede">257本の分析が出している答えを、実際の短期トレードと長期運用の判断に使える情報源へ組み替えるための計画。既存文書と実装、研究ディレクトリの実測結果を照合して書いた。コードは変更していない。</p>
+  <div class="meta"><span>作成 2026-10-22</span><span>対象 main（9bf3fb8）</span><span>根拠 docs/・memory・panel-registry の棚卸し</span></div>
+</header>
+
+<nav class="toc" aria-label="目次"><ol>
+  <li><a href="#s0">結論</a></li><li><a href="#s1">現状診断</a></li><li><a href="#s2">設計原則</a></li>
+  <li><a href="#s3">長期レーン</a></li><li><a href="#s4">短期レーン</a></li><li><a href="#s5">欠落データ</a></li>
+  <li><a href="#s6">検証と規律</a></li><li><a href="#s7">既存の改善</a></li><li><a href="#s8">作らないもの</a></li>
+  <li><a href="#s9">優先順位</a></li><li><a href="#s10">KPI</a></li>
+</ol></nav>
+
+<!-- ============ 0 ============ -->
+<section id="s0">
+  <h2><span class="num">0</span>結論（先に）</h2>
+  <div class="verdict"><ol>
+    <li><strong>いちばん欠けているのは分析ではなく「台帳」である。</strong> 実際の建玉・現金・取引・損益・口座区分（NISA／特定／信用）をサーバーに持つ場所が無い。ウォッチリストの建玉欄は localStorage の含み損益%止まりで、損益の時系列も取引の理由も残らない。株式原論の命題3（翻訳されない確信は存在しないのと等価）を、このサイト自身が満たしていない。</li>
+    <li><strong>資産形成に効くと実測で確かめられたのは5つだけ。</strong> ①市場に参加し続ける床 ②セクターに集中しセクター内では b/σ<sub>ε</sub> で分散 ③複数ストレス指標＋ヒステリシスの現金退避（最大DD −83%→−34%、ただし保険） ④税と回転コストの控除（NISA分岐 R×1.255） ⑤執行時刻の最適化。この5つを1枚の「運用方針」に束ね、台帳で守られているかを毎月測るのが長期レーンの本体。</li>
+    <li><strong>短期の方向予測は、この repo の検定を通らない。</strong> SPA p=0.334、ヌル較正 +279%、as-of で方向・確率が全滅、ML でも長期OOSで IC≈0。残るのは「状態（荒れているか）」と「寄り付きの窓の約3割」で、後者は寄った瞬間に終わっている。短期レーンは「方向を当てる」から「状態でサイズを決め、執行で漏れを減らし、小さな研究スリーブで前向きに採点する」へ設計を変える。</li>
+    <li><strong>価格だけでは測れない軸を足す。</strong> 決算日・権利落ち・信用残・空売り比率・国内金利（JGB）・時点構成銘柄が一つも無い。J-Quants を1本つなぐと5つ同時に埋まる。これは「銘柄選択」と「イベント回避」の両方の前提になる。</li>
+    <li><strong>答えを出す画面が8か所に散っていて、互いに整合していない。</strong> q提案（/axioms）・判定バッジ（/portfolio、等重み暫定）・今日のビン・期待パス・週次アナログ・クロスアセット窓・総合スコア・レジーム。出力を「q提案」1本に収束させ、他は入力に降格する。毎朝7時の1枚（寄り前ブリーフ）がその配信面になる。</li>
+  </ol></div>
+  <p class="sub">結論の多くは 7203.T とメガバンク3行での実測に基づく。他の銘柄族では符号が変わりうる。本書は「何を作るか」の順序を決める文書で、各項目の数値は着手時に再測定する。</p>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <h2><span class="num">1</span>現状診断 ─ この repo が既に証明したこと、持っていないもの</h2>
+
+  <h3>1.1 実測で決着した発見（資産形成への含意つき）</h3>
+  <div class="tw"><table>
+    <thead><tr><th>発見</th><th>証拠（出典）</th><th>資産形成にどう効くか</th><th>配線</th></tr></thead>
+    <tbody>
+    <tr><td>タイミング判断一族は B&amp;H に勝てない</td><td>SPA p=0.334、コスト10bpで全滅（cal-timing-value）</td><td>タイミングで稼ごうとする時間を減らす。回転を減らす</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>曜日最適化はエッジゼロでも +279%</td><td>ヌル較正（cal-null-calib）</td><td>累積リターンの見栄えで判断しない。F統計で判断</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>個別 μ は識別できない（SE=σ/√T、勝者の呪い）</td><td>系C26（pf-drift-id）、必要年数 144年</td><td>「上がりそうな銘柄」を選ばない。束でチルトする</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>b（ファクター感応度）は識別できる</td><td>系C29、t≈9、π(1年)=0.97（pf-sector-select）</td><td>セクター内は S=b/σ<sub>ε</sub> で順位、w∝b/σ<sub>ε</sub>²、k=5〜8本</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>銀行株の純度は 19〜43%。加重市場β 1.27</td><td>P1（pf-sector-select）</td><td>「金利の賭け」の6〜8割は「日本株の賭け」。ヘッジで分離する</td><td><span class="pill warn">★1 未実装</span></td></tr>
+    <tr><td>方向はヌル、状態（ボラ）は当たる</td><td>bank-derisk R0〜R12、QLIKE .56 vs .64</td><td>サイズを状態で決める。方向で決めない</td><td><span class="pill warn">未配線</span></td></tr>
+    <tr><td>ストレス4指標＋ヒステリシスで最大DD −83%→−34%</td><td>bank-derisk §4〜§5、ランダム配置ヌル P&lt;0.001</td><td>保険として採用。年率上積みは非有意。V字では逆効果</td><td><span class="pill warn">未配線</span></td></tr>
+    <tr><td>寄り付きの窓は前夜海外で約3割説明。寄り後はヌル</td><td>leading-indicators、OOS R² 28%</td><td>窓は取れない。寄り後の売買根拠にしない</td><td><span class="pill good">済（causal-cross-asset）</span></td></tr>
+    <tr><td>NISA 分岐は R/(1−τ)≈R×1.255。税項は g に比例</td><td>cal-nisa-vs-taxable、sim-holding-ledger</td><td>当たっている銘柄ほど回転をやめた方が増える</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>Kelly f* は μ の点推定だと銀行株でも 334%</td><td>sim-kelly（μ 既定 6%）</td><td>μ を前提スライダーに。σ²/2 の壁と誤差棒で見る</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>停止規則（TP/SL）は期待値もシャープも変えない</td><td>系C28（cal-weekday-barrier）</td><td>損切りは「期待値改善」でなく「生存」のために置く</td><td><span class="pill good">済</span></td></tr>
+    <tr><td>週末ギャップ μ≈0、ドリフトは平日夜間</td><td>cal-weekend-premium</td><td>週末回避は意味がない。夜間を外す戦略は床を捨てる</td><td><span class="pill good">済</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>1.2 持っていないもの（棚卸しで確認）</h3>
+  <div class="tw"><table>
+    <thead><tr><th>欠落</th><th>現状</th><th>何が出来ないか</th></tr></thead>
+    <tbody>
+    <tr><td>実建玉・現金・取引の台帳</td><td>watchlist の position（株数・単価・目標・ストップ）が localStorage。含み%のみ</td><td>W = Σ∫q dP − C を自分の口座で分解できない。コスト実額、税、回転率が測れない</td></tr>
+    <tr><td>判断ログ</td><td>無し（エッジ凍結台帳とアナログ台帳はあるが「自分の売買」ではない）</td><td>as-of 採点が「モデル」にしか効かず「自分」に効かない</td></tr>
+    <tr><td>通知・定期実行</td><td>cron 無し、メール無し、push 無し</td><td>年3回しか点灯しないデリスク規則を見逃す</td></tr>
+    <tr><td>イベントデータ</td><td>FOMC/CPI/日銀は静的表。決算日・権利落ちは無し</td><td>銘柄固有イベントの回避・事前登録イベントスタディが出来ない</td></tr>
+    <tr><td>需給データ</td><td>信用残・空売り比率・貸借倍率 0件</td><td>短期の需給軸が一切ない</td></tr>
+    <tr><td>国内金利</td><td>^TNX/^FVX（米国）のみ。銀行の因子は 1615.T で代用</td><td>「金利の賭け」の本体を直接測れない</td></tr>
+    <tr><td>時点構成銘柄</td><td>器 constituents.ts のみ。蛇口は未選択</td><td>生存者バイアスが横断分析に残る</td></tr>
+    <tr><td>10年より長い価格</td><td>/api/stock は range 上限 10y。研究側だけ fetch_max</td><td>2020年以降だけで見える偽の α を、アプリ内で見抜けない</td></tr>
+    <tr><td>ウォッチリストのサーバー同期</td><td>localStorage。ledger_owner cookie は台帳だけに使用</td><td>端末が変わると建玉情報が消える</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>1.3 「今どうするか」を言う画面が散っている</h3>
+  <p>棚卸しで見つかった答えの出口は8つある。q提案（<code>TodayQProposal</code>、/axioms に置かれ単一銘柄）、判定バッジ（/portfolio、画面上で「等重み暫定」と注記）、今日のビン、今日 vs 期待パス、週次アナログ、クロスアセットの窓目安、総合スコアカード、市場状態ダッシュボード。相互に整合する仕組みがなく、as-of スコアカードは 7203.T で方向・確率が全滅と出ているのに、バッジは方向成分を含んだまま点灯する。戦略ラボの閾値もライブに反映されない設計で、反映の道筋（凍結→OOS）も無い。</p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <h2><span class="num">2</span>設計原則 ─ 5つのレバーと、測れるかどうか</h2>
+  <p>株式原論の会計恒等式がそのまま設計の物差しになる。</p>
+  <div class="formula">W(T) = Σ<sub>i</sub> ∫ q<sub>i</sub>(t) dP<sub>i</sub>(t) − C　　E[W] = ∫E[q]E[dP]（参加項） + ∫Cov(q,dP)（エッジ項） − E[C]（摩擦項）</div>
+  <p>投資家が動かせるのは q の5成分だけで、この repo の実測は「どの成分が測れるか」を既に答えている。改善計画はその答えに従って配分する。</p>
+  <div class="levers">
+    <div class="lever ok"><b>対象（どの資産）</b><span>市場の床＋セクター集中＋b/σ<sub>ε</sub>。測れる。<br>→ 長期レーンの中心</span></div>
+    <div class="lever ok"><b>大きさ |q|</b><span>σ と状態は測れる。μ は測れない。<br>→ 状態でサイズ、μ は前提</span></div>
+    <div class="lever no"><b>符号・タイミング</b><span>SPA・ヌル較正・as-of で裏付けなし。<br>→ 投資しない。研究スリーブのみ</span></div>
+    <div class="lever mid"><b>保有期間</b><span>回転が減るほど税とコストが減る。<br>→ 持ち切りが既定、例外を台帳で管理</span></div>
+    <div class="lever ok"><b>摩擦 C</b><span>符号確定・測定可能。実コストは楽天表で既に一元化。<br>→ 執行と税で確実に拾う</span></div>
+  </div>
+  <p>結果として、<strong>長期レーンが主、短期レーンは従</strong>になる。これは好みではなく、この repo の検定結果からの帰結である。短期レーンに残す仕事は「状態によるサイズ調整」「執行品質」「前向きに採点される小さな実験」の3つに限る。</p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <h2><span class="num">3</span>長期運用レーン ─ 測れる5つを1枚の方針に束ねる</h2>
+
+  <div class="card"><div class="id">L1</div><h3>運用台帳（実建玉・現金・取引・損益・口座区分）をサーバーに持つ</h3>
+    <div class="tags"><span class="pill acc">最優先</span><span class="pill acc">他の全項目の前提</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>口座（NISA成長／つみたて／特定／信用）× 銘柄 × 取引（日付・売買・株数・単価・手数料・税区分）× 理由（どのパネルの、q のどの成分を根拠にしたか）を記録する。派生して、評価額・現金比率・実現／未実現損益・税見込み・回転率・コスト実額・ファクター露出（市場β、セクター b）を日次で出す。</dd>
+      <dt>なぜ</dt><dd>命題3。確信は建玉に翻訳されて初めて損益になる。今は翻訳の記録が無く、「分析が資産形成に効いたか」を原理的に測れない。毎月の W を 参加項／エッジ項／摩擦項／税 に分解できる唯一の場所になる。</dd>
+      <dt>足場</dt><dd><code>app/lib/ledger-db.ts</code>（Postgres、owner_id、UNIQUE制約の作法）、<code>ledger-owner.ts</code>（匿名オーナーcookie）、<code>nisa-vs-taxable.ts</code> の清算価値ウォーカー（税計算を流用）、<code>rakuten-margin.ts</code>（信用コスト）、<code>watchlist.ts</code> の position 型（移行元）。</dd>
+      <dt>受け入れ</dt><dd>①任意の月について「W = Σq·ΔP − C」の分解表が台帳だけから再現できる ②税見込みが nisa-vs-taxable と同じ数値になる ③端末を変えても建玉が消えない ④503 時は localStorage 退避と画面開示（LedgerSyncBar と同じ）</dd>
+      <dt>注意</dt><dd>認証が無いので匿名オーナーモデルの限界（cookie 消失＝喪失）を画面に書く。復元キーの発行を最初から入れる。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">L2</div><h3>投資方針書（IPS）ページ ─ 測定値から生成し、乖離を台帳で監視する</h3>
+    <div class="tags"><span class="pill acc">長期の中核</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>①参加：市場の床に常時参加する比率の下限 ②対象：セクター集中の有無、k=5〜8本、w∝b/σ<sub>ε</sub>²、純度目標とヘッジ比率 h ③大きさ：μ=6% 前提の fractional Kelly 上限、DD 許容 ④保有：持ち切り既定、回転の上限（回／年） ⑤税：NISA に入れる銘柄の規則 ⑥デリスク：L3 の規則とパラメータ ⑦リバランス：ウェイトの乖離帯と見直し周期。これらを版管理された文書として保存し、台帳（L1）の現状との乖離を数値で表示する。</dd>
+      <dt>なぜ</dt><dd>5つの発見が別々のパネルに散っていて、運用規則として1か所に書かれていない。方針が文書化されていないと、相場が荒れた日に「分析」が「願望」に戻る。</dd>
+      <dt>足場</dt><dd><code>pf-sector-select</code>（w の計算）、<code>kelly-uncertainty.ts</code>、<code>growth-drag.ts</code>（g の3項分解）、<code>mu-mode-store.ts</code>（μ 前提の共有）、<code>corollaries.ts</code>（各規則の公理的根拠へのリンク）。</dd>
+      <dt>受け入れ</dt><dd>方針の各項目に「根拠パネル」「測定日」「次回再測定日」が付く。台帳との乖離が帯を超えた項目が一覧の先頭に出る。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">L3</div><h3>デリスク規則（stress-hyst）をアプリに配線し、常時監視する</h3>
+    <div class="tags"><span class="pill good">実測済・効果大</span><span class="pill warn">未配線</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>VIX/20日平均 &gt;1.25、5日σ/60日σ &gt;1.8、60日高値比 &lt;−12%、KRE 60日高値比 &lt;−12% の4灯と、2灯で全額現金・5日連続全消灯で復帰の状態機械をパネルにする。各指標の現在値と閾値までの距離、点灯履歴、現金化区間をエクイティに重ねる（lightweight-charts）。対象は銘柄またはバスケット。</dd>
+      <dt>なぜ</dt><dd>研究で唯一、長期OOS・ランダム配置ヌル・コスト感度・別銘柄の4関門を通った規則。回転は年3回程度なので、通知が無いと確実に見逃す（研究の最終日時点で 3行とも 0/4 点灯だが dd60 が −8〜−11% で閾値に近い）。</dd>
+      <dt>足場</dt><dd><code>research/bank-derisk/r13_variants.py</code> の <code>stv()</code> / <code>hyst()</code> を TS に移植。VIX・KRE は <code>useBenchmarkPrices</code> 経由（/api/stock）。表示の手本は <code>EdgeDecayChart</code>（3ペイン同期）。</dd>
+      <dt>受け入れ</dt><dd>Python と同じ入力で点灯日・現金化区間・最大DDが一致する（<code>check-lib.mts</code> と同じ照合方式）。ガイドに「保険であり年率の上積みは非有意」「V字では逆効果」「設計外の 1321 では劣後」を明記。</dd>
+      <dt>注意</dt><dd>2026-03 型のV字には効かない。指標を速くする変種は全て不成立だった（R16）ので、調整欲を抑えるためにグリッド結果を画面に残す。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">L4</div><h3>★1 市場ヘッジ ─ 「1.27倍の日本株」から金利の賭けを切り出す</h3>
+    <div class="tags"><span class="pill acc">設計書あり</span><span class="pill warn">未実装</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd><code>docs/sector-market-hedge.md</code> のとおり (L, h) を同時最適化し、先物と ETF 信用売りを並置比較する。円建ての建玉単位・刻み・追証確率まで出し、採用したヘッジは台帳（L1）に建玉として載る。</dd>
+      <dt>なぜ</dt><dd>P1 で純度 19〜43% が出た時点で律速がここに移った。ヘッジの価値は純度でなく「市場の賭けとセクターの賭けを独立にサイジングできること」。空売り・先物・信用は使う方針と確認済み。</dd>
+      <dt>足場</dt><dd>設計書 §0 のファイル地図。<code>rakuten-futures.ts</code> は既にある。追証モンテカルロは <code>nisa-vs-taxable.ts</code> の walk を手本に。</dd>
+      <dt>受け入れ</dt><dd>設計書の受け入れ条件に従う。既定の結論が h*&lt;0 のときは、その理由（市場プレミアム π<sub>M</sub> の前提）を画面で示す。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">L5</div><h3>NISA 枠配分と口座跨ぎの最適化</h3>
+    <dl class="kv">
+      <dt>何を</dt><dd>台帳の建玉候補を「NISA（非課税・持ち切り向き）／特定（回転・ヘッジ向き）／信用（ショート・レバ）」に振り分ける規則を計算する。目安は g が高く回転が低いものを NISA へ、ヘッジと短期スリーブは課税口座へ。年初一括と分割の比較、枠の繰越可否、損益通算の非対称（NISA は損失を通算できない）を数値で見せる。</dd>
+      <dt>なぜ</dt><dd>税項は g に比例する（sim-holding-ledger）。同じ銘柄・同じ q でも口座を変えるだけで最終資産が変わる唯一のレバーで、しかも符号が確定している。</dd>
+      <dt>足場</dt><dd><code>nisa-vs-taxable.ts</code>（GROWTH_QUOTA / ANNUAL_QUOTA、Model A/B）、<code>pf-entry-sizing</code>（待つ価値は t=0.95 で裏付けなし → 年初一括を既定にしてよい根拠）。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">L6</div><h3>/api/stock に range=max（2000年〜）を追加する</h3>
+    <div class="tags"><span class="pill acc">検証基盤</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>研究用 <code>fetch_max.mts</code> の period1/period2 経路を route handler に取り込み、同じ <code>repairPriceGlitches({ticker})</code> と SANITIZER_VERSION を通す。パネル側は <code>allPrices</code> を受けるものから順に対応。</dd>
+      <dt>なぜ</dt><dd>デリスク研究で「2020年以降だけ見ると α+13%（t=2.3）、2012年以降に延ばすと消える」が実証された。10年窓は短期の偽陽性を見抜けない。先行指標研究も 2008〜09 年限定の現象を10年窓では区別できなかった。</dd>
+      <dt>注意</dt><dd>キャッシュ鍵は range を含むので温まり方が変わる。Yahoo 負荷は Runtime Cache で吸収する。古い区間の幻の休場行は休場日表で除去済みの経路を使う。</dd>
+    </dl></div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <h2><span class="num">4</span>短期トレードレーン ─ 方向を当てる設計をやめる</h2>
+  <p>この repo の短期分析は calendar 節だけで56本あり、そのほとんどが「いつ建てるか」を探している。検定の結果は一貫して「裏付けなし」である。短期レーンに残す価値があるのは、符号ではなく次の3つの仕事であり、設計をそこへ寄せる。</p>
+
+  <div class="card"><div class="id">S1</div><h3>短期パネル共通の「採否バッジ」（門番）</h3>
+    <div class="tags"><span class="pill acc">横断部品</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>戦略の形をしたパネル全てに、同じ4点を自動で付ける。①実コスト控除後の年率（楽天実コスト既定） ②スヌーピング補正 p（SPA／BH-FDR） ③as-of スコアカードでヌルを超えているか ④容量 K* と自分の建玉額の比。4点から「使える／保留／使えない」を1つのバッジにし、「使えない」は既定で折りたたむ。</dd>
+      <dt>なぜ</dt><dd>cal-timing-value の SPA と edge-capacity の K* は既にあるが、各パネルに個別に貼られていない。利用者は56本を1本ずつ読んで、どれが本物かを自分で判断させられている。情報源としての価値は「どれを読まなくてよいか」を言えることにある。</dd>
+      <dt>足場</dt><dd><code>StrategyVsBenchmark</code>（コスト後、8箇所配線済）、<code>timing-value.ts</code>、<code>edge-capacity.ts</code>、<code>asof-replay.ts</code>、<code>panel-registry.tsx</code>（1レコードに <code>gate</code> 関数を持たせる）。</dd>
+      <dt>受け入れ</dt><dd>7203.T で calendar 節の56本のうち「使える」が何本残るかを数字で報告できる。合成データで植え込みエッジ（週末 −0.3%）が「使える」に、エッジゼロが「使えない」になる。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">S2</div><h3>寄り前ブリーフ（毎営業日 7:00 JST の1枚）</h3>
+    <div class="tags"><span class="pill acc">配信面</span><span class="pill acc">cron 必要</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>1ページに ①デリスク4灯の状態と閾値までの距離（L3） ②次の寄り付きの窓の目安 ±1σ（既存 causal-cross-asset） ③今日のイベント（FOMC／日銀／SQ／保有銘柄の決算・権利落ち：D1） ④保有建玉のストップ／目標との距離、方針（L2）からの乖離 ⑤q提案（E1）の変更有無。<strong>既定の出力は「今日は q を変えない」</strong>で、変える日だけ理由と執行時刻（S3）を添える。Vercel Cron で生成し、メールまたは push で届ける。</dd>
+      <dt>なぜ</dt><dd>8つの判定画面を毎朝開いて回る運用は続かない。年3回の点灯を拾うには配信が要る。窓の目安は「寄りで建てる人には取れない」が、「今日 q を変える予定の人が寄りと引けのどちらで執行するか」には使える。</dd>
+      <dt>足場</dt><dd><code>cross-asset-lead.ts</code>、<code>event-calendar.ts</code>、<code>q-synthesis.ts</code>、台帳（L1）。配信は Vercel Cron（vercel.ts の crons）＋ メール送信サービスを1つ選ぶ。</dd>
+      <dt>受け入れ</dt><dd>米国終値が未確定の日は「6〜7時に更新」と出る（既存の挙動を踏襲）。ブリーフの各行が、それを出したパネルへのリンクを持つ。配信された判断は判断ログ（V1）に自動で残る。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">S3</div><h3>執行品質 ─ 予定した q 変更をいつ・どう約定させるか</h3>
+    <div class="tags"><span class="pill good">符号確定の価値</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>台帳に「予定した q 変更」を登録すると、cal-exec-timing／cal-sliced-exec（TWAP/VWAP）／cal-highlow-timing から執行計画を出し、約定後に VWAP・終値・寄り値に対する実装ショートフォールを記録する。月次で「執行で失った bp」を摩擦項として台帳に積む。</dd>
+      <dt>なぜ</dt><dd>命題5。短期の技術のうち、価値の符号が確定しているのは執行だけ。cross-sectional の実証で「終値で建てられず bid-ask を跨ぐ」だけで −63% が消えた。短期分析の投資先として最も確実。</dd>
+      <dt>足場</dt><dd>日中足は <code>/api/intraday</code>（60分足 730日）。スプレッド推定は <code>sa-risk-spread</code>（Corwin-Schultz）。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">S4</div><h3>イベント駆動の事前登録スタディ（決算・権利落ち・日銀・SQ）</h3>
+    <div class="tags"><span class="pill hold">D1 に依存</span></div>
+    <dl class="kv">
+      <dt>何を</dt><dd>銘柄固有イベント（決算発表日・権利落ち日）と市場イベントの前後 K 日の分布を、cal-event-effect の枠で出す。仮説は事前登録（edge-ledger の凍結）し、OOS で採点する。短期で「避けるべき日」「持ち越さない日」を規則にする。</dd>
+      <dt>なぜ</dt><dd>日足の方向はヌルでも、イベント日の分散は確実に大きい（状態は当たる）。「何もしない日」を決める材料としては価値がある。現状の FOMC/CPI/日銀は静的表で、銘柄固有イベントが無い。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">S5</div><h3>短期の研究スリーブ ─ 上限を固定し、全件を前向きに採点する</h3>
+    <dl class="kv">
+      <dt>何を</dt><dd>台帳に「研究スリーブ」口座区分を作り、資本の一定割合（例 5%）を上限にする。この区分の売買は必ず仮説（パネルID・エッジID）を伴い、edge-decay の SPRT＋CUSUM で死亡判定、asof-scorecard で方向・確率・区間を採点する。四半期ごとに「生きている仮説」だけが上限を使える。</dd>
+      <dt>なぜ</dt><dd>短期トレードをやめろと言う設計は実行されない（親御さんの例のとおり）。代わりに「小さく、記録し、殺す基準を先に決める」形にすると、損失は上限で止まり、当たった仮説は証拠つきで本体に昇格できる。Simons／Thorp 系譜の規律そのもの。</dd>
+      <dt>足場</dt><dd><code>edge-decay.ts</code>、<code>prospective-ledger.ts</code>、<code>asof-replay.ts</code>、台帳（L1）。</dd>
+    </dl></div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <h2><span class="num">5</span>情報源としての欠落データ</h2>
+  <p>価格以外のデータが無いことが、長期（銘柄選択の前提）と短期（イベント回避・需給）の両方を縛っている。優先順位は「1本つないで何が同時に埋まるか」で決める。</p>
+  <div class="tw"><table>
+    <thead><tr><th>ID</th><th>データ</th><th>候補ソース</th><th>埋まる用途</th><th>優先</th></tr></thead>
+    <tbody>
+    <tr><td class="n">D1</td><td>決算発表日・配当（権利落ち日・額）・週次信用残・空売り比率・上場廃止込み銘柄一覧・財務諸表</td><td>J-Quants API（JPX 公式。<code>docs/cross-section-data-sources.md</code> で本命と判定済み。APIキーをサーバー route に置く）</td><td>S4 イベント、短期需給軸、D4 時点構成、銀行の PBR 軸、税引後の配当扱い</td><td><span class="pill acc">最優先</span></td></tr>
+    <tr><td class="n">D2</td><td>国内金利（JGB 2/5/10/30年、TONA）</td><td>財務省 CSV（国債金利情報）、日銀時系列</td><td>pf-sector-select の因子を ETF 代理から金利そのものへ。★1 の π<sub>M</sub>・IRRBB</td><td><span class="pill acc">高</span></td></tr>
+    <tr><td class="n">D3</td><td>決算日・権利落ちの簡易版</td><td>Yahoo quoteSummary（calendarEvents / defaultKeyStatistics）</td><td>D1 が通るまでのつなぎ。精度は劣る</td><td><span class="pill hold">代替</span></td></tr>
+    <tr><td class="n">D4</td><td>時点構成銘柄（point-in-time）</td><td>D1 の listed_info ＋ 同梱スナップショット（案 A-2）</td><td>横断分析の生存者バイアス根治。<code>applyConstituents</code> の器は済</td><td><span class="pill acc">高</span></td></tr>
+    <tr><td class="n">D5</td><td>投信の基準価額（既存）</td><td>既存経路</td><td>NISA つみたて側の L5 に必要。既に取れている</td><td><span class="pill good">済</span></td></tr>
+    <tr><td class="n">D6</td><td>オプション IV・板</td><td>JPX 有償</td><td>derivatives 節の実IV化</td><td><span class="pill warn">見送り</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="sub">D1 は「Yahoo 一本」の方針から一歩出る。採否は方針判断だが、価格以外の軸が無いままでは §3〜§4 の半分が着手できないので、本書は採用を推す。route handler 側で取得し、価格と同じく修復と開示の規約を通すこと。</p>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <h2><span class="num">6</span>検証と規律 ─ 「分析→建玉」の輪を閉じる</h2>
+
+  <div class="card"><div class="id">V1</div><h3>判断ログと「自分の判断」の as-of 採点</h3>
+    <dl class="kv">
+      <dt>何を</dt><dd>台帳（L1）の全取引と、ブリーフ（S2）で出た「変えない」判断を、判断の型（方向・確率・区間・ボラ・警告）で分類して保存する。3か月後から asof-scorecard と同じ採点則（PT／Brier／Christoffersen／MZ／Welch）で、モデルではなく自分の判断を採点する。</dd>
+      <dt>なぜ</dt><dd>as-of 検証は先読みを消せるが探索バイアスは消せない。前向きの記録だけが本物の検証で、着手が1日遅れるごとに記録が1日減る性質を持つ（asset-utilization §2-6）。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">V2</div><h3>答えの出口を q提案1本に収束させる</h3>
+    <dl class="kv">
+      <dt>何を</dt><dd><code>TodayQProposal</code> を唯一の「どうするか」の出力と定め、判定バッジ・今日のビン・期待パス・週次アナログ・レジーム・総合スコアはその入力（寄与）に降格する。各寄与には as-of スコアカードの成績が重みとして付き、ヌルを超えない寄与（7203.T の方向・確率）は自動で 0 になる。戦略ラボの閾値は「凍結→OOS で生存→ライブ採用」の道筋を通さないと反映されない。</dd>
+      <dt>なぜ</dt><dd>8つの出口が別々に光ると、利用者は自分に都合のよい方を選ぶ（＝スヌーピングを UI がやらせている）。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">V3</div><h3>月次レビューページ</h3>
+    <dl class="kv">
+      <dt>何を</dt><dd>台帳から ①W の分解（参加／エッジ／摩擦／税） ②DD と方針の許容 ③回転率 ④執行ショートフォール ⑤方針からの乖離 ⑥研究スリーブの生死 を1枚に出す。月初に自動生成して配信する。</dd>
+    </dl></div>
+
+  <div class="card"><div class="id">V4</div><h3>公開トラックレコード（1年後）</h3>
+    <dl class="kv">
+      <dt>何を</dt><dd>既定の計画どおり、台帳の凍結記録が1年分たまってから /track-record を公開する。失敗も含めて全件が自動採点で並ぶ。薄い実績を早く出すのは、このサイトが最も批判している行為なので待つ。</dd>
+    </dl></div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <h2><span class="num">7</span>既存実装の改善</h2>
+  <div class="tw"><table>
+    <thead><tr><th>ID</th><th>対象</th><th>改善</th><th>根拠</th></tr></thead>
+    <tbody>
+    <tr><td class="n">E1</td><td><code>TodayQProposal</code>（/axioms）</td><td>トップと /portfolio の先頭へ移す。単一銘柄からポートフォリオ q ベクトル（ヘッジ含む）へ拡張。コスト後の表示と μ 前提バッジを付け、「この提案を採用」で台帳へ記録する。</td><td>答えの出口が公理ページの奥にある。V2 の中心</td></tr>
+    <tr><td class="n">E2</td><td>/portfolio 判定バッジ</td><td>「等重み暫定」を終わらせる。pf-badge のトラックレコードで成績が出ない成分（方向）は外し、警告・ボラ成分だけ残す。</td><td>as-of で方向・確率が全滅（BSS&lt;0、PT 非有意）</td></tr>
+    <tr><td class="n">E3</td><td>ウォッチリスト</td><td>ledger_owner に相乗りしてサーバー同期。建玉欄は台帳（L1）へ移管し、「狙い」だけ残す。</td><td>端末依存の資産喪失</td></tr>
+    <tr><td class="n">E4</td><td><code>pf-sector-select</code></td><td>因子に JGB 金利（D2）を追加し、ETF 代理と並置。純度の行から ★1（L4）へ導線。</td><td>「金利の賭け」を直接測る</td></tr>
+    <tr><td class="n">E5</td><td><code>risk-forecast-range</code>・ボラ系</td><td>as-of で MZ の b=0.3〜0.9 と出た。表示前に (a,b) で較正した区間を既定にし、未較正は併記に落とす。</td><td>そのままの水準では使えないと判明済み</td></tr>
+    <tr><td class="n">E6</td><td>μ 前提（sim-kelly、pf-entry-sizing、holding-ledger、q提案）</td><td><code>mu-mode-store</code> を拡張し、μ の前提値（既定 6%）を全画面で共有。画面ごとに違う μ で結論が割れるのを防ぐ。</td><td>同じ σ で結論が反転する</td></tr>
+    <tr><td class="n">E7</td><td><code>panel-registry.tsx</code></td><td>各パネルに「動かす q の成分（対象／大きさ／符号・時刻／期間／摩擦）」または「診断／教材」のタグを1項目足す。既定表示は「決定に使う」だけにし、残りは「もっと詳しく」の中へ。</td><td>257本は初見の壁。原論 第6部の実装原則2</td></tr>
+    <tr><td class="n">E8</td><td>コスト後表示</td><td>calendar 節の日中・曜日×日内パネルにも <code>StrategyVsBenchmark</code> を配線し、楽天実コストを既定にする。</td><td>8箇所で止まっている。S1 の前提</td></tr>
+    <tr><td class="n">E9</td><td><code>event-calendar.ts</code></td><td>静的表をデータ駆動（D1）にし、保有銘柄の決算・権利落ちを含める。</td><td>S4 の前提</td></tr>
+    <tr><td class="n">E10</td><td>戦略ラボ /strategy</td><td>最適点を見つけたら「凍結」ボタンで edge-ledger に登録し、OOS 生存後にのみ既定閾値へ反映できる導線を付ける。手で定数を書き換える現状の運用を廃止。</td><td>過剰最適化の抑止</td></tr>
+    <tr><td class="n">E11</td><td><code>sim-vol-target</code>・L3</td><td>状態（ボラ予測）は当たるがボラ目標だけでは最大DDが下がらないと判明。vol-target をデリスク規則と並置し、「サイズ調整」と「退避」の役割分担をガイドに書く。</td><td>bank-derisk R10〜12</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <h2><span class="num">8</span>作らないもの</h2>
+  <div class="stop"><ul>
+    <li><strong>タイミング・カレンダー系の新パネル。</strong> 56本で検定は出尽くしている。追加は多重検定台帳の M を増やすだけ。</li>
+    <li><strong>方向を当てる ML。</strong> ridge／logit／LightGBM／アンサンブルで長期 OOS の IC≈0、急落 AUC≈0.5。2020年以降だけ見える α は窓の罠。</li>
+    <li><strong>前夜米国で毎日建玉を変える売買。</strong> 2012年以降で消え、10bp で半減、20bp で消える。</li>
+    <li><strong>周波数・非線形・量子・エントロピー節の追加。</strong> P の記述であって q を変えない（命題4）。教材として残すが投資しない。</li>
+    <li><strong>実IV の無いオプション分析の拡張。</strong> D6 を見送る以上、理論計算の域を出ない。</li>
+    <li><strong>「上がりそうな銘柄」の推薦。</strong> C26 により実行不能。投資助言の境界でもある。</li>
+  </ul></div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <h2><span class="num">9</span>優先順位と着手順</h2>
+  <p>「資産形成への効果 ÷ 実装コスト」と依存関係で並べた。台帳（L1）が全ての前提で、データ（D1）が長期・短期の半分の前提になる。</p>
+  <div class="tw"><table>
+    <thead><tr><th>ID</th><th>項目</th><th>効果</th><th>コスト</th><th>依存</th><th>性質</th></tr></thead>
+    <tbody>
+    <tr><td class="n">L1</td><td>運用台帳</td><td>★★★</td><td>中</td><td>なし</td><td>時間が育てる（遅れは戻らない）</td></tr>
+    <tr><td class="n">L3</td><td>デリスク規則の配線</td><td>★★★</td><td>小</td><td>なし</td><td>実測済・保険</td></tr>
+    <tr><td class="n">L6</td><td>range=max</td><td>★★</td><td>小</td><td>なし</td><td>検証基盤</td></tr>
+    <tr><td class="n">S2</td><td>寄り前ブリーフ＋cron</td><td>★★★</td><td>中</td><td>L1・L3</td><td>配信面</td></tr>
+    <tr><td class="n">V1</td><td>判断ログと自己採点</td><td>★★★</td><td>小〜中</td><td>L1</td><td>時間が育てる</td></tr>
+    <tr><td class="n">D1</td><td>J-Quants 接続</td><td>★★★</td><td>中</td><td>方針判断</td><td>5軸を同時に開く</td></tr>
+    <tr><td class="n">L2</td><td>投資方針書</td><td>★★</td><td>小〜中</td><td>L1</td><td>長期の中核</td></tr>
+    <tr><td class="n">L4</td><td>★1 市場ヘッジ</td><td>★★</td><td>大</td><td>D2 が望ましい</td><td>設計書あり</td></tr>
+    <tr><td class="n">S1</td><td>採否バッジ（門番）</td><td>★★</td><td>中</td><td>E8</td><td>横断部品</td></tr>
+    <tr><td class="n">S3</td><td>執行品質</td><td>★★</td><td>中</td><td>L1</td><td>符号確定</td></tr>
+    <tr><td class="n">E1/E2/V2</td><td>出口の収束</td><td>★★</td><td>中</td><td>L1</td><td>UI の規律</td></tr>
+    <tr><td class="n">L5</td><td>NISA 配分</td><td>★★</td><td>小</td><td>L1</td><td>符号確定</td></tr>
+    <tr><td class="n">S4/S5</td><td>イベント・研究スリーブ</td><td>★</td><td>中</td><td>D1・L1</td><td>短期の受け皿</td></tr>
+    <tr><td class="n">E7</td><td>パネルのタグ付けと既定表示</td><td>★</td><td>小</td><td>なし</td><td>可読性</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>90日の順序（目安）</h3>
+  <div class="phase"><b>第1期 1〜3週</b><ul>
+    <li>L1 台帳（スキーマ・API・画面・watchlist 移行）と V1 判断ログの器。方向を決めた日から記録が始まる</li>
+    <li>L3 デリスク規則の TS 移植と Python 照合。L6 range=max</li>
+    <li>E6 μ 前提の共有（小さいが、後の画面全部に効く）</li></ul></div>
+  <div class="phase"><b>第2期 4〜7週</b><ul>
+    <li>S2 寄り前ブリーフと cron、配信。既定出力「今日は変えない」</li>
+    <li>L2 投資方針書の初版（手入力でよい。乖離表示から始める）</li>
+    <li>D1 の採否を決め、採用なら route とサニタイズ、E9 イベント表の置換</li></ul></div>
+  <div class="phase"><b>第3期 8〜12週</b><ul>
+    <li>L4 ★1 ヘッジ（D2 金利があれば因子を差し替えてから）</li>
+    <li>S1 門番バッジと E8 コスト後の全面配線。calendar 56本の「使える」本数を公表</li>
+    <li>E1/E2/V2 出口の収束。L5 NISA 配分</li></ul></div>
+  <div class="phase"><b>第4期 以降</b><ul>
+    <li>S3 執行品質、S4 イベント、S5 研究スリーブ（台帳に3か月分たまってから）</li>
+    <li>V3 月次レビュー自動化。V4 は台帳1年後</li></ul></div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <h2><span class="num">10</span>KPI ─ 情報源として良くなったかをどう測るか</h2>
+  <p>「分析が増えた」は KPI にしない。台帳が無いと測れないものばかりなので、L1 が先である理由がここにもある。</p>
+  <div class="tw"><table>
+    <thead><tr><th>KPI</th><th>定義</th><th>どこで出るか</th><th>目標の考え方</th></tr></thead>
+    <tbody>
+    <tr><td>税引後・コスト後の幾何成長率 g</td><td>台帳の清算価値で計算した年率 g</td><td>V3 月次レビュー</td><td>床（市場）との差を SE 付きで見る。差の有意性は長期でしか出ない</td></tr>
+    <tr><td>最大DD と方針許容の比</td><td>実現 DD ÷ IPS の許容 DD</td><td>L2・V3</td><td>1 を超えた月は方針かデリスク規則の見直し</td></tr>
+    <tr><td>回転率とコスト実額</td><td>年間売買代金 ÷ 平均評価額、実コスト（bp）</td><td>L1</td><td>方針の上限内。想定コストと実コストの差を監視</td></tr>
+    <tr><td>執行ショートフォール</td><td>約定 vs VWAP／終値（bp）</td><td>S3</td><td>符号が負に安定すること</td></tr>
+    <tr><td>翻訳率</td><td>理由（パネル・q成分）の付いた q 変更の割合</td><td>V1</td><td>100%。付かない取引は「願望」として別集計</td></tr>
+    <tr><td>自己判断の採点</td><td>警告の Welch t、区間の較正、方向の PT</td><td>V1・asof</td><td>ヌルを超えない型の判断は、翌四半期に配分を落とす</td></tr>
+    <tr><td>方針乖離</td><td>IPS の各項目との乖離帯超過数</td><td>L2</td><td>ゼロ、または理由付きの例外</td></tr>
+    <tr><td>研究スリーブの生存率</td><td>SPRT 生存 ÷ 登録仮説数</td><td>S5</td><td>低くてよい。殺せていることが規律の証拠</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <p>参照した文書: docs/investment-axioms.md、growth-strategy.md、asset-utilization.md、trading-usability-improvements.md、portfolio-analysis-open-issues.md、bank-derisk-research.md、leading-indicators-research.md、sector-factor-selection.md、sector-market-hedge.md、cross-section-data-sources.md、site-improvement-round5.md、NEXT_SESSION.md、app/lib/panel-registry.tsx、app/lib/tiers.ts、app/portfolio/page.tsx、app/api/*、research/*。</p>
+  <p>本書は計画であり、売買の推奨ではない。数値は各出典の測定日時点のもの。</p>
+</footer>
+</div>
