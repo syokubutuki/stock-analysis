@@ -744,6 +744,8 @@ export const SECTIONS: SectionDef[] = [
           definePanel({ id: "regime-transition", title: "レジーム遷移分析", input: "filtered", closeOnly: "safe", height: 440, load: () => import("../components/analysis/RegimeTransitionChart") }),
           definePanel({ id: "sa-regime-break", title: "構造変化検定", input: "filtered+series", closeOnly: "safe", height: 350, load: () => import("../components/analysis/StructuralBreakChart") }),
           definePanel({ id: "regime-bocpd", title: "ベイズ変化点検出（BOCPD）", input: "filtered+series", closeOnly: "safe", height: 500, load: () => import("../components/analysis/BOCPDChart") }),
+          // 4灯は終値だけで成立するが、評価は寄り約定を仮定する（投信では成績表が意味を持たない）→ caution
+          definePanel({ id: "regime-derisk", title: "ストレス退避規則（4指標ヒステリシス）：明日の寄りで持つか、現金にするか", input: "all+ticker", closeOnly: "caution", height: 760, load: () => import("../components/analysis/DeriskRuleChart") }),
         ],
       },
     ],

@@ -3,7 +3,7 @@
 作成日: 2026-10-23
 親文書: `docs/wealth-roadmap-2026-10.html` §3 L3（改善計画の長期レーン）
 根拠: `docs/bank-derisk-research.md`（結論・頑健性・限界）、`research/bank-derisk/`（Python 実装）
-状態: **P0（計算層・テスト・Python 照合）実装済（2026-10-23・未コミット）。P1 以降は未着手。**
+状態: **P0（計算層・テスト・Python 照合）は `15eeec3` でコミット済。P1（パネル）実装済（2026-10-23・未コミット）。P2 以降は未着手。**
 
 ---
 
@@ -28,7 +28,7 @@
 | 長期データの取得 | ✅ 研究側のみ | `research/bank-derisk/fetch_max.mts`（2000年〜、`repairPriceGlitches({ticker})` 通過済み）。**アプリの `/api/stock` は 10y 上限**（L6 で拡張予定） |
 | asof 整合の TS 実装 | ✅ 手本あり | `app/lib/cross-asset-lead.ts` `alignFeature()`・`app/lib/us-spillover-core.ts` `alignJpUs()`（「日付が厳密に小さい最新の行」） |
 | 計算層 `app/lib/derisk-rule.ts` | ✅ P0 完了（2026-10-23） | `derisk-rule.ts`・`asof-align.ts`。純粋関数 |
-| パネル `DeriskRuleChart.tsx` | ⬜ 本書 §3 | |
+| パネル `DeriskRuleChart.tsx` | ✅ P1 完了（2026-10-23） | `regime-derisk`（regime 節・`all+ticker`・caution）。A〜D・F・G を実装。E は研究値の静的表示（Worker は P2） |
 | テスト・Python 照合 | ✅ P0 完了 | `__tests__/derisk-rule.test.ts`（20件）・`fixtures/derisk-golden.json`（383KB）・`export_fixture.py`・`check-lib.mts`。結果は §7 |
 | 横断版 `pf-derisk`（/portfolio） | ⬜ 本書 §6 フェーズ3 | |
 | 通知・ブリーフ | ⬜ 範囲外（S2） | 本書は純粋関数の形だけ保証する |
@@ -448,6 +448,21 @@ P0 と P1 は同じ worktree で続けてよい（専有ファイルが重なら
 - 黄金値の `assertGolden` は期待値側も同じ桁に丸めて比較する（Python の丸めと TS の丸めを揃える）。
 
 ---
+
+### 7.3 P1（2026-10-23）— ブラウザ確認（dev 3100・8306.T・`sa:open:regime-derisk=1`）
+
+| 確認 | 結果 |
+|---|---|
+| 描画 | 3ペイン同期・現金化帯・▼退避/▲復帰マーカー・点灯数ステップ・余裕4本が描ける。コンソールエラー 0 |
+| 判定ヘッダー | 「次の立会日 2026-10-26 の建玉: 保有 1/4」「データ最終日 2026-10-23: 0/4」「米国データ 2026-10-22（未着）」「履歴の開始 2017-01-25」が出る。60日DD −12.1% が点灯・VIX比 1.16 が「閾値に近い」 |
+| 成績表 | 全期間 2017-01-25〜 13.2% / −38.3% / 0.52 vs B&H 21.3% / −54.3% / 0.60。2006-09〜2009 と 2010〜2012 は「—」（0 や NaN を出さない） |
+| エピソード | 17件。2026-03-10〜04-07（20日・DD+KRE・B&H +10.0%）は `check-lib.mts` と一致し「V字型（2026年3月）」の印が付く。2024-08-05〜10-18 も V字型 |
+| 行クリック | 区間へズームする |
+| パラメータ | calmN を 3 にすると「研究の設定での判定」カードが並列表示され localStorage に保存。「研究値に戻す」で消える |
+| 修復開示 | ^VIX の未修正の急変動（2018-02-05 等）が「参照系列の修復」として出る |
+| テスト | `npm test` 303/303（panel-ids golden・caution 27・paid 172 を更新）、eslint 0、tsc エラー無し |
+
+受け入れ条件 §5 の 3〜7・9・10 を満たす。8（投信）は未確認（終値のみ系列での文言は実装済、目視は P2 で）。
 
 ## §8 設計上の判断と、その理由
 

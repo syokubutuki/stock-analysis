@@ -119,7 +119,8 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       // cond-nday-move も同カテゴリ（課金の総スイッチ PAYWALL_ENABLED=false のため表示には影響しない）。
       // cond-surge-pullback も同カテゴリに追加。既存パネルの料金区分は変更なし。
       // 2026-10-21: causal-cross-asset を追加（causal 節なので既定どおり有料）。無料側は 86 件のまま。
-      { free: 86, paid: 171, total: 257 },
+      // 2026-10-23: regime-derisk を追加（regime 節なので既定どおり有料）。無料側は 86 件のまま。
+      { free: 86, paid: 172, total: 258 },
     );
   });
 
@@ -137,7 +138,7 @@ describe("isPanelFree() の判定結果そのもの（黄金値）", () => {
       individual: 8,
       "series-segment": 8,
       category: 70,
-      paid: 171,
+      paid: 172,
     });
   });
 

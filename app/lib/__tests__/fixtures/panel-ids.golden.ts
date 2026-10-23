@@ -187,6 +187,7 @@ export const PANEL_IDS_GOLDEN: readonly string[] = [
   "regime-transition",
   "sa-regime-break",
   "regime-bocpd",
+  "regime-derisk",
   "causal-event",
   "sa-causal",
   "causal-ccm",

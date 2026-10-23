@@ -164,7 +164,8 @@ describe("終値だけの系列での分類（FU17/FU22: 投信で無意味な�
       // cond-nday-move は①分布が終値だけで成立し、②③（始値で約定）だけが投信で使えないので CAUTION。
       // cond-surge-pullback は日中高安によるレンジ位置を要するため UNAVAILABLE。
       // causal-cross-asset は窓・寄り→引け（始値）が主題なので UNAVAILABLE。
-      { unavailable: 80, caution: 26, safe: 151 },
+      // regime-derisk は4灯が終値だけで成立し、寄り約定を仮定する成績表だけが投信で使えないので CAUTION。
+      { unavailable: 80, caution: 27, safe: 151 },
     );
   });
 
