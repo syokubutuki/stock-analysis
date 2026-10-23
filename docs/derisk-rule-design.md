@@ -3,7 +3,7 @@
 作成日: 2026-10-23
 親文書: `docs/wealth-roadmap-2026-10.html` §3 L3（改善計画の長期レーン）
 根拠: `docs/bank-derisk-research.md`（結論・頑健性・限界）、`research/bank-derisk/`（Python 実装）
-状態: **P0（計算層・テスト・Python 照合）は `15eeec3` でコミット済。P1（パネル）実装済（2026-10-23・未コミット）。P2 以降は未着手。**
+状態: **P0（計算層・テスト・Python 照合）は `15eeec3` でコミット済。P1（パネル）は `5cd6e35` でコミット済。P2 以降は未着手。**
 
 ---
 
