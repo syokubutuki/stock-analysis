@@ -3,7 +3,7 @@
 作成日: 2026-10-23
 親文書: `docs/wealth-roadmap-2026-10.html` §3 L3（改善計画の長期レーン）
 根拠: `docs/bank-derisk-research.md`（結論・頑健性・限界）、`research/bank-derisk/`（Python 実装）
-状態: **P0（計算層・テスト・Python 照合）は `15eeec3` でコミット済。P1（パネル）は `5cd6e35` でコミット済。P2 以降は未着手。**
+状態: **P0（計算層・テスト・Python 照合）は `15eeec3` でコミット済。P1（パネル）は `5cd6e35` でコミット済。P2（頑健性 Worker）・P3（横断版 `pf-derisk`）実装済（2026-10-23〜24・未コミット）。**
 
 ---
 
@@ -28,9 +28,10 @@
 | 長期データの取得 | ✅ 研究側のみ | `research/bank-derisk/fetch_max.mts`（2000年〜、`repairPriceGlitches({ticker})` 通過済み）。**アプリの `/api/stock` は 10y 上限**（L6 で拡張予定） |
 | asof 整合の TS 実装 | ✅ 手本あり | `app/lib/cross-asset-lead.ts` `alignFeature()`・`app/lib/us-spillover-core.ts` `alignJpUs()`（「日付が厳密に小さい最新の行」） |
 | 計算層 `app/lib/derisk-rule.ts` | ✅ P0 完了（2026-10-23） | `derisk-rule.ts`・`asof-align.ts`。純粋関数 |
-| パネル `DeriskRuleChart.tsx` | ✅ P1 完了（2026-10-23） | `regime-derisk`（regime 節・`all+ticker`・caution）。A〜D・F・G を実装。E は研究値の静的表示（Worker は P2） |
-| テスト・Python 照合 | ✅ P0 完了 | `__tests__/derisk-rule.test.ts`（20件）・`fixtures/derisk-golden.json`（383KB）・`export_fixture.py`・`check-lib.mts`。結果は §7 |
-| 横断版 `pf-derisk`（/portfolio） | ⬜ 本書 §6 フェーズ3 | |
+| パネル `DeriskRuleChart.tsx` | ✅ P1 完了（2026-10-23） | `regime-derisk`（regime 節・`all+ticker`・caution）。A〜D・F・G を実装 |
+| 頑健性 Worker（E） | ✅ P2 完了（2026-10-23） | `derisk-robust.ts`（純粋関数）・`derisk-rule.worker.ts`。ボタンで起動。結果は §7.4 |
+| テスト・Python 照合 | ✅ P0/P2 完了 | `__tests__/derisk-rule.test.ts`（20件）・`derisk-robust.test.ts`（12件・乱数列込みの黄金値）・`fixtures/derisk-golden.json`（383KB）・`export_fixture.py`・`check-lib.mts`（頑健性の分位照合を含む）。結果は §7 |
+| 横断版 `pf-derisk`（/portfolio） | ✅ P3 完了（2026-10-24） | `derisk-cross.ts`（純粋関数・テスト8件）・`DeriskCrossChart.tsx`。`app/portfolio/page.tsx` に `pf-risk` の直前で常設。結果は §7.5 |
 | 通知・ブリーフ | ⬜ 範囲外（S2） | 本書は純粋関数の形だけ保証する |
 
 ### 0.3 着手前に片付けること
@@ -44,11 +45,17 @@
 
 ```
 app/lib/derisk-rule.ts                     ← 新規。計算層（純粋関数。§2）
-app/lib/derisk-rule.worker.ts              ← 新規。頑健性（ランダム配置ヌル・ブロックブート）だけ（§2.7）
+app/lib/derisk-robust.ts                   ← 新規。頑健性の計算層（ランダム配置ヌル・定常ブロックブート。純粋関数。§2.7）
+app/lib/derisk-rule.worker.ts              ← 新規。derisk-robust を Worker で呼ぶだけ（§2.7）
 app/lib/asof-align.ts                      ← 新規（小）。「日付が厳密に小さい最新の行」の共通関数（§2.2）
 app/components/analysis/DeriskRuleChart.tsx ← 新規。パネル本体（§3）
 app/lib/panel-registry.tsx                 ← 1レコード追加（§3.1）
 app/lib/__tests__/derisk-rule.test.ts      ← 新規。合成系列＋黄金値（§4）
+app/lib/__tests__/derisk-robust.test.ts    ← 新規。配置制約・分位・植込み暴落の向き＋固定シードの黄金値
+app/lib/derisk-cross.ts                    ← 新規。横断版の計算層（共通2灯の取り出し・並び・集計。P3）
+app/components/analysis/DeriskCrossChart.tsx ← 新規。/portfolio `pf-derisk`（P3）
+app/lib/__tests__/derisk-cross.test.ts     ← 新規。横断固有の部分だけ（並び・集計・判断日の多数派・投信/行数不足）
+app/portfolio/page.tsx                     ← `pf-derisk` を items に追加（レジストリ非経由。/portfolio は page 直書き）
 app/lib/__tests__/fixtures/derisk-golden.json ← 新規。Python から生成（§4.2）
 research/bank-derisk/export_fixture.py     ← 新規。黄金値の生成（§4.2）
 research/bank-derisk/check-lib.mts         ← 新規。data_max 全期間での TS/Python 照合（§4.3、npm test 外）
@@ -463,6 +470,52 @@ P0 と P1 は同じ worktree で続けてよい（専有ファイルが重なら
 | テスト | `npm test` 303/303（panel-ids golden・caution 27・paid 172 を更新）、eslint 0、tsc エラー無し |
 
 受け入れ条件 §5 の 3〜7・9・10 を満たす。8（投信）は未確認（終値のみ系列での文言は実装済、目視は P2 で）。
+
+### 7.4 P2（2026-10-23）— 頑健性の分位照合（`check-lib.mts` 末尾・3メガ平均・2006-09〜・片道5bp・seed 20261023）
+
+乱数列は numpy と一致しないので、分位の向きと桁だけを見る。
+
+| 項目 | 研究（r14） | TS（derisk-robust） |
+|---|---|---|
+| ヌル 年率 中央値 [5%, 95%] vs 実際 | 3.7% [0.3, 7.1] vs 10.4%、P ≤ 0.001 | 3.6% [0.4, 7.1] vs 10.4%、P = 0.001 |
+| ヌル 最大DD | −71% [−81, −56] vs −34%、P ≤ 0.001 | −71.4% [−80.8, −57.7] vs −33.6%、P = 0.000 |
+| ヌル Sharpe | 0.15 [0.01, 0.30] vs 0.48、P ≤ 0.001 | 0.15 [0.02, 0.29] vs 0.48、P = 0.000 |
+| ブート 最大DD差 | +24.5pt [+4.2, +44.8] P=0.98 | +24.4pt [+3.0, +46.3] P=0.97 |
+| ブート Sharpe差 | +0.31 [+0.01, +0.60] P=0.96 | +0.31 [+0.02, +0.62] P=0.96 |
+| ブート 年率差 | +4.4pt [−4.5, +13.4] P=0.80 | +4.5pt [−4.2, +13.2] P=0.81 |
+
+計算時間: ヌル 1000回 約6秒（3銘柄 4,900行・Node）、ブート 2000回 約1.4秒。
+
+**画面（8306.T・10y・dev 3100）で押した結果**: 評価行 2,379 日・現金化 17 本。ヌル 年率 P(偶然 ≥ 実際)=0.614、最大DD 0.057、Sharpe 0.433。
+ブート 年率差 −8.3pt [−19.5, +2.4] P=0.11、最大DD差 +3.1pt [−16.5, +23.7] P=0.62、Sharpe差 −0.10 P=0.34。
+見出しは「この期間では偶然と区別できない」。黄金値フィクスチャ（2018〜）でも同じ向き（年率 P=0.61）。
+**研究の強さは 2008 年を避けたことに由来し、上昇相場だけの 10y 標本では規則は偶然と区別できない**。これは研究 §5.1 の「2018〜 は年率で劣後」と同じ現象で、
+画面はそれを隠さず、研究の記録と「なぜ違うか」を並べて出す。長期取得（L6 range=max）が入れば画面でも研究の向きが出るはずで、それが L6 の動機になる。
+
+実装で確定した仕様: 配置ヌルは評価行（最終行を除く）の上で行う。ブートは建玉を再標本化せず、純リターンと買い持ちリターンを同じ添字で引く。
+`percentile` は numpy 既定の線形補間。幾何分布は台 1,2,… の逆関数法。パラメータを編集すると結果は無効化され、研究値に戻すと復元する（キーは銘柄・評価行数・最終日・コスト・パラメータ）。
+
+受け入れ条件 §5 の 8（投信）: `0331418A`（eMAXIS Slim 全世界株式、接尾辞なし）で目視。判定ヘッダーに「この系列は終値だけ（始値＝終値）なので、4灯の状態は出せますが、寄り約定を仮定する成績表は意味を持ちません」が出て 4灯（0/4・保有）とエピソード表は出る。成績表は出ず、頑健性ボタンは無効化され「終値のみの系列では寄り約定を仮定できないため計算しません」が出る。これで §5 は 1〜10 すべて確認済（10 のデプロイ版目視は push 後）。
+
+### 7.5 P3（2026-10-24）— 横断版 `pf-derisk`
+
+実装で確定した仕様（§6 の1行からの具体化）:
+
+- **成績（年率・最大DD）は出さない**。横断で並べると「成績の良い銘柄だけ従う」誘惑が生まれ、保険の意味が壊れる。成績・エピソード・頑健性は行の銘柄名リンク（`/?ticker=…&panel=regime-derisk`）で1銘柄版へ。
+- 4灯のうち **市場共通の2灯（VIX 比・KRE dd60）は見出しに1回だけ**、行には固有の2灯（5日/60日ボラ比・60日高値比）と状態・点灯数・復帰カウント・判断日・履歴開始日。
+- パラメータは `RESEARCH_PARAMS` 固定（横断では編集させない）。
+- 並び: 現金 → 点灯数の多い順 → 保有が先 → ティッカー。計算不能（行数 < 120・4指標が揃わない）は末尾に理由つき。
+- 集計: 「保有 N のうち現金 M・警戒 K」＋全銘柄の現金・警戒数。保有の登録が無ければその旨。「保有銘柄だけ表示」トグル。
+- `/portfolio` のパネルはレジストリ非経由で `page.tsx` 直書き（既存 pf-* と同じ）。golden ID テストの対象外。
+- **判断日が銘柄で異なりうる**: `nextTradingDay` が東証暦に従うのは `followsTseCalendar` が真の銘柄だけで、投信コード（`0331418A`）は偽 → 翌月曜が祝日なら `.T` と1日ずれる。多数派を `nextTime` にし、ずれがあれば注意書きを出す（テストで固定: 2024-07-12 の翌週、海の日）。投信を東証暦に乗せるかは `tse-calendar.ts` 側の判断で、本書の範囲外。
+- ^VIX/KRE は `useBenchmarkSet` 経由（1銘柄版とモジュールキャッシュを共有するので、同じセッションでは再取得しない）。
+
+テスト: `npm test` 323/323（derisk-cross 8件追加）、eslint 0、tsc エラー無し。
+
+ブラウザ確認（2026-10-24・dev 3100・ウォッチリスト 8306.T 保有/8316.T 保有/7203.T 候補/0331418A 保有・`sa:open:pf-derisk=1`）:
+- パネルは `pf-risk` 直前に表示され、見出し・副題・ガイド・「参照系列の取得に失敗: ^VIX・KRE」の空状態・各行の「取得失敗」まで描画される（落ちない）。
+- **行の中身（共通2灯・集計・状態バッジ・投信の「終値のみ」札・判断日のずれ注意）は未確認**。Yahoo Finance が全ティッカーに 429（レート制限）を返し `/api/stock` が 404 になったため。dev サーバー側のモジュールキャッシュも空の状態だった。
+- 行の中身の確認は、Vercel デプロイ版で行う（`useBenchmarkSet` と各行の計算は 1銘柄版 `regime-derisk` と同じ `computeDerisk`・同じ fetch 経路なので、データが来れば描画される想定。描画ロジックは合成データの 8 テストで固定済）。
 
 ## §8 設計上の判断と、その理由
 

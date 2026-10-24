@@ -141,6 +141,10 @@ const SectorFactorSelectChart = dynamic(
   () => import("../components/analysis/SectorFactorSelectChart"),
   { ssr: false }
 );
+const DeriskCrossChart = dynamic(
+  () => import("../components/analysis/DeriskCrossChart"),
+  { ssr: false }
+);
 
 type ViewFilter = "all" | "held" | "target" | "changed";
 
@@ -254,6 +258,10 @@ export default function PortfolioPage() {
   const tickers = useMemo(() => watchlist.map((w) => w.ticker), [watchlist]);
   const tickerNames = useMemo(
     () => Object.fromEntries(watchlist.map((w) => [w.ticker, w.name])),
+    [watchlist]
+  );
+  const tickerKinds = useMemo(
+    () => Object.fromEntries(watchlist.map((w) => [w.ticker, effectiveKind(w)])),
     [watchlist]
   );
   const { data, loading, progress, reload } = usePortfolioData(tickers);
@@ -704,6 +712,14 @@ export default function PortfolioPage() {
               title: "相関が食べた分：期待リターンと「実際に増える速さ」のズレ",
               subtitle: "g = W·μ − 単独ドラッグ − 相関ドラッグ の3項分解をウォーターフォールで／隠れレバレッジ√(N/N_eff)と実質銘柄数／1銘柄ずつ足す台帳(期待↑ vs 成長率↓)／倍化年数への翻訳",
               node: <YourPortfolioDragPanel data={data} watchlist={watchlist} horizon={horizon} />,
+            });
+            // L3 デリスク規則の横断版（docs/derisk-rule-design.md §6 P3）。リスク分析の手前に
+            // 「明日の寄りで持つか現金か」を置く。配分は決めない（|q| の 1/0 だけ）。1銘柄に依存しないので常設。
+            items.push({
+              id: "pf-derisk",
+              title: "ストレス退避規則（横断）：明日の寄りで持つ銘柄・現金にする銘柄",
+              subtitle: "4指標ヒステリシス（VIX比・KRE下落は市場共通、短期ボラ比・60日高値比は銘柄固有）を全銘柄に同時適用。次の立会日の建玉（保有/警戒/現金）・固有2灯の値と余裕・復帰カウント。成績は出さない（保険の意味が壊れるため。1銘柄版で）",
+              node: <DeriskCrossChart tickers={tickers} pricesByTicker={pricesByTicker} names={tickerNames} kinds={tickerKinds} />,
             });
             if (dn >= 2) items.push({ id: "pf-risk", title: "ポートフォリオ・リスク分析", node: <PortfolioRiskPanel data={data} watchlist={watchlist} horizon={horizon} /> });
             if (dn >= 2) items.push({ id: "pf-frontier", title: "効率的フロンティア・CML", node: <EfficientFrontierChart data={data} window={HORIZON_CONFIG[horizon].window} /> });
