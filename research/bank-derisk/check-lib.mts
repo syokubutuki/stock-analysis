@@ -61,3 +61,54 @@ const N = r8306.next;
 if (N) console.log(`8306.T 次の立会日 ${N.time}: stress=${N.stress}/4 ${N.holding ? "保有" : "現金"} usAsOf ${N.usAsOf}${N.usStale ? "（米国終値未着）" : ""}`);
 console.log("\n8306.T 2026-03 のエピソード:", r8306.episodes.filter((e) => e.start >= "2026-02-01").map((e) => `${e.start}〜${e.end ?? "継続"} ${e.days}日 ${e.litAtEntry.join("+")} B&H ${e.bhReturn === null ? "-" : (e.bhReturn * 100).toFixed(1) + "%"}`));
 console.log(`コスト感度（8306.T）: ` + r8306.costSensitivity.map((c) => `${c.costBp}bp → ${(c.rule.cagr * 100).toFixed(1)}% / ${(c.rule.maxDrawdown * 100).toFixed(1)}%`).join(", "));
+
+// ───────── 頑健性（P2）: r14_robust.py (1)(3) と分位の向き・桁を照合 ─────────
+// 研究（3メガ平均・2006-09〜・片道5bp）:
+//   (1) ランダム配置ヌル 1000回: 最大DD 中央値 −71% [−81, −56] vs 実際 −34% / 年率 3.7% [0.3, 7.1] vs 10.4% / Sharpe 0.15 [0.01, 0.30] vs 0.48。3指標とも P(偶然 ≥ 実際) ≤ 0.001
+//   (3) 定常ブロックブート 2000回: 最大DD差 +24.5pt [+4.2, +44.8] P=0.98 / Sharpe差 +0.31 [+0.01, +0.60] P=0.96 / 年率差 +4.4pt [−4.5, +13.4] P=0.80
+// バスケットのヌルは研究と同じく銘柄ごとに配置してから平均する（ここで組む）。ブートは平均系列の上で computeRobustness をそのまま使う。
+{
+  const { episodeLengths, mulberry32, percentile, randomPlacement, stationaryBootstrapIndex } = await import("../../app/lib/derisk-robust");
+  const { netReturns } = await import("../../app/lib/derisk-rule");
+  const t0 = Date.now();
+  const rand = mulberry32(20261023);
+  const perAsset = banks.map((t) => {
+    const rows = results.get(t)!.rows.filter((r) => r.net !== null);
+    const pos = new Map(rows.map((r, i) => [r.time, i]));
+    return { y: Float64Array.from(rows, (r) => r.yOo as number), lens: episodeLengths(rows.map((r) => r.w)), pos };
+  });
+  const NN = 1000;
+  const dist = { cagr: new Float64Array(NN), maxDrawdown: new Float64Array(NN), sharpe: new Float64Array(NN) };
+  for (let s = 0; s < NN; s++) {
+    const nets = perAsset.map((a) => netReturns(randomPlacement(a.y.length, a.lens, rand).w, a.y, 0.0005));
+    const nn = sorted.map((d) => { const xs: number[] = []; perAsset.forEach((a, i) => { const k = a.pos.get(d); if (k !== undefined) xs.push(nets[i][k]); }); return mean(xs); });
+    const m = computeMetrics(nn, w);
+    dist.cagr[s] = m.cagr; dist.maxDrawdown[s] = m.maxDrawdown; dist.sharpe[s] = m.sharpe;
+  }
+  console.log(`\n頑健性 (1) ランダム配置ヌル ${NN}回（3メガ平均・銘柄ごとに配置）  ${Date.now() - t0}ms`);
+  for (const [k, act] of [["cagr", mb.cagr], ["maxDrawdown", mb.maxDrawdown], ["sharpe", mb.sharpe]] as const) {
+    const d = Float64Array.from(dist[k]).sort();
+    const f = (x: number) => (k === "sharpe" ? x.toFixed(2) : (x * 100).toFixed(1) + "%");
+    let ge = 0; for (const v of d) if (v >= act) ge++;
+    console.log(`  ${k.padEnd(12)} 偶然 ${f(percentile(d, 50))} [${f(percentile(d, 5))}, ${f(percentile(d, 95))}]  実際 ${f(act)}  P(偶然 ≥ 実際)=${(ge / NN).toFixed(3)}`);
+  }
+  const t1 = Date.now();
+  // バスケットの平均建玉は 0/1 でなく、純リターンは銘柄ごとのコスト控除後の平均なので、
+  // computeRobustness（w·y − c|Δw| を内部で作る）は使わず、差の分布をここで組む。
+  const NB = 2000, n = y.length;
+  const dd = { cagr: new Float64Array(NB), maxDrawdown: new Float64Array(NB), sharpe: new Float64Array(NB) };
+  const nb = new Float64Array(n), yb = new Float64Array(n), ones = new Float64Array(n).fill(1);
+  for (let b = 0; b < NB; b++) {
+    const ix = stationaryBootstrapIndex(n, 20, rand);
+    for (let i = 0; i < n; i++) { nb[i] = net[ix[i]]; yb[i] = y[ix[i]]; }
+    const mr = computeMetrics(nb, ones), mh = computeMetrics(yb, ones);
+    dd.cagr[b] = mr.cagr - mh.cagr; dd.maxDrawdown[b] = mr.maxDrawdown - mh.maxDrawdown; dd.sharpe[b] = mr.sharpe - mh.sharpe;
+  }
+  console.log(`頑健性 (3) 定常ブロックブート ${NB}回（平均20日・3メガ平均の純リターン vs 買い持ち）  ${Date.now() - t1}ms`);
+  for (const k of ["maxDrawdown", "sharpe", "cagr"] as const) {
+    const d = Float64Array.from(dd[k]).sort();
+    const f = (x: number) => (k === "sharpe" ? (x >= 0 ? "+" : "") + x.toFixed(2) : (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "pt");
+    let pos = 0; for (const v of d) if (v > 0) pos++;
+    console.log(`  ${k.padEnd(12)} 中央値 ${f(percentile(d, 50))}  90%CI [${f(percentile(d, 5))}, ${f(percentile(d, 95))}]  P(>0)=${(pos / NB).toFixed(2)}`);
+  }
+}

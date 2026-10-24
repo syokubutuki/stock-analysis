@@ -36,6 +36,8 @@ import {
   type DeriskState,
   type Light,
 } from "../../lib/derisk-rule";
+import { ROBUST_KEYS, ROBUST_LABELS, type RobustKey, type RobustResult } from "../../lib/derisk-robust";
+import type { DeriskWorkerRequest, DeriskWorkerResponse } from "../../lib/derisk-rule.worker";
 import { useBenchmarkSet } from "../../hooks/useBenchmarkSet";
 import { describeSanityReport } from "../../lib/price-sanity";
 import { representativeSpread } from "../../lib/spread-estimator";
@@ -47,6 +49,9 @@ import { useAnalysisResultSummary } from "./AccordionSection";
 const PANEL_ID = "regime-derisk";
 const BENCH = ["^VIX", "KRE"] as const;
 const PARAMS_KEY = "sa:derisk:params:v1";
+const N_NULL = 1000;
+const N_BOOT = 2000;
+const BLOCK_LEN = 20;
 
 /** 研究 §6 で「V字型：買い持ちより悪化」と記録された局面。エピソードがこの窓に重なれば印を付ける。 */
 const V_SHAPE_WINDOWS: { label: string; from: string; to: string }[] = [
@@ -76,6 +81,39 @@ function fmtMargin(l: Light): string {
 function isNear(l: Light): boolean {
   if (l.lit) return false;
   return isRatio(l.key) ? l.margin < 0.1 : l.margin < 0.02;
+}
+
+function fmtRobust(key: RobustKey, v: number): string {
+  return key === "sharpe" ? num(v) : pct(v);
+}
+function fmtDiff(key: RobustKey, v: number): string {
+  if (!Number.isFinite(v)) return "—";
+  return key === "sharpe" ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}pt`;
+}
+/** 見出しに添える短い判定。量は出さず向きだけ。 */
+function verdictLabel(r: RobustResult): string {
+  const mdd = r.null.find((s) => s.key === "maxDrawdown")!;
+  if (r.null.every((s) => s.pGe <= 0.05)) return "：3指標とも偶然より良い";
+  if (mdd.pGe <= 0.05) return "：最大DDだけ偶然より浅い";
+  return "：この期間では偶然と区別できない";
+}
+function verdictLines(r: RobustResult): string[] {
+  const out: string[] = [];
+  const nul = Object.fromEntries(r.null.map((s) => [s.key, s])) as Record<RobustKey, RobustResult["null"][number]>;
+  const boot = Object.fromEntries(r.boot.map((s) => [s.key, s])) as Record<RobustKey, RobustResult["boot"][number]>;
+  const good = ROBUST_KEYS.filter((k) => nul[k].pGe <= 0.05);
+  const bad = ROBUST_KEYS.filter((k) => nul[k].pGe >= 0.5);
+  if (good.length === 3) out.push("① 現金期間の「位置」に意味がある: 同じ本数・長さを偶然に置くと3指標とも実際より悪い（P ≤ 0.05）。");
+  else if (good.length > 0) out.push(`① 偶然より良いのは ${good.map((k) => ROBUST_LABELS[k]).join("・")} だけ。${bad.length ? `${bad.map((k) => ROBUST_LABELS[k]).join("・")} は偶然の配置の方が良い回が過半です。` : "残りは偶然と区別できません。"}`);
+  else out.push("① この期間では、現金期間を偶然の位置に置いても同程度の成績が出ます。規則の「位置」に意味があるとは言えません。");
+  const mddOk = boot.maxDrawdown.pPositive >= 0.9;
+  const cagrOk = boot.cagr.lo5 > 0;
+  if (mddOk && !cagrOk) out.push(`② 並べ替えても最大DDは浅くなる（P(>0)=${boot.maxDrawdown.pPositive.toFixed(2)}）が、年率差の90%区間は 0 をまたぐ。保険であって上積みではない、という研究の結論と同じ向きです。`);
+  else if (mddOk && cagrOk) out.push("② 並べ替えても最大DDは浅くなり、年率差の90%区間も 0 を上回ります。この期間では上積みも出ていますが、研究の全期間では年率差は 0 をまたぎます。");
+  else if (boot.maxDrawdown.pPositive <= 0.5) out.push("② 並べ替えると最大DDが買い持ちより深くなる回が過半。この期間では保険としても効いていません（V字型の急落を逃した期間が支配的）。");
+  else out.push(`② 最大DD差は P(>0)=${boot.maxDrawdown.pPositive.toFixed(2)} で、浅くなる傾向はあるが決め手に欠けます。`);
+  out.push("③ 全期間（2006〜）での研究の結果は下の記録のとおり。この画面の数字が弱いのは期間の違いで、規則が壊れた証拠ではありませんが、強い証拠でもありません。");
+  return out;
 }
 
 function sameParams(a: DeriskParams, b: DeriskParams): boolean {
@@ -196,6 +234,14 @@ export default function DeriskRuleChart({ prices, ticker }: { prices: PricePoint
   }, [tuned, prices, vix, kre, ticker]);
 
   const spreadRT = useMemo(() => representativeSpread(prices), [prices]);
+
+  // ───────── 頑健性（Worker・オンデマンド） ─────────
+  const workerRef = useRef<Worker | null>(null);
+  const reqIdRef = useRef(0);
+  const [robust, setRobust] = useState<{ key: string; result: RobustResult } | null>(null);
+  const [robustRunning, setRobustRunning] = useState(false);
+  const [robustError, setRobustError] = useState<string | null>(null);
+  useEffect(() => () => { workerRef.current?.terminate(); workerRef.current = null; }, []);
 
   const headState = result?.next ?? result?.latest ?? null;
   useAnalysisResultSummary(
@@ -363,6 +409,28 @@ export default function DeriskRuleChart({ prices, ticker }: { prices: PricePoint
   const buyHoldDaily = evalRows.map((r) => r.yOo as number);
   let switches = 0;
   for (let i = 1; i < evalRows.length; i++) switches += Math.abs(evalRows[i].w - evalRows[i - 1].w);
+  const robustKey = `${ticker}|${evalRows.length}|${evalRows[evalRows.length - 1]?.time ?? ""}|${result.costOneWay}|${JSON.stringify(params)}`;
+  const robustResult = robust && robust.key === robustKey ? robust.result : null;
+  const runRobust = () => {
+    if (!workerRef.current) workerRef.current = new Worker(new URL("../../lib/derisk-rule.worker.ts", import.meta.url));
+    const worker = workerRef.current;
+    const reqId = ++reqIdRef.current;
+    const key = robustKey;
+    setRobustRunning(true);
+    setRobustError(null);
+    worker.onmessage = (ev: MessageEvent<DeriskWorkerResponse>) => {
+      if (ev.data.reqId !== reqIdRef.current) return;
+      setRobustRunning(false);
+      if (ev.data.ok && ev.data.result) setRobust({ key, result: ev.data.result });
+      else setRobustError(ev.data.error ?? "計算に失敗しました");
+    };
+    worker.onerror = () => { setRobustRunning(false); setRobustError("Worker の起動に失敗しました"); };
+    const req: DeriskWorkerRequest = {
+      reqId, y: buyHoldDaily, w: evalRows.map((r) => r.w), costOneWay: result.costOneWay,
+      nNull: N_NULL, nBoot: N_BOOT, blockLen: BLOCK_LEN, seed: 20261023,
+    };
+    worker.postMessage(req);
+  };
   const roundTrips = Math.max(1, Math.ceil(switches / 2));
 
   const setParam = (k: keyof DeriskParams, v: number) => setParams((p) => ({ ...p, [k]: v }));
@@ -546,16 +614,100 @@ export default function DeriskRuleChart({ prices, ticker }: { prices: PricePoint
         )}
       </div>
 
-      {/* E. 頑健性（静的。ヌル・ブートは次フェーズの Worker） */}
+      {/* E. 頑健性（Worker・オンデマンド） */}
       <details className="text-xs">
-        <summary className="cursor-pointer text-gray-700">頑健性（研究の記録）</summary>
-        <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-600">
-          <li>972 設定のグリッド: すべての設定で最大DDが買い持ちより浅い。Sharpe ≥ 買い持ちが 94%。ただし α の t&gt;2 は 2%（方向は頑健、大きさは小さい）。</li>
-          <li>ランダム配置ヌル（同じ現金期間の長さ・本数を偶然の位置に置く、1000回）: 最大DD・年率・Sharpe とも偶然が上回る割合 0.1% 以下。</li>
-          <li>定常ブロック・ブートストラップ（2000回）: 最大DD差 +24.5pt [+4.2, +44.8]、Sharpe差 +0.31 [+0.01, +0.60]、年率差 +4.4pt [−4.5, +13.4]（0 をまたぐ）。</li>
-          <li>設計に使っていない銘柄（りそな・三井住友トラスト・千葉銀・ふくおか・トヨタ・ソニー・1321）: 最大DDは7中6で改善、年率は一貫しない。</li>
-          <li>この銘柄での偶然との比較（Worker）は次フェーズで追加します。</li>
-        </ul>
+        <summary className="cursor-pointer text-gray-700">頑健性（偶然との比較）{robustResult ? verdictLabel(robustResult) : ""}</summary>
+        <div className="mt-2 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={runRobust}
+              disabled={robustRunning || closeOnly || evalRows.length <= 60}
+              className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {robustRunning ? "計算中…" : robustResult ? "再計算" : "偶然との比較を計算"}
+            </button>
+            <span className="text-gray-500">
+              ランダム配置ヌル {N_NULL} 回＋定常ブロックブートストラップ {N_BOOT} 回（平均ブロック長 {BLOCK_LEN} 日）。この銘柄の評価行 {evalRows.length} 日、現金化 {result.episodes.length} 本{tuned ? "。いまのパラメータで計算します" : ""}。
+            </span>
+          </div>
+          {closeOnly && <p className="text-amber-700">終値のみの系列では寄り約定を仮定できないため計算しません。</p>}
+          {robustError && <p className="text-red-600">{robustError}</p>}
+
+          {robustResult && (
+            <>
+              <div className="overflow-x-auto">
+                <p className="text-gray-700 mb-1">① ランダム配置ヌル: 同じ本数・同じ長さの現金期間を偶然の位置に置いたときの成績分布と、実際の成績</p>
+                <table className="w-full text-xs border-collapse min-w-[560px]">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-200">
+                      <th className="text-left py-1 pr-2 font-normal">指標</th>
+                      <th className="text-right py-1 px-2 font-normal">偶然 5%</th>
+                      <th className="text-right py-1 px-2 font-normal">偶然 50%</th>
+                      <th className="text-right py-1 px-2 font-normal">偶然 95%</th>
+                      <th className="text-right py-1 px-2 font-normal">実際</th>
+                      <th className="text-right py-1 pl-2 font-normal">P(偶然 ≥ 実際)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {robustResult.null.map((s) => (
+                      <tr key={s.key} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">{ROBUST_LABELS[s.key]}{s.key === "maxDrawdown" ? "（≥ は「偶然の方が浅い」）" : ""}</td>
+                        <td className="text-right py-1 px-2 font-mono">{fmtRobust(s.key, s.p5)}</td>
+                        <td className="text-right py-1 px-2 font-mono">{fmtRobust(s.key, s.p50)}</td>
+                        <td className="text-right py-1 px-2 font-mono">{fmtRobust(s.key, s.p95)}</td>
+                        <td className="text-right py-1 px-2 font-mono font-semibold">{fmtRobust(s.key, s.actual)}</td>
+                        <td className={`text-right py-1 pl-2 font-mono ${s.pGe <= 0.05 ? "text-emerald-700" : s.pGe >= 0.5 ? "text-red-600" : "text-gray-700"}`}>{s.pGe.toFixed(3)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {robustResult.nullPlacementFailed > 0 && (
+                  <p className="text-gray-500 mt-1">配置に失敗した試行 {robustResult.nullPlacementFailed} 回（置けた区間だけで評価。研究と同じ扱い）。</p>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <p className="text-gray-700 mb-1">② 定常ブロックブートストラップ: 日次リターンをブロックで並べ替え直したときの差（退避規則 − 買い持ち）</p>
+                <table className="w-full text-xs border-collapse min-w-[480px]">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-200">
+                      <th className="text-left py-1 pr-2 font-normal">差</th>
+                      <th className="text-right py-1 px-2 font-normal">中央値</th>
+                      <th className="text-right py-1 px-2 font-normal">90% 区間</th>
+                      <th className="text-right py-1 pl-2 font-normal">P(差 &gt; 0)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {robustResult.boot.map((s) => (
+                      <tr key={s.key} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">{ROBUST_LABELS[s.key]}{s.key === "maxDrawdown" ? "（正＝浅い）" : ""}</td>
+                        <td className="text-right py-1 px-2 font-mono font-semibold">{fmtDiff(s.key, s.median)}</td>
+                        <td className="text-right py-1 px-2 font-mono">[{fmtDiff(s.key, s.lo5)}, {fmtDiff(s.key, s.hi95)}]</td>
+                        <td className={`text-right py-1 pl-2 font-mono ${s.pPositive >= 0.95 ? "text-emerald-700" : s.pPositive <= 0.5 ? "text-red-600" : "text-gray-700"}`}>{s.pPositive.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                {verdictLines(robustResult).map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
+            </>
+          )}
+
+          <div className="text-gray-600">
+            <p className="text-gray-700">研究の記録（3メガ平均・2006-09〜・片道5bp）</p>
+            <ul className="list-disc pl-4 mt-1 space-y-0.5">
+              <li>ランダム配置ヌル 1000 回: 最大DD −71% [−81, −56] vs 実際 −34%、年率 3.7% [0.3, 7.1] vs 10.4%、Sharpe 0.15 [0.01, 0.30] vs 0.48。3指標とも偶然が上回る割合 0.1% 以下。</li>
+              <li>定常ブロックブートストラップ 2000 回: 最大DD差 +24.5pt [+4.2, +44.8] P=0.98、Sharpe差 +0.31 [+0.01, +0.60] P=0.96、年率差 +4.4pt [−4.5, +13.4] P=0.80（0 をまたぐ）。</li>
+              <li>972 設定のグリッド: すべての設定で最大DDが買い持ちより浅い。Sharpe ≥ 買い持ちが 94%。ただし α の t&gt;2 は 2%（方向は頑健、大きさは小さい）。</li>
+              <li>設計に使っていない銘柄（りそな・三井住友トラスト・千葉銀・ふくおか・トヨタ・ソニー・1321）: 最大DDは7中6で改善、年率は一貫しない。</li>
+              <li>画面の数字と違う理由: ここは1銘柄・10年取得（2008 年を含まない）。研究の強さの大半は 2008 年の −80% を避けたことから来ており、上昇相場だけの標本では規則は偶然と区別できないのが普通です（2018〜 の時代別で年率が劣後するのと同じ現象）。</li>
+            </ul>
+          </div>
+        </div>
       </details>
 
       {/* F. パラメータ */}
@@ -635,6 +787,7 @@ export default function DeriskRuleChart({ prices, ticker }: { prices: PricePoint
           <li>成績表の最大DDが買い持ちより浅いのが規則の効果。年率は上がっても下がっても偶然の範囲です（研究の90%区間は 0 をまたぐ）。</li>
           <li>エピソード表で「逃した」が並ぶ時期（V字型）はこの規則の弱点そのもの。指標が前日確定値なので、1日で終わる急落は避けられません。</li>
           <li>10年取得では 2008 年を含まないため、研究の数字（−83% → −34%）は再現しません。長期取得（range=max）が入ると一致します。</li>
+          <li>頑健性: ランダム配置ヌルの「P(偶然 ≥ 実際)」が 0.05 以下なら現金期間の位置に意味があり、0.5 以上なら偶然の方が良い回が過半です。ブートストラップの最大DD差は P(&gt;0) が 0.9 以上で「並べ替えても浅い」。年率差の90%区間が 0 をまたげば上積みは言えません。</li>
         </ul>
 
         <p className="font-medium text-gray-700 mt-3">6. 投資判断への活用</p>
